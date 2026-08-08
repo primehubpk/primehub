@@ -13,7 +13,8 @@
     "react": "18.3.1",
     "react-dom": "18.3.1",
     "zustand": "4.5.4",
-    "lucide-react": "0.408.0"
+    "lucide-react": "0.408.0",
+    "firebase": "10.12.5"
   },
   "devDependencies": {
     "typescript": "5.5.4",
