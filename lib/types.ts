@@ -23,6 +23,7 @@ export interface Product {
   isWeekendSpecial: boolean;
   isFlashSale: boolean;
   imageUrl: string;
+  videoUrl?: string; // optional YouTube Shorts / Instagram Reel / direct .mp4 link
 }
 
 export interface Category {
