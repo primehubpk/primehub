@@ -3,15 +3,14 @@
 // app/admin/page.tsx
 //
 // PrimeHub Deals — Admin Panel.
-// Single-file, flat, paragraph-commented on purpose (per your code style
-// request) so every section is easy to find/edit/delete independently.
+// Single-file, flat, paragraph-commented on purpose so every section is
+// easy to find/edit/delete independently.
 //
 // NOTE ON SECURITY: the password gate below is a client-side PIN screen
 // only. It hides the admin UI from casual visitors, but it does NOT
 // protect your Firestore data on its own. Make sure your Firestore
 // security rules require real authentication before allowing reads/
-// writes to `products`, `orders`, and `settings` — a PIN alone is not
-// enough once this is live with real customer data.
+// writes to `products`, `orders`, and `settings`.
 
 import { useEffect, useState } from 'react';
 import {
@@ -39,11 +38,20 @@ import {
   Lock,
   LogOut,
   MessageCircle,
+  Loader2,
 } from 'lucide-react';
 
-// ==========================================
-// SECTION: ADMIN AUTHENTICATION (PASSWORD GATE)
-// ==========================================
+// ==========================================================================
+// SECTION: IMGBB CONFIG
+// ==========================================================================
+// Free image hosting used by the Products tab's file upload. Get your own
+// key at https://api.imgbb.com/ if you ever need to rotate this one.
+const IMGBB_API_KEY = 'f38fa84b03c7eaaeda2a4d3a164b116f';
+const IMGBB_UPLOAD_URL = `https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`;
+
+// ==========================================================================
+// SECTION 1: ADMIN LOGIN GATE
+// ==========================================================================
 // Simple PIN gate. Default password is "prime123" — change it below.
 // Auth flag is remembered in localStorage so you're not re-entering the
 // PIN on every page refresh.
@@ -96,9 +104,9 @@ function AdminLoginGate({ onSuccess }: { onSuccess: () => void }) {
   );
 }
 
-// ==========================================
-// SECTION: ADMIN HEADER & TAB NAVIGATION
-// ==========================================
+// ==========================================================================
+// SECTION 2: ADMIN NAVIGATION & HEADER
+// ==========================================================================
 
 const TABS = [
   { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -152,9 +160,9 @@ function AdminHeader({
   );
 }
 
-// ==========================================
+// ==========================================================================
 // TAB 1: DASHBOARD OVERVIEW
-// ==========================================
+// ==========================================================================
 
 function DashboardTab({ products, orders }: { products: Product[]; orders: Order[] }) {
   const totalProducts = products.length;
@@ -214,9 +222,9 @@ function DashboardTab({ products, orders }: { products: Product[]; orders: Order
   );
 }
 
-// ==========================================
+// ==========================================================================
 // TAB 2: SITE SETTINGS MANAGER
-// ==========================================
+// ==========================================================================
 
 function SiteSettingsTab() {
   const [form, setForm] = useState<SiteSettings>({
@@ -337,9 +345,9 @@ function SiteSettingsTab() {
   );
 }
 
-// ==========================================
-// TAB 3: PRODUCTS MANAGER (ADD / EDIT / DELETE)
-// ==========================================
+// ==========================================================================
+// TAB 3: PRODUCTS MANAGER (WITH IMGBB UPLOAD)
+// ==========================================================================
 
 function ProductsTab({ products, categories }: { products: Product[]; categories: Category[] }) {
   const [title, setTitle] = useState('');
@@ -350,18 +358,48 @@ function ProductsTab({ products, categories }: { products: Product[]; categories
   const [isWeekendSpecial, setIsWeekendSpecial] = useState(false);
   const [isFlashSale, setIsFlashSale] = useState(false);
   const [imageUrl, setImageUrl] = useState('');
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState('');
 
-  // File upload converts the chosen image to a base64 string and drops
-  // it straight into the same imageUrl field. You can also just paste
-  // an external URL (e.g. from ImgBB) into the text input instead.
-  function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+  // ------------------------------------------------------------------------
+  // PARAGRAPH: IMGBB IMAGE UPLOAD HANDLER
+  // When the admin picks a file, it is sent straight to ImgBB. The
+  // returned CDN URL (data.url) becomes the product's imageUrl. A small
+  // "Uploading..." indicator shows while the request is in flight.
+  // ------------------------------------------------------------------------
+  async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => setImageUrl(reader.result as string);
-    reader.readAsDataURL(file);
+
+    setIsUploading(true);
+    setUploadError('');
+
+    try {
+      const formData = new FormData();
+      formData.append('image', file);
+
+      const response = await fetch(IMGBB_UPLOAD_URL, {
+        method: 'POST',
+        body: formData,
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        setImageUrl(result.data.url);
+      } else {
+        setUploadError('Upload failed. Please try again or paste a URL instead.');
+      }
+    } catch (err) {
+      setUploadError('Upload failed. Please check your connection and try again.');
+    } finally {
+      setIsUploading(false);
+    }
   }
 
+  // ------------------------------------------------------------------------
+  // PARAGRAPH: ADD PRODUCT SUBMIT HANDLER
+  // ------------------------------------------------------------------------
   async function handleAddProduct(e: React.FormEvent) {
     e.preventDefault();
     if (!title || !price || !category) return;
@@ -387,8 +425,12 @@ function ProductsTab({ products, categories }: { products: Product[]; categories
     setIsWeekendSpecial(false);
     setIsFlashSale(false);
     setImageUrl('');
+    setUploadError('');
   }
 
+  // ------------------------------------------------------------------------
+  // PARAGRAPH: DELETE PRODUCT HANDLER
+  // ------------------------------------------------------------------------
   async function handleDeleteProduct(id: string) {
     if (!confirm('Delete this product?')) return;
     await deleteDoc(doc(db, 'products', id));
@@ -398,7 +440,9 @@ function ProductsTab({ products, categories }: { products: Product[]; categories
     <div className="max-w-5xl mx-auto px-4 py-6">
       <h2 className="font-bold text-base mb-4">Products Manager</h2>
 
-      {/* Add product form */}
+      {/* ---------------------------------------------------------------- */}
+      {/* PARAGRAPH: ADD PRODUCT FORM                                       */}
+      {/* ---------------------------------------------------------------- */}
       <form
         onSubmit={handleAddProduct}
         className="bg-white rounded-xl border border-black/10 p-5 grid grid-cols-1 md:grid-cols-2 gap-4 mb-6"
@@ -462,16 +506,38 @@ function ProductsTab({ products, categories }: { products: Product[]; categories
           />
         </div>
 
-        <div>
-          <label className="text-xs font-semibold block mb-1">Image URL (or upload below)</label>
+        {/* ---------------------------------------------------------------- */}
+        {/* PARAGRAPH: PRODUCT IMAGE — IMGBB UPLOAD + URL FALLBACK             */}
+        {/* ---------------------------------------------------------------- */}
+        <div className="md:col-span-2">
+          <label className="text-xs font-semibold block mb-1">Product Image</label>
+
+          <input
+            type="file"
+            accept="image/*"
+            onChange={handleFileUpload}
+            disabled={isUploading}
+            className="text-xs mb-2"
+          />
+
+          {isUploading && (
+            <p className="flex items-center gap-1.5 text-xs text-[#0F6A5F] mb-2">
+              <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden="true" />
+              Uploading image to ImgBB...
+            </p>
+          )}
+
+          {uploadError && <p className="text-xs text-[#E1352B] mb-2">{uploadError}</p>}
+
+          <p className="text-[11px] text-black/40 mb-1">Or paste a direct image URL instead:</p>
           <input
             type="text"
-            value={imageUrl.startsWith('data:') ? '' : imageUrl}
+            value={imageUrl}
             onChange={(e) => setImageUrl(e.target.value)}
-            placeholder="https://... or ImgBB link"
+            placeholder="https://..."
             className="w-full border border-black/15 rounded-lg px-3 py-2 text-sm outline-none focus:border-[#0F6A5F]"
           />
-          <input type="file" accept="image/*" onChange={handleFileUpload} className="text-xs mt-1.5" />
+
           {imageUrl && (
             <img src={imageUrl} alt="" className="w-16 h-16 object-cover rounded-lg mt-2 border border-black/10" />
           )}
@@ -498,13 +564,16 @@ function ProductsTab({ products, categories }: { products: Product[]; categories
 
         <button
           type="submit"
-          className="bg-[#14140F] text-white rounded-lg py-2.5 text-sm font-semibold md:col-span-2"
+          disabled={isUploading}
+          className="bg-[#14140F] text-white rounded-lg py-2.5 text-sm font-semibold md:col-span-2 disabled:opacity-40"
         >
           Add Product
         </button>
       </form>
 
-      {/* Live product table */}
+      {/* ---------------------------------------------------------------- */}
+      {/* PARAGRAPH: LIVE PRODUCT TABLE                                     */}
+      {/* ---------------------------------------------------------------- */}
       <div className="bg-white rounded-xl border border-black/10 overflow-x-auto">
         <table className="w-full text-xs">
           <thead>
@@ -549,9 +618,9 @@ function ProductsTab({ products, categories }: { products: Product[]; categories
   );
 }
 
-// ==========================================
+// ==========================================================================
 // TAB 4: CATEGORIES MANAGER
-// ==========================================
+// ==========================================================================
 
 function CategoriesTab({ categories }: { categories: Category[] }) {
   const [title, setTitle] = useState('');
@@ -623,9 +692,9 @@ function CategoriesTab({ categories }: { categories: Category[] }) {
   );
 }
 
-// ==========================================
-// TAB 5: REAL CUSTOMER ORDERS DASHBOARD
-// ==========================================
+// ==========================================================================
+// TAB 5: CUSTOMER ORDERS DASHBOARD
+// ==========================================================================
 
 function OrdersTab({ orders }: { orders: Order[] }) {
   async function handleStatusChange(id: string, status: string) {
@@ -709,9 +778,9 @@ function OrdersTab({ orders }: { orders: Order[] }) {
   );
 }
 
-// ==========================================
+// ==========================================================================
 // SECTION: MAIN ADMIN PAGE (AUTH GATE + TAB SWITCHER + FIRESTORE LISTENERS)
-// ==========================================
+// ==========================================================================
 
 export default function AdminPage() {
   const [authed, setAuthed] = useState(false);
