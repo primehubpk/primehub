@@ -1,25 +1,30 @@
 // components/Header.tsx
 // Combines SECTION 0 (black announcement marquee) and SECTION 1
 // (logo, cart badge, search, free delivery progress bar).
+//
+// UPDATED: announcement text and the free-shipping threshold now come
+// live from Firestore (`settings/main`) via the shared useSettings hook,
+// instead of being hardcoded — so editing them in the admin panel
+// updates the storefront immediately.
 
 'use client';
 
 import { useState } from 'react';
 import { Search, ShoppingCart, Truck } from 'lucide-react';
-import { useCartStore, FREE_DELIVERY_THRESHOLD } from '@/lib/cartStore';
+import { useCartStore } from '@/lib/cartStore';
+import { useSettings } from '@/lib/useSettings';
 
-// =====================================================================
+// ==========================================
 // SECTION 0: BLACK ANNOUNCEMENT TOP BAR (scrolling marquee)
-// =====================================================================
-function AnnouncementBar() {
+// ==========================================
+function AnnouncementBar({ text }: { text: string }) {
   return (
     <div className="bg-[#0A0A0A] text-white overflow-hidden whitespace-nowrap py-2">
       <div className="inline-flex animate-marquee">
         {[0, 1].map((dup) => (
           <span key={dup} className="mx-6 text-xs tracking-wide flex items-center gap-2 shrink-0">
             <Truck className="w-3.5 h-3.5 text-[#FFB020]" aria-hidden="true" />
-            Worldwide delivery available &nbsp;|&nbsp; Apni product hamain WhatsApp send karein, aapki
-            product apni website pe live karenge aur duniya bhar se order hasil karein!
+            {text}
           </span>
         ))}
       </div>
@@ -27,20 +32,23 @@ function AnnouncementBar() {
   );
 }
 
-// =====================================================================
+// ==========================================
 // SECTION 1: HEADER, SEARCH, FREE DELIVERY PROGRESS BAR
-// =====================================================================
+// ==========================================
 export default function Header() {
   const [searchQuery, setSearchQuery] = useState('');
+  const { settings } = useSettings();
 
   const cartCount = useCartStore((s) => s.getCartCount());
-  const itemsToGo = useCartStore((s) => s.getItemsToFreeDelivery());
-  const deliveryProgress = useCartStore((s) => s.getDeliveryProgress());
+  const cartItemCount = useCartStore((s) => s.items.reduce((sum, i) => sum + i.qty, 0));
   const openDrawer = useCartStore((s) => s.openDrawer);
+
+  const itemsToGo = Math.max(0, settings.freeShippingCount - cartItemCount);
+  const deliveryProgress = Math.min(100, Math.round((cartItemCount / settings.freeShippingCount) * 100));
 
   return (
     <>
-      <AnnouncementBar />
+      <AnnouncementBar text={settings.announcementText} />
 
       <header className="sticky top-0 z-40 bg-[#F4F4F1]/95 backdrop-blur border-b border-black/10">
         <div className="max-w-md mx-auto px-4 pt-3 pb-3">
@@ -84,7 +92,7 @@ export default function Header() {
                   : `Add ${itemsToGo} more items for FREE delivery`}
               </span>
               <span className="text-black/40">
-                {FREE_DELIVERY_THRESHOLD - itemsToGo}/{FREE_DELIVERY_THRESHOLD}
+                {cartItemCount}/{settings.freeShippingCount}
               </span>
             </div>
             <div className="h-1.5 rounded-full bg-black/10 overflow-hidden">
