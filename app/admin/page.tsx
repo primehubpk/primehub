@@ -346,7 +346,7 @@ function SiteSettingsTab() {
 }
 
 // ==========================================================================
-// TAB 3: PRODUCTS MANAGER (WITH IMGBB UPLOAD)
+// TAB 3: PRODUCTS MANAGER (WITH IMGBB & VIDEO LINK)
 // ==========================================================================
 
 function ProductsTab({ products, categories }: { products: Product[]; categories: Category[] }) {
@@ -358,6 +358,7 @@ function ProductsTab({ products, categories }: { products: Product[]; categories
   const [isWeekendSpecial, setIsWeekendSpecial] = useState(false);
   const [isFlashSale, setIsFlashSale] = useState(false);
   const [imageUrl, setImageUrl] = useState('');
+  const [videoUrl, setVideoUrl] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
 
@@ -413,6 +414,7 @@ function ProductsTab({ products, categories }: { products: Product[]; categories
       isWeekendSpecial,
       isFlashSale,
       imageUrl,
+      videoUrl,
       createdAt: serverTimestamp(),
     });
 
@@ -425,6 +427,7 @@ function ProductsTab({ products, categories }: { products: Product[]; categories
     setIsWeekendSpecial(false);
     setIsFlashSale(false);
     setImageUrl('');
+    setVideoUrl('');
     setUploadError('');
   }
 
@@ -543,6 +546,23 @@ function ProductsTab({ products, categories }: { products: Product[]; categories
           )}
         </div>
 
+        {/* ---------------------------------------------------------------- */}
+        {/* PARAGRAPH: PRODUCT VIDEO / REEL LINK (OPTIONAL)                    */}
+        {/* ---------------------------------------------------------------- */}
+        <div className="md:col-span-2">
+          <label className="text-xs font-semibold block mb-1">Product Video / Reel Link (optional)</label>
+          <input
+            type="text"
+            value={videoUrl}
+            onChange={(e) => setVideoUrl(e.target.value)}
+            placeholder="YouTube Shorts, Instagram Reel, or direct .mp4 link"
+            className="w-full border border-black/15 rounded-lg px-3 py-2 text-sm outline-none focus:border-[#0F6A5F]"
+          />
+          <p className="text-[11px] text-black/40 mt-1">
+            Shown on the storefront as a "Watch Video" badge on this product's card.
+          </p>
+        </div>
+
         <div className="flex items-center gap-4 md:col-span-2">
           <label className="flex items-center gap-1.5 text-xs font-medium">
             <input
@@ -582,6 +602,7 @@ function ProductsTab({ products, categories }: { products: Product[]; categories
               <th className="p-3">Title</th>
               <th className="p-3">Price</th>
               <th className="p-3">Stock</th>
+              <th className="p-3">Video</th>
               <th className="p-3"></th>
             </tr>
           </thead>
@@ -600,6 +621,7 @@ function ProductsTab({ products, categories }: { products: Product[]; categories
                 <td className="p-3">
                   <span className={p.stock < 5 ? 'text-[#E1352B] font-semibold' : ''}>{p.stock}</span>
                 </td>
+                <td className="p-3">{p.videoUrl ? '🎬 Yes' : '—'}</td>
                 <td className="p-3">
                   <button
                     type="button"
@@ -611,6 +633,13 @@ function ProductsTab({ products, categories }: { products: Product[]; categories
                 </td>
               </tr>
             ))}
+            {products.length === 0 && (
+              <tr>
+                <td colSpan={6} className="p-6 text-center text-black/40">
+                  No products yet.
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
