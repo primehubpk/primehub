@@ -6,14 +6,15 @@
 // Single-file, flat, paragraph-commented on purpose so every section is
 // easy to find/edit/delete independently.
 //
-// NOTE ON SECURITY: the password gate below is a client-side PIN screen
-// only. It hides the admin UI from casual visitors, but it does NOT
-// protect your Firestore data on its own. Make sure your Firestore
-// security rules require real authentication before allowing reads/
-// writes to `products`, `orders`, and `settings`.
+// NOTE ON SECURITY: the admin login uses Firebase Authentication.
+// Firestore rules additionally require the authenticated user
+// to match the configured Firebase Authentication admin UID.
 
 import { useEffect, useState } from 'react';
 import {
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  signOut,
   collection,
   onSnapshot,
   addDoc,
@@ -26,7 +27,7 @@ import {
   orderBy,
   serverTimestamp,
 } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
 import { Product, Category, Order, SiteSettings } from '@/lib/types';
 import {
   LayoutDashboard,
@@ -49,55 +50,66 @@ import {
 const IMGBB_API_KEY = 'f38fa84b03c7eaaeda2a4d3a164b116f';
 const IMGBB_UPLOAD_URL = `https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`;
 
+// IMPORTANT: This must match the exact Firebase Authentication UID used
+// in firebase/firestore.rules before production deployment.
+// Set NEXT_PUBLIC_FIREBASE_ADMIN_UID in the deployment environment.
+// Never put an email/password here.
+const ADMIN_UID = process.env.NEXT_PUBLIC_FIREBASE_ADMIN_UID || 'REPLACE_WITH_ADMIN_UID';
+
 // ==========================================================================
 // SECTION 1: ADMIN LOGIN GATE
 // ==========================================================================
-// Simple PIN gate. Default password is "prime123" — change it below.
-// Auth flag is remembered in localStorage so you're not re-entering the
-// PIN on every page refresh.
-
-const ADMIN_PASSWORD = 'prime123';
+// Firebase Authentication email/password login.
 
 function AdminLoginGate({ onSuccess }: { onSuccess: () => void }) {
-  const [pin, setPin] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (pin === ADMIN_PASSWORD) {
-      localStorage.setItem('ph_admin_authed', 'true');
-      setError('');
+    setError('');
+    setBusy(true);
+    try {
+      const credential = await signInWithEmailAndPassword(auth, email.trim(), password);
+
+      // Match the same admin UID used by Firestore Rules. A valid Firebase
+      // login alone must never unlock the Admin UI.
+      if (ADMIN_UID === 'REPLACE_WITH_ADMIN_UID') {
+        await signOut(auth);
+        setError('Admin UID is not configured yet. Set NEXT_PUBLIC_FIREBASE_ADMIN_UID before using the Admin panel.');
+        return;
+      }
+
+      if (credential.user.uid !== ADMIN_UID) {
+        await signOut(auth);
+        setError('This Firebase account is not authorized for the PrimeHub Deals Admin panel.');
+        return;
+      }
+
       onSuccess();
-    } else {
-      setError('Incorrect password. Please try again.');
+    } catch (err) {
+      console.error(err);
+      setError('Login failed. Check your Firebase Authentication email/password.');
+    } finally {
+      setBusy(false);
     }
   }
 
   return (
     <div className="min-h-screen bg-[#14140F] flex items-center justify-center px-4">
-      <form
-        onSubmit={handleSubmit}
-        className="bg-white rounded-2xl p-6 w-full max-w-xs flex flex-col gap-3"
-      >
+      <form onSubmit={handleSubmit} className="bg-white rounded-2xl p-6 w-full max-w-sm flex flex-col gap-3">
         <div className="w-12 h-12 rounded-full bg-[#0F6A5F] text-white flex items-center justify-center mx-auto mb-1">
           <Lock className="w-5 h-5" aria-hidden="true" />
         </div>
         <h1 className="text-center font-bold text-lg">phdeals Admin</h1>
-        <p className="text-center text-xs text-black/50 mb-2">Enter the admin password to continue</p>
-        <input
-          type="password"
-          value={pin}
-          onChange={(e) => setPin(e.target.value)}
-          placeholder="Password"
-          autoFocus
-          className="border border-black/15 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#0F6A5F]"
-        />
+        <p className="text-center text-xs text-black/50 mb-2">Sign in with the Firebase admin account.</p>
+        <input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Admin email" autoFocus className="border border-black/15 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#0F6A5F]" />
+        <input required type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" className="border border-black/15 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#0F6A5F]" />
         {error && <p className="text-xs text-[#E1352B]">{error}</p>}
-        <button
-          type="submit"
-          className="bg-[#14140F] text-white rounded-lg py-2.5 text-sm font-semibold mt-1"
-        >
-          Log In
+        <button disabled={busy} type="submit" className="bg-[#14140F] text-white rounded-lg py-2.5 text-sm font-semibold mt-1 disabled:opacity-50">
+          {busy ? 'Signing in…' : 'Log In'}
         </button>
       </form>
     </div>
@@ -230,13 +242,63 @@ function SiteSettingsTab() {
   const [form, setForm] = useState<SiteSettings>({
     announcementText: '',
     whatsappNumber: '',
-    freeShippingCount: 8,
+    freeShippingCount: 5,
     heroTitle: '',
     heroDiscountText: '',
     heroCountdownEndTime: '',
+    heroImageUrl: '',
+    heroButtonText: 'Shop Today\'s Deal',
+    heroButtonLink: '#',
+    dailyDeal: {
+      productId: '',
+      imageUrl: '',
+      title: '',
+      originalPrice: 0,
+      dealPrice: 0,
+      startAt: '',
+      endAt: '',
+      buttonText: 'Shop Deal',
+      buttonLink: '#',
+      active: false,
+    },
+    weeklyDeals: [],
+    youtubeGuide: {
+      enabled: true,
+      title: 'How To Order & List Products on PrimeHub Deals',
+      videoId: 'dQw4w9WgXcQ',
+      description: 'Watch this quick guide to learn how to order and list products on PrimeHub Deals.',
+    },
+    policies: {
+      privacyPolicy: {
+        title: 'Privacy Policy',
+        content: 'This page explains how PrimeHub Deals handles customer information and order-related data. Please contact the store team if you need clarification about our privacy practices.',
+      },
+      terms: {
+        title: 'Terms of Service',
+        content: 'By using PrimeHub Deals, you agree to use the website for lawful shopping and communication. Product availability, pricing, delivery and other details may change as the store is updated.',
+      },
+      returnPolicy: {
+        title: 'Return Policy',
+        content: 'Please contact the PrimeHub Deals team for return or order assistance. Return eligibility and handling depend on the product and order circumstances.',
+      },
+    },
+    priceBuckets: [
+      { id: 'under-99', title: 'Under 99', amount: 99, iconUrl: '', accent: '#E1352B', sortOrder: 1, active: true },
+      { id: 'under-300', title: 'Under 300', amount: 300, iconUrl: '', accent: '#0F6A5F', sortOrder: 2, active: true },
+      { id: 'under-500', title: 'Under 500', amount: 500, iconUrl: '', accent: '#FFB020', sortOrder: 3, active: true },
+      { id: 'under-1000', title: 'Under 1000', amount: 1000, iconUrl: '', accent: '#14140F', sortOrder: 4, active: true },
+    ],
   });
   const [saved, setSaved] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [isHeroUploading, setIsHeroUploading] = useState(false);
+  const [heroUploadError, setHeroUploadError] = useState('');
+  const [isDailyDealUploading, setIsDailyDealUploading] = useState(false);
+  const [dailyDealUploadError, setDailyDealUploadError] = useState('');
+  const [isWeeklyDealUploading, setIsWeeklyDealUploading] = useState<string | null>(null);
+  const [weeklyDealUploadError, setWeeklyDealUploadError] = useState<Record<string, string>>({});
+  const [isBucketUploading, setIsBucketUploading] = useState<string | null>(null);
+  const [bucketUploadError, setBucketUploadError] = useState<Record<string, string>>({});
 
   // Load existing settings once on mount
   useEffect(() => {
@@ -255,10 +317,150 @@ function SiteSettingsTab() {
     setSaved(false);
   }
 
+  async function handleDailyDealImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsDailyDealUploading(true);
+    setDailyDealUploadError('');
+
+    try {
+      const formData = new FormData();
+      formData.append('image', file);
+
+      const response = await fetch(IMGBB_UPLOAD_URL, {
+        method: 'POST',
+        body: formData,
+      });
+      const result = await response.json();
+
+      if (result.success) {
+        setForm((prev: any) => ({
+          ...prev,
+          dailyDeal: { ...(prev.dailyDeal || {}), imageUrl: result.data.url },
+        }));
+      } else {
+        setDailyDealUploadError('Daily Deal image upload failed. Try again.');
+      }
+    } catch {
+      setDailyDealUploadError('Daily Deal image upload failed. Please check your connection.');
+    } finally {
+      setIsDailyDealUploading(false);
+    }
+  }
+
+  async function handleWeeklyDealImageUpload(day: string, e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsWeeklyDealUploading(day);
+    setWeeklyDealUploadError((prev) => ({ ...prev, [day]: '' }));
+
+    try {
+      const formData = new FormData();
+      formData.append('image', file);
+
+      const response = await fetch(IMGBB_UPLOAD_URL, {
+        method: 'POST',
+        body: formData,
+      });
+      const result = await response.json();
+
+      if (!result.success) {
+        setWeeklyDealUploadError((prev) => ({
+          ...prev,
+          [day]: 'Upload failed. Try again.',
+        }));
+        return;
+      }
+
+      setForm((prev: any) => ({
+        ...prev,
+        weeklyDeals: (prev.weeklyDeals || []).map((deal: any) =>
+          deal.day === day ? { ...deal, imageUrl: result.data.url } : deal
+        ),
+      }));
+    } catch {
+      setWeeklyDealUploadError((prev) => ({
+        ...prev,
+        [day]: 'Upload failed. Please check your connection.',
+      }));
+    } finally {
+      setIsWeeklyDealUploading(null);
+    }
+  }
+
+  async function handleBucketIconUpload(bucketId: string, e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsBucketUploading(bucketId);
+    setBucketUploadError((prev) => ({ ...prev, [bucketId]: '' }));
+
+    try {
+      const formData = new FormData();
+      formData.append('image', file);
+
+      const response = await fetch(IMGBB_UPLOAD_URL, {
+        method: 'POST',
+        body: formData,
+      });
+      const result = await response.json();
+
+      if (!result.success) {
+        setBucketUploadError((prev) => ({ ...prev, [bucketId]: 'Upload failed.' }));
+        return;
+      }
+
+      setForm((prev: any) => ({
+        ...prev,
+        priceBuckets: (prev.priceBuckets || []).map((bucket: any) =>
+          bucket.id === bucketId ? { ...bucket, iconUrl: result.data.url } : bucket
+        ),
+      }));
+    } catch {
+      setBucketUploadError((prev) => ({
+        ...prev,
+        [bucketId]: 'Upload failed. Please check your connection.',
+      }));
+    } finally {
+      setIsBucketUploading(null);
+    }
+  }
+
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     await setDoc(doc(db, 'settings', 'main'), form, { merge: true });
     setSaved(true);
+  }
+
+  async function handleHeroImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsHeroUploading(true);
+    setHeroUploadError('');
+
+    try {
+      const formData = new FormData();
+      formData.append('image', file);
+
+      const response = await fetch(IMGBB_UPLOAD_URL, {
+        method: 'POST',
+        body: formData,
+      });
+      const result = await response.json();
+
+      if (result.success) {
+        handleChange('heroImageUrl', result.data.url);
+      } else {
+        setHeroUploadError('Hero image upload failed. Please try again or paste a URL.');
+      }
+    } catch {
+      setHeroUploadError('Hero image upload failed. Please check your connection.');
+    } finally {
+      setIsHeroUploading(false);
+    }
   }
 
   if (!loaded) {
@@ -319,6 +521,632 @@ function SiteSettingsTab() {
             value={form.heroDiscountText}
             onChange={(e) => handleChange('heroDiscountText', e.target.value)}
             placeholder="Up to 70% Off"
+            className="w-full border border-black/15 rounded-lg px-3 py-2 text-sm outline-none focus:border-[#0F6A5F]"
+          />
+        </div>
+
+
+
+
+
+        <div className="border-t border-black/10 pt-5">
+          <div className="mb-3">
+            <p className="text-sm font-black">PRICE BUCKETS — SHOP BY BUDGET</p>
+            <p className="text-[11px] text-black/50">
+              Set the budget tiles customers use to filter products.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            {[...(form.priceBuckets || [])]
+              .sort((a: any, b: any) => a.sortOrder - b.sortOrder)
+              .map((bucket: any) => {
+                const updateBucket = (patch: Record<string, any>) => {
+                  setForm((prev: any) => ({
+                    ...prev,
+                    priceBuckets: (prev.priceBuckets || []).map((item: any) =>
+                      item.id === bucket.id ? { ...item, ...patch } : item
+                    ),
+                  }));
+                };
+
+                return (
+                  <div key={bucket.id} className="rounded-2xl border border-black/10 bg-[#F4F4F1] p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <input
+                        type="text"
+                        value={bucket.title || ''}
+                        onChange={(e) => updateBucket({ title: e.target.value })}
+                        className="min-w-0 flex-1 border border-black/15 rounded-lg bg-white px-3 py-2 text-sm font-bold outline-none focus:border-[#0F6A5F]"
+                      />
+                      <label className="flex shrink-0 items-center gap-2 text-xs font-bold">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(bucket.active)}
+                          onChange={(e) => updateBucket({ active: e.target.checked })}
+                        />
+                        ON
+                      </label>
+                    </div>
+
+                    <div className="mt-2 grid grid-cols-3 gap-2">
+                      <input
+                        type="number"
+                        min="1"
+                        value={bucket.amount ?? 0}
+                        onChange={(e) => updateBucket({ amount: Number(e.target.value) })}
+                        placeholder="Amount"
+                        className="border border-black/15 rounded-lg bg-white px-3 py-2 text-sm outline-none focus:border-[#0F6A5F]"
+                      />
+                      <input
+                        type="text"
+                        value={bucket.accent || ''}
+                        onChange={(e) => updateBucket({ accent: e.target.value })}
+                        placeholder="Accent"
+                        className="border border-black/15 rounded-lg bg-white px-3 py-2 text-xs outline-none focus:border-[#0F6A5F]"
+                      />
+                      <input
+                        type="number"
+                        min="1"
+                        value={bucket.sortOrder ?? 1}
+                        onChange={(e) => updateBucket({ sortOrder: Number(e.target.value) })}
+                        placeholder="Order"
+                        className="border border-black/15 rounded-lg bg-white px-3 py-2 text-sm outline-none focus:border-[#0F6A5F]"
+                      />
+                    </div>
+
+                    <div className="mt-2">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => handleBucketIconUpload(bucket.id, e)}
+                        disabled={isBucketUploading === bucket.id}
+                        className="text-xs"
+                      />
+                      {isBucketUploading === bucket.id && (
+                        <p className="mt-1 text-[10px] text-[#0F6A5F]">Uploading...</p>
+                      )}
+                      {bucketUploadError[bucket.id] && (
+                        <p className="mt-1 text-[10px] text-[#E1352B]">{bucketUploadError[bucket.id]}</p>
+                      )}
+                      <input
+                        type="text"
+                        value={bucket.iconUrl || ''}
+                        onChange={(e) => updateBucket({ iconUrl: e.target.value })}
+                        placeholder="Or paste icon/image URL"
+                        className="mt-2 w-full border border-black/15 rounded-lg bg-white px-3 py-2 text-xs outline-none focus:border-[#0F6A5F]"
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+          </div>
+        </div>
+
+        <div className="border-t border-black/10 pt-5">
+          <div className="mb-3">
+            <p className="text-sm font-black">YOUTUBE GUIDE</p>
+            <p className="text-[11px] text-black/50">
+              Control the customer-facing tutorial without changing code. Video ID only; do not paste the full YouTube URL.
+            </p>
+          </div>
+
+          <div className="grid gap-3">
+            <label className="flex items-center gap-2 text-xs font-bold">
+              <input
+                type="checkbox"
+                checked={Boolean(form.youtubeGuide?.enabled)}
+                onChange={(e) =>
+                  setForm((prev: any) => ({
+                    ...prev,
+                    youtubeGuide: { ...(prev.youtubeGuide || {}), enabled: e.target.checked },
+                  }))
+                }
+              />
+              Show YouTube Guide
+            </label>
+
+            <input
+              type="text"
+              value={form.youtubeGuide?.title || ''}
+              onChange={(e) =>
+                setForm((prev: any) => ({
+                  ...prev,
+                  youtubeGuide: { ...(prev.youtubeGuide || {}), title: e.target.value },
+                }))
+              }
+              placeholder="Guide title"
+              className="w-full border border-black/15 rounded-lg px-3 py-2 text-sm outline-none focus:border-[#0F6A5F]"
+            />
+
+            <input
+              type="text"
+              value={form.youtubeGuide?.videoId || ''}
+              onChange={(e) =>
+                setForm((prev: any) => ({
+                  ...prev,
+                  youtubeGuide: { ...(prev.youtubeGuide || {}), videoId: e.target.value.trim() },
+                }))
+              }
+              placeholder="YouTube video ID, e.g. dQw4w9WgXcQ"
+              className="w-full border border-black/15 rounded-lg px-3 py-2 text-sm outline-none focus:border-[#0F6A5F]"
+            />
+
+            <textarea
+              value={form.youtubeGuide?.description || ''}
+              onChange={(e) =>
+                setForm((prev: any) => ({
+                  ...prev,
+                  youtubeGuide: { ...(prev.youtubeGuide || {}), description: e.target.value },
+                }))
+              }
+              placeholder="Short guide description"
+              rows={2}
+              className="w-full border border-black/15 rounded-lg px-3 py-2 text-sm outline-none focus:border-[#0F6A5F]"
+            />
+          </div>
+        </div>
+
+        <div className="border-t border-black/10 pt-5">
+          <div className="mb-3">
+            <p className="text-sm font-black">POLICY PAGES</p>
+            <p className="text-[11px] text-black/50">
+              Edit customer-facing Privacy Policy, Terms of Service and Return Policy. Changes are saved to settings/main.
+            </p>
+          </div>
+
+          <div className="grid gap-4">
+            {[
+              ['privacyPolicy', 'Privacy Policy'],
+              ['terms', 'Terms of Service'],
+              ['returnPolicy', 'Return Policy'],
+            ].map(([key, label]) => {
+              const policy = (form.policies as any)?.[key] || { title: label, content: '' };
+
+              return (
+                <div key={key} className="rounded-2xl border border-black/10 bg-[#F4F4F1] p-3">
+                  <input
+                    type="text"
+                    value={policy.title || ''}
+                    onChange={(e) =>
+                      setForm((prev: any) => ({
+                        ...prev,
+                        policies: {
+                          ...(prev.policies || {}),
+                          [key]: { ...policy, title: e.target.value },
+                        },
+                      }))
+                    }
+                    placeholder={`${label} title`}
+                    className="w-full border border-black/15 rounded-lg bg-white px-3 py-2 text-sm outline-none focus:border-[#0F6A5F]"
+                  />
+                  <textarea
+                    value={policy.content || ''}
+                    onChange={(e) =>
+                      setForm((prev: any) => ({
+                        ...prev,
+                        policies: {
+                          ...(prev.policies || {}),
+                          [key]: { ...policy, content: e.target.value },
+                        },
+                      }))
+                    }
+                    placeholder={`${label} content`}
+                    rows={6}
+                    className="mt-2 w-full border border-black/15 rounded-lg bg-white px-3 py-2 text-sm leading-6 outline-none focus:border-[#0F6A5F]"
+                  />
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="border-t border-black/10 pt-5">
+          <div className="mb-3">
+            <p className="text-sm font-black">WEEKLY DEALS — SUNDAY TO SATURDAY</p>
+            <p className="text-[11px] text-black/50">
+              Create one premium deal for each day. Cards appear in Sunday → Saturday order.
+            </p>
+          </div>
+
+          <div className="space-y-3">
+            {[
+              ['sunday', 'Sunday'],
+              ['monday', 'Monday'],
+              ['tuesday', 'Tuesday'],
+              ['wednesday', 'Wednesday'],
+              ['thursday', 'Thursday'],
+              ['friday', 'Friday'],
+              ['saturday', 'Saturday'],
+            ].map(([day, dayLabel]) => {
+              const existing = (form.weeklyDeals || []).find((item: any) => item.day === day) || {
+                id: `${day}-deal`,
+                day,
+                label: `${dayLabel} Deal`,
+                productId: '',
+                imageUrl: '',
+                title: '',
+                originalPrice: 0,
+                dealPrice: 0,
+                startAt: '',
+                endAt: '',
+                buttonText: 'View Deal',
+                buttonLink: '#',
+                active: false,
+              };
+
+              const update = (patch: Record<string, any>) => {
+                setForm((prev: any) => {
+                  const list = [...(prev.weeklyDeals || [])];
+                  const index = list.findIndex((item: any) => item.day === day);
+                  const next = { ...existing, ...patch };
+                  if (index >= 0) list[index] = next;
+                  else list.push(next);
+                  return { ...prev, weeklyDeals: list };
+                });
+              };
+
+              return (
+                <div key={day} className="rounded-2xl border border-black/10 bg-[#F4F4F1] p-3">
+                  <div className="flex items-center justify-between gap-3 mb-3">
+                    <div>
+                      <p className="text-sm font-black">{dayLabel} Deal</p>
+                      <p className="text-[10px] text-black/45">Premium daily weekly card</p>
+                    </div>
+                    <label className="flex items-center gap-2 text-xs font-bold">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(existing.active)}
+                        onChange={(e) => update({ active: e.target.checked })}
+                      />
+                      Active
+                    </label>
+                  </div>
+
+                  <div className="grid gap-2">
+                    <input
+                      type="text"
+                      value={existing.title || ''}
+                      onChange={(e) => update({ title: e.target.value })}
+                      placeholder={`${dayLabel} Deal title`}
+                      className="w-full border border-black/15 rounded-lg bg-white px-3 py-2 text-sm outline-none focus:border-[#0F6A5F]"
+                    />
+
+                    <input
+                      type="text"
+                      value={existing.label || ''}
+                      onChange={(e) => update({ label: e.target.value })}
+                      placeholder={`${dayLabel} Deal`}
+                      className="w-full border border-black/15 rounded-lg bg-white px-3 py-2 text-sm outline-none focus:border-[#0F6A5F]"
+                    />
+
+                    <div>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => handleWeeklyDealImageUpload(day, e)}
+                        disabled={isWeeklyDealUploading === day}
+                        className="text-xs"
+                      />
+                      {isWeeklyDealUploading === day && (
+                        <p className="text-[10px] text-[#0F6A5F] mt-1">Uploading...</p>
+                      )}
+                      {weeklyDealUploadError[day] && (
+                        <p className="text-[10px] text-[#E1352B] mt-1">{weeklyDealUploadError[day]}</p>
+                      )}
+                      <input
+                        type="text"
+                        value={existing.imageUrl || ''}
+                        onChange={(e) => update({ imageUrl: e.target.value })}
+                        placeholder="Or paste image URL"
+                        className="mt-2 w-full border border-black/15 rounded-lg bg-white px-3 py-2 text-xs outline-none focus:border-[#0F6A5F]"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        type="number"
+                        min="0"
+                        value={existing.originalPrice ?? 0}
+                        onChange={(e) => update({ originalPrice: Number(e.target.value) })}
+                        placeholder="Original price"
+                        className="w-full border border-black/15 rounded-lg bg-white px-3 py-2 text-sm outline-none focus:border-[#0F6A5F]"
+                      />
+                      <input
+                        type="number"
+                        min="0"
+                        value={existing.dealPrice ?? 0}
+                        onChange={(e) => update({ dealPrice: Number(e.target.value) })}
+                        placeholder="Deal price"
+                        className="w-full border border-black/15 rounded-lg bg-white px-3 py-2 text-sm outline-none focus:border-[#0F6A5F]"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        type="datetime-local"
+                        value={existing.startAt || ''}
+                        onChange={(e) => update({ startAt: e.target.value })}
+                        className="w-full border border-black/15 rounded-lg bg-white px-3 py-2 text-xs outline-none focus:border-[#0F6A5F]"
+                      />
+                      <input
+                        type="datetime-local"
+                        value={existing.endAt || ''}
+                        onChange={(e) => update({ endAt: e.target.value })}
+                        className="w-full border border-black/15 rounded-lg bg-white px-3 py-2 text-xs outline-none focus:border-[#0F6A5F]"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        type="text"
+                        value={existing.buttonText || ''}
+                        onChange={(e) => update({ buttonText: e.target.value })}
+                        placeholder="Button text"
+                        className="w-full border border-black/15 rounded-lg bg-white px-3 py-2 text-sm outline-none focus:border-[#0F6A5F]"
+                      />
+                      <input
+                        type="text"
+                        value={existing.buttonLink || ''}
+                        onChange={(e) => update({ buttonLink: e.target.value })}
+                        placeholder="Button link"
+                        className="w-full border border-black/15 rounded-lg bg-white px-3 py-2 text-sm outline-none focus:border-[#0F6A5F]"
+                      />
+                    </div>
+
+                    {existing.imageUrl && (
+                      <img
+                        src={existing.imageUrl}
+                        alt={`${dayLabel} Deal preview`}
+                        className="h-28 w-full rounded-xl object-cover border border-black/10"
+                      />
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="border-t border-black/10 pt-5">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <p className="text-sm font-black">DAILY DEAL — ONE DAY OFFER</p>
+              <p className="text-[11px] text-black/50">This controls the large homepage deal.</p>
+            </div>
+            <label className="flex items-center gap-2 text-xs font-bold">
+              <input
+                type="checkbox"
+                checked={Boolean(form.dailyDeal?.active)}
+                onChange={(e) =>
+                  setForm((prev: any) => ({
+                    ...prev,
+                    dailyDeal: { ...(prev.dailyDeal || {}), active: e.target.checked },
+                  }))
+                }
+              />
+              Active
+            </label>
+          </div>
+
+          <div className="grid gap-3">
+            <div>
+              <label className="text-xs font-semibold block mb-1">Deal Title</label>
+              <input
+                type="text"
+                value={form.dailyDeal?.title || ''}
+                onChange={(e) =>
+                  setForm((prev: any) => ({
+                    ...prev,
+                    dailyDeal: { ...(prev.dailyDeal || {}), title: e.target.value },
+                  }))
+                }
+                placeholder="Today's Big Deal"
+                className="w-full border border-black/15 rounded-lg px-3 py-2 text-sm outline-none focus:border-[#0F6A5F]"
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold block mb-1">Deal Image</label>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleDailyDealImageUpload}
+                disabled={isDailyDealUploading}
+                className="text-xs"
+              />
+              {isDailyDealUploading && (
+                <p className="text-xs text-[#0F6A5F] mt-1">Uploading to ImgBB...</p>
+              )}
+              {dailyDealUploadError && (
+                <p className="text-xs text-[#E1352B] mt-1">{dailyDealUploadError}</p>
+              )}
+              <input
+                type="text"
+                value={form.dailyDeal?.imageUrl || ''}
+                onChange={(e) =>
+                  setForm((prev: any) => ({
+                    ...prev,
+                    dailyDeal: { ...(prev.dailyDeal || {}), imageUrl: e.target.value },
+                  }))
+                }
+                placeholder="Or paste image URL"
+                className="w-full border border-black/15 rounded-lg px-3 py-2 text-sm mt-2 outline-none focus:border-[#0F6A5F]"
+              />
+              {form.dailyDeal?.imageUrl && (
+                <img
+                  src={form.dailyDeal.imageUrl}
+                  alt="Daily Deal preview"
+                  className="w-full h-32 object-cover rounded-xl mt-2 border border-black/10"
+                />
+              )}
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold block mb-1">Product ID (optional for now)</label>
+              <input
+                type="text"
+                value={form.dailyDeal?.productId || ''}
+                onChange={(e) =>
+                  setForm((prev: any) => ({
+                    ...prev,
+                    dailyDeal: { ...(prev.dailyDeal || {}), productId: e.target.value },
+                  }))
+                }
+                placeholder="We'll add product picker next"
+                className="w-full border border-black/15 rounded-lg px-3 py-2 text-sm outline-none focus:border-[#0F6A5F]"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-semibold block mb-1">Original Price</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={form.dailyDeal?.originalPrice ?? 0}
+                  onChange={(e) =>
+                    setForm((prev: any) => ({
+                      ...prev,
+                      dailyDeal: { ...(prev.dailyDeal || {}), originalPrice: Number(e.target.value) },
+                    }))
+                  }
+                  className="w-full border border-black/15 rounded-lg px-3 py-2 text-sm outline-none focus:border-[#0F6A5F]"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold block mb-1">Today&apos;s Deal Price</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={form.dailyDeal?.dealPrice ?? 0}
+                  onChange={(e) =>
+                    setForm((prev: any) => ({
+                      ...prev,
+                      dailyDeal: { ...(prev.dailyDeal || {}), dealPrice: Number(e.target.value) },
+                    }))
+                  }
+                  className="w-full border border-black/15 rounded-lg px-3 py-2 text-sm outline-none focus:border-[#0F6A5F]"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-semibold block mb-1">Start</label>
+                <input
+                  type="datetime-local"
+                  value={form.dailyDeal?.startAt || ''}
+                  onChange={(e) =>
+                    setForm((prev: any) => ({
+                      ...prev,
+                      dailyDeal: { ...(prev.dailyDeal || {}), startAt: e.target.value },
+                    }))
+                  }
+                  className="w-full border border-black/15 rounded-lg px-3 py-2 text-xs outline-none focus:border-[#0F6A5F]"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold block mb-1">End</label>
+                <input
+                  type="datetime-local"
+                  value={form.dailyDeal?.endAt || ''}
+                  onChange={(e) =>
+                    setForm((prev: any) => ({
+                      ...prev,
+                      dailyDeal: { ...(prev.dailyDeal || {}), endAt: e.target.value },
+                    }))
+                  }
+                  className="w-full border border-black/15 rounded-lg px-3 py-2 text-xs outline-none focus:border-[#0F6A5F]"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-semibold block mb-1">Button Text</label>
+                <input
+                  type="text"
+                  value={form.dailyDeal?.buttonText || ''}
+                  onChange={(e) =>
+                    setForm((prev: any) => ({
+                      ...prev,
+                      dailyDeal: { ...(prev.dailyDeal || {}), buttonText: e.target.value },
+                    }))
+                  }
+                  className="w-full border border-black/15 rounded-lg px-3 py-2 text-sm outline-none focus:border-[#0F6A5F]"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold block mb-1">Button Link</label>
+                <input
+                  type="text"
+                  value={form.dailyDeal?.buttonLink || ''}
+                  onChange={(e) =>
+                    setForm((prev: any) => ({
+                      ...prev,
+                      dailyDeal: { ...(prev.dailyDeal || {}), buttonLink: e.target.value },
+                    }))
+                  }
+                  className="w-full border border-black/15 rounded-lg px-3 py-2 text-sm outline-none focus:border-[#0F6A5F]"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="border-t border-black/10 pt-4">
+          <p className="text-sm font-bold mb-3">Daily Deal Hero Image</p>
+          <input
+            type="file"
+            accept="image/*"
+            onChange={handleHeroImageUpload}
+            disabled={isHeroUploading}
+            className="text-xs mb-2"
+          />
+
+          {isHeroUploading && (
+            <p className="text-xs text-[#0F6A5F] mb-2">Uploading hero image to ImgBB...</p>
+          )}
+          {heroUploadError && (
+            <p className="text-xs text-[#E1352B] mb-2">{heroUploadError}</p>
+          )}
+
+          <input
+            type="text"
+            value={form.heroImageUrl}
+            onChange={(e) => handleChange('heroImageUrl', e.target.value)}
+            placeholder="Or paste the hero image URL"
+            className="w-full border border-black/15 rounded-lg px-3 py-2 text-sm outline-none focus:border-[#0F6A5F]"
+          />
+
+          {form.heroImageUrl && (
+            <img
+              src={form.heroImageUrl}
+              alt="Daily deal preview"
+              className="w-full h-36 object-cover rounded-xl mt-3 border border-black/10"
+            />
+          )}
+        </div>
+
+        <div>
+          <label className="text-xs font-semibold block mb-1">Hero Button Text</label>
+          <input
+            type="text"
+            value={form.heroButtonText}
+            onChange={(e) => handleChange('heroButtonText', e.target.value)}
+            placeholder="Shop Today's Deal"
+            className="w-full border border-black/15 rounded-lg px-3 py-2 text-sm outline-none focus:border-[#0F6A5F]"
+          />
+        </div>
+
+        <div>
+          <label className="text-xs font-semibold block mb-1">Hero Button Link</label>
+          <input
+            type="text"
+            value={form.heroButtonLink}
+            onChange={(e) => handleChange('heroButtonLink', e.target.value)}
+            placeholder="/shop or product URL"
             className="w-full border border-black/15 rounded-lg px-3 py-2 text-sm outline-none focus:border-[#0F6A5F]"
           />
         </div>
@@ -726,80 +1554,40 @@ function CategoriesTab({ categories }: { categories: Category[] }) {
 // ==========================================================================
 
 function OrdersTab({ orders }: { orders: Order[] }) {
-  async function handleStatusChange(id: string, status: string) {
-    await updateDoc(doc(db, 'orders', id), { status });
+  async function handleStatusChange(id: string, status: Order['status']) {
+    await updateDoc(doc(db, 'orders', id), { status, updatedAt: serverTimestamp() });
   }
 
   function buildWhatsAppLink(order: Order) {
-    const itemsList = order.items.map((i) => `${i.name} x${i.qty}`).join(', ');
-    const text = `Hi ${order.customerName}, this is PrimeHub Deals regarding your order (Rs ${order.total}): ${itemsList}. Current status: ${order.status}.`;
-    return `https://wa.me/${order.phone.replace(/\D/g, '')}?text=${encodeURIComponent(text)}`;
+    const itemsList = order.items.map((i) => `${i.title} x${i.quantity}`).join(', ');
+    const phone = order.customer.phone.replace(/\D/g, '');
+    const text = `Hi ${order.customer.name}, this is PrimeHub Deals regarding your order (Rs ${order.total}): ${itemsList}. Current status: ${order.status}.`;
+    return `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
   }
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-6">
       <h2 className="font-bold text-base mb-4">Customer Orders</h2>
-
       <div className="bg-white rounded-xl border border-black/10 overflow-x-auto">
         <table className="w-full text-xs">
-          <thead>
-            <tr className="text-left text-black/50 border-b border-black/10">
-              <th className="p-3">Customer</th>
-              <th className="p-3">Items</th>
-              <th className="p-3">Total</th>
-              <th className="p-3">Payment</th>
-              <th className="p-3">Status</th>
-              <th className="p-3"></th>
-            </tr>
-          </thead>
+          <thead><tr className="text-left text-black/50 border-b border-black/10">
+            <th className="p-3">Customer</th><th className="p-3">Items</th><th className="p-3">Total</th><th className="p-3">Status</th><th className="p-3"></th>
+          </tr></thead>
           <tbody>
             {orders.map((o) => (
               <tr key={o.id} className="border-b border-black/5 last:border-0 align-top">
+                <td className="p-3"><p className="font-medium">{o.customer?.name || 'Customer'}</p><p className="text-black/50">{o.customer?.phone || '—'}</p><p className="text-black/40 text-[10px] max-w-[180px]">{o.customer?.address || '—'}, {o.customer?.city || ''}</p></td>
+                <td className="p-3">{o.items?.map((i, idx) => <p key={idx}>{i.title} x{i.quantity}</p>)}</td>
+                <td className="p-3 font-medium">Rs {Number(o.total || 0).toLocaleString()}</td>
                 <td className="p-3">
-                  <p className="font-medium">{o.customerName}</p>
-                  <p className="text-black/50">{o.phone}</p>
-                  <p className="text-black/40 text-[10px] max-w-[160px]">{o.address}</p>
-                </td>
-                <td className="p-3">
-                  {o.items?.map((i, idx) => (
-                    <p key={idx}>
-                      {i.name} x{i.qty}
-                    </p>
-                  ))}
-                </td>
-                <td className="p-3 font-medium">Rs {o.total}</td>
-                <td className="p-3">{o.paymentStatus}</td>
-                <td className="p-3">
-                  <select
-                    value={o.status}
-                    onChange={(e) => handleStatusChange(o.id, e.target.value)}
-                    className="border border-black/15 rounded-lg px-2 py-1 text-xs outline-none"
-                  >
-                    <option value="Pending">Pending</option>
-                    <option value="Shipped">Shipped</option>
-                    <option value="Delivered">Delivered</option>
-                    <option value="Cancelled">Cancelled</option>
+                  <select value={o.status} onChange={(e) => handleStatusChange(o.id, e.target.value as Order['status'])} className="border border-black/15 rounded-lg px-2 py-1 text-xs outline-none">
+                    <option value="pending">Pending</option><option value="confirmed">Confirmed</option><option value="shipped">Shipped</option><option value="delivered">Delivered</option><option value="cancelled">Cancelled</option>
                   </select>
                 </td>
-                <td className="p-3">
-                  <a
-                    href={buildWhatsAppLink(o)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1 bg-[#0F6A5F] text-white px-2.5 py-1.5 rounded-full text-[11px] font-semibold"
-                  >
-                    <MessageCircle className="w-3.5 h-3.5" aria-hidden="true" /> Chat
-                  </a>
-                </td>
+                <td className="p-3"><a href={buildWhatsAppLink(o)} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 bg-[#0F6A5F] text-white px-2.5 py-1.5 rounded-full text-[11px] font-semibold"><MessageCircle className="w-3.5 h-3.5" aria-hidden="true" /> Chat</a></td>
               </tr>
             ))}
-            {orders.length === 0 && (
-              <tr>
-                <td colSpan={6} className="p-6 text-center text-black/40">
-                  No orders yet.
-                </td>
-              </tr>
-            )}
+            {orders.length === 0 && <tr><td colSpan={5} className="p-8 text-center text-black/40">No orders yet.</td></tr>}
           </tbody>
         </table>
       </div>
@@ -820,10 +1608,26 @@ export default function AdminPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
 
-  // check localStorage auth flag on mount
   useEffect(() => {
-    setAuthed(localStorage.getItem('ph_admin_authed') === 'true');
-    setCheckedAuth(true);
+    return onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        setAuthed(false);
+        setCheckedAuth(true);
+        return;
+      }
+
+      // Keep UI authorization aligned with Firestore Rules. Any signed-in
+      // non-admin account is immediately signed out.
+      if (ADMIN_UID === 'REPLACE_WITH_ADMIN_UID' || user.uid !== ADMIN_UID) {
+        await signOut(auth);
+        setAuthed(false);
+        setCheckedAuth(true);
+        return;
+      }
+
+      setAuthed(true);
+      setCheckedAuth(true);
+    });
   }, []);
 
   // live Firestore listeners — only run once logged in
@@ -850,8 +1654,8 @@ export default function AdminPage() {
     };
   }, [authed]);
 
-  function handleLogout() {
-    localStorage.removeItem('ph_admin_authed');
+  async function handleLogout() {
+    await signOut(auth);
     setAuthed(false);
   }
 

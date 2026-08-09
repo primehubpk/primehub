@@ -20,13 +20,13 @@ import { create } from 'zustand';
 // =====================================================================
 // SECTION: CONFIG
 // =====================================================================
-export const FREE_DELIVERY_THRESHOLD = 8; // items needed in cart for free delivery
+export const FREE_DELIVERY_THRESHOLD = 5; // items needed in cart for free delivery
 
 // =====================================================================
 // SECTION: TYPES
 // =====================================================================
 export interface CartItem {
-  id: number;
+  id: string | number;
   name: string;
   price: number;
   originalPrice: number;
@@ -39,8 +39,8 @@ interface CartState {
 
   // actions
   addItem: (item: Omit<CartItem, 'qty'>) => void;
-  removeItem: (id: number) => void;
-  updateQty: (id: number, qty: number) => void;
+  removeItem: (id: string | number) => void;
+  updateQty: (id: string | number, qty: number) => void;
   clearCart: () => void;
   openDrawer: () => void;
   closeDrawer: () => void;
@@ -57,12 +57,8 @@ interface CartState {
 // SECTION: STORE
 // =====================================================================
 export const useCartStore = create<CartState>((set, get) => ({
-  items: [
-    // seed with a couple of mock items so the header badge/progress bar
-    // has something to show on first load — remove in production
-    { id: 101, name: 'Steel Jug Set (2pc)', price: 149, originalPrice: 299, qty: 2 },
-    { id: 102, name: 'Bangle Set (6pc)', price: 99, originalPrice: 199, qty: 1 },
-  ],
+  // Start empty in production. Real items are added by the storefront.
+  items: [],
   isDrawerOpen: false,
 
   addItem: (item) =>

@@ -9,6 +9,8 @@
 
 'use client';
 
+import { useRouter } from 'next/navigation';
+
 import { useState } from 'react';
 import { Search, ShoppingCart, Truck } from 'lucide-react';
 import { useCartStore } from '@/lib/cartStore';
@@ -36,6 +38,7 @@ function AnnouncementBar({ text }: { text: string }) {
 // SECTION 1: HEADER, SEARCH, FREE DELIVERY PROGRESS BAR
 // ==========================================
 export default function Header() {
+  const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
   const { settings } = useSettings();
 
@@ -43,8 +46,9 @@ export default function Header() {
   const cartItemCount = useCartStore((s) => s.items.reduce((sum, i) => sum + i.qty, 0));
   const openDrawer = useCartStore((s) => s.openDrawer);
 
-  const itemsToGo = Math.max(0, settings.freeShippingCount - cartItemCount);
-  const deliveryProgress = Math.min(100, Math.round((cartItemCount / settings.freeShippingCount) * 100));
+  const deliveryThreshold = Math.max(1, Number(settings.freeDelivery?.itemThreshold ?? settings.freeShippingCount ?? 5));
+  const itemsToGo = Math.max(0, deliveryThreshold - cartItemCount);
+  const deliveryProgress = Math.min(100, Math.round((cartItemCount / deliveryThreshold) * 100));
 
   return (
     <>
@@ -92,7 +96,7 @@ export default function Header() {
                   : `Add ${itemsToGo} more items for FREE delivery`}
               </span>
               <span className="text-black/40">
-                {cartItemCount}/{settings.freeShippingCount}
+                {cartItemCount}/{deliveryThreshold}
               </span>
             </div>
             <div className="h-1.5 rounded-full bg-black/10 overflow-hidden">

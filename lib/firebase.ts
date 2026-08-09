@@ -17,6 +17,7 @@
 // Console under APIs & Services > Credentials). Setting env vars here
 // is about environment flexibility, not hiding this value.
 
+import { getAuth } from 'firebase/auth';
 import { initializeApp, getApps, getApp, type FirebaseOptions } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
@@ -41,6 +42,7 @@ const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 // ==========================================
 // SECTION: EXPORTED SERVICES
 // ==========================================
+export const auth = getAuth(app);
 export const db = getFirestore(app);
 export const storage = getStorage(app);
 

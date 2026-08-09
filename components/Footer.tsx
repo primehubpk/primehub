@@ -2,6 +2,7 @@
 // SECTION 8: Trust badges (COD, Fast Delivery, 7-Day Returns) + footer
 // policy links. Pure server component — no client state needed.
 
+import Link from 'next/link';
 import { Wallet, Truck, RotateCcw, ShieldCheck } from 'lucide-react';
 
 const TRUST_BADGES = [
@@ -38,9 +39,9 @@ export default function Footer() {
         </div>
         <div className="grid grid-cols-2 gap-y-2.5 text-xs text-black/60">
           {POLICY_LINKS.map(({ label, href }) => (
-            <a key={href} href={href} className="hover:text-[#14140F]">
+            <Link key={href} href={href} className="hover:text-[#14140F]">
               {label}
-            </a>
+            </Link>
           ))}
         </div>
         <p className="mt-6 text-[10px] text-black/40">

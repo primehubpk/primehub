@@ -1,19 +1,21 @@
 // components/YouTubeGuide.tsx
-// SECTION 7: Embedded YouTube tutorial — "How To Order & List Products
-// on PrimeHub Deals". Click the thumbnail to open a modal player.
+// SECTION 7: Admin-controlled YouTube tutorial.
+// Settings are read from settings/main with safe local defaults.
 
 'use client';
 
 import { useState } from 'react';
 import { PlayCircle, X } from 'lucide-react';
-
-// =====================================================================
-// SECTION: CONFIG — swap this for your real tutorial video id
-// =====================================================================
-const TUTORIAL_VIDEO_ID = 'dQw4w9WgXcQ';
+import { useSettings } from '@/lib/useSettings';
 
 export default function YouTubeGuide() {
   const [videoOpen, setVideoOpen] = useState(false);
+  const { settings } = useSettings();
+  const guide = settings.youtubeGuide;
+
+  if (!guide?.enabled || !guide.videoId.trim()) return null;
+
+  const videoId = guide.videoId.trim();
 
   return (
     <section className="max-w-md mx-auto px-4 mt-7">
@@ -27,15 +29,18 @@ export default function YouTubeGuide() {
         className="relative w-full h-40 rounded-xl overflow-hidden bg-[#14140F] group"
       >
         <img
-          src={`https://img.youtube.com/vi/${TUTORIAL_VIDEO_ID}/hqdefault.jpg`}
+          src={`https://img.youtube.com/vi/${encodeURIComponent(videoId)}/hqdefault.jpg`}
           alt=""
           className="w-full h-full object-cover opacity-70 group-active:opacity-60 transition"
         />
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
           <PlayCircle className="w-12 h-12 text-white drop-shadow" aria-hidden="true" />
           <p className="text-white text-xs font-semibold px-6 text-center">
-            How To Order &amp; List Products on PrimeHub Deals
+            {guide.title || 'Watch & Learn'}
           </p>
+          {guide.description && (
+            <p className="text-white/75 text-[11px] px-6 text-center">{guide.description}</p>
+          )}
         </div>
       </button>
 
@@ -53,8 +58,8 @@ export default function YouTubeGuide() {
             <div className="aspect-video rounded-xl overflow-hidden">
               <iframe
                 className="w-full h-full"
-                src={`https://www.youtube.com/embed/${TUTORIAL_VIDEO_ID}?autoplay=1`}
-                title="How To Order & List Products on PrimeHub Deals"
+                src={`https://www.youtube.com/embed/${encodeURIComponent(videoId)}?autoplay=1`}
+                title={guide.title || 'PrimeHub Deals YouTube Guide'}
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                 allowFullScreen
               />

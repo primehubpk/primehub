@@ -1,219 +1,439 @@
-// components/ProductGrid.tsx
-// SECTION 6: "Just For You" product feed.
-//
-// UPDATED: products load live from Firestore's `products` collection.
-// Any product with a `videoUrl` (set from the admin Products tab) now
-// shows a "▶ Reel" badge — tapping it opens a modal video player.
-// Supports YouTube links (embedded as an iframe) and direct .mp4 links
-// (played with a native <video> tag). Other links (e.g. Instagram Reels,
-// which block iframe embedding) open in a new tab instead.
-
 'use client';
 
-import { useEffect, useState } from 'react';
+import Link from 'next/link';
+
+import { useEffect, useMemo, useState } from 'react';
+import {
+  ArrowDownUp,
+  Check,
+  Heart,
+  Play,
+  Plus,
+  Search,
+  ShoppingBag,
+  X,
+  Zap,
+} from 'lucide-react';
 import { collection, onSnapshot } from 'firebase/firestore';
-import { Star, MessageCircle, X } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { useCartStore } from '@/lib/cartStore';
-import { useSettings } from '@/lib/useSettings';
-import { Product } from '@/lib/types';
 
-// ==========================================
-// SECTION: HELPERS
-// ==========================================
-function buildWhatsAppLink(whatsappNumber: string, productName: string, price: number) {
-  const text = `Hi! I want to order: ${productName} - Rs ${price}. Please confirm availability.`;
-  return `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(text)}`;
+type Product = {
+  id: string;
+  title?: string;
+  name?: string;
+  price?: number;
+  compareAtPrice?: number;
+  originalPrice?: number;
+  imageUrl?: string;
+  image?: string;
+  images?: string[];
+  category?: string;
+  categoryId?: string;
+  stock?: number;
+  quantity?: number;
+  isFlashSale?: boolean;
+  videoUrl?: string;
+  reelUrl?: string;
+  description?: string;
+  [key: string]: any;
+};
+
+type SortMode = 'featured' | 'low' | 'high' | 'discount';
+
+interface ProductGridProps {
+  selectedMaxPrice?: number | null;
 }
 
-function discountBadge(price: number, originalPrice: number) {
-  if (!originalPrice || originalPrice <= price) return null;
-  const pct = Math.round(((originalPrice - price) / originalPrice) * 100);
-  return `-${pct}%`;
+function getTitle(product: Product) {
+  return product.title || product.name || 'Untitled Product';
 }
 
-// Works out how to play a given video link: YouTube gets embedded,
-// direct .mp4 gets a native player, anything else (Instagram Reels,
-// TikTok, etc.) just opens in a new tab since those platforms block
-// iframe embedding.
-type VideoKind = 'youtube' | 'mp4' | 'external';
-
-function getVideoKind(url: string): VideoKind {
-  if (url.includes('youtube.com') || url.includes('youtu.be')) return 'youtube';
-  if (url.toLowerCase().endsWith('.mp4')) return 'mp4';
-  return 'external';
+function getImage(product: Product) {
+  return product.imageUrl || product.image || product.images?.[0] || '';
 }
 
-function getYouTubeEmbedUrl(url: string): string {
-  const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|shorts\/|embed\/))([\w-]{11})/);
-  const videoId = match ? match[1] : '';
-  return `https://www.youtube.com/embed/${videoId}?autoplay=1`;
+function getOriginalPrice(product: Product) {
+  return Number(product.compareAtPrice ?? product.originalPrice ?? 0);
 }
 
-// ==========================================
-// SECTION: VIDEO MODAL
-// ==========================================
-function VideoModal({ videoUrl, onClose }: { videoUrl: string; onClose: () => void }) {
-  const kind = getVideoKind(videoUrl);
-
-  return (
-    <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center px-4">
-      <div className="relative w-full max-w-md">
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Close video"
-          className="absolute -top-10 right-0 text-white"
-        >
-          <X className="w-6 h-6" aria-hidden="true" />
-        </button>
-
-        <div className="aspect-[9/16] max-h-[80vh] rounded-xl overflow-hidden bg-black mx-auto">
-          {kind === 'youtube' && (
-            <iframe
-              className="w-full h-full"
-              src={getYouTubeEmbedUrl(videoUrl)}
-              title="Product video"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-            />
-          )}
-          {kind === 'mp4' && (
-            <video src={videoUrl} controls autoPlay className="w-full h-full object-contain" />
-          )}
-          {kind === 'external' && (
-            <div className="w-full h-full flex flex-col items-center justify-center gap-3 p-6 text-center">
-              <p className="text-white text-sm">This video opens on its original platform.</p>
-              <a
-                href={videoUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="bg-[#0F6A5F] text-white text-sm font-semibold px-4 py-2 rounded-full"
-              >
-                Open Reel
-              </a>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
+function getPrice(product: Product) {
+  return Number(product.price ?? 0);
 }
 
-// ==========================================
-// SECTION: PRODUCT GRID
-// ==========================================
-export default function ProductGrid() {
+function getDiscount(product: Product) {
+  const original = getOriginalPrice(product);
+  const price = getPrice(product);
+  if (!original || !price || original <= price) return 0;
+  return Math.round(((original - price) / original) * 100);
+}
+
+function getVideo(product: Product) {
+  return product.videoUrl || product.reelUrl || '';
+}
+
+export default function ProductGrid({ selectedMaxPrice = null }: ProductGridProps) {
   const [products, setProducts] = useState<Product[]>([]);
-  const [activeVideoUrl, setActiveVideoUrl] = useState<string | null>(null);
-  const addItem = useCartStore((s) => s.addItem);
-  const { settings } = useSettings();
+  const [loading, setLoading] = useState(true);
+  const [query, setQuery] = useState('');
+  const [sort, setSort] = useState<SortMode>('featured');
+  const [wishlist, setWishlist] = useState<string[]>([]);
+  const [quickView, setQuickView] = useState<Product | null>(null);
+  const [videoProduct, setVideoProduct] = useState<Product | null>(null);
+  const [addedId, setAddedId] = useState<string | null>(null);
+
+  const addItem = useCartStore((state) => state.addItem);
+  const openDrawer = useCartStore((state: any) => state.openDrawer);
 
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'products'), (snap) => {
-      setProducts(snap.docs.map((d) => ({ id: d.id, ...d.data() })) as Product[]);
-    });
-    return () => unsub();
+    const unsubscribe = onSnapshot(
+      collection(db, 'products'),
+      (snapshot) => {
+        setProducts(
+          snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Product[]
+        );
+        setLoading(false);
+      },
+      () => setLoading(false)
+    );
+
+    return () => unsubscribe();
   }, []);
 
-  return (
-    <section className="max-w-md mx-auto px-4 mt-6">
-      <h2 className="font-[family-name:var(--font-display)] font-bold text-base mb-3">
-        Just For You
-      </h2>
+  const visibleProducts = useMemo(() => {
+    const q = query.trim().toLowerCase();
 
-      {products.length === 0 && (
-        <p className="text-xs text-black/40">No products yet — add some from the admin panel.</p>
-      )}
+    const filtered = products.filter((product) => {
+      const title = getTitle(product).toLowerCase();
+      const category = String(product.category || product.categoryId || '').toLowerCase();
+      const matchesSearch = !q || title.includes(q) || category.includes(q);
+      const matchesBucket =
+        selectedMaxPrice == null || getPrice(product) <= selectedMaxPrice;
 
-      <div className="grid grid-cols-2 gap-3">
-        {products.map((p) => {
-          const badge = discountBadge(p.price, p.originalPrice);
-          const outOfStock = p.stock <= 0;
+      return matchesSearch && matchesBucket;
+    });
 
-          return (
-            <div
-              key={p.id}
-              className="bg-white rounded-xl border border-black/10 overflow-hidden flex flex-col"
-            >
-              <div className="relative h-24 bg-[#F4F4F1]">
-                {p.imageUrl && (
-                  <img src={p.imageUrl} alt={p.title} className="w-full h-full object-cover" />
-                )}
+    return filtered.sort((a, b) => {
+      if (sort === 'low') return getPrice(a) - getPrice(b);
+      if (sort === 'high') return getPrice(b) - getPrice(a);
+      if (sort === 'discount') return getDiscount(b) - getDiscount(a);
+      return Number(Boolean(b.isFlashSale)) - Number(Boolean(a.isFlashSale));
+    });
+  }, [products, query, selectedMaxPrice, sort]);
 
-                {badge && (
-                  <span
-                    className="absolute top-2 left-0 bg-[#E1352B] text-white text-[10px] font-bold px-2 py-0.5"
-                    style={{ clipPath: 'polygon(0 0, 100% 0, 92% 50%, 100% 100%, 0 100%)' }}
-                  >
-                    {badge}
-                  </span>
-                )}
+  const toggleWishlist = (id: string) => {
+    setWishlist((current) =>
+      current.includes(id) ? current.filter((item) => item !== id) : [...current, id]
+    );
+  };
 
-                {outOfStock && (
-                  <span className="absolute inset-0 bg-black/50 flex items-center justify-center text-white text-[10px] font-bold">
-                    SOLD OUT
-                  </span>
-                )}
+  const handleAdd = (product: Product) => {
+    addItem({
+      id: product.id,
+      name: getTitle(product),
+      price: getPrice(product),
+      originalPrice: Number(product.originalPrice ?? product.compareAtPrice ?? getPrice(product)),
+    });
+    setAddedId(product.id);
+    setTimeout(() => setAddedId(null), 1100);
+    if (typeof openDrawer === 'function') openDrawer();
+  };
 
-                {/* SECTION: SHINY "WATCH VIDEO" BADGE — only shows when this product has a videoUrl */}
-                {p.videoUrl && (
-                  <button
-                    type="button"
-                    onClick={() => setActiveVideoUrl(p.videoUrl!)}
-                    aria-label={`Watch video for ${p.title}`}
-                    className="absolute bottom-2 right-2 flex items-center gap-1 bg-gradient-to-r from-[#E1352B] to-[#FFB020] text-white text-[10px] font-bold px-2 py-1 rounded-full shadow-md active:scale-95 transition"
-                  >
-                    🎬 Reel
-                  </button>
-                )}
+  if (loading) {
+    return (
+      <section className="mt-8 px-4">
+        <div className="mb-4 h-7 w-44 animate-pulse rounded-lg bg-black/8" />
+        <div className="grid grid-cols-2 gap-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="overflow-hidden rounded-[22px] bg-white">
+              <div className="aspect-square animate-pulse bg-black/8" />
+              <div className="space-y-2 p-3">
+                <div className="h-3 w-4/5 animate-pulse rounded bg-black/8" />
+                <div className="h-5 w-1/2 animate-pulse rounded bg-black/8" />
               </div>
+            </div>
+          ))}
+        </div>
+      </section>
+    );
+  }
 
-              <div className="p-2.5 flex flex-col gap-1.5 flex-1">
-                <p className="text-xs font-medium leading-snug line-clamp-2">{p.title}</p>
+  return (
+    <section className="mt-8 px-4 pb-28">
+      <div className="mb-4">
+        <div className="mb-1 flex items-center gap-2 text-[#E1352B]">
+          <ShoppingBag size={14} />
+          <span className="text-[10px] font-black uppercase tracking-[0.2em]">
+            PrimeHub picks
+          </span>
+        </div>
+        <div className="flex items-end justify-between gap-3">
+          <div>
+            <h2 className="text-2xl font-black tracking-tight text-[#14140F]">
+              Discover deals
+            </h2>
+            <p className="mt-1 text-xs text-black/45">
+              {visibleProducts.length} product{visibleProducts.length === 1 ? '' : 's'} to explore
+            </p>
+          </div>
+        </div>
+      </div>
 
-                <div className="flex items-center gap-1">
-                  <Star className="w-3 h-3 fill-[#FFB020] text-[#FFB020]" aria-hidden="true" />
-                  <span className="text-[10px] text-black/50">4.5</span>
-                </div>
+      <div className="mb-4 flex gap-2">
+        <label className="flex min-w-0 flex-1 items-center gap-2 rounded-2xl border border-black/8 bg-white px-3 py-2.5 shadow-sm">
+          <Search size={16} className="shrink-0 text-black/40" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search products..."
+            className="min-w-0 flex-1 bg-transparent text-xs font-semibold outline-none placeholder:text-black/35"
+          />
+          {query && (
+            <button type="button" onClick={() => setQuery('')} aria-label="Clear search">
+              <X size={14} className="text-black/40" />
+            </button>
+          )}
+        </label>
 
-                <div className="flex items-baseline gap-1.5 font-[family-name:var(--font-mono)]">
-                  <span className="text-sm font-bold">Rs {p.price}</span>
-                  {p.originalPrice > p.price && (
-                    <span className="text-[10px] text-black/40 line-through">Rs {p.originalPrice}</span>
+        <label className="flex shrink-0 items-center gap-1.5 rounded-2xl border border-black/8 bg-white px-2.5 shadow-sm">
+          <ArrowDownUp size={14} className="text-black/45" />
+          <select
+            value={sort}
+            onChange={(e) => setSort(e.target.value as SortMode)}
+            className="max-w-[90px] bg-transparent text-[10px] font-black outline-none"
+            aria-label="Sort products"
+          >
+            <option value="featured">Featured</option>
+            <option value="discount">Best deal</option>
+            <option value="low">Low price</option>
+            <option value="high">High price</option>
+          </select>
+        </label>
+      </div>
+
+      {visibleProducts.length === 0 ? (
+        <div className="rounded-[28px] border border-dashed border-black/12 bg-white p-8 text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#F4F4F1]">
+            <Search size={22} className="text-black/35" />
+          </div>
+          <h3 className="mt-4 text-base font-black">No deals found</h3>
+          <p className="mt-1 text-xs text-black/45">
+            Try another search or clear your budget filter.
+          </p>
+          {selectedMaxPrice !== null && (
+            <p className="mt-3 text-[10px] font-black uppercase tracking-wider text-[#E1352B]">
+              Budget: Rs. {Number(selectedMaxPrice).toLocaleString()} or less
+            </p>
+          )}
+        </div>
+      ) : (
+        <div className="grid grid-cols-2 gap-3">
+          {visibleProducts.map((product) => {
+            const title = getTitle(product);
+            const image = getImage(product);
+            const price = getPrice(product);
+            const original = getOriginalPrice(product);
+            const discount = getDiscount(product);
+            const video = getVideo(product);
+            const stock = Number(product.stock ?? product.quantity ?? 0);
+            const lowStock = stock > 0 && stock <= 5;
+            const wished = wishlist.includes(product.id);
+
+            return (
+              <article
+                key={product.id}
+                className="group overflow-hidden rounded-[24px] border border-black/7 bg-white shadow-[0_10px_30px_rgba(20,20,15,0.06)] transition duration-300 hover:-translate-y-0.5 hover:shadow-[0_18px_42px_rgba(20,20,15,0.10)]"
+              >
+                <div className="relative aspect-square overflow-hidden bg-[#F4F4F1]">
+                  {image ? (
+                    <img
+                      src={image}
+                      alt={title}
+                      loading="lazy"
+                      className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.04]"
+                    />
+                  ) : (
+                    <div className="flex h-full items-center justify-center text-xs font-bold text-black/25">
+                      No image
+                    </div>
+                  )}
+
+                  <div className="absolute left-2.5 top-2.5 flex max-w-[75%] flex-wrap gap-1.5">
+                    {discount > 0 && (
+                      <span className="rounded-full bg-[#E1352B] px-2 py-1 text-[9px] font-black text-white shadow-sm">
+                        -{discount}%
+                      </span>
+                    )}
+                    {product.isFlashSale && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-[#14140F] px-2 py-1 text-[9px] font-black text-white shadow-sm">
+                        <Zap size={9} />
+                        FLASH
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="absolute right-2.5 top-2.5 flex gap-1.5">
+                    {video && (
+                      <button
+                        type="button"
+                        onClick={() => setVideoProduct(product)}
+                        className="flex h-8 w-8 items-center justify-center rounded-full bg-white/92 text-[#14140F] shadow-md backdrop-blur"
+                        aria-label={`Play video for ${title}`}
+                      >
+                        <Play size={13} fill="currentColor" />
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => toggleWishlist(product.id)}
+                      className="flex h-8 w-8 items-center justify-center rounded-full bg-white/92 shadow-md backdrop-blur"
+                      aria-label={wished ? `Remove ${title} from wishlist` : `Add ${title} to wishlist`}
+                    >
+                      <Heart
+                        size={14}
+                        className={wished ? 'text-[#E1352B]' : 'text-[#14140F]'}
+                        fill={wished ? 'currentColor' : 'none'}
+                      />
+                    </button>
+                  </div>
+
+                  {lowStock && (
+                    <span className="absolute bottom-2.5 left-2.5 rounded-full bg-[#FFB020] px-2 py-1 text-[9px] font-black text-[#14140F]">
+                      Only {stock} left
+                    </span>
                   )}
                 </div>
 
-                <div className="mt-1 flex gap-1.5">
+                <div className="p-3">
+                  <Link
+                    href={`/product/${product.id}`}
+                    className="block w-full text-left"
+                  >
+                    <p className="line-clamp-2 min-h-[32px] text-[12px] font-extrabold leading-4 text-[#14140F]">
+                      {title}
+                    </p>
+                    {product.category && (
+                      <p className="mt-1 text-[9px] font-black uppercase tracking-wider text-black/35">
+                        {product.category}
+                      </p>
+                    )}
+
+                    <div className="mt-2 flex items-end gap-1.5">
+                      <span className="font-[family-name:var(--font-mono)] text-[16px] font-black text-[#E1352B]">
+                        Rs. {price.toLocaleString()}
+                      </span>
+                      {original > price && (
+                        <span className="mb-0.5 text-[9px] text-black/35 line-through">
+                          Rs. {original.toLocaleString()}
+                        </span>
+                      )}
+                    </div>
+                  </Link>
+
                   <button
                     type="button"
-                    disabled={outOfStock}
-                    onClick={() =>
-                      addItem({ id: Number(p.id) || Date.now(), name: p.title, price: p.price, originalPrice: p.originalPrice })
-                    }
-                    className="flex-1 text-[10px] font-semibold bg-[#14140F] text-white rounded-full py-1.5 active:scale-95 transition disabled:opacity-40"
+                    onClick={() => handleAdd(product)}
+                    className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl bg-[#14140F] py-2.5 text-[10px] font-black text-white transition hover:bg-[#E1352B] active:scale-[0.98]"
                   >
-                    {outOfStock ? 'Sold Out' : 'Add to Cart'}
+                    {addedId === product.id ? (
+                      <>
+                        <Check size={13} />
+                        Added to cart
+                      </>
+                    ) : (
+                      <>
+                        <Plus size={13} />
+                        Add to cart
+                      </>
+                    )}
                   </button>
-                  <a
-                    href={buildWhatsAppLink(settings.whatsappNumber, p.title, p.price)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    aria-label={`Order ${p.title} on WhatsApp`}
-                    className="w-8 h-8 shrink-0 rounded-full bg-[#0F6A5F] text-white flex items-center justify-center active:scale-95 transition"
-                  >
-                    <MessageCircle className="w-3.5 h-3.5" aria-hidden="true" />
-                  </a>
                 </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+              </article>
+            );
+          })}
+        </div>
+      )}
 
-      {/* SECTION: VIDEO MODAL — mounted once, driven by activeVideoUrl */}
-      {activeVideoUrl && (
-        <VideoModal videoUrl={activeVideoUrl} onClose={() => setActiveVideoUrl(null)} />
+      {quickView && (
+        <div
+          className="fixed inset-0 z-[80] flex items-end justify-center bg-black/55 p-3 backdrop-blur-sm sm:items-center"
+          onClick={() => setQuickView(null)}
+        >
+          <div
+            className="w-full max-w-md overflow-hidden rounded-[28px] bg-white shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="relative aspect-square bg-[#F4F4F1]">
+              {getImage(quickView) && (
+                <img
+                  src={getImage(quickView)}
+                  alt={getTitle(quickView)}
+                  className="h-full w-full object-cover"
+                />
+              )}
+              <button
+                type="button"
+                onClick={() => setQuickView(null)}
+                className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-white shadow-md"
+                aria-label="Close quick view"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <div className="p-5">
+              <p className="text-lg font-black">{getTitle(quickView)}</p>
+              <div className="mt-2 flex items-baseline gap-2">
+                <span className="font-[family-name:var(--font-mono)] text-2xl font-black text-[#E1352B]">
+                  Rs. {getPrice(quickView).toLocaleString()}
+                </span>
+                {getOriginalPrice(quickView) > getPrice(quickView) && (
+                  <span className="text-xs text-black/35 line-through">
+                    Rs. {getOriginalPrice(quickView).toLocaleString()}
+                  </span>
+                )}
+              </div>
+              {quickView.description && (
+                <p className="mt-3 text-xs leading-5 text-black/55">{quickView.description}</p>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  handleAdd(quickView);
+                  setQuickView(null);
+                }}
+                className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl bg-[#E1352B] py-3.5 text-xs font-black text-white"
+              >
+                <ShoppingBag size={15} />
+                Add to cart
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {videoProduct && (
+        <div
+          className="fixed inset-0 z-[90] flex items-center justify-center bg-black/80 p-4"
+          onClick={() => setVideoProduct(null)}
+        >
+          <div className="relative w-full max-w-lg" onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              onClick={() => setVideoProduct(null)}
+              className="absolute -right-1 -top-12 flex h-9 w-9 items-center justify-center rounded-full bg-white"
+              aria-label="Close video"
+            >
+              <X size={16} />
+            </button>
+            <video
+              src={getVideo(videoProduct)}
+              controls
+              playsInline
+              autoPlay
+              className="max-h-[78vh] w-full rounded-3xl bg-black"
+            />
+          </div>
+        </div>
       )}
     </section>
   );

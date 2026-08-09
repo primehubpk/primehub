@@ -4,13 +4,93 @@
 // sides always agree on what a Product / Category / Order / Settings
 // document looks like.
 
+export interface FreeDeliverySettings {
+  enabled: boolean;
+  itemThreshold: number;
+  message: string;
+  unlockedMessage: string;
+}
+
+export interface PriceBucket {
+  id: string;
+  title: string;
+  amount: number;
+  iconUrl: string;
+  accent: string;
+  sortOrder: number;
+  active: boolean;
+}
+
+export type Weekday =
+  | 'sunday'
+  | 'monday'
+  | 'tuesday'
+  | 'wednesday'
+  | 'thursday'
+  | 'friday'
+  | 'saturday';
+
+export interface WeeklyDeal {
+  id: string;
+  day: Weekday;
+  label: string;
+  productId: string;
+  imageUrl: string;
+  title: string;
+  originalPrice: number;
+  dealPrice: number;
+  startAt: string;
+  endAt: string;
+  buttonText: string;
+  buttonLink: string;
+  active: boolean;
+}
+
+export interface DailyDeal {
+  productId: string;
+  imageUrl: string;
+  title: string;
+  originalPrice: number;
+  dealPrice: number;
+  startAt: string;
+  endAt: string;
+  buttonText: string;
+  buttonLink: string;
+  active: boolean;
+}
+
+export interface YouTubeGuideSettings {
+  enabled: boolean;
+  title: string;
+  videoId: string;
+  description: string;
+}
+
+export interface PolicyPageContent {
+  title: string;
+  content: string;
+}
+
 export interface SiteSettings {
+  freeDelivery?: FreeDeliverySettings;
+  priceBuckets?: PriceBucket[];
+  weeklyDeals?: WeeklyDeal[];
+  dailyDeal?: DailyDeal;
+  youtubeGuide?: YouTubeGuideSettings;
+  policies?: {
+    privacyPolicy?: PolicyPageContent;
+    terms?: PolicyPageContent;
+    returnPolicy?: PolicyPageContent;
+  };
   announcementText: string;
   whatsappNumber: string; // digits only, no + or leading zeros
   freeShippingCount: number;
   heroTitle: string;
   heroDiscountText: string;
   heroCountdownEndTime: string; // ISO date string, e.g. "2026-08-10T20:00:00"
+  heroImageUrl: string; // Daily deal / hero creative, managed from Admin
+  heroButtonText: string; // CTA label
+  heroButtonLink: string; // CTA destination
 }
 
 export interface Product {
@@ -33,20 +113,32 @@ export interface Category {
 }
 
 export interface OrderItem {
-  name: string;
+  productId: string;
+  title: string;
   price: number;
-  qty: number;
+  quantity: number;
+  image?: string;
+}
+
+export interface OrderCustomer {
+  name: string;
+  phone: string;
+  email?: string;
+  address: string;
+  city: string;
+  notes?: string;
 }
 
 export interface Order {
   id: string;
-  customerName: string;
-  phone: string;
-  address: string;
+  customer: OrderCustomer;
   items: OrderItem[];
+  totalItems: number;
+  subtotal: number;
   total: number;
-  paymentStatus: string;
-  status: 'Pending' | 'Shipped' | 'Delivered' | 'Cancelled';
-  placedVia: 'Website' | 'WhatsApp';
-  createdAt: any; // Firestore Timestamp
+  currency: string;
+  status: 'pending' | 'confirmed' | 'shipped' | 'delivered' | 'cancelled';
+  source: 'website' | 'WhatsApp';
+  createdAt: any;
+  updatedAt?: any;
 }

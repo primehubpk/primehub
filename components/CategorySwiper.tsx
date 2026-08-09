@@ -6,11 +6,17 @@
 
 'use client';
 
+import Link from 'next/link';
+
 import { useEffect, useState } from 'react';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { ChevronRight } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { Category } from '@/lib/types';
+
+function categorySlug(value: string) {
+  return value.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+}
 
 export default function CategorySwiper() {
   const [categories, setCategories] = useState<Category[]>([]);
@@ -28,12 +34,9 @@ export default function CategorySwiper() {
         <h2 className="font-[family-name:var(--font-display)] font-bold text-base">
           Shop by Category
         </h2>
-        <button
-          type="button"
-          className="text-[11px] font-semibold text-[#0F6A5F] flex items-center gap-0.5"
-        >
+        <Link href="/shop" className="text-[11px] font-semibold text-[#0F6A5F] flex items-center gap-0.5">
           View all <ChevronRight className="w-3.5 h-3.5" aria-hidden="true" />
-        </button>
+        </Link>
       </div>
 
       {categories.length === 0 && (
@@ -42,9 +45,9 @@ export default function CategorySwiper() {
 
       <div className="flex gap-4 overflow-x-auto pb-1 -mx-1 px-1 snap-x snap-mandatory scrollbar-hide">
         {categories.map((cat) => (
-          <button
+          <Link
             key={cat.id}
-            type="button"
+            href={`/category/${encodeURIComponent(categorySlug(cat.title || cat.id))}`}
             className="flex flex-col items-center gap-1.5 shrink-0 snap-start active:scale-95 transition"
           >
             {cat.iconUrl ? (
@@ -59,7 +62,7 @@ export default function CategorySwiper() {
               </div>
             )}
             <span className="text-[11px] text-black/70">{cat.title}</span>
-          </button>
+          </Link>
         ))}
       </div>
     </section>

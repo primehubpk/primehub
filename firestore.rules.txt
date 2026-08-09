@@ -1,0 +1,52 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    // Admin UID — only this Firebase Authentication user
+    // can perform protected admin writes.
+    function adminUid() {
+      return "BZfIarsxGkXwZUIEcfFXa9u7Ge02";
+    }
+
+    function isAdmin() {
+      return signedIn() && request.auth.uid == adminUid();
+    }
+
+    // Public storefront data.
+    // Weekly Deals are stored inside settings/main.weeklyDeals (STEP 03),
+    // so they are covered by the settings rule below.
+    // Do NOT create a second weeklyDeals collection.
+    match /products/{productId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /categories/{categoryId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /settings/{settingId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Orders are private operational data.
+    // Customers can create an order as guests,
+    // but cannot read/update/delete orders unless they are the admin.
+    match /orders/{orderId} {
+      allow create: if true;
+      allow read, update, delete: if isAdmin();
+    }
+
+    // Default deny for anything not explicitly listed above.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
