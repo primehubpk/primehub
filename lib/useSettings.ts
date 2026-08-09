@@ -1,7 +1,40 @@
+// lib/useSettings.ts
+// Small shared hook so every storefront component (Header, HeroFlashBanner,
+// ProductGrid, etc.) can read the live `settings/main` Firestore document
+// without each one duplicating its own listener + fallback logic.
+
 'use client';
-import { useEffect,useState } from 'react';
-import { doc,onSnapshot } from 'firebase/firestore';
+
+import { useEffect, useState } from 'react';
+import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { SiteSettings } from '@/lib/types';
-const DEFAULT_SETTINGS:SiteSettings={announcementText:'Worldwide delivery available | Apni product hamain WhatsApp send karein, aapki product apni website pe live karenge aur duniya bhar se order hasil karein!',whatsappNumber:'923001234567',freeShippingCount:5,heroTitle:'Flash Sale',heroDiscountText:'Up to 70% Off',heroCountdownEndTime:new Date(Date.now()+2*3600*1000).toISOString(),heroImageUrl:'https://images.unsplash.com/photo-1607082349566-187342175e2f?q=80&w=1200&auto=format&fit=crop',heroButtonText:"Shop Today's Deal",heroButtonLink:'#',dailyDeal:{productId:'',imageUrl:'',title:'',originalPrice:0,dealPrice:0,startAt:'',endAt:'',buttonText:'Shop Deal',buttonLink:'#',active:false},youtubeGuide:{enabled:true,title:'How To Order & List Products on PrimeHub Deals',videoId:'dQw4w9WgXcQ',description:'Watch this quick guide to learn how to order and list products on PrimeHub Deals.'},policies:{privacyPolicy:{title:'Privacy Policy',content:'This page explains how PrimeHub Deals handles customer information and order-related data. Please contact the store team if you need clarification about our privacy practices.'},terms:{title:'Terms of Service',content:'By using PrimeHub Deals, you agree to use the website for lawful shopping and communication. Product availability, pricing, delivery and other details may change as the store is updated.'},returnPolicy:{title:'Return Policy',content:'Please contact the PrimeHub Deals team for return or order assistance. Return eligibility and handling depend on the product and order circumstances.'}},weeklyDeals:[],freeDelivery:{enabled:true,itemThreshold:5,message:'Add {remaining} more item{plural} to unlock FREE DELIVERY',unlockedMessage:'FREE DELIVERY UNLOCKED 🎉'},priceBuckets:[{id:'under-99',title:'Under 99',amount:99,iconUrl:'',accent:'#E1352B',sortOrder:1,active:true},{id:'under-300',title:'Under 300',amount:300,iconUrl:'',accent:'#0F6A5F',sortOrder:2,active:true},{id:'under-500',title:'Under 500',amount:500,iconUrl:'',accent:'#FFB020',sortOrder:3,active:true},{id:'under-1000',title:'Under 1000',amount:1000,iconUrl:'',accent:'#14140F',sortOrder:4,active:true}]};
-export function useSettings(){const[settings,setSettings]=useState<SiteSettings>(DEFAULT_SETTINGS);const[loading,setLoading]=useState(true);useEffect(()=>{const unsub=onSnapshot(doc(db,'settings','main'),snap=>{if(snap.exists())setSettings({...DEFAULT_SETTINGS,...(snap.data() as Partial<SiteSettings>)});setLoading(false)});return()=>unsub()},[]);return{settings,loading};}
+
+// Fallback values used until Firestore responds, or if the settings
+// document hasn't been created yet from the admin panel.
+const DEFAULT_SETTINGS: SiteSettings = {
+  announcementText:
+    'Worldwide delivery available | Apni product hamain WhatsApp send karein, aapki product apni website pe live karenge aur duniya bhar se order hasil karein!',
+  whatsappNumber: '923001234567',
+  freeShippingCount: 8,
+  heroTitle: 'Flash Sale',
+  heroDiscountText: 'Up to 70% Off',
+  heroCountdownEndTime: new Date(Date.now() + 2 * 3600 * 1000).toISOString(),
+};
+
+export function useSettings() {
+  const [settings, setSettings] = useState<SiteSettings>(DEFAULT_SETTINGS);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, 'settings', 'main'), (snap) => {
+      if (snap.exists()) {
+        setSettings({ ...DEFAULT_SETTINGS, ...(snap.data() as Partial<SiteSettings>) });
+      }
+      setLoading(false);
+    });
+    return () => unsub();
+  }, []);
+
+  return { settings, loading };
+}
