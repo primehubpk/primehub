@@ -10,22 +10,23 @@
 // Firestore rules additionally require the authenticated user
 // to match the configured Firebase Authentication admin UID.
 
-import { useEffect, useState } from 'react';
-import {
-  onAuthStateChanged,
-  signInWithEmailAndPassword,
-  signOut,
-  collection,
-  onSnapshot,
-  addDoc,
-  deleteDoc,
-  doc,
-  updateDoc,
-  setDoc,
-  getDoc,
-  query,
-  orderBy,
-  serverTimestamp,
+import { 
+  onAuthStateChanged, 
+  signInWithEmailAndPassword, 
+  signOut 
+} from 'firebase/auth';
+import { 
+  collection, 
+  onSnapshot, 
+  addDoc, 
+  deleteDoc, 
+  doc, 
+  updateDoc, 
+  setDoc, 
+  getDoc, 
+  query, 
+  orderBy, 
+  serverTimestamp 
 } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { Product, Category, Order, SiteSettings } from '@/lib/types';
