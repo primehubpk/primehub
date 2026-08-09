@@ -1,0 +1,11 @@
+rules_version = '2';
+service cloud.firestore { match /databases/{database}/documents {
+function signedIn(){return request.auth!=null;}
+function adminUid(){return "BZfIarsxGkXwZUIEcfFXa9u7Ge02";}
+function isAdmin(){return signedIn()&&request.auth.uid==adminUid();}
+match /products/{productId}{allow read:if true;allow create,update,delete:if isAdmin();}
+match /categories/{categoryId}{allow read:if true;allow create,update,delete:if isAdmin();}
+match /settings/{settingId}{allow read:if true;allow create,update,delete:if isAdmin();}
+match /orders/{orderId}{allow create:if true;allow read,update,delete:if isAdmin();}
+match /{document=**}{allow read,write:if false;}
+}}
