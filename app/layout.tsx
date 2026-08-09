@@ -75,15 +75,10 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  width: 'device-width',
-  initialScale: 1,
   themeColor: '#14140F',
   colorScheme: 'light',
-  appleWebApp: {
-    capable: true,
-    title: 'PrimeHub Deals',
-    statusBarStyle: 'black-translucent',
-  },
+  width: 'device-width',
+  initialScale: 1,
 };
 
 // =====================================================================
