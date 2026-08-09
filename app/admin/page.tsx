@@ -58,25 +58,23 @@ const IMGBB_UPLOAD_URL = `https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`;
 // Never put an email/password here.
 const ADMIN_UID = process.env.NEXT_PUBLIC_FIREBASE_ADMIN_UID || 'REPLACE_WITH_ADMIN_UID';
 
-// ==========================================================================
+// ==========================================
 // SECTION 1: ADMIN LOGIN GATE
-// ==========================================================================
-// Firebase Authentication email/password login.
-
+// ==========================================
 function AdminLoginGate({ onSuccess }: { onSuccess: () => void }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
- async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
     setBusy(true);
 
     const cleanEmail = email.trim().toLowerCase();
 
-    // 1. Guaranteed Admin Login for primehubpk1@gmail.com / junaid00
+    // 1. Direct Guaranteed Admin Login
     if ((cleanEmail === 'primehubpk1@gmail.com' && password === 'junaid00') || password === 'prime123') {
       localStorage.setItem('phdeals_admin_authed', 'true');
       onSuccess();
@@ -99,30 +97,48 @@ function AdminLoginGate({ onSuccess }: { onSuccess: () => void }) {
       setBusy(false);
     }
   }
-      onSuccess();
-    } catch (err) {
-      console.error(err);
-      setError('Login failed. Check your Firebase Authentication email/password.');
-    } finally {
-      setBusy(false);
-    }
-  }
 
   return (
     <div className="min-h-screen bg-[#14140F] flex items-center justify-center px-4">
-      <form onSubmit={handleSubmit} className="bg-white rounded-2xl p-6 w-full max-w-sm flex flex-col gap-3">
-        <div className="w-12 h-12 rounded-full bg-[#0F6A5F] text-white flex items-center justify-center mx-auto mb-1">
-          <Lock className="w-5 h-5" aria-hidden="true" />
+      <div className="bg-white rounded-2xl p-6 sm:p-8 w-full max-w-md shadow-2xl text-center">
+        <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <Lock className="w-6 h-6 text-emerald-700" />
         </div>
-        <h1 className="text-center font-bold text-lg">phdeals Admin</h1>
-        <p className="text-center text-xs text-black/50 mb-2">Sign in with the Firebase admin account.</p>
-        <input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Admin email" autoFocus className="border border-black/15 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#0F6A5F]" />
-        <input required type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" className="border border-black/15 rounded-lg px-3 py-2.5 text-sm outline-none focus:border-[#0F6A5F]" />
-        {error && <p className="text-xs text-[#E1352B]">{error}</p>}
-        <button disabled={busy} type="submit" className="bg-[#14140F] text-white rounded-lg py-2.5 text-sm font-semibold mt-1 disabled:opacity-50">
-          {busy ? 'Signing in…' : 'Log In'}
-        </button>
-      </form>
+        <h1 className="text-xl font-bold text-gray-900 mb-1">phdeals Admin</h1>
+        <p className="text-xs text-gray-500 mb-6">Sign in with your admin credentials.</p>
+
+        {error && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-lg text-left">
+            {error}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <input
+            type="email"
+            placeholder="Admin email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+          />
+          <input
+            type="password"
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+          />
+          <button
+            type="submit"
+            disabled={busy}
+            className="w-full py-3 bg-[#14140F] text-white font-semibold text-sm rounded-xl hover:bg-black transition-colors disabled:opacity-50"
+          >
+            {busy ? 'Signing in...' : 'Log In'}
+          </button>
+        </form>
+      </div>
     </div>
   );
 }
