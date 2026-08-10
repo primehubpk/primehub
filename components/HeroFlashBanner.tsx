@@ -25,7 +25,11 @@ function millisecondsUntilStart(day: Weekday) {
   const targetUtc = Date.UTC(current.year, current.month - 1, current.day + delta, 0, 0, 0) - PKT_OFFSET_MS;
   return Math.max(0, targetUtc - current.now.getTime());
 }
-function millisecondsUntilEnd() { return millisecondsUntilStart(currentDay()); }
+function millisecondsUntilEnd() {
+  const current = pakistanParts();
+  const tomorrowUtc = Date.UTC(current.year, current.month - 1, current.day + 1, 0, 0, 0) - PKT_OFFSET_MS;
+  return Math.max(0, tomorrowUtc - current.now.getTime());
+}
 function countdownParts(milliseconds: number) { const total = Math.floor(milliseconds / 1000); return { days: Math.floor(total / 86400), hours: Math.floor((total % 86400) / 3600), minutes: Math.floor((total % 3600) / 60), seconds: total % 60 }; }
 function currentDay(): Weekday { return pakistanParts().weekday; }
 function dealForDay(deals: WeeklyDeal[], day: Weekday) { return deals.find((deal) => deal.day === day && deal.active) || null; }
