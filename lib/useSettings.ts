@@ -1,7 +1,7 @@
 // lib/useSettings.ts
 // Shared live storefront settings reader. The admin panel writes settings/main,
-// while this hook also tolerates older announcement field names so a previously
-// saved admin announcement never silently disappears from the header.
+// while this hook also reads the legacy settings/general document so existing
+// admin announcements remain visible during the settings migration.
 
 'use client';
 
@@ -39,13 +39,18 @@ const DEFAULT_SETTINGS: SiteSettings = {
 
 type RawSettings = Partial<SiteSettings> & Record<string, unknown>;
 
-function resolveAnnouncement(data: RawSettings): string {
+function resolveAnnouncement(mainData: RawSettings, legacyData?: RawSettings): string {
   const candidates = [
-    data.announcementText,
-    data.topAnnouncement,
-    data.topAnnouncementText,
-    data.announcement,
-    data.announcementBarText,
+    mainData.announcementText,
+    mainData.topAnnouncement,
+    mainData.topAnnouncementText,
+    mainData.announcement,
+    mainData.announcementBarText,
+    legacyData?.announcementText,
+    legacyData?.topAnnouncement,
+    legacyData?.topAnnouncementText,
+    legacyData?.announcement,
+    legacyData?.announcementBarText,
   ];
   const match = candidates.find((value) => typeof value === 'string' && value.trim());
   return typeof match === 'string' ? match.trim() : DEFAULT_SETTINGS.announcementText;
@@ -56,18 +61,47 @@ export function useSettings() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsub = onSnapshot(
+    let mainData: RawSettings = {};
+    let legacyData: RawSettings = {};
+    let mainReady = false;
+    let legacyReady = false;
+
+    const publish = () => {
+      const merged = { ...DEFAULT_SETTINGS, ...legacyData, ...mainData };
+      setSettings({ ...merged, announcementText: resolveAnnouncement(mainData, legacyData) });
+      if (mainReady) setLoading(false);
+    };
+
+    const unsubscribeMain = onSnapshot(
       doc(db, 'settings', 'main'),
       (snap) => {
-        if (snap.exists()) {
-          const data = snap.data() as RawSettings;
-          setSettings({ ...DEFAULT_SETTINGS, ...data, announcementText: resolveAnnouncement(data) });
-        }
-        setLoading(false);
+        mainReady = true;
+        mainData = snap.exists() ? (snap.data() as RawSettings) : {};
+        publish();
       },
-      () => setLoading(false)
+      () => {
+        mainReady = true;
+        publish();
+      }
     );
-    return () => unsub();
+
+    const unsubscribeLegacy = onSnapshot(
+      doc(db, 'settings', 'general'),
+      (snap) => {
+        legacyReady = true;
+        legacyData = snap.exists() ? (snap.data() as RawSettings) : {};
+        publish();
+      },
+      () => {
+        legacyReady = true;
+        publish();
+      }
+    );
+
+    return () => {
+      unsubscribeMain();
+      unsubscribeLegacy();
+    };
   }, []);
 
   return { settings, loading };
