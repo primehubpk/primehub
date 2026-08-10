@@ -18,7 +18,7 @@ export async function uploadImageToImgBB(file: File): Promise<string> { const fo
 export const adminCollection = (name: string) => collection(db, name);
 export const getAdminDocument = (name: string, id: string) => getDoc(doc(db, name, id));
 export const listAdminDocuments = (name: string) => getDocs(collection(db, name));
-export const createAdminDocument = (name: string, value: Record<string, unknown>) => addDoc(collection(db, name), value);
-export const updateAdminDocument = (name: string, id: string, value: Record<string, unknown>) => updateDoc(doc(db, name, id), value);
-export const setAdminDocument = (name: string, id: string, value: Record<string, unknown>) => setDoc(doc(db, name, id), value, { merge: true });
+export const createAdminDocument = (name: string, value: Record<string, any>) => addDoc(collection(db, name), value);
+export const updateAdminDocument = (name: string, id: string, value: Record<string, any>) => updateDoc(doc(db, name, id), value);
+export const setAdminDocument = (name: string, id: string, value: Record<string, any>) => setDoc(doc(db, name, id), value, { merge: true });
 export const deleteAdminDocument = (name: string, id: string) => deleteDoc(doc(db, name, id));
