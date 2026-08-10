@@ -1,5 +1,3 @@
-import { Timestamp } from 'firebase/firestore';
-
 export const DEAL_DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] as const;
 export type DealDay = (typeof DEAL_DAYS)[number];
 
@@ -22,10 +20,7 @@ export function isDealActive(dealDay?: string, now = new Date()): boolean {
   return !!dealDay && DEAL_DAYS.includes(dealDay as DealDay) && dealDay === getPakistanDay(now);
 }
 
-/**
- * Single pricing rule for product/cart/checkout UI.
- * Future and expired scheduled deals fall back to regular price.
- */
+/** Single pricing rule: scheduled/future deals use regular price; only today's PKT deal price is active. */
 export function getEffectivePrice(product: DealPriceInput, now = new Date()): number {
   const regularPrice = Number(product.price || 0);
   const dealPrice = Number(product.dealPrice || 0);
