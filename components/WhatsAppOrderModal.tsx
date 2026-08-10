@@ -47,7 +47,7 @@ export default function WhatsAppOrderModal({ items, onClose, onSaved }: Props) {
       const reference = await addDoc(collection(db, 'orders'), {
         customer: { name: name.trim(), phone: phone.trim(), email: '', address: '', city: city.trim(), notes: 'WhatsApp order request.' },
         items: items.map((item) => ({ productId: String(item.productId || item.id || ''), title: titleOf(item), price: priceOf(item), quantity: quantityOf(item), image: item.image || item.imageUrl || '' })),
-        totalItems: items.reduce((sum, item) => sum + quantityOf(item), 0), subtotal, total: subtotal,
+       totalItems: items.reduce<number>((sum, item) => sum + quantityOf(item), 0),
         currency: 'PKR', status: 'pending', source: 'WhatsApp', createdAt: serverTimestamp(),
       });
       const lines = items.map((item, index) => `${index + 1}. ${titleOf(item)} x ${quantityOf(item)} — Rs. ${(priceOf(item) * quantityOf(item)).toLocaleString()}`);
