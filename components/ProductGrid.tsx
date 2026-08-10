@@ -1,7 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-
 import { useEffect, useMemo, useState } from 'react';
 import {
   ArrowDownUp,
@@ -76,23 +75,21 @@ function getVideo(product: Product) {
 export default function ProductGrid({ selectedMaxPrice = null }: ProductGridProps) {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-  const [query, setQuery] = useState('');
   const [sort, setSort] = useState<SortMode>('featured');
   const [wishlist, setWishlist] = useState<string[]>([]);
   const [quickView, setQuickView] = useState<Product | null>(null);
   const [videoProduct, setVideoProduct] = useState<Product | null>(null);
   const [addedId, setAddedId] = useState<string | null>(null);
+  const [addedProductId, setAddedProductId] = useState<string | null>(null);
 
   const addItem = useCartStore((state) => state.addItem);
-  const openDrawer = useCartStore((state: any) => state.openDrawer);
+  const cartItems = useCartStore((state) => state.items);
 
   useEffect(() => {
     const unsubscribe = onSnapshot(
       collection(db, 'products'),
       (snapshot) => {
-        setProducts(
-          snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Product[]
-        );
+        setProducts(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as Product[]);
         setLoading(false);
       },
       () => {
@@ -100,22 +97,13 @@ export default function ProductGrid({ selectedMaxPrice = null }: ProductGridProp
         setLoading(false);
       }
     );
-
     return () => unsubscribe();
   }, []);
 
   const visibleProducts = useMemo(() => {
-    const q = query.trim().toLowerCase();
-
-    const filtered = products.filter((product) => {
-      const title = getTitle(product).toLowerCase();
-      const category = String(product.category || product.categoryId || '').toLowerCase();
-      const matchesSearch = !q || title.includes(q) || category.includes(q);
-      const matchesBucket =
-        selectedMaxPrice == null || getPrice(product) <= selectedMaxPrice;
-
-      return matchesSearch && matchesBucket;
-    });
+    const filtered = products.filter((product) =>
+      selectedMaxPrice == null || getPrice(product) <= selectedMaxPrice
+    );
 
     return filtered.sort((a, b) => {
       if (sort === 'low') return getPrice(a) - getPrice(b);
@@ -123,7 +111,13 @@ export default function ProductGrid({ selectedMaxPrice = null }: ProductGridProp
       if (sort === 'discount') return getDiscount(b) - getDiscount(a);
       return Number(Boolean(b.isFlashSale)) - Number(Boolean(a.isFlashSale));
     });
-  }, [products, query, selectedMaxPrice, sort]);
+  }, [products, selectedMaxPrice, sort]);
+
+  const addedProduct = addedProductId ? products.find((product) => product.id === addedProductId) || null : null;
+  const cartIds = new Set(cartItems.map((item) => String(item.id)));
+  const recommendations = products
+    .filter((product) => product.id !== addedProductId && !cartIds.has(product.id))
+    .slice(0, 4);
 
   const toggleWishlist = (id: string) => {
     setWishlist((current) =>
@@ -139,8 +133,8 @@ export default function ProductGrid({ selectedMaxPrice = null }: ProductGridProp
       originalPrice: Number(product.originalPrice ?? product.compareAtPrice ?? getPrice(product)),
     });
     setAddedId(product.id);
-    setTimeout(() => setAddedId(null), 1100);
-    if (typeof openDrawer === 'function') openDrawer();
+    setAddedProductId(product.id);
+    window.setTimeout(() => setAddedId(null), 1100);
   };
 
   if (loading) {
@@ -163,43 +157,18 @@ export default function ProductGrid({ selectedMaxPrice = null }: ProductGridProp
   }
 
   return (
-    <section className="mt-8 px-4 pb-28">
-      <div className="mb-4">
-        <div className="mb-1 flex items-center gap-2 text-[#E1352B]">
-          <ShoppingBag size={14} />
-          <span className="text-[10px] font-black uppercase tracking-[0.2em]">
-            PrimeHub picks
-          </span>
-        </div>
-        <div className="flex items-end justify-between gap-3">
-          <div>
-            <h2 className="text-2xl font-black tracking-tight text-[#14140F]">
-              Discover deals
-            </h2>
-            <p className="mt-1 text-xs text-black/45">
-              {visibleProducts.length} product{visibleProducts.length === 1 ? '' : 's'} to explore
-            </p>
+    <section className="mt-8 px-4 pb-40">
+      <div className="mb-4 flex items-end justify-between gap-3">
+        <div>
+          <div className="mb-1 flex items-center gap-2 text-[#E1352B]">
+            <ShoppingBag size={14} />
+            <span className="text-[10px] font-black uppercase tracking-[0.2em]">PrimeHub picks</span>
           </div>
+          <h2 className="text-2xl font-black tracking-tight text-[#14140F]">Discover deals</h2>
+          <p className="mt-1 text-xs text-black/45">{visibleProducts.length} product{visibleProducts.length === 1 ? '' : 's'} to explore</p>
         </div>
-      </div>
 
-      <div className="mb-4 flex gap-2">
-        <label className="flex min-w-0 flex-1 items-center gap-2 rounded-2xl border border-black/8 bg-white px-3 py-2.5 shadow-sm">
-          <Search size={16} className="shrink-0 text-black/40" />
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search products..."
-            className="min-w-0 flex-1 bg-transparent text-xs font-semibold outline-none placeholder:text-black/35"
-          />
-          {query && (
-            <button type="button" onClick={() => setQuery('')} aria-label="Clear search">
-              <X size={14} className="text-black/40" />
-            </button>
-          )}
-        </label>
-
-        <label className="flex shrink-0 items-center gap-1.5 rounded-2xl border border-black/8 bg-white px-2.5 shadow-sm">
+        <label className="flex shrink-0 items-center gap-1.5 rounded-2xl border border-black/8 bg-white px-2.5 py-2.5 shadow-sm">
           <ArrowDownUp size={14} className="text-black/45" />
           <select
             value={sort}
@@ -217,17 +186,11 @@ export default function ProductGrid({ selectedMaxPrice = null }: ProductGridProp
 
       {visibleProducts.length === 0 ? (
         <div className="rounded-[28px] border border-dashed border-black/12 bg-white p-8 text-center">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#F4F4F1]">
-            <Search size={22} className="text-black/35" />
-          </div>
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#F4F4F1]"><Search size={22} className="text-black/35" /></div>
           <h3 className="mt-4 text-base font-black">No deals found</h3>
-          <p className="mt-1 text-xs text-black/45">
-            Try another search or clear your budget filter.
-          </p>
+          <p className="mt-1 text-xs text-black/45">Try another budget filter.</p>
           {selectedMaxPrice !== null && (
-            <p className="mt-3 text-[10px] font-black uppercase tracking-wider text-[#E1352B]">
-              Budget: Rs. {Number(selectedMaxPrice).toLocaleString()} or less
-            </p>
+            <p className="mt-3 text-[10px] font-black uppercase tracking-wider text-[#E1352B]">Budget: Rs. {Number(selectedMaxPrice).toLocaleString()} or less</p>
           )}
         </div>
       ) : (
@@ -244,113 +207,38 @@ export default function ProductGrid({ selectedMaxPrice = null }: ProductGridProp
             const wished = wishlist.includes(product.id);
 
             return (
-              <article
-                key={product.id}
-                className="group overflow-hidden rounded-[24px] border border-black/7 bg-white shadow-[0_10px_30px_rgba(20,20,15,0.06)] transition duration-300 hover:-translate-y-0.5 hover:shadow-[0_18px_42px_rgba(20,20,15,0.10)]"
-              >
+              <article key={product.id} className="group overflow-hidden rounded-[24px] border border-black/7 bg-white shadow-[0_10px_30px_rgba(20,20,15,0.06)] transition duration-300 hover:-translate-y-0.5 hover:shadow-[0_18px_42px_rgba(20,20,15,0.10)]">
                 <div className="relative aspect-square overflow-hidden bg-[#F4F4F1]">
                   {image ? (
-                    <img
-                      src={image}
-                      alt={title}
-                      loading="lazy"
-                      className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.04]"
-                    />
+                    <img src={image} alt={title} loading="lazy" className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.04]" />
                   ) : (
-                    <div className="flex h-full items-center justify-center text-xs font-bold text-black/25">
-                      No image
-                    </div>
+                    <div className="flex h-full items-center justify-center text-xs font-bold text-black/25">No image</div>
                   )}
-
                   <div className="absolute left-2.5 top-2.5 flex max-w-[75%] flex-wrap gap-1.5">
-                    {discount > 0 && (
-                      <span className="rounded-full bg-[#E1352B] px-2 py-1 text-[9px] font-black text-white shadow-sm">
-                        -{discount}%
-                      </span>
-                    )}
-                    {product.isFlashSale && (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-[#14140F] px-2 py-1 text-[9px] font-black text-white shadow-sm">
-                        <Zap size={9} />
-                        FLASH
-                      </span>
-                    )}
+                    {discount > 0 && <span className="rounded-full bg-[#E1352B] px-2 py-1 text-[9px] font-black text-white shadow-sm">-{discount}%</span>}
+                    {product.isFlashSale && <span className="inline-flex items-center gap-1 rounded-full bg-[#14140F] px-2 py-1 text-[9px] font-black text-white shadow-sm"><Zap size={9} />FLASH</span>}
                   </div>
-
                   <div className="absolute right-2.5 top-2.5 flex gap-1.5">
-                    {video && (
-                      <button
-                        type="button"
-                        onClick={() => setVideoProduct(product)}
-                        className="flex h-8 w-8 items-center justify-center rounded-full bg-white/92 text-[#14140F] shadow-md backdrop-blur"
-                        aria-label={`Play video for ${title}`}
-                      >
-                        <Play size={13} fill="currentColor" />
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => toggleWishlist(product.id)}
-                      className="flex h-8 w-8 items-center justify-center rounded-full bg-white/92 shadow-md backdrop-blur"
-                      aria-label={wished ? `Remove ${title} from wishlist` : `Add ${title} to wishlist`}
-                    >
-                      <Heart
-                        size={14}
-                        className={wished ? 'text-[#E1352B]' : 'text-[#14140F]'}
-                        fill={wished ? 'currentColor' : 'none'}
-                      />
+                    {video && <button type="button" onClick={() => setVideoProduct(product)} className="flex h-8 w-8 items-center justify-center rounded-full bg-white/92 text-[#14140F] shadow-md backdrop-blur" aria-label={`Play video for ${title}`}><Play size={13} fill="currentColor" /></button>}
+                    <button type="button" onClick={() => toggleWishlist(product.id)} className="flex h-8 w-8 items-center justify-center rounded-full bg-white/92 shadow-md backdrop-blur" aria-label={wished ? `Remove ${title} from wishlist` : `Add ${title} to wishlist`}>
+                      <Heart size={14} className={wished ? 'text-[#E1352B]' : 'text-[#14140F]'} fill={wished ? 'currentColor' : 'none'} />
                     </button>
                   </div>
-
-                  {lowStock && (
-                    <span className="absolute bottom-2.5 left-2.5 rounded-full bg-[#FFB020] px-2 py-1 text-[9px] font-black text-[#14140F]">
-                      Only {stock} left
-                    </span>
-                  )}
+                  {lowStock && <span className="absolute bottom-2.5 left-2.5 rounded-full bg-[#FFB020] px-2 py-1 text-[9px] font-black text-[#14140F]">Only {stock} left</span>}
                   <ProductUrgencyBadges stock={stock} productId={product.id} />
                 </div>
 
                 <div className="p-3">
-                  <Link
-                    href={`/product/${product.id}`}
-                    className="block w-full text-left"
-                  >
-                    <p className="line-clamp-2 min-h-[32px] text-[12px] font-extrabold leading-4 text-[#14140F]">
-                      {title}
-                    </p>
-                    {product.category && (
-                      <p className="mt-1 text-[9px] font-black uppercase tracking-wider text-black/35">
-                        {product.category}
-                      </p>
-                    )}
-
+                  <Link href={`/product/${product.id}`} className="block w-full text-left">
+                    <p className="line-clamp-2 min-h-[32px] text-[12px] font-extrabold leading-4 text-[#14140F]">{title}</p>
+                    {product.category && <p className="mt-1 text-[9px] font-black uppercase tracking-wider text-black/35">{product.category}</p>}
                     <div className="mt-2 flex items-end gap-1.5">
-                      <span className="font-[family-name:var(--font-mono)] text-[16px] font-black text-[#E1352B]">
-                        Rs. {price.toLocaleString()}
-                      </span>
-                      {original > price && (
-                        <span className="mb-0.5 text-[9px] text-black/35 line-through">
-                          Rs. {original.toLocaleString()}
-                        </span>
-                      )}
+                      <span className="font-[family-name:var(--font-mono)] text-[16px] font-black text-[#E1352B]">Rs. {price.toLocaleString()}</span>
+                      {original > price && <span className="mb-0.5 text-[9px] text-black/35 line-through">Rs. {original.toLocaleString()}</span>}
                     </div>
                   </Link>
-
-                  <button
-                    type="button"
-                    onClick={() => handleAdd(product)}
-                    className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl bg-[#14140F] py-2.5 text-[10px] font-black text-white transition hover:bg-[#E1352B] active:scale-[0.98]"
-                  >
-                    {addedId === product.id ? (
-                      <>
-                        <Check size={13} />
-                        Added to cart
-                      </>
-                    ) : (
-                      <>
-                        <Plus size={13} />
-                        Add to cart
-                      </>
-                    )}
+                  <button type="button" onClick={() => handleAdd(product)} className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl bg-[#14140F] py-2.5 text-[10px] font-black text-white transition hover:bg-[#E1352B] active:scale-[0.98]">
+                    {addedId === product.id ? <><Check size={13} />Added to cart</> : <><Plus size={13} />Add to cart</>}
                   </button>
                 </div>
               </article>
@@ -359,84 +247,61 @@ export default function ProductGrid({ selectedMaxPrice = null }: ProductGridProp
         </div>
       )}
 
+      {addedProduct && (
+        <div className="fixed inset-x-0 bottom-16 z-[75] px-3 sm:bottom-4">
+          <div className="mx-auto max-w-2xl overflow-hidden rounded-[24px] border border-white/20 bg-[#14140F]/95 p-3 text-white shadow-[0_18px_60px_rgba(0,0,0,0.28)] backdrop-blur-xl">
+            <div className="mb-2 flex items-center justify-between px-1">
+              <div>
+                <p className="text-[9px] font-black uppercase tracking-[0.18em] text-[#FFB020]">Added to cart ✓</p>
+                <p className="text-[11px] font-bold text-white/70">Complete your cart with something extra</p>
+              </div>
+              <button type="button" onClick={() => setAddedProductId(null)} className="rounded-full p-1.5 text-white/45 hover:bg-white/10" aria-label="Close recommendations"><X size={14} /></button>
+            </div>
+            <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none]">
+              {[addedProduct, ...recommendations].filter(Boolean).map((product, index) => (
+                <div key={`${product!.id}-${index}`} className="flex min-w-[172px] items-center gap-2 rounded-2xl bg-white/[0.07] p-2">
+                  <img src={getImage(product!)} alt={getTitle(product!)} className="h-14 w-14 shrink-0 rounded-xl object-cover bg-white/10" />
+                  <div className="min-w-0 flex-1">
+                    <p className="line-clamp-2 text-[9px] font-bold text-white/85">{getTitle(product!)}</p>
+                    <p className="mt-1 text-[10px] font-black text-[#FFB020]">Rs. {getPrice(product!).toLocaleString()}</p>
+                    {index === 0 ? (
+                      <span className="mt-1 inline-block text-[8px] font-black uppercase tracking-wider text-white/40">Just added</span>
+                    ) : (
+                      <button type="button" onClick={() => handleAdd(product!)} className="mt-1 rounded-full bg-white px-2.5 py-1 text-[8px] font-black text-[#14140F]">+ Add</button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {quickView && (
-        <div
-          className="fixed inset-0 z-[80] flex items-end justify-center bg-black/55 p-3 backdrop-blur-sm sm:items-center"
-          onClick={() => setQuickView(null)}
-        >
-          <div
-            className="w-full max-w-md overflow-hidden rounded-[28px] bg-white shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
+        <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/55 p-3 backdrop-blur-sm sm:items-center" onClick={() => setQuickView(null)}>
+          <div className="w-full max-w-md overflow-hidden rounded-[28px] bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="relative aspect-square bg-[#F4F4F1]">
-              {getImage(quickView) && (
-                <img
-                  src={getImage(quickView)}
-                  alt={getTitle(quickView)}
-                  className="h-full w-full object-cover"
-                />
-              )}
-              <button
-                type="button"
-                onClick={() => setQuickView(null)}
-                className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-white shadow-md"
-                aria-label="Close quick view"
-              >
-                <X size={16} />
-              </button>
+              {getImage(quickView) && <img src={getImage(quickView)} alt={getTitle(quickView)} className="h-full w-full object-cover" />}
+              <button type="button" onClick={() => setQuickView(null)} className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-white shadow-md" aria-label="Close quick view"><X size={16} /></button>
             </div>
             <div className="p-5">
               <p className="text-lg font-black">{getTitle(quickView)}</p>
               <div className="mt-2 flex items-baseline gap-2">
-                <span className="font-[family-name:var(--font-mono)] text-2xl font-black text-[#E1352B]">
-                  Rs. {getPrice(quickView).toLocaleString()}
-                </span>
-                {getOriginalPrice(quickView) > getPrice(quickView) && (
-                  <span className="text-xs text-black/35 line-through">
-                    Rs. {getOriginalPrice(quickView).toLocaleString()}
-                  </span>
-                )}
+                <span className="font-[family-name:var(--font-mono)] text-2xl font-black text-[#E1352B]">Rs. {getPrice(quickView).toLocaleString()}</span>
+                {getOriginalPrice(quickView) > getPrice(quickView) && <span className="text-xs text-black/35 line-through">Rs. {getOriginalPrice(quickView).toLocaleString()}</span>}
               </div>
-              {quickView.description && (
-                <p className="mt-3 text-xs leading-5 text-black/55">{quickView.description}</p>
-              )}
-              <button
-                type="button"
-                onClick={() => {
-                  handleAdd(quickView);
-                  setQuickView(null);
-                }}
-                className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl bg-[#E1352B] py-3.5 text-xs font-black text-white"
-              >
-                <ShoppingBag size={15} />
-                Add to cart
-              </button>
+              {quickView.description && <p className="mt-3 text-xs leading-5 text-black/55">{quickView.description}</p>}
+              <button type="button" onClick={() => { handleAdd(quickView); setQuickView(null); }} className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl bg-[#E1352B] py-3.5 text-xs font-black text-white"><ShoppingBag size={15} />Add to cart</button>
             </div>
           </div>
         </div>
       )}
 
       {videoProduct && (
-        <div
-          className="fixed inset-0 z-[90] flex items-center justify-center bg-black/80 p-4"
-          onClick={() => setVideoProduct(null)}
-        >
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/80 p-4" onClick={() => setVideoProduct(null)}>
           <div className="relative w-full max-w-lg" onClick={(e) => e.stopPropagation()}>
-            <button
-              type="button"
-              onClick={() => setVideoProduct(null)}
-              className="absolute -right-1 -top-12 flex h-9 w-9 items-center justify-center rounded-full bg-white"
-              aria-label="Close video"
-            >
-              <X size={16} />
-            </button>
-            <video
-              src={getVideo(videoProduct)}
-              controls
-              playsInline
-              autoPlay
-              className="max-h-[78vh] w-full rounded-3xl bg-black"
-            />
+            <button type="button" onClick={() => setVideoProduct(null)} className="absolute -right-1 -top-12 flex h-9 w-9 items-center justify-center rounded-full bg-white" aria-label="Close video"><X size={16} /></button>
+            <video src={getVideo(videoProduct)} controls playsInline autoPlay className="max-h-[78vh] w-full rounded-3xl bg-black" />
           </div>
         </div>
       )}
