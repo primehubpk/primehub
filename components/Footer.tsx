@@ -1,53 +1,83 @@
 // components/Footer.tsx
-// SECTION 8: Trust badges (COD, Fast Delivery, 7-Day Returns) + footer
-// policy links. Pure server component — no client state needed.
+// Premium trust section + responsive footer. No admin/settings changes.
 
 import Link from 'next/link';
-import { Wallet, Truck, RotateCcw, ShieldCheck } from 'lucide-react';
+import { Wallet, Truck, RotateCcw, ShieldCheck, HeartHandshake, MessageCircle } from 'lucide-react';
 
 const TRUST_BADGES = [
-  { icon: Wallet, label: 'Cash on Delivery' },
-  { icon: Truck, label: 'Fast Delivery' },
-  { icon: RotateCcw, label: '7-Day Returns' },
+  { icon: Wallet, label: 'Cash on Delivery', text: 'Pay when your order arrives' },
+  { icon: Truck, label: 'Fast Delivery', text: 'Reliable delivery to your door' },
+  { icon: RotateCcw, label: '7-Day Returns', text: 'Simple returns for eligible items' },
+  { icon: HeartHandshake, label: 'Shop with Confidence', text: 'Customer-first support' },
+];
+
+const SHOP_LINKS = [
+  { label: 'All Products', href: '/shop' },
+  { label: 'Categories', href: '/shop' },
+  { label: 'Offers', href: '/shop?offers=1' },
+  { label: 'Wishlist', href: '/shop?wishlist=1' },
+];
+
+const HELP_LINKS = [
+  { label: 'My Account', href: '/account' },
+  { label: 'My Orders', href: '/orders' },
+  { label: 'Contact Us', href: '/contact' },
+  { label: 'Return Policy', href: '/return-policy' },
 ];
 
 const POLICY_LINKS = [
-  { label: 'Return Policy', href: '/return-policy' },
   { label: 'Privacy Policy', href: '/privacy-policy' },
   { label: 'Terms of Service', href: '/terms' },
-  { label: 'Contact Us', href: '/contact' },
 ];
 
 export default function Footer() {
   return (
-    <>
-      <section className="max-w-md mx-auto px-4 mt-8">
-        <div className="grid grid-cols-3 gap-2 text-center">
-          {TRUST_BADGES.map(({ icon: Icon, label }) => (
-            <div key={label} className="bg-white rounded-xl border border-black/10 py-3 px-1.5">
-              <Icon className="w-5 h-5 mx-auto mb-1.5 text-[#0F6A5F]" aria-hidden="true" />
-              <p className="text-[10px] font-medium leading-snug">{label}</p>
+    <div className="mt-12 border-t border-black/8 bg-white">
+      <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {TRUST_BADGES.map(({ icon: Icon, label, text }) => (
+            <div key={label} className="group rounded-[22px] border border-black/8 bg-[#F8F7F3] p-4 transition hover:-translate-y-0.5 hover:shadow-[0_12px_30px_rgba(20,20,15,0.08)]">
+              <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-[#0F6A5F] shadow-sm"><Icon className="h-5 w-5" aria-hidden="true" /></span>
+              <p className="mt-3 text-[11px] font-black text-[#14140F]">{label}</p>
+              <p className="mt-1 text-[10px] leading-4 text-black/45">{text}</p>
             </div>
           ))}
         </div>
       </section>
 
-      <footer className="max-w-md mx-auto px-4 mt-8 pt-6 border-t border-black/10">
-        <div className="flex items-center gap-1.5 mb-4">
-          <ShieldCheck className="w-4 h-4 text-[#0F6A5F]" aria-hidden="true" />
-          <span className="text-xs font-semibold">Shop with confidence</span>
+      <footer className="bg-[#14140F] text-white">
+        <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+          <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-[1.5fr_1fr_1fr_1fr]">
+            <div>
+              <div className="text-3xl font-black tracking-[-0.07em]">ph<span className="text-[#E1352B]">deals</span></div>
+              <div className="mt-1 text-[7px] font-black tracking-[0.35em] text-[#FFB020]">PRIME HUB</div>
+              <p className="mt-4 max-w-xs text-xs leading-5 text-white/55">Discover everyday products, handpicked deals and a simple shopping experience built for PrimeHub customers.</p>
+              <Link href="/contact" className="mt-5 inline-flex items-center gap-2 rounded-full bg-white px-4 py-2.5 text-[10px] font-black text-[#14140F] transition hover:bg-[#FFB020]"><MessageCircle size={14} />Need help?</Link>
+            </div>
+
+            <div>
+              <h3 className="text-[10px] font-black uppercase tracking-[0.18em] text-[#FFB020]">Shop</h3>
+              <div className="mt-4 grid gap-3">{SHOP_LINKS.map(({ label, href }) => <Link key={label} href={href} className="text-xs text-white/60 transition hover:text-white">{label}</Link>)}</div>
+            </div>
+
+            <div>
+              <h3 className="text-[10px] font-black uppercase tracking-[0.18em] text-[#FFB020]">Customer</h3>
+              <div className="mt-4 grid gap-3">{HELP_LINKS.map(({ label, href }) => <Link key={label} href={href} className="text-xs text-white/60 transition hover:text-white">{label}</Link>)}</div>
+            </div>
+
+            <div>
+              <h3 className="text-[10px] font-black uppercase tracking-[0.18em] text-[#FFB020]">Policies</h3>
+              <div className="mt-4 grid gap-3">{POLICY_LINKS.map(({ label, href }) => <Link key={label} href={href} className="text-xs text-white/60 transition hover:text-white">{label}</Link>)}</div>
+              <div className="mt-6 flex items-center gap-2 text-[10px] font-bold text-white/45"><ShieldCheck size={14} />Secure &amp; trusted shopping</div>
+            </div>
+          </div>
+
+          <div className="mt-10 flex flex-col gap-3 border-t border-white/10 pt-5 text-[9px] text-white/35 sm:flex-row sm:items-center sm:justify-between">
+            <span>© {new Date().getFullYear()} PrimeHub Deals. All rights reserved.</span>
+            <span>Built for a better shopping experience.</span>
+          </div>
         </div>
-        <div className="grid grid-cols-2 gap-y-2.5 text-xs text-black/60">
-          {POLICY_LINKS.map(({ label, href }) => (
-            <Link key={href} href={href} className="hover:text-[#14140F]">
-              {label}
-            </Link>
-          ))}
-        </div>
-        <p className="mt-6 text-[10px] text-black/40">
-          &copy; {new Date().getFullYear()} PrimeHub Deals. All rights reserved.
-        </p>
       </footer>
-    </>
+    </div>
   );
 }
