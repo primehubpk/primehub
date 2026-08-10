@@ -39,13 +39,22 @@ export const useCartStore = create<CartState>()(
     (set, get) => ({
       items: [],
       isDrawerOpen: false,
-      // Keep the customer on the page after adding. The persistent bottom mini-cart provides cart actions.
       addItem: (item) => set((state) => {
         const existing = state.items.find((i) => i.id === item.id);
+        const normalized = {
+          ...item,
+          image: item.image || item.imageUrl,
+          imageUrl: item.imageUrl || item.image,
+        };
         return {
           items: existing
-            ? state.items.map((i) => i.id === item.id ? { ...i, ...item, qty: i.qty + 1 } : i)
-            : [...state.items, { ...item, qty: 1 }],
+            ? state.items.map((i) => i.id === item.id ? {
+                ...i,
+                ...normalized,
+                qty: i.qty + 1,
+              } : i)
+            : [...state.items, { ...normalized, qty: 1 }],
+          // Never open the legacy drawer from an add-to-cart action.
           isDrawerOpen: false,
         };
       }),
