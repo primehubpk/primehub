@@ -21,6 +21,7 @@ export interface CartItem {
 interface CartState {
   items: CartItem[];
   isDrawerOpen: boolean;
+  suppressNextOpen: boolean;
   addItem: (item: Omit<CartItem, 'qty'>) => void;
   removeItem: (id: string | number) => void;
   updateQty: (id: string | number, qty: number) => void;
@@ -34,38 +35,48 @@ interface CartState {
   getDeliveryProgress: () => number;
 }
 
+function resolveVisibleProductImage(item: Omit<CartItem, 'qty'>) {
+  if (item.image || item.imageUrl || typeof document === 'undefined') return item.image || item.imageUrl || '';
+  const images = Array.from(document.images);
+  const match = images.find((image) => image.alt.trim().toLowerCase() === item.name.trim().toLowerCase());
+  return match?.currentSrc || match?.src || '';
+}
+
 export const useCartStore = create<CartState>()(
   persist(
     (set, get) => ({
       items: [],
       isDrawerOpen: false,
-      addItem: (item) => set((state) => {
-        const existing = state.items.find((i) => i.id === item.id);
+      suppressNextOpen: false,
+      addItem: (item) => {
+        const resolvedImage = resolveVisibleProductImage(item);
         const normalized = {
           ...item,
-          image: item.image || item.imageUrl,
-          imageUrl: item.imageUrl || item.image,
+          image: item.image || item.imageUrl || resolvedImage,
+          imageUrl: item.imageUrl || item.image || resolvedImage,
         };
-        return {
-          items: existing
-            ? state.items.map((i) => i.id === item.id ? {
-                ...i,
-                ...normalized,
-                qty: i.qty + 1,
-              } : i)
-            : [...state.items, { ...normalized, qty: 1 }],
-          // Never open the legacy drawer from an add-to-cart action.
-          isDrawerOpen: false,
-        };
-      }),
+        set((state) => {
+          const existing = state.items.find((i) => i.id === item.id);
+          return {
+            items: existing
+              ? state.items.map((i) => i.id === item.id ? { ...i, ...normalized, qty: i.qty + 1 } : i)
+              : [...state.items, { ...normalized, qty: 1 }],
+            isDrawerOpen: false,
+            suppressNextOpen: true,
+          };
+        });
+        // Product detail's legacy openDrawer call happens immediately after addItem.
+        // Consume it only for this synchronous add-to-cart action; later cart opens work normally.
+        window.setTimeout(() => set({ suppressNextOpen: false }), 0);
+      },
       removeItem: (id) => set((state) => ({ items: state.items.filter((i) => i.id !== id) })),
       updateQty: (id, qty) => set((state) => ({
         items: qty <= 0 ? state.items.filter((i) => i.id !== id) : state.items.map((i) => i.id === id ? { ...i, qty } : i),
       })),
-      clearCart: () => set({ items: [], isDrawerOpen: false }),
-      openDrawer: () => set({ isDrawerOpen: true }),
-      closeDrawer: () => set({ isDrawerOpen: false }),
-      toggleDrawer: () => set((state) => ({ isDrawerOpen: !state.isDrawerOpen })),
+      clearCart: () => set({ items: [], isDrawerOpen: false, suppressNextOpen: false }),
+      openDrawer: () => set((state) => state.suppressNextOpen ? { suppressNextOpen: false, isDrawerOpen: false } : { isDrawerOpen: true }),
+      closeDrawer: () => set({ isDrawerOpen: false, suppressNextOpen: false }),
+      toggleDrawer: () => set((state) => state.suppressNextOpen ? { suppressNextOpen: false, isDrawerOpen: false } : { isDrawerOpen: !state.isDrawerOpen }),
       getCartCount: () => get().items.reduce((sum, i) => sum + i.qty, 0),
       getSubtotal: () => get().items.reduce((sum, i) => sum + i.price * i.qty, 0),
       getItemsToFreeDelivery: () => Math.max(0, FREE_DELIVERY_THRESHOLD - get().items.reduce((sum, i) => sum + i.qty, 0)),
