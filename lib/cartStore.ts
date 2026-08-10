@@ -1,31 +1,14 @@
 /**
  * lib/cartStore.ts
  * Global cart state using Zustand.
- *
- * Install first:
- *   npm install zustand
- *
- * This store is the single source of truth for:
- *  - cart line items (add / remove / update qty)
- *  - derived totals (count, subtotal)
- *  - free delivery threshold + progress logic
- *  - cart drawer open/close toggle
- *
- * Any component (Header cart badge, ProductGrid add-to-cart buttons,
- * a future CartDrawer) reads from this single store instead of prop-drilling.
+ * The cart is persistent and is the single source of truth for line items.
  */
 
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
-// =====================================================================
-// SECTION: CONFIG
-// =====================================================================
-export const FREE_DELIVERY_THRESHOLD = 5; // items needed in cart for free delivery
+export const FREE_DELIVERY_THRESHOLD = 5;
 
-// =====================================================================
-// SECTION: TYPES
-// =====================================================================
 export interface CartItem {
   id: string | number;
   name: string;
@@ -37,8 +20,6 @@ export interface CartItem {
 interface CartState {
   items: CartItem[];
   isDrawerOpen: boolean;
-
-  // actions
   addItem: (item: Omit<CartItem, 'qty'>) => void;
   removeItem: (id: string | number) => void;
   updateQty: (id: string | number, qty: number) => void;
@@ -46,61 +27,47 @@ interface CartState {
   openDrawer: () => void;
   closeDrawer: () => void;
   toggleDrawer: () => void;
-
-  // derived getters (computed on read, not stored)
   getCartCount: () => number;
   getSubtotal: () => number;
   getItemsToFreeDelivery: () => number;
   getDeliveryProgress: () => number;
 }
 
-// =====================================================================
-// SECTION: STORE
-// =====================================================================
 export const useCartStore = create<CartState>()(persist((set, get) => ({
-  // Start empty in production. Real items are added by the storefront.
   items: [],
   isDrawerOpen: false,
 
   addItem: (item) =>
     set((state) => {
       const existing = state.items.find((i) => i.id === item.id);
-      if (existing) {
-        return {
-          items: state.items.map((i) =>
-            i.id === item.id ? { ...i, qty: i.qty + 1 } : i
-          ),
-        };
-      }
-      return { items: [...state.items, { ...item, qty: 1 }] };
+      const items = existing
+        ? state.items.map((i) => i.id === item.id ? { ...i, qty: i.qty + 1 } : i)
+        : [...state.items, { ...item, qty: 1 }];
+
+      // After adding, show the real cart drawer. This prevents the add-to-cart
+      // recommendation banner from being mistaken for the actual cart.
+      return { items, isDrawerOpen: true };
     }),
 
-  removeItem: (id) =>
-    set((state) => ({ items: state.items.filter((i) => i.id !== id) })),
+  removeItem: (id) => set((state) => ({ items: state.items.filter((i) => i.id !== id) })),
 
-  updateQty: (id, qty) =>
-    set((state) => ({
-      items:
-        qty <= 0
-          ? state.items.filter((i) => i.id !== id)
-          : state.items.map((i) => (i.id === id ? { ...i, qty } : i)),
-    })),
+  updateQty: (id, qty) => set((state) => ({
+    items: qty <= 0
+      ? state.items.filter((i) => i.id !== id)
+      : state.items.map((i) => i.id === id ? { ...i, qty } : i),
+  })),
 
   clearCart: () => set({ items: [] }),
-
   openDrawer: () => set({ isDrawerOpen: true }),
   closeDrawer: () => set({ isDrawerOpen: false }),
   toggleDrawer: () => set((state) => ({ isDrawerOpen: !state.isDrawerOpen })),
 
   getCartCount: () => get().items.reduce((sum, i) => sum + i.qty, 0),
-
   getSubtotal: () => get().items.reduce((sum, i) => sum + i.price * i.qty, 0),
-
   getItemsToFreeDelivery: () => {
     const count = get().items.reduce((sum, i) => sum + i.qty, 0);
     return Math.max(0, FREE_DELIVERY_THRESHOLD - count);
   },
-
   getDeliveryProgress: () => {
     const count = get().items.reduce((sum, i) => sum + i.qty, 0);
     return Math.min(100, Math.round((count / FREE_DELIVERY_THRESHOLD) * 100));
@@ -108,6 +75,5 @@ export const useCartStore = create<CartState>()(persist((set, get) => ({
 }), {
   name: 'phdeals-cart',
   storage: createJSONStorage(() => localStorage),
-  // Keep the drawer closed after reload; only customer cart lines persist.
   partialize: (state) => ({ items: state.items }),
 }));
