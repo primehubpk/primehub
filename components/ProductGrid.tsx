@@ -83,6 +83,7 @@ export default function ProductGrid({ selectedMaxPrice = null }: ProductGridProp
   const [addedProductId, setAddedProductId] = useState<string | null>(null);
 
   const addItem = useCartStore((state) => state.addItem);
+  const openDrawer = useCartStore((state) => state.openDrawer);
   const cartItems = useCartStore((state) => state.items);
 
   useEffect(() => {
@@ -114,10 +115,6 @@ export default function ProductGrid({ selectedMaxPrice = null }: ProductGridProp
   }, [products, selectedMaxPrice, sort]);
 
   const addedProduct = addedProductId ? products.find((product) => product.id === addedProductId) || null : null;
-  const cartIds = new Set(cartItems.map((item) => String(item.id)));
-  const recommendations = products
-    .filter((product) => product.id !== addedProductId && !cartIds.has(product.id))
-    .slice(0, 4);
 
   const toggleWishlist = (id: string) => {
     setWishlist((current) =>
@@ -135,6 +132,7 @@ export default function ProductGrid({ selectedMaxPrice = null }: ProductGridProp
     setAddedId(product.id);
     setAddedProductId(product.id);
     window.setTimeout(() => setAddedId(null), 1100);
+    window.setTimeout(() => setAddedProductId(null), 4500);
   };
 
   if (loading) {
@@ -249,30 +247,17 @@ export default function ProductGrid({ selectedMaxPrice = null }: ProductGridProp
 
       {addedProduct && (
         <div className="fixed inset-x-0 bottom-16 z-[75] px-3 sm:bottom-4">
-          <div className="mx-auto max-w-2xl overflow-hidden rounded-[24px] border border-white/20 bg-[#14140F]/95 p-3 text-white shadow-[0_18px_60px_rgba(0,0,0,0.28)] backdrop-blur-xl">
-            <div className="mb-2 flex items-center justify-between px-1">
-              <div>
-                <p className="text-[9px] font-black uppercase tracking-[0.18em] text-[#FFB020]">Added to cart ✓</p>
-                <p className="text-[11px] font-bold text-white/70">Complete your cart with something extra</p>
-              </div>
-              <button type="button" onClick={() => setAddedProductId(null)} className="rounded-full p-1.5 text-white/45 hover:bg-white/10" aria-label="Close recommendations"><X size={14} /></button>
+          <div className="mx-auto flex max-w-md items-center gap-3 rounded-[20px] border border-white/15 bg-[#14140F]/96 p-2.5 text-white shadow-[0_18px_60px_rgba(0,0,0,0.28)] backdrop-blur-xl">
+            <div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl bg-white/10">
+              {getImage(addedProduct) && <img src={getImage(addedProduct)} alt="" className="h-full w-full object-cover" />}
             </div>
-            <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none]">
-              {[addedProduct, ...recommendations].filter(Boolean).map((product, index) => (
-                <div key={`${product!.id}-${index}`} className="flex min-w-[172px] items-center gap-2 rounded-2xl bg-white/[0.07] p-2">
-                  <img src={getImage(product!)} alt={getTitle(product!)} className="h-14 w-14 shrink-0 rounded-xl object-cover bg-white/10" />
-                  <div className="min-w-0 flex-1">
-                    <p className="line-clamp-2 text-[9px] font-bold text-white/85">{getTitle(product!)}</p>
-                    <p className="mt-1 text-[10px] font-black text-[#FFB020]">Rs. {getPrice(product!).toLocaleString()}</p>
-                    {index === 0 ? (
-                      <span className="mt-1 inline-block text-[8px] font-black uppercase tracking-wider text-white/40">Just added</span>
-                    ) : (
-                      <button type="button" onClick={() => handleAdd(product!)} className="mt-1 rounded-full bg-white px-2.5 py-1 text-[8px] font-black text-[#14140F]">+ Add</button>
-                    )}
-                  </div>
-                </div>
-              ))}
+            <div className="min-w-0 flex-1">
+              <p className="text-[8px] font-black uppercase tracking-[0.18em] text-[#FFB020]">Added to cart ✓</p>
+              <p className="mt-0.5 truncate text-[10px] font-bold text-white/80">{getTitle(addedProduct)}</p>
+              <p className="mt-0.5 text-[10px] font-black text-white">Rs. {getPrice(addedProduct).toLocaleString()}</p>
             </div>
+            <button type="button" onClick={openDrawer} className="shrink-0 rounded-full bg-white px-3.5 py-2 text-[9px] font-black text-[#14140F]">View cart</button>
+            <button type="button" onClick={() => setAddedProductId(null)} className="shrink-0 rounded-full p-1.5 text-white/45 hover:bg-white/10" aria-label="Close notification"><X size={13} /></button>
           </div>
         </div>
       )}
