@@ -39,21 +39,21 @@ export const useCartStore = create<CartState>()(
     (set, get) => ({
       items: [],
       isDrawerOpen: false,
-      // Keep the customer on the page after adding. The bottom confirmation provides the cart action.
+      // Keep the customer on the page after adding. The persistent bottom mini-cart provides cart actions.
       addItem: (item) => set((state) => {
         const existing = state.items.find((i) => i.id === item.id);
         return {
           items: existing
             ? state.items.map((i) => i.id === item.id ? { ...i, ...item, qty: i.qty + 1 } : i)
             : [...state.items, { ...item, qty: 1 }],
-          isDrawerOpen: state.isDrawerOpen,
+          isDrawerOpen: false,
         };
       }),
       removeItem: (id) => set((state) => ({ items: state.items.filter((i) => i.id !== id) })),
       updateQty: (id, qty) => set((state) => ({
         items: qty <= 0 ? state.items.filter((i) => i.id !== id) : state.items.map((i) => i.id === id ? { ...i, qty } : i),
       })),
-      clearCart: () => set({ items: [] }),
+      clearCart: () => set({ items: [], isDrawerOpen: false }),
       openDrawer: () => set({ isDrawerOpen: true }),
       closeDrawer: () => set({ isDrawerOpen: false }),
       toggleDrawer: () => set((state) => ({ isDrawerOpen: !state.isDrawerOpen })),
