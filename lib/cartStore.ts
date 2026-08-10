@@ -16,6 +16,7 @@
  */
 
 import { create } from 'zustand';
+import { createJSONStorage, persist } from 'zustand/middleware';
 
 // =====================================================================
 // SECTION: CONFIG
@@ -56,7 +57,7 @@ interface CartState {
 // =====================================================================
 // SECTION: STORE
 // =====================================================================
-export const useCartStore = create<CartState>((set, get) => ({
+export const useCartStore = create<CartState>()(persist((set, get) => ({
   // Start empty in production. Real items are added by the storefront.
   items: [],
   isDrawerOpen: false,
@@ -104,4 +105,9 @@ export const useCartStore = create<CartState>((set, get) => ({
     const count = get().items.reduce((sum, i) => sum + i.qty, 0);
     return Math.min(100, Math.round((count / FREE_DELIVERY_THRESHOLD) * 100));
   },
+}), {
+  name: 'phdeals-cart',
+  storage: createJSONStorage(() => localStorage),
+  // Keep the drawer closed after reload; only customer cart lines persist.
+  partialize: (state) => ({ items: state.items }),
 }));

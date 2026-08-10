@@ -21,6 +21,8 @@ import {
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useCartStore } from '@/lib/cartStore';
+import RecentlyViewed, { rememberProduct } from '@/components/RecentlyViewed';
+import ReviewsSection from '@/components/ReviewsSection';
 
 type Product = {
   id: string;
@@ -101,6 +103,7 @@ export default function ProductDetailPage() {
           setFailed(true);
         } else {
           setProduct({ id: snap.id, ...snap.data() } as Product);
+          rememberProduct(snap.id);
         }
       } catch {
         if (!cancelled) setFailed(true);
@@ -447,6 +450,9 @@ export default function ProductDetailPage() {
           </section>
         </div>
       </div>
+
+      <RecentlyViewed excludeId={id} />
+      <ReviewsSection productId={id} />
 
       {videoOpen && videoOf(product) && (
         <div

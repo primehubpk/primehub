@@ -17,6 +17,7 @@ import {
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useCartStore } from '@/lib/cartStore';
+import { ProductUrgencyBadges } from '@/components/ProductCard';
 
 type Product = {
   id: string;
@@ -94,7 +95,10 @@ export default function ProductGrid({ selectedMaxPrice = null }: ProductGridProp
         );
         setLoading(false);
       },
-      () => setLoading(false)
+      () => {
+        setProducts([]);
+        setLoading(false);
+      }
     );
 
     return () => unsubscribe();
@@ -302,6 +306,7 @@ export default function ProductGrid({ selectedMaxPrice = null }: ProductGridProp
                       Only {stock} left
                     </span>
                   )}
+                  <ProductUrgencyBadges stock={stock} productId={product.id} />
                 </div>
 
                 <div className="p-3">

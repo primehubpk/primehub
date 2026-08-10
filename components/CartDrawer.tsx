@@ -2,10 +2,11 @@
 
 import Link from 'next/link';
 
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Minus, Plus, ShoppingBag, Trash2, X, Truck, MessageCircle } from 'lucide-react';
 import { useCartStore } from '@/lib/cartStore';
 import { useSettings } from '@/lib/useSettings';
+import WhatsAppOrderModal from '@/components/WhatsAppOrderModal';
 
 const FALLBACK_THRESHOLD = 5;
 
@@ -29,6 +30,8 @@ export default function CartDrawer() {
   const removeItem = useCartStore((state) => state.removeItem);
   const updateQty = useCartStore((state) => state.updateQty);
   const clearCart = useCartStore((state: any) => state.clearCart);
+  const addItem = useCartStore((state: any) => state.addItem);
+  const [whatsAppOpen, setWhatsAppOpen] = useState(false);
 
   const threshold = Math.max(
     1,
@@ -243,6 +246,11 @@ export default function CartDrawer() {
 
         {items.length > 0 && (
           <footer className="border-t border-black/8 bg-white p-4">
+            <section className="mb-4 rounded-2xl bg-[#F4F4F1] p-3">
+              <p className="text-[9px] font-black uppercase tracking-wider text-black/40">Frequently bought together</p>
+              <p className="mt-1 text-[11px] font-black">Add a surprise deal to your order</p>
+              <button type="button" onClick={() => addItem({ id: 'bundle-surprise-deal', name: 'PrimeHub Surprise Deal', price: 99, originalPrice: 149 })} className="mt-2 rounded-xl bg-[#E1352B] px-3 py-2 text-[9px] font-black text-white">Add bundle — Rs. 99</button>
+            </section>
             <div className="mb-3 flex items-center justify-between">
               <span className="text-xs font-bold text-black/50">Subtotal</span>
               <span className="font-[family-name:var(--font-mono)] text-xl font-black">
@@ -252,7 +260,7 @@ export default function CartDrawer() {
 
             <button
               type="button"
-              onClick={sendWhatsApp}
+              onClick={() => setWhatsAppOpen(true)}
               className="mb-2 flex w-full items-center justify-center gap-2 rounded-2xl bg-[#0F6A5F] py-3.5 text-xs font-black text-white"
             >
               <MessageCircle size={16} />
@@ -277,6 +285,7 @@ export default function CartDrawer() {
           </footer>
         )}
       </aside>
+      {whatsAppOpen && <WhatsAppOrderModal items={items} onClose={() => setWhatsAppOpen(false)} />}
     </div>
   );
 }

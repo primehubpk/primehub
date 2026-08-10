@@ -37,11 +37,63 @@ service cloud.firestore {
     }
 
     // Orders are private operational data.
-    // Customers can create an order as guests,
+    // Customers can create a pending website order as guests,
     // but cannot read/update/delete orders unless they are the admin.
     match /orders/{orderId} {
-      allow create: if true;
+      allow create: if request.resource.data.keys().hasOnly([
+          'customer', 'items', 'totalItems', 'subtotal', 'total', 'currency',
+          'status', 'source', 'createdAt'
+        ])
+        && request.resource.data.customer is map
+        && request.resource.data.customer.keys().hasAll([
+          'name', 'phone', 'email', 'address', 'city', 'notes'
+        ])
+        && request.resource.data.customer.name is string
+        && request.resource.data.customer.phone is string
+        && request.resource.data.customer.email is string
+        && request.resource.data.customer.address is string
+        && request.resource.data.customer.city is string
+        && request.resource.data.customer.notes is string
+        && request.resource.data.items is list
+        && request.resource.data.items.size() > 0
+        && request.resource.data.items.size() <= 50
+        && request.resource.data.totalItems is int
+        && request.resource.data.totalItems > 0
+        && request.resource.data.subtotal is number
+        && request.resource.data.total is number
+        && request.resource.data.total == request.resource.data.subtotal
+        && request.resource.data.currency == 'PKR'
+        && request.resource.data.status == 'pending'
+        && (request.resource.data.source == 'website'
+          || request.resource.data.source == 'WhatsApp')
+        && request.resource.data.createdAt is timestamp;
       allow read, update, delete: if isAdmin();
+    }
+
+    // ==================== CUSTOMER REVIEWS ====================
+    match /reviews/{reviewId} {
+      allow read: if true;
+      allow create: if request.resource.data.productId is string
+        && request.resource.data.name is string
+        && request.resource.data.rating is int
+        && request.resource.data.rating >= 1
+        && request.resource.data.rating <= 5
+        && request.resource.data.comment is string;
+      allow update, delete: if isAdmin();
+    }
+
+    // ==================== SUPPLIER SUBMISSIONS ====================
+    match /vendor_submissions/{submissionId} {
+      allow create: if request.resource.data.status == 'pending';
+      allow read, update, delete: if isAdmin();
+    }
+
+    // ==================== CUSTOMER LOYALTY ====================
+    match /user_rewards/{userId} {
+      allow read: if signedIn() && request.auth.uid == userId;
+      allow create: if signedIn() && request.auth.uid == userId;
+      allow update: if signedIn() && request.auth.uid == userId;
+      allow delete: if false;
     }
 
     // Default deny for anything not explicitly listed above.

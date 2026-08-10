@@ -8,6 +8,7 @@ import BottomNav from '@/components/BottomNav';
 import './globals.css';
 import CartDrawer from '@/components/CartDrawer';
 import PWARegister from '@/components/PWARegister';
+import PWAInstallBanner from '@/components/PWAInstallBanner';
 
 // =====================================================================
 // SECTION: FONTS
@@ -119,6 +120,7 @@ export default function RootLayout({
         <BottomNav />
         <CartDrawer />
         <PWARegister />
+        <PWAInstallBanner />
       </body>
     </html>
   );

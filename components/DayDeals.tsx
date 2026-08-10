@@ -1,56 +1,91 @@
-// components/DayDeals.tsx
-// SECTION 3: Weekend Glow Deals — glowing discount badges with a
-// highlighted Saturday/Sunday special card.
+'use client';
 
+import Link from 'next/link';
+import { useEffect, useState } from 'react';
+import { collection, onSnapshot, query, where } from 'firebase/firestore';
 import { Sparkles } from 'lucide-react';
+import { db } from '@/lib/firebase';
 
-// =====================================================================
-// SECTION: CONFIG — set which day is "special" and its deals
-// =====================================================================
-const WEEKEND_DEALS = [
-  { discount: '-40%', special: false },
-  { discount: '-25%', special: false },
-  { discount: '-50%', special: true }, // highlighted as the Sat/Sun special
-];
+type WeekendProduct = {
+  id: string;
+  title?: string;
+  name?: string;
+  price?: number;
+  originalPrice?: number;
+  imageUrl?: string;
+  image?: string;
+  images?: string[];
+};
 
 function isWeekend() {
-  const day = new Date().getDay(); // 0 = Sunday, 6 = Saturday
+  const day = new Date().getDay();
   return day === 0 || day === 6;
 }
 
+function titleOf(product: WeekendProduct) {
+  return product.title || product.name || 'Weekend Deal';
+}
+
+function imageOf(product: WeekendProduct) {
+  return product.imageUrl || product.image || product.images?.[0] || '';
+}
+
 export default function DayDeals() {
+  const [deals, setDeals] = useState<WeekendProduct[]>([]);
   const weekendActive = isWeekend();
 
+  useEffect(() => {
+    const weekendDealsQuery = query(
+      collection(db, 'products'),
+      where('isWeekendSpecial', '==', true)
+    );
+
+    return onSnapshot(
+      weekendDealsQuery,
+      (snapshot) => {
+        setDeals(snapshot.docs.map((item) => ({ id: item.id, ...item.data() })) as WeekendProduct[]);
+      },
+      () => setDeals([])
+    );
+  }, []);
+
+  if (!deals.length) return null;
+
   return (
-    <section className="max-w-md mx-auto px-4 mt-6">
-      <div className="flex items-center gap-1.5 mb-3">
-        <Sparkles className="w-4 h-4 text-[#FFB020]" aria-hidden="true" />
-        <h2 className="font-[family-name:var(--font-display)] font-bold text-base">
+    <section className="mx-auto mt-6 max-w-md px-4">
+      <div className="mb-3 flex items-center gap-1.5">
+        <Sparkles className="h-4 w-4 text-[#FFB020]" aria-hidden="true" />
+        <h2 className="font-[family-name:var(--font-display)] text-base font-bold">
           {weekendActive ? 'Weekend Glow Deals — Live Now' : 'Weekend Glow Deals'}
         </h2>
       </div>
 
       <div className="grid grid-cols-3 gap-2.5">
-        {WEEKEND_DEALS.map((deal, i) => (
-          <div
-            key={i}
-            className={`relative rounded-xl p-3 text-center bg-white border ${
-              deal.special
-                ? 'border-[#FFB020] ring-2 ring-[#FFB020]/40'
-                : 'border-black/10'
-            }`}
-          >
-            <div className="h-14 rounded-lg bg-[#F4F4F1] mb-2" />
-            <span className="inline-block text-[11px] font-bold text-white px-2 py-0.5 rounded-full bg-[#E1352B] animate-pulse-glow">
-              {deal.discount}
-            </span>
-            {deal.special && (
-              <span className="block mt-1 text-[9px] font-semibold text-[#FFB020]">
-                {new Date().getDay() === 0 ? 'SUN SPECIAL' : 'SAT SPECIAL'}
-              </span>
-            )}
-          </div>
-        ))}
+        {deals.slice(0, 3).map((deal) => {
+          const price = Number(deal.price || 0);
+          const original = Number(deal.originalPrice || 0);
+          const discount = original > price && price > 0
+            ? Math.round(((original - price) / original) * 100)
+            : 0;
+
+          return (
+            <Link
+              key={deal.id}
+              href={`/product/${deal.id}`}
+              className="relative overflow-hidden rounded-xl border border-black/10 bg-white p-2 text-center"
+            >
+              <div className="mb-2 aspect-square overflow-hidden rounded-lg bg-[#F4F4F1]">
+                {imageOf(deal) && <img src={imageOf(deal)} alt={titleOf(deal)} className="h-full w-full object-cover" />}
+              </div>
+              <p className="truncate text-[9px] font-bold">{titleOf(deal)}</p>
+              {discount > 0 && (
+                <span className="mt-1 inline-block rounded-full bg-[#E1352B] px-2 py-0.5 text-[10px] font-bold text-white">
+                  -{discount}%
+                </span>
+              )}
+            </Link>
+          );
+        })}
       </div>
     </section>
   );

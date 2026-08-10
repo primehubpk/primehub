@@ -15,6 +15,7 @@ import { useState } from 'react';
 import { Search, ShoppingCart, Truck } from 'lucide-react';
 import { useCartStore } from '@/lib/cartStore';
 import { useSettings } from '@/lib/useSettings';
+import LiveSearchBar from '@/components/LiveSearchBar';
 
 // ==========================================
 // SECTION 0: BLACK ANNOUNCEMENT TOP BAR (scrolling marquee)
@@ -50,6 +51,12 @@ export default function Header() {
   const itemsToGo = Math.max(0, deliveryThreshold - cartItemCount);
   const deliveryProgress = Math.min(100, Math.round((cartItemCount / deliveryThreshold) * 100));
 
+  const submitSearch = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const query = searchQuery.trim();
+    router.push(query ? `/shop?q=${encodeURIComponent(query)}` : '/shop');
+  };
+
   return (
     <>
       <AnnouncementBar text={settings.announcementText} />
@@ -76,16 +83,10 @@ export default function Header() {
           </div>
 
           {/* Live search */}
-          <div className="flex items-center gap-2 bg-white border border-black/10 rounded-full px-4 py-2.5">
+          <form onSubmit={submitSearch} className="flex items-center gap-2 bg-white border border-black/10 rounded-full px-4 py-2.5">
             <Search className="w-4 h-4 text-black/40 shrink-0" aria-hidden="true" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search bangles, kitchen, tech..."
-              className="bg-transparent text-sm w-full outline-none placeholder:text-black/40"
-            />
-          </div>
+            <LiveSearchBar value={searchQuery} onChange={setSearchQuery} />
+          </form>
 
           {/* Free delivery progress bar */}
           <div className="mt-3">

@@ -76,12 +76,16 @@ export function useSettings() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsub = onSnapshot(doc(db, 'settings', 'main'), (snap) => {
-      if (snap.exists()) {
-        setSettings({ ...DEFAULT_SETTINGS, ...(snap.data() as Partial<SiteSettings>) });
-      }
-      setLoading(false);
-    });
+    const unsub = onSnapshot(
+      doc(db, 'settings', 'main'),
+      (snap) => {
+        if (snap.exists()) {
+          setSettings({ ...DEFAULT_SETTINGS, ...(snap.data() as Partial<SiteSettings>) });
+        }
+        setLoading(false);
+      },
+      () => setLoading(false)
+    );
     return () => unsub();
   }, []);
 
