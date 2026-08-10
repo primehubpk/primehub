@@ -123,11 +123,14 @@ export default function ProductGrid({ selectedMaxPrice = null }: ProductGridProp
   };
 
   const handleAdd = (product: Product) => {
+    const image = getImage(product);
     addItem({
       id: product.id,
       name: getTitle(product),
       price: getPrice(product),
       originalPrice: Number(product.originalPrice ?? product.compareAtPrice ?? getPrice(product)),
+      image,
+      imageUrl: image,
     });
     setAddedId(product.id);
     setAddedProductId(product.id);
