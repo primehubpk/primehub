@@ -11,7 +11,19 @@ import LiveSearchBar from '@/components/LiveSearchBar';
 
 type StoreCategory = { id: string; title: string; slug?: string; iconUrl?: string; sortOrder?: number; active?: boolean };
 function slugify(value: string) { return value.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, ''); }
-function AnnouncementBar({ text }: { text: string }) { const announcement = text?.trim() || 'PrimeHub Deals'; return <div className="bg-[#090909] py-2.5 text-white"><div className="mx-auto flex max-w-7xl items-center justify-center gap-2 px-4 text-center text-[10px] font-black uppercase tracking-[0.16em] sm:text-[11px]"><ShieldCheck size={13} className="shrink-0 text-white/70" /><span className="truncate">{announcement}</span></div></div>; }
+function AnnouncementBar({ text }: { text: string }) {
+  const announcement = text?.trim() || 'PrimeHub Deals';
+  return <div className="overflow-hidden bg-[#090909] py-2.5 text-white" role="region" aria-label="Announcement">
+    <div className="relative overflow-hidden whitespace-nowrap">
+      <div className="inline-flex min-w-full animate-[ph-marquee_18s_linear_infinite] items-center justify-center gap-10 px-4 text-[10px] font-black uppercase tracking-[0.16em] sm:text-[11px]">
+        <span className="inline-flex shrink-0 items-center gap-2"><ShieldCheck size={13} className="text-white/70" />{announcement}</span>
+        <span className="inline-flex shrink-0 items-center gap-2"><ShieldCheck size={13} className="text-white/70" />{announcement}</span>
+        <span className="inline-flex shrink-0 items-center gap-2"><ShieldCheck size={13} className="text-white/70" />{announcement}</span>
+      </div>
+    </div>
+    <style jsx>{`@keyframes ph-marquee{from{transform:translateX(0)}to{transform:translateX(-33.333%)}}`}</style>
+  </div>;
+}
 
 export default function Header() {
   const router = useRouter(); const [searchQuery, setSearchQuery] = useState(''); const [categories, setCategories] = useState<StoreCategory[]>([]); const { settings } = useSettings();
