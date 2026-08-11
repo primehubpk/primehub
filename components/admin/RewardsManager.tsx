@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Gift, Plus, Save, Trash2, Upload, Zap, Trophy, PackageCheck, History } from 'lucide-react';
 import { onSnapshot } from 'firebase/firestore';
 import { uploadImageToImgBB, adminCollection, createAdminDocument, deleteAdminDocument, setAdminDocument, updateAdminDocument, writeAdminAuditLog } from './shared';
@@ -11,12 +11,13 @@ type RewardSettings = { dailySpinLimit:number; checkInRewards:number[]; pointsEx
 const defaults:RewardSettings={dailySpinLimit:1,checkInRewards:[10,15,20,25,30,50,100],pointsExpiryDays:0,guestMode:true,loginRequiredToRedeem:true};
 
 export default function RewardsManager(){
- const [tab,setTab]=useState<'overview'|'wheel'|'checkin'|'store'|'redemptions'>('overview'); const [settings,setSettings]=useState(defaults); const [prizes,setPrizes]=useState<Prize[]>([]); const [gifts,setGifts]=useState<GiftReward[]>([]); const [message,setMessage]=useState(''); const [saving,setSaving]=useState(false);
+ const [tab,setTab]=useState<'overview'|'wheel'|'checkin'|'store'|'redemptions'>('overview');
+ const [settings,setSettings]=useState(defaults); const [prizes,setPrizes]=useState<Prize[]>([]); const [gifts,setGifts]=useState<GiftReward[]>([]); const [message,setMessage]=useState(''); const [saving,setSaving]=useState(false);
  useEffect(()=>{const a=onSnapshot(adminCollection('settings'),s=>{const d=s.docs.find(x=>x.id==='rewards')?.data();if(d)setSettings({...defaults,...d} as RewardSettings)});const b=onSnapshot(adminCollection('reward_gifts'),s=>setGifts(s.docs.map(d=>({id:d.id,...d.data()}) as GiftReward)));return()=>{a();b()}},[]);
- useEffect(()=>{const a=onSnapshot(adminCollection('settings'),s=>{const d=s.docs.find(x=>x.id==='rewards')?.data();const saved=d?.spinWheelSlots;if(Array.isArray(saved))setPrizes(saved.map((p:unknown,i:number)=>{const x=p as Record<string,unknown>;const type=x.type;return{id:String(x.id||i+1),name:String(x.name||''),type:type==='points'||type==='coupon'||type==='try-again'||type==='free-delivery'?type:'points',points:Number(x.points||x.value||0),probability:Number(x.probability||0),active:x.active!==false,stock:Number(x.stock||0),voucherCode:String(x.voucherCode||'')}})))});return()=>a()},[]);
+ useEffect(()=>{const a=onSnapshot(adminCollection('settings'),s=>{const d=s.docs.find(x=>x.id==='rewards')?.data();const saved=d?.spinWheelSlots;if(Array.isArray(saved))setPrizes(saved.map((p:any,i:number)=>({id:String(p.id||i+1),name:String(p.name||''),type:['points','coupon','try-again','free-delivery'].includes(p.type)?p.type:'points',points:Number(p.points||p.value||0),probability:Number(p.probability||0),active:p.active!==false,stock:Number(p.stock||0),voucherCode:p.voucherCode||''})))});return()=>a()},[]);
  const total=useMemo(()=>prizes.filter(p=>p.active).reduce((n,p)=>n+Number(p.probability||0),0),[prizes]);
  async function saveSettings(){setSaving(true);try{await setAdminDocument('settings','rewards',{...settings,spinWheelSlots:prizes.map(({id,...p})=>p),updatedAt:new Date().toISOString()});await writeAdminAuditLog('update','rewards','settings',{settings,prizeCount:prizes.length});setMessage('Rewards settings saved.')}catch(e){setMessage(e instanceof Error?e.message:'Save failed.')}finally{setSaving(false)}}
- function addPrize(){const p={name:'Try Again',type:'try-again' as const,points:0,probability:10,active:true,stock:0};setPrizes(x=>[...x,{id:crypto.randomUUID(),...p}])}
+ async function addPrize(){const p={name:'Try Again',type:'try-again',points:0,probability:10,active:true,stock:0};setPrizes(x=>[...x,{id:crypto.randomUUID(),...p} as Prize])}
  async function addGift(){await createAdminDocument('reward_gifts',{title:'New Reward',pointsCost:100,stock:1,active:true,description:'',imageUrl:'',createdAt:new Date().toISOString()})}
  async function saveGift(g:GiftReward){const {id,...data}=g;await updateAdminDocument('reward_gifts',id,{...data,updatedAt:new Date().toISOString()})}
  async function uploadGift(g:GiftReward,file:File){setMessage('Uploading image...');try{const imageUrl=await uploadImageToImgBB(file);await updateAdminDocument('reward_gifts',g.id,{imageUrl,updatedAt:new Date().toISOString()});setMessage('Image uploaded.')}catch(e){setMessage(e instanceof Error?e.message:'Upload failed.')}}
@@ -28,5 +29,5 @@ export default function RewardsManager(){
  {tab==='redemptions'&&<div className="mt-4 rounded-2xl bg-white p-8 text-center shadow-sm"><History className="mx-auto h-10 w-10 text-black/20"/><h3 className="mt-3 text-lg font-black">Redemption queue</h3><p className="mx-auto mt-2 max-w-xl text-xs leading-5 text-black/45">Customer redemptions are stored in reward_redemptions with a controlled status flow. Admin can process them after the customer has securely spent the required points.</p></div>}
  </section>
 }
-function Stat({icon,label,value}:{icon:ReactNode;label:string;value:string}){return <div className="rounded-2xl bg-white p-5 shadow-sm"><div className="h-5 w-5 text-[#E1352B]">{icon}</div><p className="mt-3 text-[9px] font-black uppercase tracking-wider text-black/40">{label}</p><p className="mt-1 text-xl font-black">{value}</p></div>}
+function Stat({icon,label,value}:{icon:React.ReactNode;label:string;value:string}){return <div className="rounded-2xl bg-white p-5 shadow-sm"><div className="h-5 w-5 text-[#E1352B]">{icon}</div><p className="mt-3 text-[9px] font-black uppercase tracking-wider text-black/40">{label}</p><p className="mt-1 text-xl font-black">{value}</p></div>}
 function Field({label,value,onChange}:{label:string;value:number;onChange:(v:number)=>void}){return <label className="block"><span className="text-[9px] font-black uppercase tracking-wide text-black/45">{label}</span><input type="number" min="0" value={value} onChange={e=>onChange(Number(e.target.value))} className="mt-1 w-full rounded-xl border border-black/10 bg-[#F4F4F1] px-3 py-2 text-xs font-black outline-none"/></label>}
