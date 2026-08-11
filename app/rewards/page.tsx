@@ -1,90 +1,35 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { db, auth } from '@/lib/firebase';
+import { useEffect, useMemo, useState } from 'react';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { doc, onSnapshot, setDoc, serverTimestamp } from 'firebase/firestore';
-import { Sparkles, Trophy, Zap, Gift } from 'lucide-react';
+import { doc, getDoc, onSnapshot, runTransaction, serverTimestamp } from 'firebase/firestore';
+import { Gift, Sparkles, Trophy, Zap, LogIn, Lock, History } from 'lucide-react';
+import { auth, db } from '@/lib/firebase';
 
-interface Reward { points?: number; streak?: number; lastCheckIn?: string; lastSpin?: string; coupons?: string[]; }
-const EMPTY_REWARD: Reward = { points: 0, streak: 0, coupons: [] };
-const guestKey = 'phdeals-guest-rewards';
+type Prize={name:string;type:'try-again'|'points'|'coupon'|'free-delivery';points:number;probability:number;active?:boolean;voucherCode?:string};
+type RewardSettings={dailySpinLimit:number;checkInRewards:number[];guestMode:boolean;loginRequiredToRedeem:boolean;pointsExpiryDays:number;spinWheelSlots?:Prize[]};
+type Wallet={points:number;streak:number;lastCheckIn?:string;lastSpin?:string;coupons?:string[]};
+type GiftReward={id:string;title:string;imageUrl?:string;pointsCost:number;stock:number;active?:boolean;description?:string};
+const GUEST_KEY='phdeals-guest-rewards';
+const defaultSettings:RewardSettings={dailySpinLimit:1,checkInRewards:[10,15,20,25,30,50,100],guestMode:true,loginRequiredToRedeem:true,pointsExpiryDays:0};
+const emptyWallet:Wallet={points:0,streak:0,coupons:[]};
+function day(){return new Date().toISOString().slice(0,10)}
+function weighted(prizes:Prize[]){const active=prizes.filter(p=>p.active!==false&&Number(p.probability)>0);const total=active.reduce((n,p)=>n+Number(p.probability),0);let r=Math.random()*total;for(const p of active){r-=Number(p.probability);if(r<=0)return p}return active[active.length-1]}
 
-export default function RewardsPage() {
-  const [user, setUser] = useState<User | null>(null);
-  const [authReady, setAuthReady] = useState(false);
-  const [reward, setReward] = useState<Reward>(EMPTY_REWARD);
-  const [message, setMessage] = useState('');
-  const day = () => new Date().toISOString().slice(0, 10);
-
-  useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => { setUser(u); setAuthReady(true); });
-    return () => unsub();
-  }, []);
-
-  useEffect(() => {
-    if (user) return;
-    try { const saved = localStorage.getItem(guestKey); if (saved) setReward({ ...EMPTY_REWARD, ...JSON.parse(saved) }); } catch { /* keep defaults */ }
-  }, [user]);
-
-  useEffect(() => {
-    if (!user) return;
-    const unsub = onSnapshot(doc(db, 'user_rewards', user.uid), (snap) => setReward({ ...EMPTY_REWARD, ...(snap.data() || {}) } as Reward));
-    return () => unsub();
-  }, [user]);
-
-  const saveGuest = (next: Reward) => { setReward(next); try { localStorage.setItem(guestKey, JSON.stringify(next)); } catch { /* storage may be unavailable */ } };
-
-  async function checkIn() {
-    if (reward.lastCheckIn === day()) return;
-    const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
-    const streak = reward.lastCheckIn === yesterday ? Math.min(7, Number(reward.streak || 0) + 1) : 1;
-    const next = { ...reward, points: Number(reward.points || 0) + 10, streak, lastCheckIn: day(), coupons: reward.coupons || [] };
-    if (user) await setDoc(doc(db, 'user_rewards', user.uid), { ...next, updatedAt: serverTimestamp() }, { merge: true }); else saveGuest(next);
-    setMessage(`Day ${streak} check-in complete: +10 points`);
-  }
-
-  async function spin() {
-    if (reward.lastSpin === day()) return;
-    const coupon = ['SAVE10', 'SAVE15', 'FREESHIP'][Math.floor(Math.random() * 3)];
-    const next = { ...reward, points: Number(reward.points || 0) + 5, lastSpin: day(), coupons: [...(reward.coupons || []), coupon] };
-    if (user) await setDoc(doc(db, 'user_rewards', user.uid), { ...next, updatedAt: serverTimestamp() }, { merge: true }); else saveGuest(next);
-    setMessage(`You won ${coupon}. ${user ? 'It is saved to your account.' : 'It is saved on this device.'}`);
-  }
-
-  if (!authReady) return <main className="min-h-screen bg-[#F4F4F1]" aria-label="Rewards Hub" />;
-
-  return (
-    <main className="min-h-screen bg-[#F4F4F1] px-4 py-6 pb-28">
-      <div className="mx-auto max-w-md space-y-4">
-        <section className="rounded-[30px] bg-[#14140F] p-6 text-white shadow-md">
-          <Sparkles className="h-6 w-6 text-[#FFB020]" />
-          <h1 className="mt-3 text-3xl font-black">Rewards Hub</h1>
-          <p className="mt-2 text-xs text-white/60">{user?.email || 'Guest rewards — no account required'}</p>
-          <p className="mt-5 text-3xl font-black text-[#FFB020]">{reward.points || 0} points</p>
-        </section>
-
-        <section className="rounded-[30px] border bg-white p-5 shadow-sm">
-          <Trophy className="h-6 w-6 text-[#E1352B]" />
-          <h2 className="mt-2 text-xl font-black">7-Day Check-in</h2>
-          <div className="mt-4 grid grid-cols-7 gap-1">{Array.from({ length: 7 }, (_, i) => <span key={i} className={`rounded-lg p-2 text-center text-[9px] font-black ${i < Number(reward.streak || 0) ? 'bg-[#0F6A5F] text-white' : 'bg-[#F4F4F1] text-gray-500'}`}>D{i + 1}</span>)}</div>
-          <button disabled={reward.lastCheckIn === day()} onClick={checkIn} className="mt-4 w-full rounded-xl bg-[#14140F] py-3 text-xs font-black text-white disabled:opacity-50">{reward.lastCheckIn === day() ? 'Checked in today' : 'Check in +10 points'}</button>
-        </section>
-
-        <section className="rounded-[30px] border bg-white p-5 shadow-sm">
-          <Zap className="h-6 w-6 text-[#FFB020]" />
-          <h2 className="mt-2 text-xl font-black">Spin & Win</h2>
-          <button disabled={reward.lastSpin === day()} onClick={spin} className="mt-4 w-full rounded-xl bg-[#E1352B] py-4 text-xs font-black text-white disabled:opacity-50">{reward.lastSpin === day() ? 'Come back tomorrow' : 'Spin for a coupon'}</button>
-        </section>
-
-        <section className="rounded-[30px] border bg-white p-5 shadow-sm">
-          <Gift className="h-6 w-6 text-[#0F6A5F]" />
-          <h2 className="mt-2 text-lg font-black">Saved Coupons</h2>
-          <p className="mt-2 text-xs font-mono text-black/60">{reward.coupons?.length ? reward.coupons.join(' · ') : 'No coupons yet.'}</p>
-        </section>
-
-        {message && <p className="rounded-xl bg-[#0F6A5F] p-3 text-center text-xs font-black text-white">{message}</p>}
-      </div>
-    </main>
-  );
+export default function RewardsPage(){
+ const [user,setUser]=useState<User|null>(null);const [ready,setReady]=useState(false);const [wallet,setWallet]=useState<Wallet>(emptyWallet);const [settings,setSettings]=useState(defaultSettings);const [prizes,setPrizes]=useState<Prize[]>([]);const [gifts,setGifts]=useState<GiftReward[]>([]);const [message,setMessage]=useState('');const [busy,setBusy]=useState(false);
+ useEffect(()=>onAuthStateChanged(auth,u=>{setUser(u);setReady(true)}),[]);
+ useEffect(()=>{const a=onSnapshot(doc(db,'settings','rewards'),s=>{const d=s.data()||{};setSettings({...defaultSettings,...d});setPrizes(Array.isArray(d.spinWheelSlots)?d.spinWheelSlots:[])});const b=onSnapshot(doc(db,'settings','rewards'),()=>{});return()=>{a();b()}},[]);
+ useEffect(()=>{const a=onSnapshot((require('firebase/firestore') as typeof import('firebase/firestore')).collection(db,'reward_gifts'),s=>setGifts(s.docs.map(d=>({id:d.id,...d.data()}) as GiftReward).filter(x=>x.active!==false)));return()=>a()},[]);
+ useEffect(()=>{if(user){return onSnapshot(doc(db,'user_rewards',user.uid),s=>setWallet({...emptyWallet,...(s.data()||{})} as Wallet))}try{const s=localStorage.getItem(GUEST_KEY);if(s)setWallet({...emptyWallet,...JSON.parse(s)})}catch{}},[user]);
+ const saveGuest=(w:Wallet)=>{setWallet(w);try{localStorage.setItem(GUEST_KEY,JSON.stringify(w))}catch{}};
+ async function checkIn(){if(wallet.lastCheckIn===day())return;setBusy(true);try{const yesterday=new Date(Date.now()-86400000).toISOString().slice(0,10);const streak=wallet.lastCheckIn===yesterday?Math.min(7,Math.max(1,wallet.streak)+1):1;const points=Number(settings.checkInRewards[streak-1]??10);const next={...wallet,points:wallet.points+points,streak,lastCheckIn:day()};if(user)await runTransaction(db,async tx=>{const ref=doc(db,'user_rewards',user.uid);const snap=await tx.get(ref);const current={...emptyWallet,...(snap.data()||{})} as Wallet;if(current.lastCheckIn===day())throw new Error('Already checked in today.');tx.set(ref,{...current,points:Number(current.points)+points,streak,lastCheckIn:day(),updatedAt:serverTimestamp()},{merge:true})});else saveGuest(next);setMessage(`Day ${streak} complete — +${points} points`)}catch(e){setMessage(e instanceof Error?e.message:'Check-in failed')}finally{setBusy(false)}}
+ async function spin(){if(wallet.lastSpin===day()||settings.dailySpinLimit<1)return;setBusy(true);try{const prize=weighted(prizes);if(!prize)throw new Error('Spin prizes are not configured yet.');const gained=Math.max(0,Number(prize.points||0));const coupon=prize.type==='coupon'?(prize.voucherCode||`PH-${Math.random().toString(36).slice(2,8).toUpperCase()}`):'';if(user)await runTransaction(db,async tx=>{const ref=doc(db,'user_rewards',user.uid);const snap=await tx.get(ref);const current={...emptyWallet,...(snap.data()||{})} as Wallet;if(current.lastSpin===day())throw new Error('Come back tomorrow.');tx.set(ref,{...current,points:Number(current.points)+gained,lastSpin:day(),coupons:coupon?[...(current.coupons||[]),coupon]:(current.coupons||[]),updatedAt:serverTimestamp()},{merge:true})});else saveGuest({...wallet,points:wallet.points+gained,lastSpin:day(),coupons:coupon?[...(wallet.coupons||[]),coupon]:(wallet.coupons||[])});setMessage(prize.type==='try-again'?'Try again tomorrow — better luck next time!':`🎉 ${prize.name} — ${gained?`+${gained} points`:coupon||'Reward won!'}`)}catch(e){setMessage(e instanceof Error?e.message:'Spin failed')}finally{setBusy(false)}}
+ async function redeem(g:GiftReward){if(settings.loginRequiredToRedeem&&!user){setMessage('Please login first so your reward is saved permanently.');return}if(wallet.points<g.pointsCost||g.stock<1)return;setBusy(true);try{await runTransaction(db,async tx=>{const wref=doc(db,'user_rewards',user!.uid);const gref=doc(db,'reward_gifts',g.id);const rref=doc(db,'reward_redemptions',`${user!.uid}_${g.id}_${Date.now()}`);const ws=await tx.get(wref);const gs=await tx.get(gref);const current={...emptyWallet,...(ws.data()||{})} as Wallet;const live={...g,...(gs.data()||{})} as GiftReward;if(Number(current.points)<Number(live.pointsCost))throw new Error('Not enough points.');if(Number(live.stock)<1)throw new Error('Out of stock.');tx.update(wref,{points:Number(current.points)-Number(live.pointsCost),updatedAt:serverTimestamp()});tx.update(gref,{stock:Number(live.stock)-1});tx.set(rref,{userId:user!.uid,giftId:g.id,title:live.title,pointsCost:Number(live.pointsCost),status:'pending',createdAt:serverTimestamp()})});setMessage(`🎁 ${g.title} redeemed. Your redemption is pending admin approval.`)}catch(e){setMessage(e instanceof Error?e.message:'Redemption failed')}finally{setBusy(false)}}
+ if(!ready)return <main className="min-h-screen bg-[#F4F4F1]"/>;
+ return <main className="min-h-screen bg-[#F4F4F1] px-4 py-6 pb-28"><div className="mx-auto max-w-md space-y-4"><section className="rounded-[30px] bg-[#14140F] p-6 text-white shadow-md"><Sparkles className="h-6 w-6 text-[#FFB020]"/><h1 className="mt-3 text-3xl font-black">Rewards Hub</h1><p className="mt-2 text-xs text-white/60">{user?.email||'Guest rewards — no account required'}</p><p className="mt-5 text-3xl font-black text-[#FFB020]">{wallet.points||0} points</p>{!user&&<a href="/login" className="mt-4 inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2 text-xs font-black text-black"><LogIn size={14}/>Login to save rewards</a>}</section>
+ <section className="rounded-[30px] border bg-white p-5 shadow-sm"><Trophy className="h-6 w-6 text-[#E1352B]"/><h2 className="mt-2 text-xl font-black">7-Day Check-in</h2><div className="mt-4 grid grid-cols-7 gap-1">{Array.from({length:7},(_,i)=><span key={i} className={`rounded-lg p-2 text-center text-[9px] font-black ${i<Number(wallet.streak||0)?'bg-[#0F6A5F] text-white':'bg-[#F4F4F1] text-black/45'}`}>D{i+1}</span>)}</div><button disabled={busy||wallet.lastCheckIn===day()} onClick={checkIn} className="mt-4 w-full rounded-xl bg-[#14140F] py-3 text-xs font-black text-white disabled:opacity-50">{wallet.lastCheckIn===day()?'Checked in today':`Check in +${settings.checkInRewards[Math.max(0,Math.min(6,wallet.streak||0))]??10} points`}</button></section>
+ <section className="rounded-[30px] border bg-white p-5 shadow-sm"><Zap className="h-6 w-6 text-[#FFB020]"/><h2 className="mt-2 text-xl font-black">Spin & Win</h2><p className="mt-1 text-xs text-black/45">Try Again and small points can be common; big prizes stay rare according to the admin probability settings.</p><button disabled={busy||wallet.lastSpin===day()} onClick={spin} className="mt-4 w-full rounded-xl bg-[#E1352B] py-4 text-xs font-black text-white disabled:opacity-50">{wallet.lastSpin===day()?'Come back tomorrow':'SPIN & WIN'}</button></section>
+ <section className="rounded-[30px] border bg-white p-5 shadow-sm"><div className="flex items-center gap-2"><Gift className="h-6 w-6 text-[#0F6A5F]"/><h2 className="text-xl font-black">Reward Store</h2></div><div className="mt-4 space-y-3">{gifts.map(g=><article key={g.id} className="overflow-hidden rounded-2xl border border-black/10"><div className="relative aspect-[16/9] bg-[#F4F4F1]">{g.imageUrl&&<img src={g.imageUrl} alt={g.title} className="h-full w-full object-cover"/>}<span className="absolute right-2 top-2 rounded-full bg-[#FFB020] px-3 py-1 text-[9px] font-black">{g.pointsCost} POINTS</span></div><div className="p-4"><h3 className="font-black">{g.title}</h3><p className="mt-1 text-[10px] text-black/45">{g.description||'Redeem this reward using your points.'}</p><div className="mt-3 flex items-center justify-between gap-2"><span className="text-[10px] font-bold text-black/45">Stock {g.stock}</span><button disabled={busy||g.stock<1||wallet.points<g.pointsCost} onClick={()=>redeem(g)} className="rounded-xl bg-[#14140F] px-4 py-2 text-[10px] font-black text-white disabled:opacity-40">{wallet.points>=g.pointsCost?'Redeem':'Need '+(g.pointsCost-wallet.points)+' more'}</button></div></div></article>)}{gifts.length===0&&<p className="py-6 text-center text-xs text-black/40">Rewards will appear here when admin adds them.</p>}</div></section>
+ <section className="rounded-[30px] border bg-white p-5 shadow-sm"><div className="flex items-center gap-2"><History className="h-5 w-5 text-black/45"/><h2 className="text-lg font-black">Reward rules</h2></div><ul className="mt-3 space-y-2 text-[10px] leading-5 text-black/55"><li>• {settings.guestMode?'Guest mode is enabled.':'Login is required for rewards.'}</li><li>• {settings.loginRequiredToRedeem?'Login is required before reward redemption.':'Guests may redeem if the current policy allows it.'}</li><li>• {settings.pointsExpiryDays?`Points expire after ${settings.pointsExpiryDays} days.`:'Points do not expire.'}</li></ul></section>{message&&<p className="rounded-xl bg-[#0F6A5F] p-3 text-center text-xs font-black text-white">{message}</p>}<div className="flex items-center justify-center gap-1 text-[9px] font-bold text-black/35"><Lock size={11}/> Reward actions are account-protected when you login.</div></div></main>;
 }
