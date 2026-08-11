@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { doc, getDoc, onSnapshot, runTransaction, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, onSnapshot, runTransaction, serverTimestamp } from 'firebase/firestore';
 import { Gift, Sparkles, Trophy, Zap, LogIn, Lock, History } from 'lucide-react';
 import { auth, db } from '@/lib/firebase';
 
@@ -19,8 +19,8 @@ function weighted(prizes:Prize[]){const active=prizes.filter(p=>p.active!==false
 export default function RewardsPage(){
  const [user,setUser]=useState<User|null>(null);const [ready,setReady]=useState(false);const [wallet,setWallet]=useState<Wallet>(emptyWallet);const [settings,setSettings]=useState(defaultSettings);const [prizes,setPrizes]=useState<Prize[]>([]);const [gifts,setGifts]=useState<GiftReward[]>([]);const [message,setMessage]=useState('');const [busy,setBusy]=useState(false);
  useEffect(()=>onAuthStateChanged(auth,u=>{setUser(u);setReady(true)}),[]);
- useEffect(()=>{const a=onSnapshot(doc(db,'settings','rewards'),s=>{const d=s.data()||{};setSettings({...defaultSettings,...d});setPrizes(Array.isArray(d.spinWheelSlots)?d.spinWheelSlots:[])});const b=onSnapshot(doc(db,'settings','rewards'),()=>{});return()=>{a();b()}},[]);
- useEffect(()=>{const a=onSnapshot((require('firebase/firestore') as typeof import('firebase/firestore')).collection(db,'reward_gifts'),s=>setGifts(s.docs.map(d=>({id:d.id,...d.data()}) as GiftReward).filter(x=>x.active!==false)));return()=>a()},[]);
+ useEffect(()=>{const a=onSnapshot(doc(db,'settings','rewards'),s=>{const d=s.data()||{};setSettings({...defaultSettings,...d});setPrizes(Array.isArray(d.spinWheelSlots)?d.spinWheelSlots:[])});return()=>a()},[]);
+ useEffect(()=>{const a=onSnapshot(collection(db,'reward_gifts'),s=>setGifts(s.docs.map(d=>({id:d.id,...d.data()}) as GiftReward).filter(x=>x.active!==false)));return()=>a()},[]);
  useEffect(()=>{if(user){return onSnapshot(doc(db,'user_rewards',user.uid),s=>setWallet({...emptyWallet,...(s.data()||{})} as Wallet))}try{const s=localStorage.getItem(GUEST_KEY);if(s)setWallet({...emptyWallet,...JSON.parse(s)})}catch{}},[user]);
  const saveGuest=(w:Wallet)=>{setWallet(w);try{localStorage.setItem(GUEST_KEY,JSON.stringify(w))}catch{}};
  async function checkIn(){if(wallet.lastCheckIn===day())return;setBusy(true);try{const yesterday=new Date(Date.now()-86400000).toISOString().slice(0,10);const streak=wallet.lastCheckIn===yesterday?Math.min(7,Math.max(1,wallet.streak)+1):1;const points=Number(settings.checkInRewards[streak-1]??10);const next={...wallet,points:wallet.points+points,streak,lastCheckIn:day()};if(user)await runTransaction(db,async tx=>{const ref=doc(db,'user_rewards',user.uid);const snap=await tx.get(ref);const current={...emptyWallet,...(snap.data()||{})} as Wallet;if(current.lastCheckIn===day())throw new Error('Already checked in today.');tx.set(ref,{...current,points:Number(current.points)+points,streak,lastCheckIn:day(),updatedAt:serverTimestamp()},{merge:true})});else saveGuest(next);setMessage(`Day ${streak} complete — +${points} points`)}catch(e){setMessage(e instanceof Error?e.message:'Check-in failed')}finally{setBusy(false)}}
