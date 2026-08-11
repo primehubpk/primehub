@@ -15,16 +15,23 @@ import { Eye, EyeOff, KeyRound, LockKeyhole, LogOut, ShieldCheck } from 'lucide-
 import { auth } from '@/lib/firebase';
 
 /**
- * Client-side access gate only. Real authorization MUST also be enforced by
- * Firebase Auth/Firestore/Storage rules. No master PIN or password is stored
- * in the frontend bundle.
+ * Production access is always Firebase Auth based. Preview deployments have a
+ * deliberately isolated demo gate so a preview can be tested before a real
+ * Firebase Admin user is provisioned. The demo gate is disabled on the live
+ * PrimeHub domain and never creates/changes a Firebase account.
  */
 const ADMIN_UID = process.env.NEXT_PUBLIC_FIREBASE_ADMIN_UID || '';
 const ADMIN_EMAIL = process.env.NEXT_PUBLIC_FIREBASE_ADMIN_EMAIL || 'primehubpk1@gmail.com';
+const PREVIEW_DEMO_PASSWORD = 'junaid00';
+const PRODUCTION_HOSTS = new Set(['primehub-one.vercel.app', 'primehub.pk', 'www.primehub.pk']);
 
 type Props = { children: React.ReactNode };
-
 type Notice = { type: 'error' | 'success'; text: string } | null;
+
+function isPreviewDeployment() {
+  if (typeof window === 'undefined') return false;
+  return !PRODUCTION_HOSTS.has(window.location.hostname);
+}
 
 function isAllowedAdmin(user: User) {
   if (ADMIN_UID && user.uid === ADMIN_UID) return true;
@@ -45,24 +52,39 @@ export default function AdminAuthGuard({ children }: Props) {
   const [newPassword, setNewPassword] = useState('');
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
+  const [previewDemo, setPreviewDemo] = useState(false);
 
   useEffect(() => {
-    return onAuthStateChanged(auth, async (nextUser) => {
-      if (!nextUser) {
-        setUser(null);
-        setChecking(false);
-        return;
-      }
+    const handleDemoLogout = () => {
+      sessionStorage.removeItem('primehub-admin-preview-demo');
+      setPreviewDemo(false);
+      setUser(null);
+    };
 
-      if (isAllowedAdmin(nextUser)) {
+    window.addEventListener('primehub-admin-demo-logout', handleDemoLogout);
+
+    if (isPreviewDeployment() && sessionStorage.getItem('primehub-admin-preview-demo') === '1') {
+      setPreviewDemo(true);
+      setChecking(false);
+    }
+
+    const unsubscribe = onAuthStateChanged(auth, async (nextUser) => {
+      if (nextUser && isAllowedAdmin(nextUser)) {
         setUser(nextUser);
-      } else {
+      } else if (nextUser) {
         await signOut(auth);
         setUser(null);
         setError('This Firebase account is not authorized for the PrimeHub Admin panel.');
+      } else if (!sessionStorage.getItem('primehub-admin-preview-demo')) {
+        setUser(null);
       }
       setChecking(false);
     });
+
+    return () => {
+      unsubscribe();
+      window.removeEventListener('primehub-admin-demo-logout', handleDemoLogout);
+    };
   }, []);
 
   async function login(event: FormEvent) {
@@ -70,7 +92,15 @@ export default function AdminAuthGuard({ children }: Props) {
     setError('');
     setNotice(null);
     setBusy(true);
+
     try {
+      if (isPreviewDeployment() && email.trim().toLowerCase() === ADMIN_EMAIL.toLowerCase() && password === PREVIEW_DEMO_PASSWORD) {
+        sessionStorage.setItem('primehub-admin-preview-demo', '1');
+        setPreviewDemo(true);
+        setBusy(false);
+        return;
+      }
+
       const credential = await signInWithEmailAndPassword(auth, email.trim(), password);
       if (!isAllowedAdmin(credential.user)) {
         await signOut(auth);
@@ -78,7 +108,7 @@ export default function AdminAuthGuard({ children }: Props) {
       }
     } catch (err) {
       console.error(err);
-      setError('Login failed. Check your email and password and try again.');
+      setError('Login failed. On a preview use the preview credentials; on production use the Firebase Admin account.');
     } finally {
       setBusy(false);
     }
@@ -106,6 +136,10 @@ export default function AdminAuthGuard({ children }: Props) {
 
   async function changePassword(event: FormEvent) {
     event.preventDefault();
+    if (previewDemo) {
+      setNotice({ type: 'error', text: 'Preview demo mode does not change the production admin password.' });
+      return;
+    }
     if (!user?.email) return;
     if (newPassword.length < 8) {
       setNotice({ type: 'error', text: 'New password must be at least 8 characters.' });
@@ -128,11 +162,13 @@ export default function AdminAuthGuard({ children }: Props) {
     }
   }
 
+  const authenticated = Boolean(user) || previewDemo;
+
   if (checking) {
     return <div className="flex min-h-screen items-center justify-center bg-[#F4F4F1]"><div className="rounded-3xl bg-white px-6 py-5 text-xs font-black shadow-sm">Checking admin security...</div></div>;
   }
 
-  if (!user) {
+  if (!authenticated) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#F4F4F1] px-4">
         <form onSubmit={login} className="w-full max-w-sm rounded-[30px] bg-white p-7 shadow-xl">
@@ -140,6 +176,7 @@ export default function AdminAuthGuard({ children }: Props) {
           <p className="mt-5 text-[9px] font-black uppercase tracking-[0.25em] text-[#E1352B]">PrimeHub Admin</p>
           <h1 className="mt-1 text-2xl font-black">Secure Login</h1>
           <p className="mt-2 text-xs leading-5 text-black/40">Sign in with your authorized Firebase Admin account.</p>
+          {isPreviewDeployment() && <div className="mt-4 rounded-2xl bg-[#FFF5D6] p-3 text-[10px] font-bold leading-4 text-[#8A5A00]">Preview environment: demo access is enabled for testing. Production authentication remains Firebase-only.</div>}
           {error && <div className="mt-4 rounded-2xl bg-[#E1352B]/10 p-3 text-[10px] font-bold leading-4 text-[#E1352B]">{error}</div>}
           {notice && <div className="mt-4 rounded-2xl bg-[#0F6A5F]/10 p-3 text-[10px] font-bold leading-4 text-[#0F6A5F]">{notice.text}</div>}
           <label className="mt-5 block">
@@ -161,12 +198,14 @@ export default function AdminAuthGuard({ children }: Props) {
     );
   }
 
+  const displayEmail = previewDemo ? `${ADMIN_EMAIL} · Preview Demo` : user?.email;
+
   return (
     <div className="min-h-screen">
       <div className="sticky top-0 z-[150] flex items-center justify-end gap-2 border-b border-black/5 bg-white/90 px-4 py-2 backdrop-blur">
-        <span className="mr-auto truncate text-[9px] font-bold text-black/35">{user.email}</span>
+        <span className="mr-auto truncate text-[9px] font-bold text-black/35">{displayEmail}</span>
         <button type="button" onClick={() => setShowSecurity((value) => !value)} className="flex items-center gap-1.5 rounded-full bg-[#F4F4F1] px-3 py-2 text-[9px] font-black"><KeyRound size={12} /> Security</button>
-        <button type="button" onClick={() => signOut(auth)} className="flex items-center gap-1.5 rounded-full bg-[#F4F4F1] px-3 py-2 text-[9px] font-black"><LogOut size={12} /> Logout</button>
+        <button type="button" onClick={() => { if (previewDemo) { window.dispatchEvent(new Event('primehub-admin-demo-logout')); } else { void signOut(auth); } }} className="flex items-center gap-1.5 rounded-full bg-[#F4F4F1] px-3 py-2 text-[9px] font-black"><LogOut size={12} /> Logout</button>
       </div>
       {showSecurity && (
         <div className="border-b border-black/5 bg-white px-4 py-4">
