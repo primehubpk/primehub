@@ -12,11 +12,10 @@ import DealScheduleManager from '@/components/admin/DealScheduleManager';
 import OrdersManager from '@/components/admin/OrdersManager';
 import VendorRequests from '@/components/admin/VendorRequests';
 import SiteSettingsManager from '@/components/admin/SiteSettingsManager';
-import MediaLibrary from '@/components/admin/MediaLibrary';
 import { auth } from '@/lib/firebase';
 import { adminCollection, type Order, type Product, type VendorRequest } from '@/components/admin/shared';
 
-type Tab = Exclude<AdminTab, 'rewards'>;
+type Tab = Exclude<AdminTab, 'rewards' | 'media'>;
 
 export default function ProfessionalAdminPage() {
   return <AdminAuthGuard><ProfessionalAdmin /></AdminAuthGuard>;
@@ -36,12 +35,16 @@ function ProfessionalAdmin() {
     return () => { productsUnsub(); ordersUnsub(); vendorsUnsub(); };
   }, []);
 
+  const handleTabChange = (tab: AdminTab) => {
+    // Rewards is rendered by the parent admin router; Media Library has been removed.
+    if (tab !== 'rewards') setActiveTab(tab);
+  };
+
   const render = () => {
     switch (activeTab) {
       case 'dashboard': return <ProDashboard products={products} orders={orders} vendorRequests={vendorRequests} />;
       case 'products': return <ProductsManager />;
       case 'categories': return <CategoriesManager />;
-      case 'media': return <MediaLibrary />;
       case 'deals': return <DealScheduleManager />;
       case 'orders': return <OrdersManager />;
       case 'suppliers': return <VendorRequests />;
@@ -49,5 +52,5 @@ function ProfessionalAdmin() {
     }
   };
 
-  return <main className="min-h-screen bg-[#F4F4F1]"><AdminHeader activeTab={activeTab} onTabChange={setActiveTab} onLogout={() => signOut(auth)} search={search} onSearchChange={setSearch} stats={{ totalProducts: products.length, totalOrders: orders.length }} />{render()}</main>;
+  return <main className="min-h-screen bg-[#F4F4F1]"><AdminHeader activeTab={activeTab} onTabChange={handleTabChange} onLogout={() => signOut(auth)} search={search} onSearchChange={setSearch} stats={{ totalProducts: products.length, totalOrders: orders.length }} />{render()}</main>;
 }
