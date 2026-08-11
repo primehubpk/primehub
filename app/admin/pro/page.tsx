@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { signOut } from 'firebase/auth';
 import { onSnapshot } from 'firebase/firestore';
 import AdminAuthGuard from '@/components/AdminAuthGuard';
 import AdminHeader, { type AdminTab } from '@/components/admin/AdminHeader';
@@ -12,6 +13,7 @@ import OrdersManager from '@/components/admin/OrdersManager';
 import VendorRequests from '@/components/admin/VendorRequests';
 import SiteSettingsManager from '@/components/admin/SiteSettingsManager';
 import MediaLibrary from '@/components/admin/MediaLibrary';
+import { auth } from '@/lib/firebase';
 import { adminCollection, type Order, type Product, type VendorRequest } from '@/components/admin/shared';
 
 type Tab = Exclude<AdminTab, 'rewards'>;
@@ -47,5 +49,5 @@ function ProfessionalAdmin() {
     }
   };
 
-  return <main className="min-h-screen bg-[#F4F4F1]"><AdminHeader activeTab={activeTab} onTabChange={setActiveTab} onLogout={() => undefined} search={search} onSearchChange={setSearch} stats={{ totalProducts: products.length, totalOrders: orders.length }} />{render()}</main>;
+  return <main className="min-h-screen bg-[#F4F4F1]"><AdminHeader activeTab={activeTab} onTabChange={setActiveTab} onLogout={() => signOut(auth)} search={search} onSearchChange={setSearch} stats={{ totalProducts: products.length, totalOrders: orders.length }} />{render()}</main>;
 }
