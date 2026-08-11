@@ -1,13 +1,20 @@
 'use client';
 
 import { ChangeEvent } from 'react';
-import { CalendarClock, ClipboardList, LayoutDashboard, LogOut, Package, Search, Settings, Tags, Users } from 'lucide-react';
+import { CalendarClock, ClipboardList, Image, LayoutDashboard, LogOut, Package, Search, Settings, Tags, Users } from 'lucide-react';
 import type { DashboardStats } from './shared';
 
-export type AdminTab = 'dashboard' | 'settings' | 'products' | 'categories' | 'deals' | 'orders' | 'suppliers' | 'rewards';
+export type AdminTab = 'dashboard' | 'settings' | 'products' | 'categories' | 'deals' | 'orders' | 'suppliers' | 'media';
 type Props = { activeTab: AdminTab; onTabChange: (tab: AdminTab) => void; onLogout: () => void; search?: string; onSearchChange?: (value: string) => void; stats?: Partial<DashboardStats> };
 const tabs: Array<{ key: AdminTab; label: string; icon: typeof LayoutDashboard }> = [
-  { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard }, { key: 'settings', label: 'Settings', icon: Settings }, { key: 'products', label: 'Products', icon: Package }, { key: 'categories', label: 'Categories', icon: Tags }, { key: 'deals', label: 'One Day Deals', icon: CalendarClock }, { key: 'orders', label: 'Orders', icon: ClipboardList }, { key: 'suppliers', label: 'Suppliers', icon: Users },
+  { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { key: 'products', label: 'Products', icon: Package },
+  { key: 'categories', label: 'Categories', icon: Tags },
+  { key: 'media', label: 'Media Library', icon: Image },
+  { key: 'deals', label: 'One Day Deals', icon: CalendarClock },
+  { key: 'orders', label: 'Orders', icon: ClipboardList },
+  { key: 'suppliers', label: 'Suppliers', icon: Users },
+  { key: 'settings', label: 'Settings', icon: Settings },
 ];
 
 export default function AdminHeader({ activeTab, onTabChange, onLogout, search = '', onSearchChange, stats }: Props) {
