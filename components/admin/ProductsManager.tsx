@@ -2,13 +2,21 @@
 
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react';
 import { onSnapshot } from 'firebase/firestore';
-import { Edit3, ImagePlus, Search, Trash2, X, Plus, Minus, Check, Loader2 } from 'lucide-react';
-import { adminCollection, createAdminDocument, deleteAdminDocument, type Product, updateAdminDocument, uploadImageToImgBB } from './shared';
+import { Edit3, ImagePlus, Search, Trash2, X, Plus, Minus, Check, Loader2, Tag, Star } from 'lucide-react';
+import { adminCollection, createAdminDocument, deleteAdminDocument, getAdminDocument, setAdminDocument, type Product, updateAdminDocument, uploadImageToImgBB } from './shared';
+import type { PriceBucket, Weekday, WeeklyDeal } from '@/lib/types';
 
 type CategoryOption = { id: string; title: string; active?: boolean; sortOrder?: number };
 type MediaAsset = { id: string; name?: string; url: string; type?: string };
 type VariantOption = { id: string; name: string; values: string[] };
 type VariantRow = { id: string; label: string; sku: string; price: string; salePrice: string; stock: string; imageUrl: string; active: boolean };
+
+type DealChoice = { day: Weekday | ''; dealPrice: string };
+
+const DAYS: Array<{ key: Weekday; label: string }> = [
+  { key: 'monday', label: 'Monday Deal' }, { key: 'tuesday', label: 'Tuesday Deal' }, { key: 'wednesday', label: 'Wednesday Deal' },
+  { key: 'thursday', label: 'Thursday Deal' }, { key: 'friday', label: 'Friday Deal' }, { key: 'saturday', label: 'Saturday Deal' }, { key: 'sunday', label: 'Sunday Deal' },
+];
 
 const EMPTY_FORM = {
   title: '', originalPrice: '', discountPrice: '', description: '', category: '', stock: '0',
@@ -26,7 +34,11 @@ export default function ProductsManager() {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<CategoryOption[]>([]);
   const [media, setMedia] = useState<MediaAsset[]>([]);
+  const [priceBuckets, setPriceBuckets] = useState<PriceBucket[]>([]);
+  const [weeklyDeals, setWeeklyDeals] = useState<WeeklyDeal[]>([]);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [deal, setDeal] = useState<DealChoice>({ day: '', dealPrice: '' });
+  const [bucketIds, setBucketIds] = useState<string[]>([]);
   const [options, setOptions] = useState<VariantOption[]>(DEFAULT_OPTIONS);
   const [variantRows, setVariantRows] = useState<VariantRow[]>([]);
   const [query, setQuery] = useState('');
@@ -41,6 +53,14 @@ export default function ProductsManager() {
     setCategories(snapshot.docs.map((item) => ({ id: item.id, ...item.data() }) as CategoryOption).filter((item) => item.active !== false).sort((a, b) => Number(a.sortOrder ?? 999) - Number(b.sortOrder ?? 999)));
   }, (error) => setMessage(`Categories could not load: ${error.message}`)), []);
   useEffect(() => onSnapshot(adminCollection('media_assets'), (snapshot) => setMedia(snapshot.docs.map((item) => ({ id: item.id, ...item.data() }) as MediaAsset)), (error) => setMessage(`Media library could not load: ${error.message}`)), []);
+  useEffect(() => {
+    getAdminDocument('settings', 'main').then((snapshot) => {
+      if (!snapshot.exists()) return;
+      const data = snapshot.data() as { priceBuckets?: PriceBucket[]; weeklyDeals?: WeeklyDeal[] };
+      setPriceBuckets(Array.isArray(data.priceBuckets) ? data.priceBuckets.filter((bucket) => bucket.active !== false) : []);
+      setWeeklyDeals(Array.isArray(data.weeklyDeals) ? data.weeklyDeals : []);
+    }).catch((error) => setMessage(`Store settings could not load: ${error.message}`));
+  }, []);
 
   const shown = useMemo(() => products.filter((product) => product.title.toLowerCase().includes(query.toLowerCase()) || String(product.category || '').toLowerCase().includes(query.toLowerCase())), [products, query]);
   const gallery = useMemo(() => media.filter((asset) => `${asset.name || ''} ${asset.url}`.toLowerCase().includes(gallerySearch.toLowerCase())), [media, gallerySearch]);
@@ -58,7 +78,7 @@ export default function ProductsManager() {
       setMessage(`${files.length} image${files.length > 1 ? 's' : ''} uploaded successfully.`);
     } catch (error) {
       console.error(error);
-      setMessage(error instanceof Error ? `Upload failed: ${error.message}` : 'Upload failed. Check Firebase Storage permissions.');
+      setMessage(error instanceof Error ? `Upload failed: ${error.message}` : 'Upload failed. Please try again.');
     } finally { setBusy(false); event.target.value = ''; }
   }
 
@@ -81,18 +101,39 @@ export default function ProductsManager() {
     const rawOptions = Array.isArray((product as any).variantOptions) ? (product as any).variantOptions as VariantOption[] : DEFAULT_OPTIONS;
     const original = Number((product as any).originalPrice ?? product.price ?? 0);
     const current = Number(product.price ?? 0);
+    const existingDeal = weeklyDeals.find((item) => item.productId === product.id);
     setEditing(product);
     setForm({ ...EMPTY_FORM, title: product.title, originalPrice: String(original || ''), discountPrice: current && current !== original ? String(current) : '', description: String(product.description || ''), category: String(product.category || ''), stock: String(product.stock ?? 0), videoUrl: String((product as any).videoUrl || ''), images: product.images || [product.imageUrl || ''].filter(Boolean), slug: String((product as any).slug || slugify(product.title)), brand: String((product as any).brand || ''), featured: Boolean((product as any).featured), published: (product as any).published !== false });
+    setDeal({ day: existingDeal?.day || '', dealPrice: existingDeal?.dealPrice ? String(existingDeal.dealPrice) : '' });
+    setBucketIds(Array.isArray((product as any).priceBucketIds) ? (product as any).priceBucketIds : []);
     setOptions(rawOptions.length ? rawOptions : DEFAULT_OPTIONS);
     setVariantRows(Array.isArray((product as any).variantMatrix) ? (product as any).variantMatrix : []);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
-  function reset() { setEditing(null); setForm(EMPTY_FORM); setOptions(DEFAULT_OPTIONS); setVariantRows([]); setMessage(''); }
+  function reset() { setEditing(null); setForm(EMPTY_FORM); setDeal({ day: '', dealPrice: '' }); setBucketIds([]); setOptions(DEFAULT_OPTIONS); setVariantRows([]); setMessage(''); }
+
+  async function syncWeeklyDeal(productId: string) {
+    const snapshot = await getAdminDocument('settings', 'main');
+    const data = snapshot.exists() ? snapshot.data() as { weeklyDeals?: WeeklyDeal[] } : {};
+    let nextDeals = Array.isArray(data.weeklyDeals) ? data.weeklyDeals.filter((item) => item.productId !== productId) : [];
+    if (deal.day) {
+      const product = editing?.id === productId ? editing : products.find((item) => item.id === productId);
+      const originalPrice = Number(form.originalPrice);
+      const dealPrice = Number(deal.dealPrice);
+      if (!dealPrice || dealPrice >= originalPrice) throw new Error('Deal price must be lower than the regular/original price.');
+      nextDeals = nextDeals.filter((item) => item.day !== deal.day);
+      nextDeals.push({ id: `weekly-${deal.day}`, day: deal.day, label: 'One Day Deal', productId, imageUrl: form.images[0] || '', title: form.title.trim(), originalPrice, dealPrice, startAt: '', endAt: '', buttonText: 'Shop Deal', buttonLink: `/product/${productId}`, active: true });
+      void product;
+    }
+    await setAdminDocument('settings', 'main', { weeklyDeals: nextDeals });
+    setWeeklyDeals(nextDeals);
+  }
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!form.title.trim() || !form.originalPrice || !form.category) { setMessage('Product name, original price and category are required.'); return; }
+    if (deal.day && (!deal.dealPrice || Number(deal.dealPrice) >= Number(form.originalPrice))) { setMessage('Deal price must be lower than the regular/original price.'); return; }
     setBusy(true); setMessage('');
     try {
       const cleanedOptions = options.filter((item) => item.name.trim() && item.values.some((value) => value.trim())).map((item) => ({ ...item, name: item.name.trim(), values: item.values.map((value) => value.trim()).filter(Boolean) }));
@@ -102,10 +143,12 @@ export default function ProductsManager() {
       const payload = {
         title: form.title.trim(), slug: slugify(form.slug || form.title), brand: form.brand.trim(), price: salePrice, originalPrice,
         description: form.description, category: form.category, stock: Math.max(0, Number(form.stock || 0)), videoUrl: form.videoUrl.trim(), imageUrl: form.images[0] || '', images: form.images,
-        variantOptions: cleanedOptions, variantMatrix: variantRows, featured: form.featured, published: form.published, updatedAt: new Date().toISOString(),
+        variantOptions: cleanedOptions, variantMatrix: variantRows, featured: form.featured, published: form.published, priceBucketIds: bucketIds, updatedAt: new Date().toISOString(),
       };
+      let productId = editing?.id || '';
       if (editing) await updateAdminDocument('products', editing.id, payload);
-      else await createAdminDocument('products', { ...payload, isFlashSale: false, isWeekendSpecial: false, createdAt: new Date().toISOString() });
+      else productId = (await createAdminDocument('products', { ...payload, isFlashSale: false, isWeekendSpecial: false, createdAt: new Date().toISOString() })).id;
+      await syncWeeklyDeal(productId);
       setMessage(editing ? 'Product updated successfully.' : 'Product added successfully.');
       reset();
     } catch (error) {
@@ -113,9 +156,12 @@ export default function ProductsManager() {
     } finally { setBusy(false); }
   }
 
+  const bucketLabel = (id: string) => priceBuckets.find((bucket) => bucket.id === id)?.title || id;
+  const selectedDealLabel = deal.day ? DAYS.find((item) => item.key === deal.day)?.label : 'No deal — regular product';
+
   return <section className="mx-auto max-w-6xl px-4 py-6">
-    <div><p className="text-[9px] font-black uppercase tracking-[.22em] text-[#E1352B]">Catalog control</p><h2 className="mt-1 text-2xl font-black">Products Manager</h2><p className="mt-1 text-sm text-black/50">One clean product setup: category, two prices, one description, media, variants and publishing.</p></div>
-    {message && <div className="mt-4 rounded-xl bg-white p-3 text-xs font-bold text-black/65 shadow-sm">{message}</div>}
+    <div><p className="text-[9px] font-black uppercase tracking-[.22em] text-[#E1352B]">Catalog control</p><h2 className="mt-1 text-2xl font-black">Products Manager</h2><p className="mt-1 text-sm text-black/50">Complete product setup: pricing, category, media, variants, daily deals, price buckets and storefront placement.</p></div>
+    {message && <div role="status" className="mt-4 rounded-xl bg-white p-3 text-xs font-bold text-black/65 shadow-sm">{message}</div>}
     <form onSubmit={save} className="mt-5 grid gap-4 rounded-3xl bg-white p-5 shadow-sm">
       <div className="grid gap-3 md:grid-cols-2">
         <input value={form.title} onChange={(e) => change('title', e.target.value)} placeholder="Product name" required className="rounded-xl bg-[#F4F4F1] p-3 text-sm" />
@@ -141,7 +187,22 @@ export default function ProductsManager() {
         {!!variantRows.length && <div className="mt-3 overflow-x-auto"><table className="w-full min-w-[720px] text-left text-xs"><thead><tr className="border-b border-black/10 text-black/45"><th className="p-2">Combination</th><th className="p-2">SKU</th><th className="p-2">Price</th><th className="p-2">Sale</th><th className="p-2">Stock</th><th className="p-2">Active</th></tr></thead><tbody>{variantRows.map((row, index) => <tr key={row.id} className="border-b border-black/5"><td className="p-2 font-bold">{row.label}</td><td className="p-2"><input value={row.sku} onChange={(e) => setVariantRows((r) => r.map((x, i) => i === index ? { ...x, sku: e.target.value } : x))} className="w-28 rounded-lg bg-[#F4F4F1] p-2" /></td><td className="p-2"><input type="number" value={row.price} onChange={(e) => setVariantRows((r) => r.map((x, i) => i === index ? { ...x, price: e.target.value } : x))} className="w-24 rounded-lg bg-[#F4F4F1] p-2" /></td><td className="p-2"><input type="number" value={row.salePrice} onChange={(e) => setVariantRows((r) => r.map((x, i) => i === index ? { ...x, salePrice: e.target.value } : x))} className="w-24 rounded-lg bg-[#F4F4F1] p-2" /></td><td className="p-2"><input type="number" value={row.stock} onChange={(e) => setVariantRows((r) => r.map((x, i) => i === index ? { ...x, stock: e.target.value } : x))} className="w-20 rounded-lg bg-[#F4F4F1] p-2" /></td><td className="p-2"><input type="checkbox" checked={row.active} onChange={(e) => setVariantRows((r) => r.map((x, i) => i === index ? { ...x, active: e.target.checked } : x))} /></td></tr>)}</tbody></table></div>}
       </div>
 
-      <div className="rounded-2xl border border-black/10 bg-[#FAFAF7] p-4"><div className="flex flex-wrap gap-5 text-xs font-bold"><label className="flex items-center gap-2"><input type="checkbox" checked={form.published} onChange={(e) => change('published', e.target.checked)} /> Published on storefront</label><label className="flex items-center gap-2"><input type="checkbox" checked={form.featured} onChange={(e) => change('featured', e.target.checked)} /> Featured product</label></div><p className="mt-2 text-[11px] text-black/45"><b>Published</b> controls whether customers can see the product. <b>Featured</b> marks it for featured product sections; it does not change price or stock.</p></div>
+      <div className="rounded-2xl border border-[#FFB020]/30 bg-[#FFF9E9] p-4">
+        <div className="flex items-center gap-2"><Tag size={16} className="text-[#D99A17]" /><div><p className="text-sm font-black">Daily Deal placement</p><p className="text-[11px] text-black/50">Choose the day here. None means the product stays a regular product.</p></div></div>
+        <div className="mt-3 grid gap-3 md:grid-cols-2">
+          <label className="grid gap-1"><span className="text-[10px] font-black uppercase tracking-wider text-black/45">Which deal?</span><select value={deal.day} onChange={(e) => setDeal((current) => ({ ...current, day: e.target.value as Weekday | '', dealPrice: e.target.value ? current.dealPrice : '' }))} className="rounded-xl bg-white p-3 text-sm"><option value="">None — regular product</option>{DAYS.map((item) => <option key={item.key} value={item.key}>{item.label}</option>)}</select></label>
+          <label className={`grid gap-1 ${!deal.day ? 'opacity-45' : ''}`}><span className="text-[10px] font-black uppercase tracking-wider text-black/45">Deal price <span className="font-normal normal-case">(only for selected day)</span></span><input disabled={!deal.day} value={deal.dealPrice} onChange={(e) => setDeal((current) => ({ ...current, dealPrice: e.target.value }))} placeholder="Rs. 1,299" type="number" min="1" className="rounded-xl bg-white p-3 text-sm" /></label>
+        </div>
+        <div className="mt-3 rounded-xl bg-white/70 px-3 py-2 text-[11px] font-bold text-black/55">Selected: <span className="text-black">{selectedDealLabel}</span>{deal.day && <span> · Special price activates only on that Pakistan-time day; otherwise the regular price is used.</span>}</div>
+      </div>
+
+      <div className="rounded-2xl border border-black/10 bg-[#FAFAF7] p-4">
+        <div className="flex items-center gap-2"><Tag size={15} className="text-[#0F6A5F]" /><div><p className="text-sm font-black">Price Buckets</p><p className="text-[11px] text-black/45">These are controlled from Admin → Settings. Select where this product should appear.</p></div></div>
+        {!priceBuckets.length ? <p className="mt-3 rounded-xl bg-white p-3 text-xs text-black/45">No active price buckets have been created yet. Create them in Store Settings.</p> : <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">{priceBuckets.map((bucket) => <label key={bucket.id} className={`flex cursor-pointer items-center gap-2 rounded-xl bg-white p-3 text-xs font-bold ring-1 ${bucketIds.includes(bucket.id) ? 'ring-[#0F6A5F]' : 'ring-black/5'}`}><input type="checkbox" checked={bucketIds.includes(bucket.id)} onChange={(e) => setBucketIds((current) => e.target.checked ? [...current, bucket.id] : current.filter((id) => id !== bucket.id))} /> <span>{bucket.title}</span></label>)}</div>}
+        {!!bucketIds.length && <p className="mt-2 text-[10px] font-bold text-black/45">Assigned: {bucketIds.map(bucketLabel).join(' · ')}</p>}
+      </div>
+
+      <div className="rounded-2xl border border-black/10 bg-[#FAFAF7] p-4"><div className="flex flex-wrap gap-5 text-xs font-bold"><label className="flex items-center gap-2"><input type="checkbox" checked={form.published} onChange={(e) => change('published', e.target.checked)} /> Published on storefront</label><label className="flex items-center gap-2"><input type="checkbox" checked={form.featured} onChange={(e) => change('featured', e.target.checked)} /> Featured product <span className="font-normal text-black/40">(highlighted sections only)</span></label></div><p className="mt-2 text-[11px] text-black/45"><b>Published</b> controls storefront visibility. <b>Featured</b> does not change price, stock or deal status; it only allows the product into featured merchandising sections.</p></div>
       <button disabled={busy} className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#14140F] py-3 text-xs font-black text-white disabled:opacity-50">{busy && <Loader2 size={14} className="animate-spin" />}{editing ? 'Save product' : 'Add product'}</button>
     </form>
 
