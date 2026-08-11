@@ -2,7 +2,7 @@
 
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react';
 import { onSnapshot } from 'firebase/firestore';
-import { Edit3, ImagePlus, Search, Trash2, X, Plus, Minus, Check, Loader2, Tag, Star } from 'lucide-react';
+import { Edit3, ImagePlus, Search, Trash2, X, Plus, Minus, Check, Loader2, Tag } from 'lucide-react';
 import { adminCollection, createAdminDocument, deleteAdminDocument, getAdminDocument, setAdminDocument, type Product, updateAdminDocument, uploadImageToImgBB } from './shared';
 import type { PriceBucket, Weekday, WeeklyDeal } from '@/lib/types';
 
@@ -10,23 +10,14 @@ type CategoryOption = { id: string; title: string; active?: boolean; sortOrder?:
 type MediaAsset = { id: string; name?: string; url: string; type?: string };
 type VariantOption = { id: string; name: string; values: string[] };
 type VariantRow = { id: string; label: string; sku: string; price: string; salePrice: string; stock: string; imageUrl: string; active: boolean };
-
 type DealChoice = { day: Weekday | ''; dealPrice: string };
 
 const DAYS: Array<{ key: Weekday; label: string }> = [
   { key: 'monday', label: 'Monday Deal' }, { key: 'tuesday', label: 'Tuesday Deal' }, { key: 'wednesday', label: 'Wednesday Deal' },
   { key: 'thursday', label: 'Thursday Deal' }, { key: 'friday', label: 'Friday Deal' }, { key: 'saturday', label: 'Saturday Deal' }, { key: 'sunday', label: 'Sunday Deal' },
 ];
-
-const EMPTY_FORM = {
-  title: '', originalPrice: '', discountPrice: '', description: '', category: '', stock: '0',
-  videoUrl: '', images: [] as string[], slug: '', brand: '', featured: false, published: true,
-};
-const DEFAULT_OPTIONS: VariantOption[] = [
-  { id: 'color', name: 'Color', values: [] },
-  { id: 'size', name: 'Size', values: [] },
-];
-
+const EMPTY_FORM = { title: '', originalPrice: '', discountPrice: '', description: '', category: '', stock: '0', videoUrl: '', images: [] as string[], slug: '', brand: '', featured: false, published: true };
+const DEFAULT_OPTIONS: VariantOption[] = [{ id: 'color', name: 'Color', values: [] }, { id: 'size', name: 'Size', values: [] }];
 function slugify(value: string) { return value.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, ''); }
 function makeId() { return Math.random().toString(36).slice(2, 10); }
 
@@ -49,166 +40,72 @@ export default function ProductsManager() {
   const [message, setMessage] = useState('');
 
   useEffect(() => onSnapshot(adminCollection('products'), (snapshot) => setProducts(snapshot.docs.map((item) => ({ id: item.id, ...item.data() }) as Product)), (error) => setMessage(`Products could not load: ${error.message}`)), []);
-  useEffect(() => onSnapshot(adminCollection('categories'), (snapshot) => {
-    setCategories(snapshot.docs.map((item) => ({ id: item.id, ...item.data() }) as CategoryOption).filter((item) => item.active !== false).sort((a, b) => Number(a.sortOrder ?? 999) - Number(b.sortOrder ?? 999)));
-  }, (error) => setMessage(`Categories could not load: ${error.message}`)), []);
+  useEffect(() => onSnapshot(adminCollection('categories'), (snapshot) => setCategories(snapshot.docs.map((item) => ({ id: item.id, ...item.data() }) as CategoryOption).filter((item) => item.active !== false).sort((a, b) => Number(a.sortOrder ?? 999) - Number(b.sortOrder ?? 999))), (error) => setMessage(`Categories could not load: ${error.message}`)), []);
   useEffect(() => onSnapshot(adminCollection('media_assets'), (snapshot) => setMedia(snapshot.docs.map((item) => ({ id: item.id, ...item.data() }) as MediaAsset)), (error) => setMessage(`Media library could not load: ${error.message}`)), []);
-  useEffect(() => {
-    getAdminDocument('settings', 'main').then((snapshot) => {
-      if (!snapshot.exists()) return;
-      const data = snapshot.data() as { priceBuckets?: PriceBucket[]; weeklyDeals?: WeeklyDeal[] };
-      setPriceBuckets(Array.isArray(data.priceBuckets) ? data.priceBuckets.filter((bucket) => bucket.active !== false) : []);
-      setWeeklyDeals(Array.isArray(data.weeklyDeals) ? data.weeklyDeals : []);
-    }).catch((error) => setMessage(`Store settings could not load: ${error.message}`));
-  }, []);
+  useEffect(() => { getAdminDocument('settings', 'main').then((snapshot) => { if (!snapshot.exists()) return; const data = snapshot.data() as { priceBuckets?: PriceBucket[]; weeklyDeals?: WeeklyDeal[] }; setPriceBuckets(Array.isArray(data.priceBuckets) ? data.priceBuckets.filter((bucket) => bucket.active !== false) : []); setWeeklyDeals(Array.isArray(data.weeklyDeals) ? data.weeklyDeals : []); }).catch((error) => setMessage(`Store settings could not load: ${error.message}`)); }, []);
 
   const shown = useMemo(() => products.filter((product) => product.title.toLowerCase().includes(query.toLowerCase()) || String(product.category || '').toLowerCase().includes(query.toLowerCase())), [products, query]);
   const gallery = useMemo(() => media.filter((asset) => `${asset.name || ''} ${asset.url}`.toLowerCase().includes(gallerySearch.toLowerCase())), [media, gallerySearch]);
   const change = (key: keyof typeof EMPTY_FORM, value: string | boolean | string[]) => setForm((current) => ({ ...current, [key]: value }));
 
   async function upload(event: ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(event.target.files || []); if (!files.length) return;
-    setBusy(true); setMessage('');
-    try {
-      for (const file of files) {
-        const url = await uploadImageToImgBB(file);
-        setForm((current) => ({ ...current, images: [...current.images, url] }));
-        try { await createAdminDocument('media_assets', { name: file.name, url, type: file.type, size: file.size, createdAt: new Date().toISOString() }); } catch (mediaError) { console.error(mediaError); }
-      }
-      setMessage(`${files.length} image${files.length > 1 ? 's' : ''} uploaded successfully.`);
-    } catch (error) {
-      console.error(error);
-      setMessage(error instanceof Error ? `Upload failed: ${error.message}` : 'Upload failed. Please try again.');
-    } finally { setBusy(false); event.target.value = ''; }
+    const files = Array.from(event.target.files || []); if (!files.length) return; setBusy(true); setMessage('');
+    try { for (const file of files) { const url = await uploadImageToImgBB(file); setForm((current) => ({ ...current, images: [...current.images, url] })); try { await createAdminDocument('media_assets', { name: file.name, url, type: file.type, size: file.size, createdAt: new Date().toISOString() }); } catch (mediaError) { console.error(mediaError); } } setMessage(`${files.length} image${files.length > 1 ? 's' : ''} uploaded successfully.`); }
+    catch (error) { console.error(error); setMessage(error instanceof Error ? `Upload failed: ${error.message}` : 'Upload failed. Please try again.'); }
+    finally { setBusy(false); event.target.value = ''; }
   }
-
   function addOption() { setOptions((current) => [...current, { id: makeId(), name: 'Option', values: [] }]); }
   function removeOption(id: string) { setOptions((current) => current.filter((item) => item.id !== id)); setVariantRows([]); }
   function updateOption(id: string, patch: Partial<VariantOption>) { setOptions((current) => current.map((item) => item.id === id ? { ...item, ...patch } : item)); }
   function addValue(id: string) { setOptions((current) => current.map((item) => item.id === id ? { ...item, values: [...item.values, ''] } : item)); }
   function updateValue(id: string, index: number, value: string) { setOptions((current) => current.map((item) => item.id === id ? { ...item, values: item.values.map((v, i) => i === index ? value : v) } : item)); }
   function removeValue(id: string, index: number) { setOptions((current) => current.map((item) => item.id === id ? { ...item, values: item.values.filter((_, i) => i !== index) } : item)); }
-
   function buildVariantRows(nextOptions = options) {
-    const active = nextOptions.filter((item) => item.name.trim() && item.values.some(Boolean)).map((item) => ({ ...item, values: item.values.filter(Boolean) }));
-    if (!active.length) { setVariantRows([]); return; }
-    const combinations = active.reduce<string[][]>((acc, option) => acc.flatMap((prefix) => option.values.map((value) => [...prefix, value])), [[]]);
-    const defaultPrice = form.discountPrice || form.originalPrice;
+    const active = nextOptions.filter((item) => item.name.trim() && item.values.some(Boolean)).map((item) => ({ ...item, values: item.values.filter(Boolean) })); if (!active.length) { setVariantRows([]); return; }
+    const combinations = active.reduce<string[][]>((acc, option) => acc.flatMap((prefix) => option.values.map((value) => [...prefix, value])), [[]]); const defaultPrice = form.discountPrice || form.originalPrice;
     setVariantRows(combinations.map((parts) => ({ id: makeId(), label: parts.join(' / '), sku: '', price: defaultPrice, salePrice: '', stock: form.stock, imageUrl: form.images[0] || '', active: true })));
   }
-
   function startEdit(product: Product) {
-    const rawOptions = Array.isArray((product as any).variantOptions) ? (product as any).variantOptions as VariantOption[] : DEFAULT_OPTIONS;
-    const original = Number((product as any).originalPrice ?? product.price ?? 0);
-    const current = Number(product.price ?? 0);
-    const existingDeal = weeklyDeals.find((item) => item.productId === product.id);
-    setEditing(product);
-    setForm({ ...EMPTY_FORM, title: product.title, originalPrice: String(original || ''), discountPrice: current && current !== original ? String(current) : '', description: String(product.description || ''), category: String(product.category || ''), stock: String(product.stock ?? 0), videoUrl: String((product as any).videoUrl || ''), images: product.images || [product.imageUrl || ''].filter(Boolean), slug: String((product as any).slug || slugify(product.title)), brand: String((product as any).brand || ''), featured: Boolean((product as any).featured), published: (product as any).published !== false });
-    setDeal({ day: existingDeal?.day || '', dealPrice: existingDeal?.dealPrice ? String(existingDeal.dealPrice) : '' });
-    setBucketIds(Array.isArray((product as any).priceBucketIds) ? (product as any).priceBucketIds : []);
-    setOptions(rawOptions.length ? rawOptions : DEFAULT_OPTIONS);
-    setVariantRows(Array.isArray((product as any).variantMatrix) ? (product as any).variantMatrix : []);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    const rawOptions = Array.isArray((product as any).variantOptions) ? (product as any).variantOptions as VariantOption[] : DEFAULT_OPTIONS; const original = Number((product as any).originalPrice ?? product.price ?? 0); const current = Number(product.price ?? 0); const existingDeal = weeklyDeals.find((item) => item.productId === product.id);
+    setEditing(product); setForm({ ...EMPTY_FORM, title: product.title, originalPrice: String(original || ''), discountPrice: current && current !== original ? String(current) : '', description: String(product.description || ''), category: String(product.category || ''), stock: String(product.stock ?? 0), videoUrl: String((product as any).videoUrl || ''), images: product.images || [product.imageUrl || ''].filter(Boolean), slug: String((product as any).slug || slugify(product.title)), brand: String((product as any).brand || ''), featured: Boolean((product as any).featured), published: (product as any).published !== false });
+    setDeal({ day: existingDeal?.day || '', dealPrice: existingDeal?.dealPrice ? String(existingDeal.dealPrice) : '' }); setBucketIds(Array.isArray((product as any).priceBucketIds) ? (product as any).priceBucketIds : []); setOptions(rawOptions.length ? rawOptions : DEFAULT_OPTIONS); setVariantRows(Array.isArray((product as any).variantMatrix) ? (product as any).variantMatrix : []); window.scrollTo({ top: 0, behavior: 'smooth' });
   }
-
   function reset() { setEditing(null); setForm(EMPTY_FORM); setDeal({ day: '', dealPrice: '' }); setBucketIds([]); setOptions(DEFAULT_OPTIONS); setVariantRows([]); setMessage(''); }
 
   async function syncWeeklyDeal(productId: string) {
-    const snapshot = await getAdminDocument('settings', 'main');
-    const data = snapshot.exists() ? snapshot.data() as { weeklyDeals?: WeeklyDeal[] } : {};
-    let nextDeals = Array.isArray(data.weeklyDeals) ? data.weeklyDeals.filter((item) => item.productId !== productId) : [];
-    if (deal.day) {
-      const product = editing?.id === productId ? editing : products.find((item) => item.id === productId);
-      const originalPrice = Number(form.originalPrice);
-      const dealPrice = Number(deal.dealPrice);
-      if (!dealPrice || dealPrice >= originalPrice) throw new Error('Deal price must be lower than the regular/original price.');
-      nextDeals = nextDeals.filter((item) => item.day !== deal.day);
-      nextDeals.push({ id: `weekly-${deal.day}`, day: deal.day, label: 'One Day Deal', productId, imageUrl: form.images[0] || '', title: form.title.trim(), originalPrice, dealPrice, startAt: '', endAt: '', buttonText: 'Shop Deal', buttonLink: `/product/${productId}`, active: true });
-      void product;
-    }
-    await setAdminDocument('settings', 'main', { weeklyDeals: nextDeals });
-    setWeeklyDeals(nextDeals);
+    const snapshot = await getAdminDocument('settings', 'main'); const data = snapshot.exists() ? snapshot.data() as { weeklyDeals?: WeeklyDeal[] } : {}; let nextDeals = Array.isArray(data.weeklyDeals) ? data.weeklyDeals.filter((item) => item.productId !== productId) : [];
+    if (deal.day) { const dealPrice = Number(deal.dealPrice); const originalPrice = Number(form.originalPrice); if (!dealPrice || dealPrice >= originalPrice) throw new Error('Deal price must be lower than the regular/original price.'); nextDeals = nextDeals.filter((item) => item.day !== deal.day); nextDeals.push({ id: `weekly-${deal.day}`, day: deal.day, label: 'One Day Deal', productId, imageUrl: form.images[0] || '', title: form.title.trim(), originalPrice, dealPrice, startAt: '', endAt: '', buttonText: 'Shop Deal', buttonLink: `/product/${productId}`, active: true }); }
+    await setAdminDocument('settings', 'main', { weeklyDeals: nextDeals }); setWeeklyDeals(nextDeals);
   }
-
   async function save(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!form.title.trim() || !form.originalPrice || !form.category) { setMessage('Product name, original price and category are required.'); return; }
-    if (deal.day && (!deal.dealPrice || Number(deal.dealPrice) >= Number(form.originalPrice))) { setMessage('Deal price must be lower than the regular/original price.'); return; }
+    event.preventDefault(); if (!form.title.trim() || !form.originalPrice || !form.category) { setMessage('Product name, original price and category are required.'); return; } if (deal.day && (!deal.dealPrice || Number(deal.dealPrice) >= Number(form.originalPrice))) { setMessage('Deal price must be lower than the regular/original price.'); return; }
     setBusy(true); setMessage('');
-    try {
-      const cleanedOptions = options.filter((item) => item.name.trim() && item.values.some((value) => value.trim())).map((item) => ({ ...item, name: item.name.trim(), values: item.values.map((value) => value.trim()).filter(Boolean) }));
-      const originalPrice = Number(form.originalPrice);
-      const salePrice = form.discountPrice ? Number(form.discountPrice) : originalPrice;
-      if (salePrice > originalPrice) throw new Error('Discount price cannot be higher than original price.');
-      const payload = {
-        title: form.title.trim(), slug: slugify(form.slug || form.title), brand: form.brand.trim(), price: salePrice, originalPrice,
-        description: form.description, category: form.category, stock: Math.max(0, Number(form.stock || 0)), videoUrl: form.videoUrl.trim(), imageUrl: form.images[0] || '', images: form.images,
-        variantOptions: cleanedOptions, variantMatrix: variantRows, featured: form.featured, published: form.published, priceBucketIds: bucketIds, updatedAt: new Date().toISOString(),
-      };
-      let productId = editing?.id || '';
-      if (editing) await updateAdminDocument('products', editing.id, payload);
-      else productId = (await createAdminDocument('products', { ...payload, isFlashSale: false, isWeekendSpecial: false, createdAt: new Date().toISOString() })).id;
-      await syncWeeklyDeal(productId);
-      setMessage(editing ? 'Product updated successfully.' : 'Product added successfully.');
-      reset();
-    } catch (error) {
-      console.error(error); setMessage(error instanceof Error ? error.message : 'Could not save product.');
-    } finally { setBusy(false); }
+    try { const cleanedOptions = options.filter((item) => item.name.trim() && item.values.some((value) => value.trim())).map((item) => ({ ...item, name: item.name.trim(), values: item.values.map((value) => value.trim()).filter(Boolean) })); const originalPrice = Number(form.originalPrice); const salePrice = form.discountPrice ? Number(form.discountPrice) : originalPrice; if (salePrice > originalPrice) throw new Error('Discount price cannot be higher than original price.');
+      const payload = { title: form.title.trim(), slug: slugify(form.slug || form.title), brand: form.brand.trim(), price: salePrice, originalPrice, description: form.description, category: form.category, stock: Math.max(0, Number(form.stock || 0)), videoUrl: form.videoUrl.trim(), imageUrl: form.images[0] || '', images: form.images, variantOptions: cleanedOptions, variantMatrix: variantRows, featured: form.featured, published: form.published, priceBucketIds: bucketIds, updatedAt: new Date().toISOString() };
+      let productId = editing?.id || ''; if (editing) await updateAdminDocument('products', editing.id, payload); else productId = (await createAdminDocument('products', { ...payload, isFlashSale: false, isWeekendSpecial: false, createdAt: new Date().toISOString() })).id; await syncWeeklyDeal(productId); setMessage(editing ? 'Product updated successfully.' : 'Product added successfully.'); reset();
+    } catch (error) { console.error(error); setMessage(error instanceof Error ? error.message : 'Could not save product.'); } finally { setBusy(false); }
   }
 
-  const bucketLabel = (id: string) => priceBuckets.find((bucket) => bucket.id === id)?.title || id;
-  const selectedDealLabel = deal.day ? DAYS.find((item) => item.key === deal.day)?.label : 'No deal — regular product';
-
+  const bucketLabel = (id: string) => priceBuckets.find((bucket) => bucket.id === id)?.title || id; const selectedDealLabel = deal.day ? DAYS.find((item) => item.key === deal.day)?.label : 'No deal — regular product';
   return <section className="mx-auto max-w-6xl px-4 py-6">
     <div><p className="text-[9px] font-black uppercase tracking-[.22em] text-[#E1352B]">Catalog control</p><h2 className="mt-1 text-2xl font-black">Products Manager</h2><p className="mt-1 text-sm text-black/50">Complete product setup: pricing, category, media, variants, daily deals, price buckets and storefront placement.</p></div>
     {message && <div role="status" className="mt-4 rounded-xl bg-white p-3 text-xs font-bold text-black/65 shadow-sm">{message}</div>}
     <form onSubmit={save} className="mt-5 grid gap-4 rounded-3xl bg-white p-5 shadow-sm">
-      <div className="grid gap-3 md:grid-cols-2">
-        <input value={form.title} onChange={(e) => change('title', e.target.value)} placeholder="Product name" required className="rounded-xl bg-[#F4F4F1] p-3 text-sm" />
-        <input value={form.brand} onChange={(e) => change('brand', e.target.value)} placeholder="Brand (optional)" className="rounded-xl bg-[#F4F4F1] p-3 text-sm" />
+      <div className="grid gap-3 md:grid-cols-2"><input value={form.title} onChange={(e) => change('title', e.target.value)} placeholder="Product name" required className="rounded-xl bg-[#F4F4F1] p-3 text-sm" /><input value={form.brand} onChange={(e) => change('brand', e.target.value)} placeholder="Brand (optional)" className="rounded-xl bg-[#F4F4F1] p-3 text-sm" />
         <label className="grid gap-1"><span className="text-[10px] font-black uppercase tracking-wider text-black/45">Original price</span><input value={form.originalPrice} onChange={(e) => change('originalPrice', e.target.value)} placeholder="Rs. 1,500" required type="number" min="0" className="rounded-xl bg-[#F4F4F1] p-3 text-sm" /></label>
         <label className="grid gap-1"><span className="text-[10px] font-black uppercase tracking-wider text-black/45">Discount price <span className="font-normal normal-case">(optional)</span></span><input value={form.discountPrice} onChange={(e) => change('discountPrice', e.target.value)} placeholder="Rs. 999" type="number" min="0" className="rounded-xl bg-[#F4F4F1] p-3 text-sm" /></label>
         <label className="grid gap-1"><span className="text-[10px] font-black uppercase tracking-wider text-black/45">Category</span><select value={form.category} onChange={(e) => change('category', e.target.value)} required className="rounded-xl bg-[#F4F4F1] p-3 text-sm"><option value="">Select category</option>{categories.map((category) => <option key={category.id} value={category.id}>{category.title}</option>)}</select></label>
-        <label className="grid gap-1"><span className="text-[10px] font-black uppercase tracking-wider text-black/45">Stock quantity</span><input value={form.stock} onChange={(e) => change('stock', e.target.value)} placeholder="0" type="number" min="0" className="rounded-xl bg-[#F4F4F1] p-3 text-sm" /></label>
-        <input value={form.slug} onChange={(e) => change('slug', e.target.value)} placeholder="SEO slug (optional)" className="rounded-xl bg-[#F4F4F1] p-3 text-sm" />
-        <input value={form.videoUrl} onChange={(e) => change('videoUrl', e.target.value)} placeholder="YouTube / Shorts / Reel / MP4 URL (optional)" className="rounded-xl bg-[#F4F4F1] p-3 text-sm" />
-      </div>
+        <label className="grid gap-1"><span className="text-[10px] font-black uppercase tracking-wider text-black/45">Stock quantity</span><input value={form.stock} onChange={(e) => change('stock', e.target.value)} placeholder="0" type="number" min="0" className="rounded-xl bg-[#F4F4F1] p-3 text-sm" /></label><input value={form.slug} onChange={(e) => change('slug', e.target.value)} placeholder="SEO slug (optional)" className="rounded-xl bg-[#F4F4F1] p-3 text-sm" /><input value={form.videoUrl} onChange={(e) => change('videoUrl', e.target.value)} placeholder="YouTube / Shorts / Reel / MP4 URL (optional)" className="rounded-xl bg-[#F4F4F1] p-3 text-sm" /></div>
       <textarea value={form.description} onChange={(e) => change('description', e.target.value)} placeholder="Product description" className="min-h-32 rounded-xl bg-[#F4F4F1] p-3 text-sm" />
-
-      <div className="rounded-2xl border border-black/10 p-4">
-        <div className="flex flex-wrap items-center justify-between gap-2"><div><p className="text-sm font-black">Product gallery</p><p className="text-[11px] text-black/45">Select existing images or upload new images. New uploads are also added to Media Library.</p></div><div className="flex gap-2"><button type="button" onClick={() => setShowGallery(true)} className="inline-flex items-center gap-2 rounded-lg border border-black/10 px-3 py-2 text-xs font-black"><ImagePlus size={14} /> Choose from gallery</button><label className={`inline-flex items-center gap-2 rounded-lg bg-black/5 px-3 py-2 text-xs font-black ${busy ? 'pointer-events-none opacity-50' : 'cursor-pointer'}`}><ImagePlus size={14} /> {busy ? 'Uploading...' : 'Upload'}<input type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple onChange={upload} className="hidden" disabled={busy} /></label></div></div>
-        <div className="mt-3 flex gap-2 overflow-x-auto">{form.images.map((url, index) => <div key={`${url}-${index}`} className="relative shrink-0"><img src={url} alt="Product" className="h-20 w-20 rounded-xl object-cover" /><button type="button" onClick={() => change('images', form.images.filter((_, i) => i !== index))} className="absolute -right-1 -top-1 rounded-full bg-red-600 p-1 text-white"><X size={11} /></button>{index === 0 && <span className="absolute bottom-1 left-1 rounded bg-black/70 px-1.5 py-0.5 text-[8px] font-black text-white">MAIN</span>}</div>)}{!form.images.length && <div className="flex h-20 w-20 items-center justify-center rounded-xl bg-[#F4F4F1] text-black/30"><ImagePlus /></div>}</div>
-      </div>
-
-      <div className="rounded-2xl border border-black/10 p-4">
-        <div className="flex items-center justify-between"><div><p className="text-sm font-black">Variants</p><p className="text-[11px] text-black/45">Color, Size or any custom option. Generate combinations only when you are ready.</p></div><button type="button" onClick={addOption} className="inline-flex items-center gap-1 rounded-lg bg-black/5 px-3 py-2 text-xs font-black"><Plus size={13} /> Add option</button></div>
-        <div className="mt-3 space-y-3">{options.map((option) => <div key={option.id} className="rounded-xl bg-[#F4F4F1] p-3"><div className="flex gap-2"><input value={option.name} onChange={(e) => updateOption(option.id, { name: e.target.value })} placeholder="Option name (Color / Size)" className="w-40 rounded-lg bg-white p-2 text-xs font-bold" />{option.id !== 'color' && option.id !== 'size' && <button type="button" onClick={() => removeOption(option.id)} className="rounded-lg bg-red-50 p-2 text-[#E1352B]"><Trash2 size={13} /></button>}</div><div className="mt-2 space-y-2">{option.values.map((value, index) => <div key={`${option.id}-${index}`} className="flex gap-2"><input value={value} onChange={(e) => updateValue(option.id, index, e.target.value)} placeholder={`${option.name} value`} className="flex-1 rounded-lg bg-white p-2 text-xs" /><button type="button" onClick={() => removeValue(option.id, index)} className="rounded-lg bg-white p-2"><Minus size={13} /></button></div>)}<button type="button" onClick={() => addValue(option.id)} className="text-[11px] font-black text-[#0F6A5F]">+ Add {option.name || 'value'}</button></div></div>)}</div>
-        <button type="button" onClick={() => buildVariantRows()} className="mt-3 inline-flex items-center gap-2 rounded-xl bg-[#14140F] px-4 py-2.5 text-xs font-black text-white"><Check size={13} /> Generate combinations</button>
-        {!!variantRows.length && <div className="mt-3 overflow-x-auto"><table className="w-full min-w-[720px] text-left text-xs"><thead><tr className="border-b border-black/10 text-black/45"><th className="p-2">Combination</th><th className="p-2">SKU</th><th className="p-2">Price</th><th className="p-2">Sale</th><th className="p-2">Stock</th><th className="p-2">Active</th></tr></thead><tbody>{variantRows.map((row, index) => <tr key={row.id} className="border-b border-black/5"><td className="p-2 font-bold">{row.label}</td><td className="p-2"><input value={row.sku} onChange={(e) => setVariantRows((r) => r.map((x, i) => i === index ? { ...x, sku: e.target.value } : x))} className="w-28 rounded-lg bg-[#F4F4F1] p-2" /></td><td className="p-2"><input type="number" value={row.price} onChange={(e) => setVariantRows((r) => r.map((x, i) => i === index ? { ...x, price: e.target.value } : x))} className="w-24 rounded-lg bg-[#F4F4F1] p-2" /></td><td className="p-2"><input type="number" value={row.salePrice} onChange={(e) => setVariantRows((r) => r.map((x, i) => i === index ? { ...x, salePrice: e.target.value } : x))} className="w-24 rounded-lg bg-[#F4F4F1] p-2" /></td><td className="p-2"><input type="number" value={row.stock} onChange={(e) => setVariantRows((r) => r.map((x, i) => i === index ? { ...x, stock: e.target.value } : x))} className="w-20 rounded-lg bg-[#F4F4F1] p-2" /></td><td className="p-2"><input type="checkbox" checked={row.active} onChange={(e) => setVariantRows((r) => r.map((x, i) => i === index ? { ...x, active: e.target.checked } : x))} /></td></tr>)}</tbody></table></div>}
-      </div>
-
-      <div className="rounded-2xl border border-[#FFB020]/30 bg-[#FFF9E9] p-4">
-        <div className="flex items-center gap-2"><Tag size={16} className="text-[#D99A17]" /><div><p className="text-sm font-black">Daily Deal placement</p><p className="text-[11px] text-black/50">Choose the day here. None means the product stays a regular product.</p></div></div>
-        <div className="mt-3 grid gap-3 md:grid-cols-2">
-          <label className="grid gap-1"><span className="text-[10px] font-black uppercase tracking-wider text-black/45">Which deal?</span><select value={deal.day} onChange={(e) => setDeal((current) => ({ ...current, day: e.target.value as Weekday | '', dealPrice: e.target.value ? current.dealPrice : '' }))} className="rounded-xl bg-white p-3 text-sm"><option value="">None — regular product</option>{DAYS.map((item) => <option key={item.key} value={item.key}>{item.label}</option>)}</select></label>
-          <label className={`grid gap-1 ${!deal.day ? 'opacity-45' : ''}`}><span className="text-[10px] font-black uppercase tracking-wider text-black/45">Deal price <span className="font-normal normal-case">(only for selected day)</span></span><input disabled={!deal.day} value={deal.dealPrice} onChange={(e) => setDeal((current) => ({ ...current, dealPrice: e.target.value }))} placeholder="Rs. 1,299" type="number" min="1" className="rounded-xl bg-white p-3 text-sm" /></label>
-        </div>
-        <div className="mt-3 rounded-xl bg-white/70 px-3 py-2 text-[11px] font-bold text-black/55">Selected: <span className="text-black">{selectedDealLabel}</span>{deal.day && <span> · Special price activates only on that Pakistan-time day; otherwise the regular price is used.</span>}</div>
-      </div>
-
-      <div className="rounded-2xl border border-black/10 bg-[#FAFAF7] p-4">
-        <div className="flex items-center gap-2"><Tag size={15} className="text-[#0F6A5F]" /><div><p className="text-sm font-black">Price Buckets</p><p className="text-[11px] text-black/45">These are controlled from Admin → Settings. Select where this product should appear.</p></div></div>
-        {!priceBuckets.length ? <p className="mt-3 rounded-xl bg-white p-3 text-xs text-black/45">No active price buckets have been created yet. Create them in Store Settings.</p> : <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">{priceBuckets.map((bucket) => <label key={bucket.id} className={`flex cursor-pointer items-center gap-2 rounded-xl bg-white p-3 text-xs font-bold ring-1 ${bucketIds.includes(bucket.id) ? 'ring-[#0F6A5F]' : 'ring-black/5'}`}><input type="checkbox" checked={bucketIds.includes(bucket.id)} onChange={(e) => setBucketIds((current) => e.target.checked ? [...current, bucket.id] : current.filter((id) => id !== bucket.id))} /> <span>{bucket.title}</span></label>)}</div>}
-        {!!bucketIds.length && <p className="mt-2 text-[10px] font-bold text-black/45">Assigned: {bucketIds.map(bucketLabel).join(' · ')}</p>}
-      </div>
-
+      <div className="rounded-2xl border border-black/10 p-4"><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="text-sm font-black">Product gallery</p><p className="text-[11px] text-black/45">Select existing images or upload new images. New uploads are also added to Media Library.</p></div><div className="flex gap-2"><button type="button" onClick={() => setShowGallery(true)} className="inline-flex items-center gap-2 rounded-lg border border-black/10 px-3 py-2 text-xs font-black"><ImagePlus size={14} /> Choose from gallery</button><label className={`inline-flex items-center gap-2 rounded-lg bg-black/5 px-3 py-2 text-xs font-black ${busy ? 'pointer-events-none opacity-50' : 'cursor-pointer'}`}><ImagePlus size={14} /> {busy ? 'Uploading...' : 'Upload'}<input type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple onChange={upload} className="hidden" disabled={busy} /></label></div></div><div className="mt-3 flex gap-2 overflow-x-auto">{form.images.map((url, index) => <div key={`${url}-${index}`} className="relative shrink-0"><img src={url} alt="Product" className="h-20 w-20 rounded-xl object-cover" /><button type="button" onClick={() => change('images', form.images.filter((_, i) => i !== index))} className="absolute -right-1 -top-1 rounded-full bg-red-600 p-1 text-white"><X size={11} /></button>{index === 0 && <span className="absolute bottom-1 left-1 rounded bg-black/70 px-1.5 py-0.5 text-[8px] font-black text-white">MAIN</span>}</div>)}{!form.images.length && <div className="flex h-20 w-20 items-center justify-center rounded-xl bg-[#F4F4F1] text-black/30"><ImagePlus /></div>}</div></div>
+      <div className="rounded-2xl border border-black/10 p-4"><div className="flex items-center justify-between"><div><p className="text-sm font-black">Variants</p><p className="text-[11px] text-black/45">Color, Size or any custom option. Generate combinations only when you are ready.</p></div><button type="button" onClick={addOption} className="inline-flex items-center gap-1 rounded-lg bg-black/5 px-3 py-2 text-xs font-black"><Plus size={13} /> Add option</button></div><div className="mt-3 space-y-3">{options.map((option) => <div key={option.id} className="rounded-xl bg-[#F4F4F1] p-3"><div className="flex gap-2"><input value={option.name} onChange={(e) => updateOption(option.id, { name: e.target.value })} placeholder="Option name (Color / Size)" className="w-40 rounded-lg bg-white p-2 text-xs font-bold" />{option.id !== 'color' && option.id !== 'size' && <button type="button" onClick={() => removeOption(option.id)} className="rounded-lg bg-red-50 p-2 text-[#E1352B]"><Trash2 size={13} /></button>}</div><div className="mt-2 space-y-2">{option.values.map((value, index) => <div key={`${option.id}-${index}`} className="flex gap-2"><input value={value} onChange={(e) => updateValue(option.id, index, e.target.value)} placeholder={`${option.name} value`} className="flex-1 rounded-lg bg-white p-2 text-xs" /><button type="button" onClick={() => removeValue(option.id, index)} className="rounded-lg bg-white p-2"><Minus size={13} /></button></div>)}<button type="button" onClick={() => addValue(option.id)} className="text-[11px] font-black text-[#0F6A5F]">+ Add {option.name || 'value'}</button></div></div>)}</div><button type="button" onClick={() => buildVariantRows()} className="mt-3 inline-flex items-center gap-2 rounded-xl bg-[#14140F] px-4 py-2.5 text-xs font-black text-white"><Check size={13} /> Generate combinations</button>{!!variantRows.length && <div className="mt-3 overflow-x-auto"><table className="w-full min-w-[720px] text-left text-xs"><thead><tr className="border-b border-black/10 text-black/45"><th className="p-2">Combination</th><th className="p-2">SKU</th><th className="p-2">Price</th><th className="p-2">Sale</th><th className="p-2">Stock</th><th className="p-2">Active</th></tr></thead><tbody>{variantRows.map((row, index) => <tr key={row.id} className="border-b border-black/5"><td className="p-2 font-bold">{row.label}</td><td className="p-2"><input value={row.sku} onChange={(e) => setVariantRows((r) => r.map((x, i) => i === index ? { ...x, sku: e.target.value } : x))} className="w-28 rounded-lg bg-[#F4F4F1] p-2" /></td><td className="p-2"><input type="number" value={row.price} onChange={(e) => setVariantRows((r) => r.map((x, i) => i === index ? { ...x, price: e.target.value } : x))} className="w-24 rounded-lg bg-[#F4F4F1] p-2" /></td><td className="p-2"><input type="number" value={row.salePrice} onChange={(e) => setVariantRows((r) => r.map((x, i) => i === index ? { ...x, salePrice: e.target.value } : x))} className="w-24 rounded-lg bg-[#F4F4F1] p-2" /></td><td className="p-2"><input type="number" value={row.stock} onChange={(e) => setVariantRows((r) => r.map((x, i) => i === index ? { ...x, stock: e.target.value } : x))} className="w-20 rounded-lg bg-[#F4F4F1] p-2" /></td><td className="p-2"><input type="checkbox" checked={row.active} onChange={(e) => setVariantRows((r) => r.map((x, i) => i === index ? { ...x, active: e.target.checked } : x))} /></td></tr>)}</tbody></table></div>}</div>
+      <div className="rounded-2xl border border-[#FFB020]/30 bg-[#FFF9E9] p-4"><div className="flex items-center gap-2"><Tag size={16} className="text-[#D99A17]" /><div><p className="text-sm font-black">Daily Deal placement</p><p className="text-[11px] text-black/50">Choose the day here. None means the product stays a regular product.</p></div></div><div className="mt-3 grid gap-3 md:grid-cols-2"><label className="grid gap-1"><span className="text-[10px] font-black uppercase tracking-wider text-black/45">Which deal?</span><select value={deal.day} onChange={(e) => setDeal((current) => ({ ...current, day: e.target.value as Weekday | '', dealPrice: e.target.value ? current.dealPrice : '' }))} className="rounded-xl bg-white p-3 text-sm"><option value="">None — regular product</option>{DAYS.map((item) => <option key={item.key} value={item.key}>{item.label}</option>)}</select></label><label className={`grid gap-1 ${!deal.day ? 'opacity-45' : ''}`}><span className="text-[10px] font-black uppercase tracking-wider text-black/45">Deal price <span className="font-normal normal-case">(only for selected day)</span></span><input disabled={!deal.day} value={deal.dealPrice} onChange={(e) => setDeal((current) => ({ ...current, dealPrice: e.target.value }))} placeholder="Rs. 1,299" type="number" min="1" className="rounded-xl bg-white p-3 text-sm" /></label></div><div className="mt-3 rounded-xl bg-white/70 px-3 py-2 text-[11px] font-bold text-black/55">Selected: <span className="text-black">{selectedDealLabel}</span>{deal.day && <span> · Special price activates only on that Pakistan-time day; otherwise the regular price is used.</span>}</div></div>
+      <div className="rounded-2xl border border-black/10 bg-[#FAFAF7] p-4"><div className="flex items-center gap-2"><Tag size={15} className="text-[#0F6A5F]" /><div><p className="text-sm font-black">Price Buckets</p><p className="text-[11px] text-black/45">These are controlled from Admin → Settings. Select where this product should appear.</p></div></div>{!priceBuckets.length ? <p className="mt-3 rounded-xl bg-white p-3 text-xs text-black/45">No active price buckets have been created yet. Create them in Store Settings.</p> : <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">{priceBuckets.map((bucket) => <label key={bucket.id} className={`flex cursor-pointer items-center gap-2 rounded-xl bg-white p-3 text-xs font-bold ring-1 ${bucketIds.includes(bucket.id) ? 'ring-[#0F6A5F]' : 'ring-black/5'}`}><input type="checkbox" checked={bucketIds.includes(bucket.id)} onChange={(e) => setBucketIds((current) => e.target.checked ? [...current, bucket.id] : current.filter((id) => id !== bucket.id))} /> <span>{bucket.title}</span></label>)}</div>}{!!bucketIds.length && <p className="mt-2 text-[10px] font-bold text-black/45">Assigned: {bucketIds.map(bucketLabel).join(' · ')}</p>}</div>
       <div className="rounded-2xl border border-black/10 bg-[#FAFAF7] p-4"><div className="flex flex-wrap gap-5 text-xs font-bold"><label className="flex items-center gap-2"><input type="checkbox" checked={form.published} onChange={(e) => change('published', e.target.checked)} /> Published on storefront</label><label className="flex items-center gap-2"><input type="checkbox" checked={form.featured} onChange={(e) => change('featured', e.target.checked)} /> Featured product <span className="font-normal text-black/40">(highlighted sections only)</span></label></div><p className="mt-2 text-[11px] text-black/45"><b>Published</b> controls storefront visibility. <b>Featured</b> does not change price, stock or deal status; it only allows the product into featured merchandising sections.</p></div>
       <button disabled={busy} className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#14140F] py-3 text-xs font-black text-white disabled:opacity-50">{busy && <Loader2 size={14} className="animate-spin" />}{editing ? 'Save product' : 'Add product'}</button>
     </form>
-
     <div className="mt-6 flex items-center gap-2 rounded-xl bg-white px-3 py-2 shadow-sm"><Search size={15} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search products" className="w-full bg-transparent text-sm outline-none" /></div>
     <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{shown.map((product) => <article key={product.id} className="rounded-2xl bg-white p-3 shadow-sm">{product.imageUrl && <img src={product.imageUrl} alt={product.title} className="h-32 w-full rounded-xl object-cover" />}<p className="mt-2 font-black">{product.title}</p><p className="text-xs text-[#E1352B]">Rs. {Number(product.price).toLocaleString()} · Stock {product.stock}</p><p className="mt-1 text-[11px] text-black/45">{String(product.category || '')}</p><div className="mt-3 flex gap-2"><button type="button" onClick={() => startEdit(product)} className="rounded-lg bg-black/5 p-2"><Edit3 size={14} /></button><button type="button" onClick={() => confirm(`Delete ${product.title}?`) && deleteAdminDocument('products', product.id)} className="rounded-lg bg-red-50 p-2 text-[#E1352B]"><Trash2 size={14} /></button></div></article>)}</div>
-
     {showGallery && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"><div className="max-h-[85vh] w-full max-w-5xl overflow-auto rounded-3xl bg-[#F4F4F1] p-5"><div className="flex items-center justify-between gap-3"><div><h3 className="text-xl font-black">Choose from Media Gallery</h3><p className="text-xs text-black/45">Select one or multiple images.</p></div><button type="button" onClick={() => setShowGallery(false)} className="rounded-full bg-white p-2"><X /></button></div><div className="mt-4 flex items-center gap-2 rounded-xl bg-white px-3 py-2"><Search size={15} /><input value={gallerySearch} onChange={(e) => setGallerySearch(e.target.value)} placeholder="Search gallery" className="w-full bg-transparent text-sm outline-none" /></div><div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6">{gallery.map((asset) => { const selected = form.images.includes(asset.url); return <button key={asset.id} type="button" onClick={() => change('images', selected ? form.images.filter((url) => url !== asset.url) : [...form.images, asset.url])} className={`overflow-hidden rounded-xl border-2 bg-white text-left ${selected ? 'border-[#0F6A5F]' : 'border-transparent'}`}><img src={asset.url} alt={asset.name || 'Media'} className="aspect-square w-full object-cover" /><span className="block truncate p-2 text-[10px] font-bold">{selected ? '✓ Selected' : asset.name || 'Image'}</span></button>; })}</div><div className="mt-4 flex justify-end"><button type="button" onClick={() => setShowGallery(false)} className="rounded-xl bg-[#14140F] px-5 py-3 text-xs font-black text-white">Done</button></div></div></div>}
     {editing && <button type="button" onClick={reset} className="fixed bottom-6 right-6 rounded-full bg-[#E1352B] p-3 text-white"><X /></button>}
   </section>;
