@@ -36,7 +36,8 @@ function ProfessionalAdmin() {
   }, []);
 
   const handleTabChange = (tab: AdminTab) => {
-    if (tab !== 'rewards' && tab !== 'media') setActiveTab(tab);
+    // Rewards is rendered by the parent admin router; Media Library has been removed.
+    if (tab !== 'rewards') setActiveTab(tab);
   };
 
   const render = () => {
