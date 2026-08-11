@@ -1,8 +1,5 @@
 // lib/useSettings.ts
-// Shared live storefront settings reader. The admin panel writes settings/main,
-// while this hook also reads the legacy settings/general document so existing
-// admin announcements remain visible during the settings migration.
-
+// Shared live storefront settings reader. The admin panel writes settings/main.
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -11,22 +8,12 @@ import { db } from '@/lib/firebase';
 import { SiteSettings } from '@/lib/types';
 
 const DEFAULT_SETTINGS: SiteSettings = {
-  announcementText: 'PrimeHub Deals',
-  whatsappNumber: '923001234567',
-  freeShippingCount: 5,
-  heroTitle: 'Flash Sale',
-  heroDiscountText: 'Up to 70% Off',
-  heroCountdownEndTime: new Date(Date.now() + 2 * 3600 * 1000).toISOString(),
-  heroImageUrl: 'https://images.unsplash.com/photo-1607082349566-187342175e2f?q=80&w=1200&auto=format&fit=crop',
-  heroButtonText: "Shop Today's Deal",
-  heroButtonLink: '#',
+  announcementText: 'PrimeHub Deals', whatsappNumber: '923001234567', freeShippingCount: 5,
+  heroTitle: 'Flash Sale', heroDiscountText: 'Up to 70% Off', heroCountdownEndTime: new Date(Date.now() + 2 * 3600 * 1000).toISOString(),
+  heroImageUrl: '', heroButtonText: "Shop Today's Deal", heroButtonLink: '#',
   dailyDeal: { productId: '', imageUrl: '', title: '', originalPrice: 0, dealPrice: 0, startAt: '', endAt: '', buttonText: 'Shop Deal', buttonLink: '#', active: false },
   youtubeGuide: { enabled: true, title: 'How To Order & List Products on PrimeHub Deals', videoId: 'dQw4w9WgXcQ', description: 'Watch this quick guide to learn how to order and list products on PrimeHub Deals.' },
-  policies: {
-    privacyPolicy: { title: 'Privacy Policy', content: 'This page explains how PrimeHub Deals handles customer information and order-related data.' },
-    terms: { title: 'Terms of Service', content: 'By using PrimeHub Deals, you agree to use the website for lawful shopping and communication.' },
-    returnPolicy: { title: 'Return Policy', content: 'Please contact the PrimeHub Deals team for return or order assistance.' },
-  },
+  policies: { privacyPolicy: { title: 'Privacy Policy', content: '' }, terms: { title: 'Terms of Service', content: '' }, returnPolicy: { title: 'Return Policy', content: '' } },
   weeklyDeals: [],
   freeDelivery: { enabled: true, itemThreshold: 5, message: 'Add {remaining} more item{plural} to unlock FREE DELIVERY', unlockedMessage: 'FREE DELIVERY UNLOCKED 🎉' },
   priceBuckets: [
@@ -37,72 +24,39 @@ const DEFAULT_SETTINGS: SiteSettings = {
   ],
 };
 
-type RawSettings = Partial<SiteSettings> & Record<string, unknown>;
+type RawSettings = Partial<SiteSettings> & Record<string, any>;
 
 function resolveAnnouncement(mainData: RawSettings, legacyData?: RawSettings): string {
-  const candidates = [
-    mainData.announcementText,
-    mainData.topAnnouncement,
-    mainData.topAnnouncementText,
-    mainData.announcement,
-    mainData.announcementBarText,
-    legacyData?.announcementText,
-    legacyData?.topAnnouncement,
-    legacyData?.topAnnouncementText,
-    legacyData?.announcement,
-    legacyData?.announcementBarText,
-  ];
+  const candidates = [mainData.announcementText, mainData.topAnnouncement, mainData.topAnnouncementText, mainData.announcement, mainData.announcementBarText, legacyData?.announcementText, legacyData?.topAnnouncement, legacyData?.topAnnouncementText, legacyData?.announcement, legacyData?.announcementBarText];
   const match = candidates.find((value) => typeof value === 'string' && value.trim());
   return typeof match === 'string' ? match.trim() : DEFAULT_SETTINGS.announcementText;
+}
+
+function currentPakistanDay() {
+  return new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Karachi', weekday: 'long' }).format(new Date()).toLowerCase();
+}
+
+function resolveTodayDeal(mainData: RawSettings) {
+  const weeklyDeals = Array.isArray(mainData.weeklyDeals) ? mainData.weeklyDeals : [];
+  const today = currentPakistanDay();
+  const scheduled = weeklyDeals.find((deal: any) => deal.day === today && deal.active !== false && Number(deal.dealPrice) > 0);
+  if (!scheduled) return mainData.dailyDeal ?? DEFAULT_SETTINGS.dailyDeal;
+  return { ...scheduled, active: true, startAt: scheduled.startAt || '', endAt: scheduled.endAt || '' };
 }
 
 export function useSettings() {
   const [settings, setSettings] = useState<SiteSettings>(DEFAULT_SETTINGS);
   const [loading, setLoading] = useState(true);
-
   useEffect(() => {
-    let mainData: RawSettings = {};
-    let legacyData: RawSettings = {};
-    let mainReady = false;
-    let legacyReady = false;
-
+    let mainData: RawSettings = {}; let legacyData: RawSettings = {}; let mainReady = false;
     const publish = () => {
-      const merged = { ...DEFAULT_SETTINGS, ...legacyData, ...mainData };
-      setSettings({ ...merged, announcementText: resolveAnnouncement(mainData, legacyData) });
-      if (mainReady) setLoading(false);
+      const merged: RawSettings = { ...DEFAULT_SETTINGS, ...legacyData, ...mainData };
+      const resolved = { ...merged, announcementText: resolveAnnouncement(mainData, legacyData), dailyDeal: resolveTodayDeal(mainData) } as SiteSettings;
+      setSettings(resolved); if (mainReady) setLoading(false);
     };
-
-    const unsubscribeMain = onSnapshot(
-      doc(db, 'settings', 'main'),
-      (snap) => {
-        mainReady = true;
-        mainData = snap.exists() ? (snap.data() as RawSettings) : {};
-        publish();
-      },
-      () => {
-        mainReady = true;
-        publish();
-      }
-    );
-
-    const unsubscribeLegacy = onSnapshot(
-      doc(db, 'settings', 'general'),
-      (snap) => {
-        legacyReady = true;
-        legacyData = snap.exists() ? (snap.data() as RawSettings) : {};
-        publish();
-      },
-      () => {
-        legacyReady = true;
-        publish();
-      }
-    );
-
-    return () => {
-      unsubscribeMain();
-      unsubscribeLegacy();
-    };
+    const unsubscribeMain = onSnapshot(doc(db, 'settings', 'main'), (snap) => { mainReady = true; mainData = snap.exists() ? (snap.data() as RawSettings) : {}; publish(); }, () => { mainReady = true; publish(); });
+    const unsubscribeLegacy = onSnapshot(doc(db, 'settings', 'general'), (snap) => { legacyData = snap.exists() ? (snap.data() as RawSettings) : {}; publish(); }, () => publish());
+    return () => { unsubscribeMain(); unsubscribeLegacy(); };
   }, []);
-
   return { settings, loading };
 }
