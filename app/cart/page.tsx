@@ -3,12 +3,17 @@
 import Link from 'next/link';
 import { Minus, Plus, ShoppingBag, Trash2 } from 'lucide-react';
 import { useCartStore } from '@/lib/cartStore';
+import RewardsVoucherPanel from '@/components/RewardsVoucherPanel';
+import { useRewardsStore } from '@/lib/rewardsStore';
 
 export default function CartPage() {
   const items = useCartStore((s) => s.items);
   const updateQty = useCartStore((s) => s.updateQty);
   const removeItem = useCartStore((s) => s.removeItem);
   const subtotal = useCartStore((s) => s.getSubtotal());
+  const getRewardsDiscount = useRewardsStore((s) => s.getRewardsDiscount);
+  const rewardsDiscount = getRewardsDiscount(subtotal);
+  const total = Math.max(0, subtotal - rewardsDiscount);
 
   return (
     <main className="min-h-screen bg-[#F4F4F1] px-4 py-6 pb-28">
@@ -32,7 +37,13 @@ export default function CartPage() {
                 </div>
               ))}
             </div>
-            <div className="mt-5 rounded-3xl bg-white p-5 shadow-sm"><div className="flex justify-between font-black"><span>Subtotal</span><span>Rs. {subtotal.toLocaleString()}</span></div><Link href="/checkout" className="mt-4 flex justify-center rounded-2xl bg-[#14140F] py-4 text-xs font-black text-white">Proceed to Checkout</Link></div>
+            <RewardsVoucherPanel subtotal={subtotal} />
+            <div className="mt-5 rounded-3xl bg-white p-5 shadow-sm">
+              <div className="flex justify-between text-sm font-bold text-black/45"><span>Subtotal</span><span>Rs. {subtotal.toLocaleString()}</span></div>
+              {rewardsDiscount > 0 && <div className="mt-2 flex justify-between font-black text-[#0F6A5F]"><span>Rewards discount</span><span>- Rs. {rewardsDiscount.toLocaleString()}</span></div>}
+              <div className="mt-3 flex justify-between border-t border-black/8 pt-3 text-lg font-black"><span>Total</span><span>Rs. {total.toLocaleString()}</span></div>
+              <Link href="/checkout" className="mt-4 flex justify-center rounded-2xl bg-[#14140F] py-4 text-xs font-black text-white">Proceed to Checkout</Link>
+            </div>
           </>
         )}
       </div>
