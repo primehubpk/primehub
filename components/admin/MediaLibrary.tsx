@@ -1,0 +1,71 @@
+'use client';
+
+import { ChangeEvent, useEffect, useMemo, useState } from 'react';
+import { onSnapshot, orderBy, query } from 'firebase/firestore';
+import { Copy, ImagePlus, Loader2, Search, Trash2 } from 'lucide-react';
+import { adminCollection, createAdminDocument, deleteAdminDocument, uploadImageToImgBB } from './shared';
+
+type MediaAsset = { id: string; name?: string; url: string; type?: string; size?: number; createdAt?: unknown };
+
+export default function MediaLibrary() {
+  const [assets, setAssets] = useState<MediaAsset[]>([]);
+  const [queryText, setQueryText] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState('');
+
+  useEffect(() => onSnapshot(query(adminCollection('media_assets'), orderBy('createdAt', 'desc')), (snapshot) => {
+    setAssets(snapshot.docs.map((item) => ({ id: item.id, ...item.data() }) as MediaAsset));
+  }, (error) => {
+    console.error(error);
+    setMessage('Media library needs a Firestore index/rule configuration before it can load.');
+  }), []);
+
+  const shown = useMemo(() => assets.filter((asset) => `${asset.name || ''} ${asset.url}`.toLowerCase().includes(queryText.toLowerCase())), [assets, queryText]);
+
+  async function upload(event: ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(event.target.files || []);
+    if (!files.length) return;
+    setBusy(true);
+    setMessage('');
+    try {
+      for (const file of files) {
+        const url = await uploadImageToImgBB(file);
+        await createAdminDocument('media_assets', {
+          name: file.name,
+          url,
+          type: file.type,
+          size: file.size,
+          createdAt: new Date().toISOString(),
+        });
+      }
+      setMessage(`${files.length} image${files.length > 1 ? 's' : ''} added to the library.`);
+    } catch (error) {
+      console.error(error);
+      setMessage(error instanceof Error ? error.message : 'Upload failed.');
+    } finally {
+      setBusy(false);
+      event.target.value = '';
+    }
+  }
+
+  async function copy(url: string) {
+    await navigator.clipboard.writeText(url);
+    setMessage('Image URL copied.');
+  }
+
+  return (
+    <section className="mx-auto max-w-6xl px-4 py-6">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div><p className="text-[9px] font-black uppercase tracking-[.22em] text-[#E1352B]">Central content</p><h2 className="mt-1 text-2xl font-black">Media Library</h2><p className="mt-1 text-xs text-black/45">Upload once, reuse images across products, categories, deals and banners.</p></div>
+        <label className="flex cursor-pointer items-center gap-2 rounded-xl bg-[#14140F] px-4 py-3 text-xs font-black text-white"><ImagePlus size={15} />{busy ? 'Uploading...' : 'Upload images'}<input type="file" accept="image/*" multiple onChange={upload} className="hidden" disabled={busy} /></label>
+      </div>
+      {message && <p className="mt-4 rounded-xl bg-white p-3 text-xs font-bold text-black/60 shadow-sm">{message}</p>}
+      <div className="mt-5 flex items-center gap-2 rounded-xl bg-white px-3 py-2 shadow-sm"><Search size={15} /><input value={queryText} onChange={(event) => setQueryText(event.target.value)} placeholder="Search media..." className="w-full bg-transparent text-sm outline-none" /></div>
+      {busy && <div className="mt-5 flex items-center gap-2 text-xs font-bold text-black/45"><Loader2 size={14} className="animate-spin" /> Uploading securely to Firebase Storage...</div>}
+      <div className="mt-5 grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
+        {shown.map((asset) => <article key={asset.id} className="overflow-hidden rounded-2xl bg-white shadow-sm"><img src={asset.url} alt={asset.name || 'Media asset'} className="aspect-square w-full object-cover" /><div className="p-3"><p className="truncate text-xs font-black" title={asset.name}>{asset.name || 'Untitled image'}</p><div className="mt-2 flex gap-2"><button type="button" onClick={() => copy(asset.url)} className="flex flex-1 items-center justify-center gap-1 rounded-lg bg-black/5 px-2 py-2 text-[10px] font-black"><Copy size={12} />Copy URL</button><button type="button" onClick={() => confirm('Delete this media asset?') && deleteAdminDocument('media_assets', asset.id)} className="rounded-lg bg-red-50 p-2 text-[#E1352B]" aria-label="Delete media"><Trash2 size={13} /></button></div></div></article>)}
+        {!shown.length && <p className="col-span-full rounded-2xl bg-white p-10 text-center text-sm text-black/40">No media assets yet. Upload your first images.</p>}
+      </div>
+    </section>
+  );
+}
