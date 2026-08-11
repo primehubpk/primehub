@@ -89,7 +89,14 @@ export const useRewardsStore = create<RewardsState>()(
         const voucherDiscount = get().getVoucherDiscount(subtotal);
         return voucherDiscount + get().getPointsDiscount(Math.max(0, subtotal - voucherDiscount));
       },
-      resetRewardsForOrder: () => set({ appliedVoucher: null, pointsToRedeem: 0 }),
+      resetRewardsForOrder: () => set((state) => ({
+        rewardPoints: Math.max(0, state.rewardPoints - state.pointsToRedeem),
+        vouchers: state.appliedVoucher
+          ? state.vouchers.filter((voucher) => voucher.code !== state.appliedVoucher)
+          : state.vouchers,
+        appliedVoucher: null,
+        pointsToRedeem: 0,
+      })),
     }),
     {
       name: 'phdeals-rewards',
