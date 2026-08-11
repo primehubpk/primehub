@@ -36,6 +36,10 @@ function ProfessionalAdmin() {
     return () => { productsUnsub(); ordersUnsub(); vendorsUnsub(); };
   }, []);
 
+  const handleTabChange = (tab: AdminTab) => {
+    if (tab !== 'rewards') setActiveTab(tab);
+  };
+
   const render = () => {
     switch (activeTab) {
       case 'dashboard': return <ProDashboard products={products} orders={orders} vendorRequests={vendorRequests} />;
@@ -49,5 +53,5 @@ function ProfessionalAdmin() {
     }
   };
 
-  return <main className="min-h-screen bg-[#F4F4F1]"><AdminHeader activeTab={activeTab} onTabChange={setActiveTab} onLogout={() => signOut(auth)} search={search} onSearchChange={setSearch} stats={{ totalProducts: products.length, totalOrders: orders.length }} />{render()}</main>;
+  return <main className="min-h-screen bg-[#F4F4F1]"><AdminHeader activeTab={activeTab} onTabChange={handleTabChange} onLogout={() => signOut(auth)} search={search} onSearchChange={setSearch} stats={{ totalProducts: products.length, totalOrders: orders.length }} />{render()}</main>;
 }
