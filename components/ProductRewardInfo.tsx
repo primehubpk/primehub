@@ -10,7 +10,7 @@ import { auth, db } from '@/lib/firebase';
 type Reward={productId?:string;pointsCost?:number;active?:boolean;stock?:number;imageUrl?:string};
 type Product={imageUrl?:string;image?:string;images?:string[]};
 const GUEST_KEY='phdeals-guest-rewards';
-const same=(a:string,b:string)=>Boolean(a&&b&&a.trim()===b.trim());
+const same=(a:string,b?:string)=>Boolean(a&&b&&a.trim()===b.trim());
 
 export default function ProductRewardInfo({productId,productImages=[]}:{productId:string;productImages?:string[]}){
  const [required,setRequired]=useState<number|null>(null);const [stock,setStock]=useState(0);const [points,setPoints]=useState(0);const [uid,setUid]=useState<string|null>(null);const [images,setImages]=useState(productImages);
