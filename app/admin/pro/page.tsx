@@ -12,11 +12,10 @@ import DealScheduleManager from '@/components/admin/DealScheduleManager';
 import OrdersManager from '@/components/admin/OrdersManager';
 import VendorRequests from '@/components/admin/VendorRequests';
 import SiteSettingsManager from '@/components/admin/SiteSettingsManager';
-import MediaLibrary from '@/components/admin/MediaLibrary';
 import { auth } from '@/lib/firebase';
 import { adminCollection, type Order, type Product, type VendorRequest } from '@/components/admin/shared';
 
-type Tab = Exclude<AdminTab, 'rewards'>;
+type Tab = Exclude<AdminTab, 'rewards' | 'media'>;
 
 export default function ProfessionalAdminPage() {
   return <AdminAuthGuard><ProfessionalAdmin /></AdminAuthGuard>;
@@ -37,7 +36,7 @@ function ProfessionalAdmin() {
   }, []);
 
   const handleTabChange = (tab: AdminTab) => {
-    if (tab !== 'rewards') setActiveTab(tab);
+    if (tab !== 'rewards' && tab !== 'media') setActiveTab(tab);
   };
 
   const render = () => {
@@ -45,7 +44,6 @@ function ProfessionalAdmin() {
       case 'dashboard': return <ProDashboard products={products} orders={orders} vendorRequests={vendorRequests} />;
       case 'products': return <ProductsManager />;
       case 'categories': return <CategoriesManager />;
-      case 'media': return <MediaLibrary />;
       case 'deals': return <DealScheduleManager />;
       case 'orders': return <OrdersManager />;
       case 'suppliers': return <VendorRequests />;
