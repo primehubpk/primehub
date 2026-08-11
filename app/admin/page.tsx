@@ -34,7 +34,13 @@ function AdminPanel() {
     return () => { unsubscribeProducts(); unsubscribeOrders(); unsubscribeVendors(); };
   }, []);
 
-  async function logout() { await signOut(auth); }
+  async function logout() {
+    if (typeof window !== 'undefined' && sessionStorage.getItem('primehub-admin-preview-demo') === '1') {
+      window.dispatchEvent(new Event('primehub-admin-demo-logout'));
+      return;
+    }
+    await signOut(auth);
+  }
 
   function renderActiveTab() {
     switch (activeTab) {
