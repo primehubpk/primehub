@@ -5,6 +5,7 @@ import { Wallet, Truck, RotateCcw, HeartHandshake, MessageCircle, MapPin, Globe2
 
 const WHATSAPP = '923035985676';
 const WHATSAPP_HREF = `https://wa.me/${WHATSAPP}`;
+const MAP_HREF = 'https://www.google.com/maps/search/?api=1&query=Prime+Hub+Sabir+Bangles+Store+Shop+217+Street+7+Gulistan+Colony+Mustafabad+Dharampura+Lahore';
 const ADDRESS = 'Shop No. 217, Street No. 7, Gulistan Colony, Mustafabad, Dharampura, Lahore';
 const ADDRESS_DETAIL = 'Prime Hub (Sabir Bangles Store) · Near Aftab Masjid, School Road';
 
@@ -77,10 +78,10 @@ export default function Footer() {
                 <MessageCircle className="mt-0.5 h-4 w-4 shrink-0 text-[#25D366]" />
                 <span><b className="block text-[10px] text-white">Need help?</b><span className="text-[9px] text-white/45">WhatsApp 03035958676</span></span>
               </a>
-              <div className="flex items-start gap-2.5 rounded-2xl border border-white/10 bg-white/5 p-3">
+              <a href={MAP_HREF} target="_blank" rel="noreferrer" className="flex items-start gap-2.5 rounded-2xl border border-white/10 bg-white/5 p-3 transition hover:bg-white/10">
                 <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-[#FFB020]" />
                 <span><b className="block text-[10px] text-white">Our location</b><span className="text-[9px] leading-4 text-white/45">{ADDRESS}<br />{ADDRESS_DETAIL}</span></span>
-              </div>
+              </a>
               <div className="grid grid-cols-2 gap-2">
                 <Link href="/contact" className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 p-3 text-[9px] font-black text-white/70 transition hover:bg-white/10"><Globe2 size={14} /> Worldwide delivery</Link>
                 <a href={WHATSAPP_HREF} target="_blank" rel="noreferrer" className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/5 p-3 text-[9px] font-black text-white/70 transition hover:bg-white/10"><ShoppingBag size={14} /> Wholesale deals</a>
