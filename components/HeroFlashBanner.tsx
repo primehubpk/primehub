@@ -34,7 +34,6 @@ export default function HeroFlashBanner() {
   const [nowTick, setNowTick] = useState(Date.now());
   const todayKey = pakistanDay();
   const weeklyDeals = settings.weeklyDeals || [];
-  const todayDeal = weeklyDeals.find((deal) => deal.day === todayKey && deal.active !== false && Number(deal.dealPrice) > 0);
   const bigDeal = settings.dailyDeal;
   const countdown = useMemo(() => {
     const end = bigDeal?.endAt ? new Date(bigDeal.endAt).getTime() : 0;
@@ -48,19 +47,19 @@ export default function HeroFlashBanner() {
   }, []);
 
   return <>
-    <section className="mx-4 mt-3 overflow-hidden rounded-[24px] border border-black/6 bg-white shadow-[0_12px_40px_rgba(20,20,15,0.07)]">
-      <div className="flex gap-1.5 overflow-x-auto px-3 py-3 sm:px-5 [scrollbar-width:none]">
+    <section className="mx-4 mt-3 overflow-hidden rounded-[26px] border border-black/8 bg-white shadow-[0_14px_42px_rgba(20,20,15,0.09)]">
+      <div className="flex gap-2 overflow-x-auto px-3 py-3.5 sm:px-5 [scrollbar-width:none]">
         {DAYS.map(({ key, label, Icon }) => {
           const active = key === todayKey;
           const deal = weeklyDeals.find((item) => item.day === key && item.active !== false && Number(item.dealPrice) > 0);
-          return <Link key={key} href={`/deals/${key}`} className={`group relative min-w-[108px] flex-1 overflow-hidden rounded-2xl border px-2 py-2.5 text-center transition hover:-translate-y-0.5 ${active ? 'border-[#14140F] bg-[#14140F] text-white shadow-[0_8px_24px_rgba(20,20,15,0.14)]' : 'border-black/7 bg-[#FBFAF7] text-[#14140F] hover:border-[#FFB020] hover:shadow-[0_8px_24px_rgba(255,176,32,0.14)]'}`}>
-            {deal?.imageUrl && <img src={deal.imageUrl} alt="" className="absolute inset-0 h-full w-full object-cover opacity-35 transition group-hover:opacity-45" />}
+          return <Link key={key} href={`/deals/${key}`} className={`group relative min-w-[112px] flex-1 overflow-hidden rounded-[20px] border px-2.5 py-3 text-center transition duration-200 ${active ? 'border-[#0F6A5F] bg-[#0F6A5F] text-white shadow-[0_10px_26px_rgba(15,106,95,0.2)]' : 'border-black/7 bg-[#FCFBF8] text-[#14140F] hover:-translate-y-0.5 hover:border-[#0F6A5F]/25 hover:shadow-[0_10px_26px_rgba(20,20,15,0.08)]'}`}>
+            {deal?.imageUrl && <img src={deal.imageUrl} alt="" className={`absolute inset-0 h-full w-full object-cover transition duration-200 ${active ? 'opacity-20 group-hover:opacity-25' : 'opacity-15 group-hover:opacity-22'}`} />}
             <span className="relative z-10 block">
-              <span className={`mx-auto flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border transition group-hover:scale-105 ${active ? 'border-white/20 bg-white/10 text-[#FFB020]' : 'border-[#FFB020]/35 bg-[#FFF8E8] text-[#D69200]'}`}>
-                {deal?.imageUrl ? <img src={deal.imageUrl} alt="" className="h-full w-full object-cover" /> : <Icon size={18} strokeWidth={2.2} />}
+              <span className={`mx-auto flex h-11 w-11 items-center justify-center overflow-hidden rounded-2xl border ${active ? 'border-white/20 bg-white/10 text-[#FFD16A]' : 'border-[#0F6A5F]/12 bg-white text-[#0F6A5F]'}`}>
+                {deal?.imageUrl ? <img src={deal.imageUrl} alt="" className="h-full w-full object-cover" /> : <Icon size={18} strokeWidth={2.3} />}
               </span>
-              <span className={`mt-1.5 block whitespace-nowrap text-[10px] font-black uppercase tracking-[0.08em] ${active ? 'text-white' : ''}`}>{active ? 'TODAY' : label}</span>
-              {deal && <span className={`mt-0.5 block text-[8px] font-bold ${active ? 'text-white/70' : 'text-black/50'}`}>Rs. {Number(deal.dealPrice).toLocaleString()}</span>}
+              <span className={`mt-2 block whitespace-nowrap text-[10px] font-black uppercase tracking-[0.07em] ${active ? 'text-white' : 'text-[#14140F]'}`}>{active ? 'TODAY' : label}</span>
+              {deal && <span className={`mt-1 block text-[9px] font-bold ${active ? 'text-white/75' : 'text-black/55'}`}>Rs. {Number(deal.dealPrice).toLocaleString()}</span>}
             </span>
           </Link>;
         })}
@@ -68,24 +67,24 @@ export default function HeroFlashBanner() {
     </section>
 
     {bigDeal?.active && bigDeal.title && (
-      <Link href="/deals/big" className="group mx-4 mt-3 block overflow-hidden rounded-[28px] bg-[#14140F] text-white shadow-[0_18px_50px_rgba(20,20,15,0.16)]">
+      <Link href="/deals/big" className="group mx-4 mt-4 block overflow-hidden rounded-[30px] bg-[#0F6A5F] text-white shadow-[0_20px_52px_rgba(15,106,95,0.22)]">
         <section>
-          <div className="relative min-h-[370px] overflow-hidden">
-            {bigDeal.imageUrl && <img src={bigDeal.imageUrl} alt={bigDeal.title} className="absolute inset-0 h-full w-full object-cover opacity-90 transition duration-700 group-hover:scale-[1.02]" />}
-            <div className="absolute inset-0 bg-gradient-to-t from-[#14140F]/95 via-[#14140F]/45 to-[#14140F]/10" />
-            <div className="relative flex min-h-[370px] flex-col justify-end p-5 sm:p-7">
+          <div className="relative min-h-[390px] overflow-hidden">
+            {bigDeal.imageUrl && <img src={bigDeal.imageUrl} alt={bigDeal.title} className="absolute inset-0 h-full w-full object-cover opacity-95 transition duration-700 group-hover:scale-[1.025]" />}
+            <div className="absolute inset-0 bg-gradient-to-t from-[#0B4F47]/96 via-[#0F6A5F]/42 to-[#0F6A5F]/8" />
+            <div className="relative flex min-h-[390px] flex-col justify-end p-5 sm:p-7">
               <div className="mb-auto flex items-center justify-between gap-3">
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-[#E1352B] px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.16em]"><Zap size={13} /> Big Deal</span>
-                <span className="rounded-full bg-[#FFB020] px-3 py-1.5 text-xs font-black text-[#14140F]">{discount > 0 ? `-${discount}% OFF` : 'LIMITED TIME'}</span>
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.16em] text-[#0F6A5F]"><Zap size={13} /> Big Deal</span>
+                <span className="rounded-full bg-[#FFD16A] px-3 py-1.5 text-xs font-black text-[#14140F]">{discount > 0 ? `-${discount}% OFF` : 'LIMITED TIME'}</span>
               </div>
               <div className="max-w-xl">
-                <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.2em] text-white/75">PrimeHub spotlight</p>
+                <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.2em] text-white/80">PrimeHub spotlight</p>
                 <h2 className="text-3xl font-black leading-[0.95] tracking-tight sm:text-5xl">Big Deal</h2>
-                <h3 className="mt-3 text-lg font-bold sm:text-2xl">{bigDeal.title}</h3>
-                <div className="mt-4 flex items-end gap-3"><span className="font-[family-name:var(--font-mono)] text-3xl font-black text-[#FFB020]">Rs. {Number(bigDeal.dealPrice).toLocaleString()}</span>{Number(bigDeal.originalPrice) > Number(bigDeal.dealPrice) && <span className="pb-1 text-sm text-white/60 line-through">Rs. {Number(bigDeal.originalPrice).toLocaleString()}</span>}</div>
+                <h3 className="mt-3 max-w-lg text-xl font-black leading-tight sm:text-3xl">{bigDeal.title}</h3>
+                <div className="mt-4 flex items-end gap-3"><span className="font-[family-name:var(--font-mono)] text-3xl font-black text-[#FFD16A]">Rs. {Number(bigDeal.dealPrice).toLocaleString()}</span>{Number(bigDeal.originalPrice) > Number(bigDeal.dealPrice) && <span className="pb-1 text-sm text-white/65 line-through">Rs. {Number(bigDeal.originalPrice).toLocaleString()}</span>}</div>
                 <div className="mt-4 flex flex-wrap items-center gap-2">
-                  <div className="inline-flex items-center gap-2 rounded-xl bg-white/12 px-3 py-2 backdrop-blur-md"><Clock3 size={14} /><span className="text-[10px] font-bold uppercase tracking-wider text-white/75">Ends in</span><span className="font-[family-name:var(--font-mono)] text-sm font-bold">{String(countdown.hours).padStart(2, '0')}:{String(countdown.minutes).padStart(2, '0')}:{String(countdown.seconds).padStart(2, '0')}</span></div>
-                  <span className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-xs font-black text-[#14140F]">View Big Deal <ArrowRight size={14} /></span>
+                  <div className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-black/10 px-3 py-2.5 backdrop-blur-md"><Clock3 size={14} /><span className="text-[10px] font-bold uppercase tracking-wider text-white/80">Ends in</span><span className="font-[family-name:var(--font-mono)] text-sm font-bold">{String(countdown.hours).padStart(2, '0')}:{String(countdown.minutes).padStart(2, '0')}:{String(countdown.seconds).padStart(2, '0')}</span></div>
+                  <span className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-xs font-black text-[#0F6A5F]">View Big Deal <ArrowRight size={14} /></span>
                 </div>
               </div>
             </div>
