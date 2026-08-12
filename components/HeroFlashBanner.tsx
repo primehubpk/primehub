@@ -49,16 +49,17 @@ export default function HeroFlashBanner() {
       </div>
     </section>
 
-    {todayDeal && <Link href={`/deals/${todayKey}`} className="group mx-4 mt-3 block overflow-hidden rounded-[24px] border border-[#0F6A5F]/10 bg-white shadow-[0_10px_32px_rgba(20,20,15,0.07)]">
-      <div className="flex items-center gap-3 p-3.5 sm:p-4">
-        <div className="h-20 w-20 shrink-0 overflow-hidden rounded-[18px] bg-[#F4F4F1] ring-1 ring-black/5 sm:h-24 sm:w-24">
-          {todayDeal.imageUrl ? <img src={todayDeal.imageUrl} alt={todayDeal.title || 'Daily Deal'} className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center text-[#0F6A5F]"><Sparkles size={24}/></div>}
+    {todayDeal && <Link href={`/deals/${todayKey}`} className="group mx-4 mt-3 block overflow-hidden rounded-[26px] border border-[#0F6A5F]/12 bg-white shadow-[0_12px_36px_rgba(15,106,95,0.10)]">
+      <div className="grid grid-cols-[112px_1fr] items-stretch sm:grid-cols-[150px_1fr]">
+        <div className="relative min-h-[136px] overflow-hidden bg-[#F4F4F1] sm:min-h-[160px]">
+          {todayDeal.imageUrl ? <img src={todayDeal.imageUrl} alt={todayDeal.title || 'Daily Deal'} className="h-full w-full object-cover object-center transition duration-500 group-hover:scale-[1.02]" /> : <div className="flex h-full w-full items-center justify-center text-[#0F6A5F]"><Sparkles size={28}/></div>}
+          <span className="absolute left-3 top-3 rounded-full bg-white/95 px-2.5 py-1 text-[8px] font-black uppercase tracking-[0.14em] text-[#0F6A5F]">Daily Deal</span>
         </div>
-        <div className="min-w-0 flex-1">
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-[#EAF7F4] px-2.5 py-1 text-[8px] font-black uppercase tracking-[0.14em] text-[#0F6A5F]">Today’s Daily Deal</span>
-          <h3 className="mt-1 text-base font-black leading-tight text-[#14140F]">{todayDeal.title || labelFor(todayKey)}</h3>
-          <div className="mt-1.5 flex items-end gap-2"><span className="text-xl font-black text-[#0F6A5F]">Rs. {Number(todayDeal.dealPrice).toLocaleString()}</span>{Number(todayDeal.originalPrice || 0) > Number(todayDeal.dealPrice) && <span className="text-[10px] text-black/35 line-through">Rs. {Number(todayDeal.originalPrice).toLocaleString()}</span>}</div>
-          <span className="mt-1.5 inline-flex items-center gap-1 text-[9px] font-black text-[#0F6A5F]">View today’s deal <ArrowRight size={12}/></span>
+        <div className="flex min-w-0 flex-col justify-center p-4 sm:p-5">
+          <div className="flex items-center gap-2"><span className="text-[9px] font-black uppercase tracking-[0.18em] text-[#0F6A5F]">Today only</span><span className="h-1 w-1 rounded-full bg-[#FFD16A]"/><span className="text-[9px] font-black uppercase tracking-[0.14em] text-black/35">Limited stock</span></div>
+          <h3 className="mt-1.5 text-lg font-black leading-tight text-[#14140F] sm:text-2xl">{todayDeal.title || labelFor(todayKey)}</h3>
+          <div className="mt-2 flex flex-wrap items-end gap-2.5"><span className="text-2xl font-black text-[#0F6A5F] sm:text-3xl">Rs. {Number(todayDeal.dealPrice).toLocaleString()}</span>{Number(todayDeal.originalPrice || 0) > Number(todayDeal.dealPrice) && <span className="pb-0.5 text-xs text-black/35 line-through sm:text-sm">Rs. {Number(todayDeal.originalPrice).toLocaleString()}</span>}</div>
+          <div className="mt-3 flex items-center gap-2"><span className="inline-flex items-center gap-1.5 rounded-xl bg-[#EAF7F4] px-3 py-2 text-[9px] font-black text-[#0F6A5F]"><Sparkles size={12}/> View Deal</span><span className="text-[9px] font-bold text-black/35">Admin-scheduled offer</span></div>
         </div>
       </div>
     </Link>}
