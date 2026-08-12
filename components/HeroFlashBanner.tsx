@@ -39,7 +39,7 @@ export default function HeroFlashBanner() {
             {deal?.imageUrl && <img src={deal.imageUrl} alt="" className={`absolute inset-0 h-full w-full object-cover transition duration-200 ${active ? 'opacity-24 group-hover:opacity-30' : 'opacity-10 group-hover:opacity-16'}`} />}
             <span className="relative z-10 block">
               <span className={`mx-auto flex h-11 w-11 items-center justify-center overflow-hidden rounded-2xl border ${active ? 'border-white/20 bg-white/10 text-[#FFD16A]' : 'border-[#0F6A5F]/12 bg-white text-[#0F6A5F]'}`}>
-                {deal?.imageUrl ? <img src={deal.imageUrl} alt="" className="h-full w-full object-cover" /> : <Icon size={18} strokeWidth={2.3} />}
+                {deal?.imageUrl ? <img src={deal.imageUrl} alt="" className="h-full w-full scale-150 object-cover" /> : <Icon size={18} strokeWidth={2.3} />}
               </span>
               <span className={`mt-2 block whitespace-nowrap text-[10px] font-black uppercase tracking-[0.07em] ${active ? 'text-white' : 'text-[#14140F]'}`}>{active ? 'TODAY' : label}</span>
               {deal && <span className={`mt-1 block text-[9px] font-bold ${active ? 'text-white/80' : 'text-black/55'}`}>Rs. {Number(deal.dealPrice).toLocaleString()}</span>}
