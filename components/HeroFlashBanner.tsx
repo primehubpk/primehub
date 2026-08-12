@@ -36,10 +36,9 @@ export default function HeroFlashBanner() {
           const active = key === todayKey;
           const deal = weeklyDeals.find((item) => item.day === key && item.active !== false && Number(item.dealPrice) > 0);
           return <Link key={key} href={`/deals/${key}`} className={`group relative min-w-[112px] flex-1 overflow-hidden rounded-[20px] border px-2.5 py-3 text-center transition duration-200 ${active ? 'border-[#0F6A5F] bg-[#0F6A5F] text-white shadow-[0_10px_26px_rgba(15,106,95,0.2)]' : 'border-black/7 bg-[#FCFBF8] text-[#14140F] hover:-translate-y-0.5 hover:border-[#0F6A5F]/25 hover:shadow-[0_10px_26px_rgba(20,20,15,0.08)]'}`}>
-            {deal?.imageUrl && key !== 'tuesday' && <img src={deal.imageUrl} alt="" className={`absolute inset-0 h-full w-full object-cover transition duration-200 ${active ? 'opacity-24 group-hover:opacity-30' : 'opacity-10 group-hover:opacity-16'}`} />}
             <span className="relative z-10 block">
-              {key === 'tuesday' && deal?.imageUrl ? (
-                <img src={deal.imageUrl} alt={label} className="mx-auto h-20 w-20 scale-125 rounded-2xl object-cover shadow-[0_6px_16px_rgba(20,20,15,0.18)]" />
+              {deal?.imageUrl ? (
+                <img src={deal.imageUrl} alt={label} className="mx-auto h-20 w-20 scale-125 rounded-2xl object-cover shadow-[0_6px_16px_rgba(20,20,15,0.18)] transition duration-200 group-hover:scale-[1.32]" />
               ) : (
                 <span className={`mx-auto flex h-11 w-11 items-center justify-center overflow-hidden rounded-2xl border ${active ? 'border-white/20 bg-white/10 text-[#FFD16A]' : 'border-[#0F6A5F]/12 bg-white text-[#0F6A5F]'}`}>
                   {deal?.imageUrl ? <img src={deal.imageUrl} alt="" className="h-full w-full scale-150 object-cover" /> : <Icon size={18} strokeWidth={2.3} />}
