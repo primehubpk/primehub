@@ -54,16 +54,16 @@ export default function HeroFlashBanner() {
         <div className="absolute -right-16 -top-16 h-40 w-40 rounded-full bg-[#FFD16A]/25 blur-3xl" />
         <div className="relative grid md:grid-cols-[46%_54%]">
           <div className="relative min-h-[245px] overflow-hidden bg-[#F4F4F1] sm:min-h-[280px] md:min-h-[310px]">
-            {todayDeal.imageUrl ? <img src={todayDeal.imageUrl} alt={todayDeal.title || 'Daily Deal'} className="h-full w-full object-cover object-center transition duration-700 group-hover:scale-[1.03]" /> : <div className="flex h-full w-full items-center justify-center text-[#0F6A5F]"><Sparkles size={38}/></div>}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent" />
-            <span className="absolute left-4 top-4 inline-flex items-center gap-1.5 rounded-full bg-[#0F6A5F] px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.16em] text-white shadow-sm"><Sparkles size={11}/> Today’s Deal</span>
+            {todayDeal.imageUrl ? <img src={todayDeal.imageUrl} alt={todayDeal.title || 'Daily Deal'} className="h-full w-full object-contain object-center transition duration-700 group-hover:scale-[1.02] md:object-cover" /> : <div className="flex h-full w-full items-center justify-center text-[#0F6A5F]"><Sparkles size={38}/></div>}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/18 via-transparent to-transparent" />
+            <span className="absolute left-4 top-4 inline-flex items-center gap-1.5 rounded-full bg-[#0F6A5F] px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.16em] text-white shadow-sm"><Sparkles size={11}/> Daily Deal</span>
           </div>
           <div className="flex min-w-0 flex-col justify-center p-5 sm:p-7">
-            <div className="flex flex-wrap items-center gap-2"><span className="rounded-full bg-[#EAF7F4] px-3 py-1.5 text-[8px] font-black uppercase tracking-[0.16em] text-[#0F6A5F]">Daily Deal</span><span className="rounded-full bg-[#FFF4D6] px-3 py-1.5 text-[8px] font-black uppercase tracking-[0.14em] text-[#AA7A00]">Limited Time</span></div>
+            <div className="flex flex-wrap items-center gap-2"><span className="rounded-full bg-[#EAF7F4] px-3 py-1.5 text-[8px] font-black uppercase tracking-[0.16em] text-[#0F6A5F]">{labelFor(todayKey)}</span><span className="rounded-full bg-[#FFF4D6] px-3 py-1.5 text-[8px] font-black uppercase tracking-[0.14em] text-[#AA7A00]">Limited Time</span></div>
             <h3 className="mt-3 text-2xl font-black leading-tight text-[#14140F] sm:text-3xl">{todayDeal.title || labelFor(todayKey)}</h3>
             <div className="mt-3 flex flex-wrap items-end gap-2.5"><span className="text-3xl font-black text-[#0F6A5F]">Rs. {Number(todayDeal.dealPrice).toLocaleString()}</span>{Number(todayDeal.originalPrice || 0) > Number(todayDeal.dealPrice) && <span className="pb-1 text-sm text-black/35 line-through">Rs. {Number(todayDeal.originalPrice).toLocaleString()}</span>}</div>
-            <p className="mt-2 text-xs leading-5 text-black/45">Premium daily offer selected from the Admin schedule.</p>
-            <div className="mt-5 flex items-center gap-3"><span className="inline-flex items-center gap-2 rounded-2xl bg-[#14140F] px-4 py-3 text-[10px] font-black text-white shadow-sm">View Daily Deal <ArrowRight size={14}/></span><span className="text-[9px] font-bold uppercase tracking-[0.14em] text-[#0F6A5F]">Tap to shop</span></div>
+            <p className="mt-2 text-xs leading-5 text-black/45">Exclusive scheduled offer from PrimeHub.</p>
+            <div className="mt-5 flex items-center gap-3"><span className="inline-flex items-center gap-2 rounded-2xl bg-[#14140F] px-4 py-3 text-[10px] font-black text-white shadow-sm">View {labelFor(todayKey)} <ArrowRight size={14}/></span><span className="text-[9px] font-bold uppercase tracking-[0.14em] text-[#0F6A5F]">Tap to shop</span></div>
           </div>
         </div>
       </div>
@@ -75,11 +75,7 @@ export default function HeroFlashBanner() {
         <div className="absolute inset-0 bg-gradient-to-t from-[#0B4F47]/94 via-[#0F6A5F]/28 to-transparent" />
         <div className="relative flex min-h-[390px] flex-col justify-end p-5 sm:p-8">
           <div className="mb-auto flex items-center justify-between gap-3"><span className="rounded-full bg-white/95 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.16em] text-[#0F6A5F]">Big Deal</span><span className="rounded-full bg-[#FFD16A] px-3 py-1.5 text-xs font-black text-[#14140F]">{discount > 0 ? `-${discount}% OFF` : 'LIMITED TIME'}</span></div>
-          <div className="max-w-lg">
-            <h2 className="text-3xl font-black leading-none tracking-tight sm:text-5xl">{bigDeal.title}</h2>
-            <div className="mt-4 flex items-end gap-3"><span className="text-3xl font-black text-[#FFD16A]">Rs. {Number(bigDeal.dealPrice).toLocaleString()}</span>{Number(bigDeal.originalPrice) > Number(bigDeal.dealPrice) && <span className="pb-1 text-sm text-white/60 line-through">Rs. {Number(bigDeal.originalPrice).toLocaleString()}</span>}</div>
-            <div className="mt-4 flex flex-wrap items-center gap-2"><div className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-black/15 px-3 py-2.5 backdrop-blur-md"><Clock3 size={14}/><span className="text-[10px] font-bold uppercase tracking-wider text-white/80">Ends in</span><span className="font-[family-name:var(--font-mono)] text-sm font-bold">{String(countdown.hours).padStart(2,'0')}:{String(countdown.minutes).padStart(2,'0')}:{String(countdown.seconds).padStart(2,'0')}</span></div><span className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-xs font-black text-[#0F6A5F]">View Deal <ArrowRight size={14}/></span></div>
-          </div>
+          <div className="max-w-lg"><h2 className="text-3xl font-black leading-none tracking-tight sm:text-5xl">{bigDeal.title}</h2><div className="mt-4 flex items-end gap-3"><span className="text-3xl font-black text-[#FFD16A]">Rs. {Number(bigDeal.dealPrice).toLocaleString()}</span>{Number(bigDeal.originalPrice) > Number(bigDeal.dealPrice) && <span className="pb-1 text-sm text-white/60 line-through">Rs. {Number(bigDeal.originalPrice).toLocaleString()}</span>}</div><div className="mt-4 flex flex-wrap items-center gap-2"><div className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-black/15 px-3 py-2.5 backdrop-blur-md"><Clock3 size={14}/><span className="text-[10px] font-bold uppercase tracking-wider text-white/80">Ends in</span><span className="font-[family-name:var(--font-mono)] text-sm font-bold">{String(countdown.hours).padStart(2,'0')}:{String(countdown.minutes).padStart(2,'0')}:{String(countdown.seconds).padStart(2,'0')}</span></div><span className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-xs font-black text-[#0F6A5F]">View Deal <ArrowRight size={14}/></span></div></div>
         </div>
       </div></section>
     </Link>}
