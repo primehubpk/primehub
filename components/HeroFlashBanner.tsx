@@ -38,7 +38,7 @@ export default function HeroFlashBanner() {
           const discount = deal && Number(deal.originalPrice || 0) > Number(deal.dealPrice) ? Math.round(((Number(deal.originalPrice) - Number(deal.dealPrice)) / Number(deal.originalPrice)) * 100) : 0;
           return <Link key={key} href={`/deals/${key}`} className={`group relative min-w-[112px] flex-1 overflow-hidden rounded-[20px] border px-2.5 py-3 text-center transition duration-200 ${active ? 'border-[#0F6A5F] bg-[#0F6A5F] text-white shadow-[0_10px_26px_rgba(15,106,95,0.2)]' : deal ? 'border-[#E1352B]/20 bg-gradient-to-b from-[#FFF9F5] to-white text-[#14140F] shadow-[0_10px_24px_rgba(225,53,43,0.10)] hover:-translate-y-1 hover:border-[#E1352B]/45 hover:shadow-[0_14px_30px_rgba(225,53,43,0.18)]' : 'border-black/7 bg-[#FCFBF8] text-[#14140F] hover:-translate-y-0.5 hover:border-[#0F6A5F]/25 hover:shadow-[0_10px_26px_rgba(20,20,15,0.08)]'}`}>
             <span className="relative z-10 block">
-              {deal?.imageUrl ? (
+              {deal?.imageUrl && !active ? (
                 <span className="relative mx-auto block h-20 w-20 overflow-hidden rounded-2xl border-2 border-white bg-white shadow-[0_8px_18px_rgba(20,20,15,0.18)]">
                   <img src={deal.imageUrl} alt={label} className="h-full w-full scale-125 object-cover transition duration-200 group-hover:scale-[1.34]" />
                   <span className="absolute left-1.5 top-1.5 rounded-full bg-[#E1352B] px-1.5 py-0.5 text-[6px] font-black uppercase tracking-[0.08em] text-white shadow-sm">Sale</span>
