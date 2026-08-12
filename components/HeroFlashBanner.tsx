@@ -50,16 +50,19 @@ export default function HeroFlashBanner() {
     </section>
 
     {todayDeal && <Link href={`/deals/${todayKey}`} className="group mx-4 mt-3 block overflow-hidden rounded-[26px] border border-[#0F6A5F]/12 bg-white shadow-[0_12px_36px_rgba(15,106,95,0.10)]">
-      <div className="grid grid-cols-[112px_1fr] items-stretch sm:grid-cols-[150px_1fr]">
-        <div className="relative min-h-[136px] overflow-hidden bg-[#F4F4F1] sm:min-h-[160px]">
-          {todayDeal.imageUrl ? <img src={todayDeal.imageUrl} alt={todayDeal.title || 'Daily Deal'} className="h-full w-full object-cover object-center transition duration-500 group-hover:scale-[1.02]" /> : <div className="flex h-full w-full items-center justify-center text-[#0F6A5F]"><Sparkles size={28}/></div>}
-          <span className="absolute left-3 top-3 rounded-full bg-white/95 px-2.5 py-1 text-[8px] font-black uppercase tracking-[0.14em] text-[#0F6A5F]">Daily Deal</span>
-        </div>
-        <div className="flex min-w-0 flex-col justify-center p-4 sm:p-5">
-          <div className="flex items-center gap-2"><span className="text-[9px] font-black uppercase tracking-[0.18em] text-[#0F6A5F]">Today only</span><span className="h-1 w-1 rounded-full bg-[#FFD16A]"/><span className="text-[9px] font-black uppercase tracking-[0.14em] text-black/35">Limited stock</span></div>
-          <h3 className="mt-1.5 text-lg font-black leading-tight text-[#14140F] sm:text-2xl">{todayDeal.title || labelFor(todayKey)}</h3>
-          <div className="mt-2 flex flex-wrap items-end gap-2.5"><span className="text-2xl font-black text-[#0F6A5F] sm:text-3xl">Rs. {Number(todayDeal.dealPrice).toLocaleString()}</span>{Number(todayDeal.originalPrice || 0) > Number(todayDeal.dealPrice) && <span className="pb-0.5 text-xs text-black/35 line-through sm:text-sm">Rs. {Number(todayDeal.originalPrice).toLocaleString()}</span>}</div>
-          <div className="mt-3 flex items-center gap-2"><span className="inline-flex items-center gap-1.5 rounded-xl bg-[#EAF7F4] px-3 py-2 text-[9px] font-black text-[#0F6A5F]"><Sparkles size={12}/> View Deal</span><span className="text-[9px] font-bold text-black/35">Admin-scheduled offer</span></div>
+      <div className="relative overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_85%_15%,rgba(255,209,106,0.22),transparent_28%),linear-gradient(135deg,#ffffff_0%,#f8fbfa_55%,#eef7f4_100%)]" />
+        <div className="relative grid grid-cols-[118px_1fr] items-stretch sm:grid-cols-[170px_1fr]">
+          <div className="relative min-h-[154px] overflow-hidden bg-[#F4F4F1] sm:min-h-[190px]">
+            {todayDeal.imageUrl ? <img src={todayDeal.imageUrl} alt={todayDeal.title || 'Daily Deal'} className="h-full w-full object-cover object-center transition duration-500 group-hover:scale-[1.03]" /> : <div className="flex h-full w-full items-center justify-center text-[#0F6A5F]"><Sparkles size={32}/></div>}
+            <span className="absolute left-3 top-3 rounded-full bg-[#0F6A5F] px-2.5 py-1 text-[8px] font-black uppercase tracking-[0.14em] text-white">Today’s Deal</span>
+          </div>
+          <div className="relative flex min-w-0 flex-col justify-center p-4 sm:p-6">
+            <div className="flex flex-wrap items-center gap-2"><span className="rounded-full bg-[#EAF7F4] px-2.5 py-1 text-[8px] font-black uppercase tracking-[0.14em] text-[#0F6A5F]">Daily Deal</span><span className="text-[8px] font-black uppercase tracking-[0.12em] text-black/35">Admin scheduled</span></div>
+            <h3 className="mt-2 text-lg font-black leading-tight text-[#14140F] sm:text-2xl">{todayDeal.title || labelFor(todayKey)}</h3>
+            <div className="mt-2 flex flex-wrap items-end gap-2.5"><span className="text-2xl font-black text-[#0F6A5F] sm:text-3xl">Rs. {Number(todayDeal.dealPrice).toLocaleString()}</span>{Number(todayDeal.originalPrice || 0) > Number(todayDeal.dealPrice) && <span className="pb-0.5 text-xs text-black/35 line-through sm:text-sm">Rs. {Number(todayDeal.originalPrice).toLocaleString()}</span>}</div>
+            <div className="mt-3 flex items-center justify-between gap-2"><span className="inline-flex items-center gap-1.5 rounded-xl bg-[#14140F] px-3 py-2 text-[9px] font-black text-white">View Deal <ArrowRight size={12}/></span><span className="text-[8px] font-bold uppercase tracking-[0.12em] text-[#0F6A5F]">Limited-time offer</span></div>
+          </div>
         </div>
       </div>
     </Link>}
