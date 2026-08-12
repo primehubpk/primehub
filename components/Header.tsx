@@ -13,15 +13,14 @@ type StoreCategory = { id: string; title: string; slug?: string; iconUrl?: strin
 function slugify(value: string) { return value.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, ''); }
 function AnnouncementBar({ text }: { text: string }) {
   const announcement = text?.trim() || 'PrimeHub Deals';
+  const items = [announcement, announcement];
   return <div className="overflow-hidden bg-[#090909] py-2.5 text-white" role="region" aria-label="Announcement">
-    <div className="relative overflow-hidden whitespace-nowrap">
-      <div className="inline-flex min-w-full animate-[ph-marquee_18s_linear_infinite] items-center justify-center gap-10 px-4 text-[10px] font-black uppercase tracking-[0.16em] sm:text-[11px]">
-        <span className="inline-flex shrink-0 items-center gap-2"><ShieldCheck size={13} className="text-white/70" />{announcement}</span>
-        <span className="inline-flex shrink-0 items-center gap-2"><ShieldCheck size={13} className="text-white/70" />{announcement}</span>
-        <span className="inline-flex shrink-0 items-center gap-2"><ShieldCheck size={13} className="text-white/70" />{announcement}</span>
+    <div className="overflow-hidden whitespace-nowrap">
+      <div className="ph-marquee-track flex w-max items-center gap-10 px-4 text-[10px] font-black uppercase tracking-[0.16em] sm:text-[11px]">
+        {items.map((value, index) => <span key={index} className="inline-flex shrink-0 items-center gap-2"><ShieldCheck size={13} className="text-white/70" />{value}</span>)}
       </div>
     </div>
-    <style jsx>{`@keyframes ph-marquee{from{transform:translateX(0)}to{transform:translateX(-33.333%)}}`}</style>
+    <style jsx>{`@keyframes ph-marquee{from{transform:translateX(0)}to{transform:translateX(calc(-50% - 20px))}}.ph-marquee-track{animation:ph-marquee 18s linear infinite;will-change:transform}@media (prefers-reduced-motion:reduce){.ph-marquee-track{animation:none;transform:none;justify-content:center;width:100%}}`}</style>
   </div>;
 }
 
@@ -48,6 +47,6 @@ export default function Header() {
         <div className="mt-2 md:hidden"><div className="mb-1 flex items-center justify-between text-[10px] font-bold"><span className="text-[#0F6A5F]">{itemsToGo === 0 ? 'Free delivery unlocked!' : `Add ${itemsToGo} more item${itemsToGo === 1 ? '' : 's'} for FREE delivery`}</span><span className="text-black/40">{cartItemCount}/{deliveryThreshold}</span></div><div className="h-1.5 overflow-hidden rounded-full bg-black/10"><div className="h-full rounded-full bg-[#0F6A5F]" style={{ width: `${deliveryProgress}%` }}/></div></div>
       </div>
     </header>
-    <div className="border-b border-black/8 bg-[#F8F7F3]"><div className="mx-auto max-w-7xl px-4 py-3 sm:px-6 lg:px-8"><div className="flex items-center gap-2 overflow-x-auto pb-1 [scrollbar-width:none]"><button type="button" onClick={() => router.push('/shop')} className="flex shrink-0 items-center gap-2 rounded-2xl border border-black/10 bg-[#14140F] px-3 py-2 text-[10px] font-black text-white shadow-sm"><MoreHorizontal size={15}/>All Categories</button>{visibleCategories.map((category) => <button key={category.id} type="button" onClick={() => openCategory(category)} className="group flex min-w-[78px] shrink-0 flex-col items-center gap-1 rounded-2xl px-2 py-1.5 text-[9px] font-black text-black/75"><span className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-[#FFF0C9] text-[#B77900]">{category.iconUrl ? <img src={category.iconUrl} alt="" className="h-full w-full object-cover"/> : <Sparkles size={14}/>}</span><span className="max-w-[84px] truncate">{category.title}</span></button>)}{categories.filter((category) => (category.active ?? true) && category.title.trim()).length > 12 && <button type="button" onClick={() => router.push('/shop')} className="flex shrink-0 flex-col items-center gap-1 rounded-2xl px-2 py-1.5 text-[9px] font-black"><MoreHorizontal className="h-8 w-8 rounded-full bg-[#FFF0C9] p-1.5 text-[#B77900]"/><span>More</span></button>}</div></div></div>
+    <div className="sticky top-0 z-30 border-b border-black/8 bg-[#F8F7F3]/95 shadow-[0_5px_18px_rgba(20,20,15,0.04)] backdrop-blur-md"><div className="mx-auto max-w-7xl px-4 py-3 sm:px-6 lg:px-8"><div className="flex items-center gap-2 overflow-x-auto pb-1 [scrollbar-width:none]"><button type="button" onClick={() => router.push('/shop')} className="flex shrink-0 items-center gap-2 rounded-2xl border border-black/10 bg-[#14140F] px-3 py-2 text-[10px] font-black text-white shadow-sm"><MoreHorizontal size={15}/>All Categories</button>{visibleCategories.map((category) => <button key={category.id} type="button" onClick={() => openCategory(category)} className="group flex min-w-[78px] shrink-0 flex-col items-center gap-1 rounded-2xl px-2 py-1.5 text-[9px] font-black text-black/75"><span className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-[#FFF0C9] text-[#B77900]">{category.iconUrl ? <img src={category.iconUrl} alt="" className="h-full w-full object-cover"/> : <Sparkles size={14}/>}</span><span className="max-w-[84px] truncate">{category.title}</span></button>)}{categories.filter((category) => (category.active ?? true) && category.title.trim()).length > 12 && <button type="button" onClick={() => router.push('/shop')} className="flex shrink-0 flex-col items-center gap-1 rounded-2xl px-2 py-1.5 text-[9px] font-black"><MoreHorizontal className="h-8 w-8 rounded-full bg-[#FFF0C9] p-1.5 text-[#B77900]"/><span>More</span></button>}</div></div></div>
   </>;
 }
