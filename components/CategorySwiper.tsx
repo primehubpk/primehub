@@ -25,6 +25,9 @@ export default function CategorySwiper() {
 
   if (categories.length === 0) return null;
 
+  // Homepage should show a single category row, using the first/admin-top category only.
+  const primaryCategory = categories[0];
+
   return (
     <section className="mx-auto mt-7 max-w-md px-4">
       <div className="mb-3 flex items-end justify-between">
@@ -37,26 +40,26 @@ export default function CategorySwiper() {
         </Link>
       </div>
 
-      <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-2 snap-x snap-mandatory [scrollbar-width:none]">
-        {categories.map((cat) => (
-          <Link
-            key={cat.id}
-            href={`/category/${encodeURIComponent(categorySlug(cat.title || cat.id))}`}
-            className="group flex w-[78px] shrink-0 snap-start flex-col items-center gap-1.5 text-center transition active:scale-95"
-          >
-            <span className="flex h-[68px] w-[68px] items-center justify-center overflow-hidden rounded-[22px] border border-black/6 bg-white p-1 shadow-[0_8px_22px_rgba(20,20,15,0.06)] transition group-hover:-translate-y-0.5 group-hover:shadow-[0_12px_26px_rgba(20,20,15,0.1)]">
-              {cat.iconUrl ? (
-                <img src={cat.iconUrl} alt={cat.title} className="h-full w-full rounded-[18px] object-cover" />
-              ) : (
-                <span className="flex h-full w-full items-center justify-center rounded-[18px] bg-[#F4F4F1] font-[family-name:var(--font-display)] text-xl font-black text-[#0F6A5F]">
-                  {cat.title.charAt(0)}
-                </span>
-              )}
+      <Link
+        href={`/category/${encodeURIComponent(categorySlug(primaryCategory.title || primaryCategory.id))}`}
+        className="group flex items-center gap-3 rounded-[22px] border border-black/6 bg-white p-2.5 shadow-[0_8px_22px_rgba(20,20,15,0.06)] transition active:scale-[0.99]"
+      >
+        <span className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-[18px] bg-[#F4F4F1] ring-1 ring-black/5">
+          {primaryCategory.iconUrl ? (
+            <img src={primaryCategory.iconUrl} alt={primaryCategory.title} className="h-full w-full object-cover" />
+          ) : (
+            <span className="font-[family-name:var(--font-display)] text-xl font-black text-[#0F6A5F]">
+              {primaryCategory.title.charAt(0)}
             </span>
-            <span className="line-clamp-2 text-[10px] font-bold leading-3.5 text-black/70">{cat.title}</span>
-          </Link>
-        ))}
-      </div>
+          )}
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-[9px] font-black uppercase tracking-[0.15em] text-[#0F6A5F]">Featured category</span>
+          <span className="mt-0.5 block truncate text-sm font-black text-[#14140F]">{primaryCategory.title}</span>
+          <span className="mt-0.5 block text-[10px] text-black/40">Explore products in this category</span>
+        </span>
+        <ChevronRight className="h-5 w-5 shrink-0 text-black/30 transition group-hover:translate-x-0.5" aria-hidden="true" />
+      </Link>
     </section>
   );
 }
