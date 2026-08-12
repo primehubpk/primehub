@@ -35,10 +35,10 @@ export default function HeroFlashBanner() {
         {DAYS.map(({ key, label, Icon }) => {
           const active = key === todayKey;
           const deal = weeklyDeals.find((item) => item.day === key && item.active !== false && Number(item.dealPrice) > 0);
-          return <Link key={key} href={`/deals/${key}`} className={`group relative min-w-[112px] flex-1 overflow-hidden rounded-[20px] border px-2.5 py-3 text-center transition duration-200 ${active ? 'border-[#0F6A5F] bg-[#0F6A5F] text-white shadow-[0_10px_26px_rgba(15,106,95,0.2)]' : 'border-black/7 bg-[#FCFBF8] text-[#14140F] hover:-translate-y-0.5 hover:border-[#0F6A5F]/25 hover:shadow-[0_10px_26px_rgba(20,20,15,0.08)]'}`}>
+          return <Link key={key} href={`/deals/${key}`} className={`group relative isolate min-w-[112px] flex-1 overflow-hidden rounded-[20px] border px-2.5 py-3 text-center transition duration-200 ${active ? 'border-[#0F6A5F] bg-[#0F6A5F] text-white shadow-[0_10px_26px_rgba(15,106,95,0.2)]' : 'border-black/7 bg-[#FCFBF8] text-[#14140F] hover:-translate-y-0.5 hover:border-[#0F6A5F]/25 hover:shadow-[0_10px_26px_rgba(20,20,15,0.08)]'}`}>
             <span className="relative z-10 block">
-              <span className={`mx-auto flex h-12 w-12 items-center justify-center overflow-hidden rounded-2xl border shadow-sm ${active ? 'border-white/20 bg-white/10 text-[#FFD16A]' : 'border-[#0F6A5F]/12 bg-white text-[#0F6A5F]'}`}>
-                {deal?.imageUrl ? <img src={deal.imageUrl} alt="" className="h-full w-full object-contain contrast-110 saturate-110" /> : <Icon size={20} strokeWidth={2.3} />}
+              <span className={`relative mx-auto flex h-12 w-12 items-center justify-center overflow-hidden rounded-2xl border shadow-sm ${active ? 'border-white/20 bg-white/10 text-[#FFD16A]' : 'border-[#0F6A5F]/12 bg-[#FCFBF8] text-[#0F6A5F]'}`}>
+                {deal?.imageUrl ? <img src={deal.imageUrl} alt="" className="relative z-10 block h-full w-full object-contain contrast-110 saturate-110" /> : <Icon size={20} strokeWidth={2.3} />}
               </span>
               <span className={`mt-2 block whitespace-nowrap text-[10px] font-black uppercase tracking-[0.07em] ${active ? 'text-white' : 'text-[#14140F]'}`}>{active ? 'TODAY' : label}</span>
               {deal && <span className={`mt-1 block text-[9px] font-bold ${active ? 'text-white/80' : 'text-black/55'}`}>Rs. {Number(deal.dealPrice).toLocaleString()}</span>}
