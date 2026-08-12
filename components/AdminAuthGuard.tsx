@@ -5,7 +5,6 @@ import {
   EmailAuthProvider,
   onAuthStateChanged,
   reauthenticateWithCredential,
-  sendPasswordResetEmail,
   signInWithEmailAndPassword,
   signOut,
   updatePassword,
@@ -83,26 +82,6 @@ export default function AdminAuthGuard({ children }: Props) {
     }
   }
 
-  async function forgotPassword() {
-    setError('');
-    setNotice(null);
-    const targetEmail = email.trim();
-    if (!targetEmail) {
-      setError('Enter your admin email first.');
-      return;
-    }
-    setBusy(true);
-    try {
-      await sendPasswordResetEmail(auth, targetEmail);
-      setNotice({ type: 'success', text: 'Password reset email sent. Check your inbox.' });
-    } catch (err) {
-      console.error(err);
-      setError('Unable to send the reset email. Check the admin email and Firebase Auth settings.');
-    } finally {
-      setBusy(false);
-    }
-  }
-
   async function changePassword(event: FormEvent) {
     event.preventDefault();
     if (!user?.email) return;
@@ -144,7 +123,6 @@ export default function AdminAuthGuard({ children }: Props) {
           <label className="mt-5 block"><span className="mb-1.5 block text-[9px] font-black uppercase tracking-wider text-black/40">Admin Email</span><input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full rounded-2xl bg-[#F4F4F1] px-3 py-3.5 text-xs font-bold outline-none" placeholder="admin@example.com" autoComplete="username" /></label>
           <label className="mt-3 block"><span className="mb-1.5 block text-[9px] font-black uppercase tracking-wider text-black/40">Password</span><div className="flex items-center gap-2 rounded-2xl bg-[#F4F4F1] px-3"><LockKeyhole size={15} className="text-black/30" /><input required type={showPassword ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-transparent py-3.5 text-xs font-bold outline-none" placeholder="Enter password" autoComplete="current-password" /><button type="button" onClick={() => setShowPassword((value) => !value)} className="p-1 text-black/40" aria-label={showPassword ? 'Hide password' : 'Show password'}>{showPassword ? <EyeOff size={16} /> : <Eye size={16} />}</button></div></label>
           <button disabled={busy} className="mt-5 w-full rounded-2xl bg-[#14140F] py-4 text-xs font-black text-white disabled:opacity-50">{busy ? 'Signing in...' : 'Sign in securely'}</button>
-          <button type="button" disabled={busy} onClick={forgotPassword} className="mt-3 flex w-full items-center justify-center gap-1 text-[10px] font-black text-black/50 hover:text-black"><KeyRound size={13} /> Forgot password?</button>
         </form>
       </main>
     );
@@ -153,7 +131,7 @@ export default function AdminAuthGuard({ children }: Props) {
   return (
     <div className="min-h-screen">
       <div className="sticky top-0 z-[150] flex items-center justify-end gap-2 border-b border-black/5 bg-white/90 px-4 py-2 backdrop-blur"><span className="mr-auto truncate text-[9px] font-bold text-black/35">{user.email}</span><button type="button" onClick={() => setShowSecurity((value) => !value)} className="flex items-center gap-1.5 rounded-full bg-[#F4F4F1] px-3 py-2 text-[9px] font-black"><KeyRound size={12} /> Security</button><button type="button" onClick={() => { void signOut(auth); }} className="flex items-center gap-1.5 rounded-full bg-[#F4F4F1] px-3 py-2 text-[9px] font-black"><LogOut size={12} /> Logout</button></div>
-      {showSecurity && <div className="border-b border-black/5 bg-white px-4 py-4"><form onSubmit={changePassword} className="mx-auto grid max-w-6xl gap-2 md:grid-cols-[1fr_1fr_auto] md:items-end"><label><span className="mb-1 block text-[9px] font-black uppercase tracking-wider text-black/40">Current password</span><input required type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} className="w-full rounded-xl bg-[#F4F4F1] px-3 py-2.5 text-xs outline-none" autoComplete="current-password" /></label><label><span className="mb-1 block text-[9px] font-black uppercase tracking-wider text-black/40">New password</span><div className="flex rounded-xl bg-[#F4F4F1] px-3"><input required minLength={8} type={showNewPassword ? 'text' : 'password'} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="w-full bg-transparent py-2.5 text-xs outline-none" autoComplete="new-password" /><button type="button" onClick={() => setShowNewPassword((value) => !value)} aria-label="Toggle new password visibility" className="text-black/40">{showNewPassword ? <EyeOff size={15} /> : <Eye size={15} />}</button></div></label><button disabled={savingPassword} className="rounded-xl bg-[#14140F] px-4 py-2.5 text-xs font-black text-white disabled:opacity-50">{savingPassword ? 'Saving...' : 'Change password'}</button></form>{notice && <p className={`mx-auto mt-2 max-w-6xl text-[10px] font-bold ${notice.type === 'error' ? 'text-[#E1352B]' : 'text-[#0F6A5F]'}`}>{notice.text}</p>}</div>}
+      {showSecurity && <div className="border-b border-black/5 bg-white px-4 py-4"><form onSubmit={changePassword} className="mx-auto grid max-w-6xl gap-2 md:grid-cols-[1fr_1fr_auto] md:items-end"><label><span className="mb-1 block text-[9px] font-black uppercase tracking-wider text-black/40">Current password</span><input required type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} className="w-full rounded-xl bg-[#F4F4F1] px-3 py-2.5 text-xs outline-none" autoComplete="current-password" /></label><label><span className="mb-1 block text-[9px] font-black uppercase tracking-wider text-black/40">New password</span><div className="flex rounded-xl bg-[#F4F4F1] px-3"><input required minLength={8} type={showNewPassword ? 'text' : 'password'} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="w-full bg-transparent py-2.5 text-xs outline-none" autoComplete="new-password" /><button type="button" onClick={() => setShowNewPassword((value) => !value)} aria-label="Toggle new password visibility" className="text-black/40">{showNewPassword ? <EyeOff size={15} /> : <Eye size={16} />}</button></div></label><button disabled={savingPassword} className="rounded-xl bg-[#14140F] px-4 py-2.5 text-xs font-black text-white disabled:opacity-50">{savingPassword ? 'Saving...' : 'Change password'}</button></form>{notice && <p className={`mx-auto mt-2 max-w-6xl text-[10px] font-bold ${notice.type === 'error' ? 'text-[#E1352B]' : 'text-[#0F6A5F]'}`}>{notice.text}</p>}</div>}
       {children}
     </div>
   );
