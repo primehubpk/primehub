@@ -1,14 +1,15 @@
 'use client';
 
 import { FormEvent, useEffect, useState } from 'react';
-import { signInAnonymously, onAuthStateChanged, signOut, User } from 'firebase/auth';
 import { Eye, EyeOff, LockKeyhole, LogOut, ShieldCheck } from 'lucide-react';
-import { auth } from '@/lib/firebase';
 
 type Props = { children: React.ReactNode };
 
+const ADMIN_PASSWORD = 'junaid00';
+const SESSION_KEY = 'primehub-admin-session';
+
 export default function AdminAuthGuard({ children }: Props) {
-  const [user, setUser] = useState<User | null>(null);
+  const [authenticated, setAuthenticated] = useState(false);
   const [checking, setChecking] = useState(true);
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -16,49 +17,40 @@ export default function AdminAuthGuard({ children }: Props) {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    let mounted = true;
-    const unsubscribe = onAuthStateChanged(auth, (nextUser) => {
-      if (mounted) {
-        setUser(nextUser);
-        setChecking(false);
-      }
-    });
-    return () => {
-      mounted = false;
-      unsubscribe();
-    };
+    try {
+      setAuthenticated(sessionStorage.getItem(SESSION_KEY) === '1');
+    } finally {
+      setChecking(false);
+    }
   }, []);
 
-  async function login(event: FormEvent) {
+  function login(event: FormEvent) {
     event.preventDefault();
     setError('');
     setBusy(true);
     try {
-      if (password !== 'junaid00') {
+      if (password !== ADMIN_PASSWORD) {
         setError('Incorrect admin password.');
         return;
       }
-      const credential = await signInAnonymously(auth);
-      if (!credential.user) throw new Error('Unable to start admin session.');
-      setUser(credential.user);
-    } catch (err) {
-      console.error(err);
-      setError('Admin login failed. Make sure Firebase Anonymous Authentication is enabled.');
+      sessionStorage.setItem(SESSION_KEY, '1');
+      setAuthenticated(true);
+      setPassword('');
     } finally {
       setBusy(false);
     }
   }
 
-  async function logout() {
-    await signOut(auth);
-    setUser(null);
+  function logout() {
+    sessionStorage.removeItem(SESSION_KEY);
+    setAuthenticated(false);
   }
 
   if (checking) {
     return <div className="flex min-h-screen items-center justify-center bg-[#F4F4F1]"><div className="rounded-3xl bg-white px-6 py-5 text-xs font-black shadow-sm">Checking admin security...</div></div>;
   }
 
-  if (!user) {
+  if (!authenticated) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#F4F4F1] px-4">
         <form onSubmit={login} className="w-full max-w-sm rounded-[30px] bg-white p-7 shadow-xl">
