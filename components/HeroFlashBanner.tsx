@@ -45,7 +45,7 @@ export default function HeroFlashBanner() {
                   {discount > 0 && <span className="absolute bottom-1.5 right-1.5 rounded-full bg-[#FFD16A] px-1.5 py-0.5 text-[7px] font-black text-[#14140F] shadow-sm">-{discount}%</span>}
                 </span>
               ) : (
-                <span className={`mx-auto flex h-11 w-11 items-center justify-center overflow-hidden rounded-2xl border ${active ? 'border-white/20 bg-white/10 text-[#FFD16A]' : 'border-[#0F6A5F]/12 bg-white text-[#0F6A5F]'}`}>
+                <span className={`mx-auto flex h-11 w-11 items-center justify-center overflow-hidden rounded-2xl border ${active ? 'h-20 w-20 border-white/20 bg-white/10 text-[#FFD16A]' : 'border-[#0F6A5F]/12 bg-white text-[#0F6A5F]'}`}>
                   {deal?.imageUrl ? <img src={deal.imageUrl} alt="" className="h-full w-full scale-150 object-cover" /> : <Icon size={18} strokeWidth={2.3} />}
                 </span>
               )}
@@ -61,10 +61,10 @@ export default function HeroFlashBanner() {
       <div className="relative overflow-hidden bg-gradient-to-br from-white via-[#F8FBFA] to-[#EEF7F4]">
         <div className="absolute -right-16 -top-16 h-40 w-40 rounded-full bg-[#FFD16A]/25 blur-3xl" />
         <div className="relative grid md:grid-cols-[46%_54%]">
-          <div className="relative min-h-[245px] overflow-hidden bg-[#F4F4F1] sm:min-h-[280px] md:min-h-[310px]">
-            {todayDeal.imageUrl ? <img src={todayDeal.imageUrl} alt={todayDeal.title || 'Daily Deal'} className="h-full w-full object-contain object-center transition duration-700 group-hover:scale-[1.02] md:object-cover" /> : <div className="flex h-full w-full items-center justify-center text-[#0F6A5F]"><Sparkles size={38}/></div>}
+          <div className="relative min-h-[290px] overflow-hidden bg-[#F4F4F1] sm:min-h-[340px] md:min-h-[400px]">
+            {todayDeal.imageUrl ? <img src={todayDeal.imageUrl} alt={todayDeal.title || 'Today Deal'} className="h-full w-full object-contain object-center transition duration-700 group-hover:scale-[1.02] md:object-cover" /> : <div className="flex h-full w-full items-center justify-center text-[#0F6A5F]"><Sparkles size={38}/></div>}
             <div className="absolute inset-0 bg-gradient-to-t from-black/18 via-transparent to-transparent" />
-            <span className="absolute left-4 top-4 inline-flex items-center gap-1.5 rounded-full bg-[#0F6A5F] px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.16em] text-white shadow-sm"><Sparkles size={11}/> Daily Deal</span>
+            <span className="absolute left-4 top-4 inline-flex items-center gap-1.5 rounded-full bg-[#0F6A5F] px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.16em] text-white shadow-sm"><Sparkles size={11}/> Today Deal</span>
           </div>
           <div className="flex min-w-0 flex-col justify-center p-5 sm:p-7">
             <div className="flex flex-wrap items-center gap-2"><span className="rounded-full bg-[#EAF7F4] px-3 py-1.5 text-[8px] font-black uppercase tracking-[0.16em] text-[#0F6A5F]">{labelFor(todayKey)}</span><span className="rounded-full bg-[#FFF4D6] px-3 py-1.5 text-[8px] font-black uppercase tracking-[0.14em] text-[#AA7A00]">Limited Time</span></div>
