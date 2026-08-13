@@ -37,18 +37,21 @@ export default function HeroFlashBanner() {
           return <Link key={key} href={`/deals/${key}`} className={`group relative min-w-[112px] flex-1 overflow-hidden rounded-[20px] border px-2.5 py-3 text-center transition duration-200 ${active ? 'border-[#0F6A5F] bg-[#0F6A5F] text-white shadow-[0_10px_26px_rgba(15,106,95,0.2)]' : deal ? 'border-[#E1352B]/20 bg-gradient-to-b from-[#FFF9F5] to-white text-[#14140F] shadow-[0_10px_24px_rgba(225,53,43,0.10)] hover:-translate-y-1 hover:border-[#E1352B]/45 hover:shadow-[0_14px_30px_rgba(225,53,43,0.18)]' : 'border-black/7 bg-[#FCFBF8] text-[#14140F] hover:-translate-y-0.5 hover:border-[#0F6A5F]/25 hover:shadow-[0_10px_26px_rgba(20,20,15,0.08)]'}`}>
             <span className="relative z-10 block">
               {deal?.imageUrl ? (
-                <span className={`relative mx-auto block overflow-hidden rounded-2xl border-2 bg-white shadow-[0_8px_18px_rgba(20,20,15,0.18)] ${active ? 'h-28 w-28 border-white/20' : 'h-20 w-20 border-white'}`}>
+                <span className="relative mx-auto block h-20 w-20 overflow-hidden rounded-2xl border-2 border-white bg-white shadow-[0_8px_18px_rgba(20,20,15,0.18)]">
                   <img src={deal.imageUrl} alt={label} className="h-full w-full scale-125 object-cover transition duration-200 group-hover:scale-[1.34]" />
                   <span className="absolute left-1.5 top-1.5 rounded-full bg-[#E1352B] px-1.5 py-0.5 text-[6px] font-black uppercase tracking-[0.08em] text-white shadow-sm">Sale</span>
                   {dealDiscount > 0 && <span className="absolute bottom-1.5 right-1.5 rounded-full bg-[#FFD16A] px-1.5 py-0.5 text-[7px] font-black text-[#14140F] shadow-sm">-{dealDiscount}%</span>}
                 </span>
               ) : (
-                <span className={`mx-auto flex items-center justify-center overflow-hidden rounded-2xl border ${active ? 'h-28 w-28 border-white/20 bg-white/10 text-[#FFD16A]' : 'h-11 w-11 border-[#0F6A5F]/12 bg-white text-[#0F6A5F]'}`}>
+                <span className="mx-auto flex h-11 w-11 items-center justify-center overflow-hidden rounded-2xl border border-[#0F6A5F]/12 bg-white text-[#0F6A5F]">
                   <Icon size={18} strokeWidth={2.3} />
                 </span>
               )}
-              <span className={`mt-2 block whitespace-nowrap text-[10px] font-black uppercase tracking-[0.07em] ${active ? 'text-white' : 'text-[#14140F]'}`}>{active ? 'TODAY' : label}</span>
-              {deal && <><span className={`mt-1 block text-[9px] font-bold ${active ? 'text-white/80' : 'text-[#E1352B]'}`}>Rs. {Number(deal.dealPrice).toLocaleString()}</span>{!active && <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-[#14140F] px-2 py-1 text-[7px] font-black uppercase tracking-[0.08em] text-white">Shop now <ArrowRight size={8}/></span>}</>}
+              <span className={`mt-2 block whitespace-nowrap text-[10px] font-black uppercase tracking-[0.07em] ${active ? 'text-white' : 'text-[#14140F]'}`}>{active ? 'TODAY DEAL' : label}</span>
+              {deal && <>
+                <span className={`mt-1 block text-[9px] font-bold ${active ? 'text-white/90' : 'text-[#E1352B]'}`}>Rs. {Number(deal.dealPrice).toLocaleString()}</span>
+                <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-[#14140F] px-2 py-1 text-[7px] font-black uppercase tracking-[0.08em] text-white">Shop now <ArrowRight size={8}/></span>
+              </>}
             </span>
           </Link>;
         })}
