@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
-import { CalendarDays, Clock3, Gift, Sparkles, Star, Tags, Trophy, WandSparkles, Zap, ArrowRight } from 'lucide-react';
+import { CalendarDays, Clock3, Gift, Sparkles, Star, Tags, Trophy, WandSparkles, ArrowRight } from 'lucide-react';
 import { useSettings } from '@/lib/useSettings';
 import type { Weekday } from '@/lib/types';
 
@@ -15,6 +15,7 @@ function pakistanDay() { return new Intl.DateTimeFormat('en-US', { timeZone: 'As
 function pakistanParts() { const now = new Date(); const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Karachi', weekday: 'long', year: 'numeric', month: 'numeric', day: 'numeric' }).formatToParts(now); return { year: Number(parts.find((p) => p.type === 'year')?.value), month: Number(parts.find((p) => p.type === 'month')?.value), day: Number(parts.find((p) => p.type === 'day')?.value), now }; }
 function millisecondsUntilPakistanMidnight() { const current = pakistanParts(); const tomorrowUtc = Date.UTC(current.year, current.month - 1, current.day + 1, 0, 0, 0) - 5 * 60 * 60 * 1000; return Math.max(0, tomorrowUtc - current.now.getTime()); }
 function countdownParts(milliseconds: number) { const total = Math.floor(milliseconds / 1000); return { hours: Math.floor(total / 3600), minutes: Math.floor((total % 3600) / 60), seconds: total % 60 }; }
+function dealDiscount(originalPrice: number, dealPrice: number) { return originalPrice > dealPrice && dealPrice > 0 ? Math.round(((originalPrice - dealPrice) / originalPrice) * 100) : 0; }
 
 export default function HeroFlashBanner() {
   const { settings } = useSettings();
@@ -35,13 +36,19 @@ export default function HeroFlashBanner() {
         {DAYS.map(({ key, label, Icon }) => {
           const active = key === todayKey;
           const deal = weeklyDeals.find((item) => item.day === key && item.active !== false && Number(item.dealPrice) > 0);
+          const dealPrice = Number(deal?.dealPrice || 0);
+          const originalPrice = Number(deal?.originalPrice || 0);
+          const dealOff = dealDiscount(originalPrice, dealPrice);
           return <Link key={key} href={`/deals/${key}`} className={`group relative min-w-[112px] flex-1 overflow-hidden rounded-[20px] border px-2.5 py-3 text-center transition duration-200 ${active ? 'border-[#0F6A5F] bg-[#0F6A5F] text-white shadow-[0_10px_26px_rgba(15,106,95,0.2)]' : 'border-black/7 bg-[#FCFBF8] text-[#14140F] hover:-translate-y-0.5 hover:border-[#0F6A5F]/25 hover:shadow-[0_10px_26px_rgba(20,20,15,0.08)]'}`}>
             <span className="relative z-10 block">
-              <span className={`mx-auto flex h-12 w-12 items-center justify-center overflow-hidden rounded-2xl border ${active ? 'border-white/20 bg-white/10 text-[#FFD16A]' : 'border-[#0F6A5F]/12 bg-white text-[#0F6A5F]'}`}>
-                {deal?.imageUrl ? <img src={deal.imageUrl} alt="" className="h-12 w-12 shrink-0 rounded-2xl object-contain" /> : <Icon size={18} strokeWidth={2.3} />}
+              <span className="relative mx-auto block h-16 w-16 overflow-hidden rounded-2xl">
+                {deal?.imageUrl ? <img src={deal.imageUrl} alt={deal.title || label} className="block h-16 w-16 rounded-2xl object-cover" /> : <span className={`flex h-16 w-16 items-center justify-center rounded-2xl ${active ? 'text-[#FFD16A]' : 'text-[#0F6A5F]'}`}><Icon size={24} strokeWidth={2.3} /></span>}
+                {deal && <span className="absolute left-0.5 top-0.5 rounded-md bg-[#F04444] px-1.5 py-0.5 text-[7px] font-black uppercase tracking-wide text-white shadow-sm">SALE</span>}
+                {dealOff > 0 && <span className="absolute bottom-0.5 right-0.5 rounded-md bg-[#FFD16A] px-1.5 py-0.5 text-[7px] font-black text-[#14140F] shadow-sm">-{dealOff}%</span>}
               </span>
-              <span className={`mt-2 block whitespace-nowrap text-[10px] font-black uppercase tracking-[0.07em] ${active ? 'text-white' : 'text-[#14140F]'}`}>{active ? 'TODAY' : label}</span>
-              {deal && <span className={`mt-1 block text-[9px] font-bold ${active ? 'text-white/80' : 'text-black/55'}`}>Rs. {Number(deal.dealPrice).toLocaleString()}</span>}
+              <span className={`mt-2 block whitespace-nowrap text-[10px] font-black uppercase tracking-[0.07em] ${active ? 'text-white' : 'text-[#14140F]'}`}>{active ? 'TODAY DEAL' : label}</span>
+              {deal && <span className={`mt-1 block text-[9px] font-bold ${active ? 'text-white/85' : 'text-[#D33B3B]'}`}>Rs. {dealPrice.toLocaleString()}</span>}
+              {deal && <span className="mx-auto mt-1.5 inline-flex items-center rounded-full bg-[#14140F] px-2.5 py-1 text-[7px] font-black uppercase tracking-wide text-white">SHOP NOW <ArrowRight size={9} className="ml-1" /></span>}
             </span>
           </Link>;
         })}
