@@ -30,6 +30,7 @@ const DAYS: Record<Weekday, string> = {
 const DAY_ORDER: Weekday[] = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
 
 type DealStatus = 'live' | 'ended' | 'upcoming';
+type DealProduct = Product & { description?: string };
 
 function pakistanWeekday(): Weekday {
   const value = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Karachi', weekday: 'long' }).format(new Date()).toLowerCase();
@@ -80,7 +81,7 @@ export default function DayDealPage() {
     [settings.weeklyDeals, day]
   );
 
-  const [product, setProduct] = useState<Product | null>(null);
+  const [product, setProduct] = useState<DealProduct | null>(null);
   const [productLoading, setProductLoading] = useState(false);
   const [productFailed, setProductFailed] = useState(false);
   const [expired, setExpired] = useState(false);
@@ -105,7 +106,7 @@ export default function DayDealPage() {
           setProduct(null);
           setProductFailed(true);
         } else {
-          setProduct({ id: snap.id, ...snap.data() } as Product);
+          setProduct({ id: snap.id, ...snap.data() } as DealProduct);
         }
       } catch {
         if (!cancelled) setProductFailed(true);
