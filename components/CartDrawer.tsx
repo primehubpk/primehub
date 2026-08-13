@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
-import { Minus, Plus, ShoppingBag, Trash2, X, Truck, MessageCircle } from 'lucide-react';
+import { Minus, Plus, ShoppingBag, Trash2, X, Truck, MessageCircle, Home } from 'lucide-react';
 import { useCartStore } from '@/lib/cartStore';
 import { useSettings } from '@/lib/useSettings';
 import WhatsAppOrderModal from '@/components/WhatsAppOrderModal';
@@ -17,6 +17,7 @@ export default function CartDrawer() {
   const { settings } = useSettings();
   const isOpen = useCartStore((state: any) => Boolean(state.isDrawerOpen));
   const closeDrawer = useCartStore((state: any) => state.closeDrawer);
+  const minimizeCart = useCartStore((state: any) => state.minimizeCart);
   const items = useCartStore((state: any) => state.items || state.cart || []);
   const removeItem = useCartStore((state) => state.removeItem);
   const updateQty = useCartStore((state) => state.updateQty);
@@ -56,13 +57,16 @@ export default function CartDrawer() {
     <div className="fixed inset-0 z-[100]">
       <button type="button" aria-label="Close cart" onClick={closeDrawer} className="absolute inset-0 bg-black/50 backdrop-blur-[2px]" />
       <aside className="absolute right-0 top-0 flex h-full w-full max-w-md flex-col bg-[#F4F4F1] shadow-2xl">
-        <header className="flex items-center justify-between border-b border-black/8 bg-white px-5 py-4">
-          <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#E1352B]">Your bag</p>
+        <header className="flex items-center justify-between border-b border-black/8 bg-white px-4 py-4 sm:px-5">
+          <div className="min-w-0">
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#E1352B]">Cart · {totalItems} item{totalItems === 1 ? '' : 's'}</p>
             <h2 className="mt-0.5 text-xl font-black text-[#14140F]">Shopping Cart</h2>
-            <p className="mt-0.5 text-[10px] font-semibold text-black/40">{totalItems} item{totalItems === 1 ? '' : 's'} · items stay here until you remove them</p>
+            <p className="mt-0.5 text-[10px] font-semibold text-black/40">Total: Rs. {subtotal.toLocaleString()} · items stay safe until removed</p>
           </div>
-          <button type="button" onClick={closeDrawer} className="flex h-10 w-10 items-center justify-center rounded-full bg-[#F4F4F1]" aria-label="Close cart"><X size={18} /></button>
+          <div className="flex shrink-0 items-center gap-1.5">
+            <button type="button" onClick={minimizeCart} className="flex h-10 w-10 items-center justify-center rounded-full bg-[#F4F4F1] text-black/60 hover:bg-black/5 hover:text-black" aria-label="Minimize cart"><Minus size={17} /></button>
+            <button type="button" onClick={closeDrawer} className="flex h-10 w-10 items-center justify-center rounded-full bg-[#F4F4F1] text-black/60 hover:bg-black/5 hover:text-black" aria-label="Close cart"><X size={18} /></button>
+          </div>
         </header>
 
         {freeDeliveryEnabled && (
@@ -84,7 +88,7 @@ export default function CartDrawer() {
               <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-white shadow-sm"><ShoppingBag size={25} className="text-black/30" /></div>
               <h3 className="mt-4 text-base font-black">Your cart is empty</h3>
               <p className="mt-1 max-w-[240px] text-xs leading-5 text-black/45">Add something you love and your products will appear here.</p>
-              <button type="button" onClick={closeDrawer} className="mt-5 rounded-full bg-[#14140F] px-5 py-2.5 text-[10px] font-black text-white">Continue Shopping</button>
+              <Link href="/shop" onClick={closeDrawer} className="mt-5 rounded-full bg-[#14140F] px-5 py-2.5 text-[10px] font-black text-white">Continue Shopping</Link>
             </div>
           ) : (
             <div className="space-y-3">
@@ -119,6 +123,11 @@ export default function CartDrawer() {
         {items.length > 0 && (
           <footer className="border-t border-black/8 bg-white p-4">
             <div className="mb-3 flex items-center justify-between"><span className="text-xs font-bold text-black/50">Subtotal</span><span className="font-[family-name:var(--font-mono)] text-xl font-black">Rs. {subtotal.toLocaleString()}</span></div>
+            <div className="mb-3 grid grid-cols-2 gap-2">
+              <Link href="/shop" onClick={closeDrawer} className="flex items-center justify-center gap-1.5 rounded-2xl border border-black/8 bg-[#F4F4F1] py-3 text-[10px] font-black"><Plus size={13} />Add More Products</Link>
+              <Link href="/" onClick={closeDrawer} className="flex items-center justify-center gap-1.5 rounded-2xl border border-black/8 bg-[#F4F4F1] py-3 text-[10px] font-black"><Home size={13} />Home</Link>
+            </div>
+            <Link href="/cart" onClick={closeDrawer} className="mb-2 flex w-full items-center justify-center rounded-2xl border border-black/8 bg-white py-3.5 text-xs font-black">View Cart</Link>
             <button type="button" onClick={() => setWhatsAppOpen(true)} className="mb-2 flex w-full items-center justify-center gap-2 rounded-2xl bg-[#0F6A5F] py-3.5 text-xs font-black text-white"><MessageCircle size={16} />Order on WhatsApp</button>
             <Link href="/checkout" onClick={closeDrawer} className="flex w-full items-center justify-center rounded-2xl bg-[#14140F] py-3.5 text-xs font-black text-white">Checkout on Website</Link>
             <button type="button" onClick={clearCart} className="mt-3 w-full text-[10px] font-black uppercase tracking-wider text-black/35">Clear cart</button>
