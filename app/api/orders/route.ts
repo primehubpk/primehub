@@ -73,9 +73,7 @@ async function buildAuthoritativeItems(items: IncomingItem[]) {
     if (stock <= 0) throw new Error(`${product.title || product.name || 'This product'} is currently unavailable.`);
 
     const regularPrice = numberValue(product.price);
-    const isLiveDealItem =
-      item.dealDay === currentDay &&
-      liveDeal?.productId === productId;
+    const isLiveDealItem = item.dealDay === currentDay && liveDeal?.productId === productId;
     const authoritativePrice = isLiveDealItem ? numberValue(liveDeal.dealPrice) : regularPrice;
 
     if (authoritativePrice <= 0) throw new Error('Product price is not available.');
@@ -102,12 +100,9 @@ async function buildAuthoritativeItems(items: IncomingItem[]) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const customer = body?.customer as Customer | undefined;
     const rawItems = Array.isArray(body?.items) ? (body.items as IncomingItem[]) : [];
+    const quoteOnly = body?.mode === 'quote';
 
-    if (!customer?.name?.trim() || !customer?.phone?.trim() || !customer?.address?.trim() || !customer?.city?.trim()) {
-      return NextResponse.json({ error: 'Name, phone, address and city are required.' }, { status: 400 });
-    }
     if (!rawItems.length || rawItems.length > 50) {
       return NextResponse.json({ error: 'Your cart is empty or contains too many items.' }, { status: 400 });
     }
@@ -115,6 +110,15 @@ export async function POST(request: Request) {
     const items = await buildAuthoritativeItems(rawItems);
     const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
     const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+
+    if (quoteOnly) {
+      return NextResponse.json({ items, subtotal, totalItems });
+    }
+
+    const customer = body?.customer as Customer | undefined;
+    if (!customer?.name?.trim() || !customer?.phone?.trim() || !customer?.address?.trim() || !customer?.city?.trim()) {
+      return NextResponse.json({ error: 'Name, phone, address and city are required.' }, { status: 400 });
+    }
 
     const orderRef = await adminDb.collection('orders').add({
       customer: {
