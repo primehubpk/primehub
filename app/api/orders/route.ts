@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { adminDb } from '@/lib/firebaseAdmin';
+import { getAdminDb } from '@/lib/firebaseAdmin';
 
 export const runtime = 'nodejs';
 
@@ -43,6 +43,7 @@ function numberValue(value: unknown) {
 }
 
 async function buildAuthoritativeItems(items: IncomingItem[]) {
+  const adminDb = getAdminDb();
   const currentDay = pakistanWeekday();
   const settingsSnap = await adminDb.collection('settings').doc('main').get();
   const settings = settingsSnap.exists ? settingsSnap.data() || {} : {};
@@ -120,6 +121,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Name, phone, address and city are required.' }, { status: 400 });
     }
 
+    const adminDb = getAdminDb();
     const orderRef = await adminDb.collection('orders').add({
       customer: {
         name: customer.name.trim(),
