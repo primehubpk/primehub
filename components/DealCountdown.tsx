@@ -14,15 +14,19 @@ function remaining(target: string) {
   };
 }
 
-export default function DealCountdown({ target }: { target: string }) {
+export default function DealCountdown({ target, onExpired }: { target: string; onExpired?: () => void }) {
   const [time, setTime] = useState(() => remaining(target));
 
   useEffect(() => {
-    const tick = () => setTime(remaining(target));
+    const tick = () => {
+      const next = remaining(target);
+      setTime(next);
+      if (next.done) onExpired?.();
+    };
     tick();
     const interval = window.setInterval(tick, 1000);
     return () => window.clearInterval(interval);
-  }, [target]);
+  }, [target, onExpired]);
 
   const pad = (value: number) => String(value).padStart(2, '0');
 
