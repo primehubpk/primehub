@@ -7,7 +7,6 @@ import {
   ArrowLeft,
   Check,
   ChevronRight,
-  Clock3,
   LockKeyhole,
   ShoppingBag,
   Sparkles,
