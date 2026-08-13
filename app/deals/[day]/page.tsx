@@ -171,9 +171,7 @@ export default function DayDealPage() {
       {live && <DealCelebration />}
       <div className="mx-auto max-w-6xl px-4 py-4 md:px-6 md:py-6">
         <div className="flex items-center justify-between">
-          <Link href="/" className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2.5 text-[10px] font-black shadow-sm">
-            <ArrowLeft size={14} /> Back to Home
-          </Link>
+          <Link href="/" className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2.5 text-[10px] font-black shadow-sm"><ArrowLeft size={14} /> Back to Home</Link>
           <span className="hidden text-[9px] font-black uppercase tracking-[0.25em] text-black/35 sm:block">PrimeHub Live Deal Experience</span>
         </div>
 
@@ -181,9 +179,7 @@ export default function DayDealPage() {
           <div className="absolute -right-20 -top-24 h-56 w-56 rounded-full bg-emerald-400/10 blur-3xl" />
           <div className="relative">
             <div className="flex flex-wrap items-center gap-2">
-              <span className={`rounded-full px-3 py-1.5 text-[9px] font-black uppercase tracking-wider ${live ? 'bg-[#E1352B] text-white' : 'bg-white/10 text-white/70'}`}>
-                {live ? 'LIVE NOW' : status === 'upcoming' ? 'COMING SOON' : 'DEAL ENDED'}
-              </span>
+              <span className={`rounded-full px-3 py-1.5 text-[9px] font-black uppercase tracking-wider ${live ? 'bg-[#E1352B] text-white' : 'bg-white/10 text-white/70'}`}>{live ? 'LIVE NOW' : status === 'upcoming' ? 'COMING SOON' : 'DEAL ENDED'}</span>
               {live && <span className="rounded-full bg-[#FFB020] px-3 py-1.5 text-[9px] font-black text-[#14140F]">TODAY ONLY</span>}
             </div>
             <p className="mt-5 text-[9px] font-black uppercase tracking-[0.3em] text-[#FFB020]">One day special offer</p>
@@ -198,7 +194,7 @@ export default function DayDealPage() {
             <p className="mt-5 text-[9px] font-black uppercase tracking-[0.25em] text-[#E1352B]">No scheduled product</p>
             <h2 className="mt-2 text-2xl font-black">No Deal Scheduled For This Day</h2>
             <p className="mx-auto mt-2 max-w-md text-xs leading-5 text-black/45">The selected day has no product assigned in the Admin Panel, so no invented deal content is shown.</p>
-            <Link href="/" className="mt-6 inline-flex items-center gap-2 rounded-2xl bg-[#14140F] px-5 py-3 text-xs font-black text-white">View Homepage <ChevronRight size={15} /></Link>
+            <Link href={`/deals/${today}`} className="mt-6 inline-flex items-center gap-2 rounded-2xl bg-[#14140F] px-5 py-3 text-xs font-black text-white">View Today's Deal <ChevronRight size={15} /></Link>
           </section>
         ) : (
           <section className="mt-4 overflow-hidden rounded-[32px] border border-black/6 bg-white shadow-sm">
@@ -231,14 +227,13 @@ export default function DayDealPage() {
                 </div>
 
                 {live && <div className="mt-5"><DealCountdown target={nextPakistanMidnightISO()} /></div>}
-
                 {live && !available && <div className="mt-4 rounded-2xl bg-[#E1352B]/8 p-3 text-xs font-bold text-[#E1352B]">This product is currently unavailable. The live price will not be applied.</div>}
 
                 <div className="mt-6 grid gap-2 sm:grid-cols-2">
                   {live ? (
                     <button type="button" onClick={buyNow} disabled={!available} className="inline-flex min-h-14 items-center justify-center gap-2 rounded-2xl bg-[#14140F] px-5 text-sm font-black text-white shadow-lg transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-40"><ShoppingBag size={18} /> BUY NOW — Rs. {displayedPrice.toLocaleString()}</button>
                   ) : (
-                    <Link href="/deals/" className="inline-flex min-h-14 items-center justify-center gap-2 rounded-2xl bg-[#14140F] px-5 text-sm font-black text-white"><Zap size={17} fill="currentColor" /> VIEW TODAY'S LIVE DEAL</Link>
+                    <Link href={`/deals/${today}`} className="inline-flex min-h-14 items-center justify-center gap-2 rounded-2xl bg-[#14140F] px-5 text-sm font-black text-white"><Zap size={17} fill="currentColor" /> VIEW TODAY'S LIVE DEAL</Link>
                   )}
                   <Link href={`/product/${product?.id}`} className="inline-flex min-h-14 items-center justify-center gap-2 rounded-2xl border border-black/10 px-5 text-xs font-black text-[#14140F] hover:bg-black/[0.02]">View Full Details <ChevronRight size={15} /></Link>
                 </div>
@@ -262,7 +257,7 @@ export default function DayDealPage() {
               const itemStatus = statusForDay(itemDay, today);
               const hasDeal = Boolean((settings.weeklyDeals || []).some((item) => item.day === itemDay && item.productId));
               const active = itemDay === day;
-              return <Link key={itemDay} href={`/deals/${itemDay}`} className={`rounded-2xl border p-3 transition hover:-translate-y-0.5 ${active ? 'border-white bg-white text-[#14140F]' : 'border-white/10 bg-white/5 text-white'}`}><div className="flex items-center justify-between gap-2"><span className="text-[10px] font-black">{DAYS[itemDay]}</span><ChevronRight size={13} className="shrink-0 opacity-50" /></div><span className={`mt-2 inline-flex rounded-full border px-2 py-1 text-[8px] font-black ${active ? statusClass(itemStatus) : statusClass(itemStatus)}`}>{hasDeal ? statusLabel(itemStatus) : 'NO DEAL'}</span></Link>;
+              return <Link key={itemDay} href={`/deals/${itemDay}`} className={`rounded-2xl border p-3 transition hover:-translate-y-0.5 ${active ? 'border-white bg-white text-[#14140F]' : 'border-white/10 bg-white/5 text-white'}`}><div className="flex items-center justify-between gap-2"><span className="text-[10px] font-black">{DAYS[itemDay]}</span><ChevronRight size={13} className="shrink-0 opacity-50" /></div><span className={`mt-2 inline-flex rounded-full border px-2 py-1 text-[8px] font-black ${statusClass(itemStatus)}`}>{hasDeal ? statusLabel(itemStatus) : 'NO DEAL'}</span></Link>;
             })}
           </div>
         </section>
