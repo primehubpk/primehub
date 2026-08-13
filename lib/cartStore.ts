@@ -5,6 +5,7 @@
  */
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
+import type { Weekday } from '@/lib/types';
 
 export const FREE_DELIVERY_THRESHOLD = 5;
 
@@ -16,6 +17,7 @@ export interface CartItem {
   image?: string;
   imageUrl?: string;
   qty: number;
+  dealDay?: Weekday;
 }
 
 interface CartState {
