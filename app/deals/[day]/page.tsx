@@ -83,6 +83,11 @@ export default function DayDealPage() {
   const [product, setProduct] = useState<Product | null>(null);
   const [productLoading, setProductLoading] = useState(false);
   const [productFailed, setProductFailed] = useState(false);
+  const [expired, setExpired] = useState(false);
+
+  useEffect(() => {
+    setExpired(false);
+  }, [day]);
 
   useEffect(() => {
     let cancelled = false;
@@ -140,7 +145,7 @@ export default function DayDealPage() {
   }
 
   const scheduled = Boolean(deal?.productId && product && !productFailed);
-  const live = status === 'live' && scheduled && deal?.active !== false && Number(deal?.dealPrice) > 0;
+  const live = status === 'live' && scheduled && deal?.active !== false && Number(deal?.dealPrice) > 0 && !expired;
   const stock = Number(product?.stock ?? 0);
   const available = stock > 0;
   const regularPrice = product ? (Number(product.originalPrice) > Number(product.price) ? Number(product.originalPrice) : Number(product.price)) : 0;
@@ -225,7 +230,7 @@ export default function DayDealPage() {
                   {!live && <p className="mt-2 text-[10px] font-bold text-black/40">The discounted price is not purchasable outside the live {DAYS[day]} window.</p>}
                 </div>
 
-                {live && <div className="mt-5"><DealCountdown target={nextPakistanMidnightISO()} /></div>}
+                {live && <div className="mt-5"><DealCountdown target={nextPakistanMidnightISO()} onExpired={() => setExpired(true)} /></div>}
                 {live && !available && <div className="mt-4 rounded-2xl bg-[#E1352B]/8 p-3 text-xs font-bold text-[#E1352B]">This product is currently unavailable. The live price will not be applied.</div>}
 
                 <div className="mt-6 grid gap-2 sm:grid-cols-2">
