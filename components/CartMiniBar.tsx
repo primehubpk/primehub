@@ -44,6 +44,7 @@ export default function CartMiniBar() {
   const updateQty = useCartStore((state) => state.updateQty);
   const [whatsAppOpen, setWhatsAppOpen] = useState(false);
   const [resolvedImages, setResolvedImages] = useState<Record<string, string>>({});
+  const [brokenImages, setBrokenImages] = useState<Record<string, boolean>>({});
 
   const threshold = Math.max(1, Number(settings.freeDelivery?.itemThreshold || FALLBACK_THRESHOLD));
   const totalItems = useMemo(() => items.reduce((sum, item) => sum + Number(item.qty || 1), 0), [items]);
@@ -126,15 +127,22 @@ export default function CartMiniBar() {
               const qty = Math.max(1, Number(item.qty || 1));
               const unitPrice = Number(item.price || 0);
               const lineTotal = unitPrice * qty;
-              const image = productImage(item) || resolvedImages[String(item.id)] || '';
+              const itemKey = String(item.id);
+              const image = productImage(item) || resolvedImages[itemKey] || '';
+              const imageUnavailable = !image || brokenImages[itemKey];
               const title = productTitle(item);
               return (
-                <div key={String(item.id)} className="flex min-w-0 items-center gap-2.5 rounded-2xl border border-white/8 bg-white/[.07] p-2.5">
+                <div key={itemKey} className="flex min-w-0 items-center gap-2.5 rounded-2xl border border-white/8 bg-white/[.07] p-2.5">
                   <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-white/10 ring-1 ring-white/10">
-                    {image ? (
-                      <img src={image} alt={title} className="h-full w-full object-cover" onError={(event) => { event.currentTarget.style.display = 'none'; }} />
+                    {!imageUnavailable ? (
+                      <img
+                        src={image}
+                        alt={title}
+                        className="h-full w-full object-cover"
+                        onError={() => setBrokenImages((current) => ({ ...current, [itemKey]: true }))}
+                      />
                     ) : (
-                      <div className="flex h-full w-full items-center justify-center text-white/30"><ImageOff size={17} /></div>
+                      <div className="flex h-full w-full flex-col items-center justify-center gap-0.5 text-white/30"><ImageOff size={17} /><span className="text-[7px] font-bold">No image</span></div>
                     )}
                   </div>
 
