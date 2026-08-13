@@ -5,7 +5,6 @@ import type { Metadata, Viewport } from 'next';
 import { Space_Grotesk, Inter, Space_Mono } from 'next/font/google';
 import BottomNav from '@/components/BottomNav';
 import './globals.css';
-import CartDrawer from '@/components/CartDrawer';
 import CartMiniBar from '@/components/CartMiniBar';
 import PWARegister from '@/components/PWARegister';
 import PWAInstallBanner from '@/components/PWAInstallBanner';
@@ -42,7 +41,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {children}
         <BottomNav />
         <CartMiniBar />
-        <CartDrawer />
         <PWARegister />
         <PWAInstallBanner />
       </body>

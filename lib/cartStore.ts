@@ -5,6 +5,7 @@
  */
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
+import type { Weekday } from '@/lib/types';
 
 export const FREE_DELIVERY_THRESHOLD = 5;
 
@@ -16,18 +17,21 @@ export interface CartItem {
   image?: string;
   imageUrl?: string;
   qty: number;
+  dealDay?: Weekday;
 }
 
 interface CartState {
   items: CartItem[];
   isDrawerOpen: boolean;
-  suppressNextOpen: boolean;
+  isMiniCollapsed: boolean;
   addItem: (item: Omit<CartItem, 'qty'>) => void;
   removeItem: (id: string | number) => void;
   updateQty: (id: string | number, qty: number) => void;
   clearCart: () => void;
   openDrawer: () => void;
   closeDrawer: () => void;
+  minimizeCart: () => void;
+  expandMiniCart: () => void;
   toggleDrawer: () => void;
   getCartCount: () => number;
   getSubtotal: () => number;
@@ -47,7 +51,7 @@ export const useCartStore = create<CartState>()(
     (set, get) => ({
       items: [],
       isDrawerOpen: false,
-      suppressNextOpen: false,
+      isMiniCollapsed: false,
       addItem: (item) => {
         const resolvedImage = resolveVisibleProductImage(item);
         const normalized = {
@@ -61,22 +65,21 @@ export const useCartStore = create<CartState>()(
             items: existing
               ? state.items.map((i) => i.id === item.id ? { ...i, ...normalized, qty: i.qty + 1 } : i)
               : [...state.items, { ...normalized, qty: 1 }],
-            isDrawerOpen: false,
-            suppressNextOpen: true,
+            isDrawerOpen: true,
+            isMiniCollapsed: false,
           };
         });
-        // Product detail's legacy openDrawer call happens immediately after addItem.
-        // Consume it only for this synchronous add-to-cart action; later cart opens work normally.
-        window.setTimeout(() => set({ suppressNextOpen: false }), 0);
       },
       removeItem: (id) => set((state) => ({ items: state.items.filter((i) => i.id !== id) })),
       updateQty: (id, qty) => set((state) => ({
         items: qty <= 0 ? state.items.filter((i) => i.id !== id) : state.items.map((i) => i.id === id ? { ...i, qty } : i),
       })),
-      clearCart: () => set({ items: [], isDrawerOpen: false, suppressNextOpen: false }),
-      openDrawer: () => set((state) => state.suppressNextOpen ? { suppressNextOpen: false, isDrawerOpen: false } : { isDrawerOpen: true }),
-      closeDrawer: () => set({ isDrawerOpen: false, suppressNextOpen: false }),
-      toggleDrawer: () => set((state) => state.suppressNextOpen ? { suppressNextOpen: false, isDrawerOpen: false } : { isDrawerOpen: !state.isDrawerOpen }),
+      clearCart: () => set({ items: [], isDrawerOpen: false, isMiniCollapsed: false }),
+      openDrawer: () => set({ isDrawerOpen: true, isMiniCollapsed: false }),
+      closeDrawer: () => set({ isDrawerOpen: false }),
+      minimizeCart: () => set({ isDrawerOpen: false, isMiniCollapsed: true }),
+      expandMiniCart: () => set({ isDrawerOpen: true, isMiniCollapsed: false }),
+      toggleDrawer: () => set((state) => ({ isDrawerOpen: !state.isDrawerOpen, isMiniCollapsed: state.isDrawerOpen ? state.isMiniCollapsed : false })),
       getCartCount: () => get().items.reduce((sum, i) => sum + i.qty, 0),
       getSubtotal: () => get().items.reduce((sum, i) => sum + i.price * i.qty, 0),
       getItemsToFreeDelivery: () => Math.max(0, FREE_DELIVERY_THRESHOLD - get().items.reduce((sum, i) => sum + i.qty, 0)),

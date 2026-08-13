@@ -86,7 +86,6 @@ export default function ProductDetailPage() {
   const [added, setAdded] = useState(false);
 
   const addItem = useCartStore((state) => state.addItem);
-  const openDrawer = useCartStore((state: any) => state.openDrawer);
 
   useEffect(() => {
     let cancelled = false;
@@ -139,6 +138,8 @@ export default function ProductDetailPage() {
       name: titleOf(product),
       price,
       originalPrice: original || price,
+      image: images[0] || product.imageUrl || product.image || '',
+      imageUrl: images[0] || product.imageUrl || product.image || '',
     };
     for (let i = 0; i < quantity; i += 1) addItem(cartItem);
 
@@ -271,53 +272,20 @@ export default function ProductDetailPage() {
 
               {images.length > 1 && (
                 <>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setActiveImage((i) => (i - 1 + images.length) % images.length)
-                    }
-                    className="absolute left-3 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 shadow-md"
-                    aria-label="Previous image"
-                  >
-                    <ChevronLeft size={17} />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setActiveImage((i) => (i + 1) % images.length)}
-                    className="absolute right-3 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 shadow-md"
-                    aria-label="Next image"
-                  >
-                    <ChevronRight size={17} />
-                  </button>
+                  <button type="button" onClick={() => setActiveImage((i) => (i - 1 + images.length) % images.length)} className="absolute left-3 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 shadow-md" aria-label="Previous image"><ChevronLeft size={17} /></button>
+                  <button type="button" onClick={() => setActiveImage((i) => (i + 1) % images.length)} className="absolute right-3 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 shadow-md" aria-label="Next image"><ChevronRight size={17} /></button>
                 </>
               )}
 
               {videoOf(product) && (
-                <button
-                  type="button"
-                  onClick={() => setVideoOpen(true)}
-                  className="absolute bottom-3 left-3 flex items-center gap-1.5 rounded-full bg-white/95 px-3 py-2 text-[10px] font-black shadow-md"
-                >
-                  <Play size={11} fill="currentColor" />
-                  Watch Reel
-                </button>
+                <button type="button" onClick={() => setVideoOpen(true)} className="absolute bottom-3 left-3 flex items-center gap-1.5 rounded-full bg-white/95 px-3 py-2 text-[10px] font-black shadow-md"><Play size={11} fill="currentColor" />Watch Reel</button>
               )}
             </div>
 
             {images.length > 1 && (
               <div className="flex gap-2 overflow-x-auto p-3">
                 {images.map((image, index) => (
-                  <button
-                    type="button"
-                    key={`${image}-${index}`}
-                    onClick={() => setActiveImage(index)}
-                    className={`h-16 w-16 shrink-0 overflow-hidden rounded-xl border-2 ${
-                      index === activeImage ? 'border-[#E1352B]' : 'border-transparent'
-                    }`}
-                    aria-label={`View image ${index + 1}`}
-                  >
-                    <img src={image} alt="" className="h-full w-full object-cover" />
-                  </button>
+                  <button type="button" key={`${image}-${index}`} onClick={() => setActiveImage(index)} className={`h-16 w-16 shrink-0 overflow-hidden rounded-xl border-2 ${index === activeImage ? 'border-[#E1352B]' : 'border-transparent'}`} aria-label={`View image ${index + 1}`}><img src={image} alt="" className="h-full w-full object-cover" /></button>
                 ))}
               </div>
             )}
@@ -325,128 +293,50 @@ export default function ProductDetailPage() {
 
           <section className="rounded-[28px] border border-black/7 bg-white p-5 shadow-sm md:p-7">
             <div className="flex flex-wrap items-center gap-2">
-              {product.category && (
-                <span className="rounded-full bg-[#0F6A5F]/10 px-2.5 py-1 text-[9px] font-black uppercase tracking-wider text-[#0F6A5F]">
-                  {product.category}
-                </span>
-              )}
-              {lowStock && (
-                <span className="rounded-full bg-[#FFB020]/20 px-2.5 py-1 text-[9px] font-black text-[#8a5a00]">
-                  Only {stock} left
-                </span>
-              )}
+              {product.category && <span className="rounded-full bg-[#0F6A5F]/10 px-2.5 py-1 text-[9px] font-black uppercase tracking-wider text-[#0F6A5F]">{product.category}</span>}
+              {lowStock && <span className="rounded-full bg-[#FFB020]/20 px-2.5 py-1 text-[9px] font-black text-[#8a5a00]">Only {stock} left</span>}
             </div>
 
-            <h1 className="mt-3 text-2xl font-black leading-tight tracking-tight text-[#14140F] md:text-3xl">
-              {titleOf(product)}
-            </h1>
+            <h1 className="mt-3 text-2xl font-black leading-tight tracking-tight text-[#14140F] md:text-3xl">{titleOf(product)}</h1>
 
             {(rating > 0 || reviews > 0) && (
               <div className="mt-3 flex items-center gap-2">
-                <span className="flex items-center gap-1 rounded-full bg-[#FFB020]/15 px-2 py-1 text-[10px] font-black">
-                  <Star size={11} fill="currentColor" />
-                  {rating ? rating.toFixed(1) : 'New'}
-                </span>
-                {reviews > 0 && (
-                  <span className="text-[10px] font-bold text-black/40">
-                    {reviews.toLocaleString()} reviews
-                  </span>
-                )}
+                <span className="flex items-center gap-1 rounded-full bg-[#FFB020]/15 px-2 py-1 text-[10px] font-black"><Star size={11} fill="currentColor" />{rating ? rating.toFixed(1) : 'New'}</span>
+                {reviews > 0 && <span className="text-[10px] font-bold text-black/40">{reviews.toLocaleString()} reviews</span>}
               </div>
             )}
 
             <div className="mt-5 flex flex-wrap items-end gap-2">
-              <span className="font-[family-name:var(--font-mono)] text-3xl font-black text-[#E1352B]">
-                Rs. {price.toLocaleString()}
-              </span>
-              {original > price && (
-                <span className="mb-1 text-sm text-black/35 line-through">
-                  Rs. {original.toLocaleString()}
-                </span>
-              )}
+              <span className="font-[family-name:var(--font-mono)] text-3xl font-black text-[#E1352B]">Rs. {price.toLocaleString()}</span>
+              {original > price && <span className="mb-1 text-sm text-black/35 line-through">Rs. {original.toLocaleString()}</span>}
             </div>
 
-            {discount > 0 && (
-              <p className="mt-1 text-[10px] font-black uppercase tracking-wider text-[#0F6A5F]">
-                You save Rs. {(original - price).toLocaleString()}
-              </p>
-            )}
+            {discount > 0 && <p className="mt-1 text-[10px] font-black uppercase tracking-wider text-[#0F6A5F]">You save Rs. {(original - price).toLocaleString()}</p>}
 
             <div className="my-5 h-px bg-black/8" />
 
             <div className="flex items-start gap-3 rounded-2xl bg-[#F4F4F1] p-3">
               <Truck size={17} className="mt-0.5 shrink-0 text-[#0F6A5F]" />
-              <div>
-                <p className="text-[11px] font-black">Worldwide delivery available</p>
-                <p className="mt-0.5 text-[10px] leading-4 text-black/45">
-                  Delivery options and final charges can be confirmed at checkout.
-                </p>
-              </div>
+              <div><p className="text-[11px] font-black">Worldwide delivery available</p><p className="mt-0.5 text-[10px] leading-4 text-black/45">Delivery options and final charges can be confirmed at checkout.</p></div>
             </div>
 
-            {product.description && (
-              <div className="mt-5">
-                <h2 className="text-xs font-black uppercase tracking-[0.15em]">
-                  About this deal
-                </h2>
-                <p className="mt-2 whitespace-pre-line text-xs leading-5 text-black/55">
-                  {product.description}
-                </p>
-              </div>
-            )}
+            {product.description && <div className="mt-5"><h2 className="text-xs font-black uppercase tracking-[0.15em]">About this deal</h2><p className="mt-2 whitespace-pre-line text-xs leading-5 text-black/55">{product.description}</p></div>}
 
             <div className="mt-6 flex items-center justify-between rounded-2xl border border-black/8 p-2">
-              <span className="pl-2 text-[10px] font-black uppercase tracking-wider text-black/40">
-                Quantity
-              </span>
+              <span className="pl-2 text-[10px] font-black uppercase tracking-wider text-black/40">Quantity</span>
               <div className="flex items-center rounded-xl bg-[#F4F4F1]">
-                <button
-                  type="button"
-                  onClick={() => setQuantity((q) => Math.max(1, q - 1))}
-                  className="flex h-10 w-10 items-center justify-center"
-                  aria-label="Decrease quantity"
-                >
-                  <Minus size={14} />
-                </button>
+                <button type="button" onClick={() => setQuantity((q) => Math.max(1, q - 1))} className="flex h-10 w-10 items-center justify-center" aria-label="Decrease quantity"><Minus size={14} /></button>
                 <span className="w-8 text-center text-xs font-black">{quantity}</span>
-                <button
-                  type="button"
-                  onClick={() => setQuantity((q) => q + 1)}
-                  className="flex h-10 w-10 items-center justify-center"
-                  aria-label="Increase quantity"
-                >
-                  <Plus size={14} />
-                </button>
+                <button type="button" onClick={() => setQuantity((q) => q + 1)} className="flex h-10 w-10 items-center justify-center" aria-label="Increase quantity"><Plus size={14} /></button>
               </div>
             </div>
 
             <div className="mt-4 grid gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  addProduct();
-                  if (typeof openDrawer === 'function') openDrawer();
-                }}
-                className="flex items-center justify-center gap-2 rounded-2xl bg-[#14140F] py-4 text-xs font-black text-white transition hover:bg-[#E1352B] active:scale-[0.99]"
-              >
-                {added ? <Zap size={15} /> : <ShoppingBag size={15} />}
-                {added ? 'Added to Cart' : 'Add to Cart'}
-              </button>
-
-              <button
-                type="button"
-                onClick={buyWhatsApp}
-                className="flex items-center justify-center gap-2 rounded-2xl bg-[#0F6A5F] py-4 text-xs font-black text-white"
-              >
-                <MessageCircle size={15} />
-                Order This on WhatsApp
-              </button>
+              <button type="button" onClick={addProduct} className="flex items-center justify-center gap-2 rounded-2xl bg-[#14140F] py-4 text-xs font-black text-white transition hover:bg-[#E1352B] active:scale-[0.99]">{added ? <Zap size={15} /> : <ShoppingBag size={15} />}{added ? 'Added to Cart' : 'Add to Cart'}</button>
+              <button type="button" onClick={buyWhatsApp} className="flex items-center justify-center gap-2 rounded-2xl bg-[#0F6A5F] py-4 text-xs font-black text-white"><MessageCircle size={15} />Order This on WhatsApp</button>
             </div>
 
-            <p className="mt-3 text-center text-[9px] font-bold leading-4 text-black/35">
-              Secure your deal first. Customer details and website checkout will be added in
-              the checkout step.
-            </p>
+            <p className="mt-3 text-center text-[9px] font-bold leading-4 text-black/35">Secure your deal first. Customer details and website checkout will be added in the checkout step.</p>
           </section>
         </div>
       </div>
@@ -455,26 +345,10 @@ export default function ProductDetailPage() {
       <ReviewsSection productId={id} />
 
       {videoOpen && videoOf(product) && (
-        <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4"
-          onClick={() => setVideoOpen(false)}
-        >
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4" onClick={() => setVideoOpen(false)}>
           <div className="relative w-full max-w-lg" onClick={(e) => e.stopPropagation()}>
-            <button
-              type="button"
-              onClick={() => setVideoOpen(false)}
-              className="absolute -right-1 -top-12 flex h-9 w-9 items-center justify-center rounded-full bg-white"
-              aria-label="Close video"
-            >
-              <X size={16} />
-            </button>
-            <video
-              src={videoOf(product)}
-              controls
-              autoPlay
-              playsInline
-              className="max-h-[78vh] w-full rounded-3xl bg-black"
-            />
+            <button type="button" onClick={() => setVideoOpen(false)} className="absolute -right-1 -top-12 flex h-9 w-9 items-center justify-center rounded-full bg-white" aria-label="Close video"><X size={16} /></button>
+            <video src={videoOf(product)} controls autoPlay playsInline className="max-h-[78vh] w-full rounded-3xl bg-black" />
           </div>
         </div>
       )}
