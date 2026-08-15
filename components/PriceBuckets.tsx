@@ -55,7 +55,9 @@ export default function PriceBuckets({ selectedMaxPrice, onSelect }: PriceBucket
               </div>
               <p className="relative mt-3 text-[8px] font-black uppercase tracking-[0.16em] opacity-45">{wholesale ? 'Bulk savings' : 'Best finds'}</p>
               <p className="relative mt-0.5 text-base font-black leading-tight">{bucket.title}</p>
-              <p className="relative mt-1 font-[family-name:var(--font-mono)] text-[9px] opacity-50">{wholesale || bucket.amount === null ? 'Special wholesale pricing' : `Products ≤ Rs. ${bucket.amount.toLocaleString()}`}</p>
+              <p className="relative mt-1 font-[family-name:var(--font-mono)] text-[9px] opacity-50">
+                {wholesale || !bucket.amount ? 'Special wholesale pricing' : `Products ≤ Rs. ${bucket.amount.toLocaleString()}`}
+              </p>
             </>
           );
           return wholesale ? (
