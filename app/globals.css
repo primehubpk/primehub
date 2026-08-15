@@ -66,6 +66,13 @@ main > div > div > section:has(> div > [class*="bg-gradient-to-r"]) .live-deal-c
   background: none !important;
 }
 
+/* On mobile, the live deal banner is rendered before the product grid. */
+@media (max-width: 767px) {
+  .live-deal-celebration {
+    display: none !important;
+  }
+}
+
 .live-deal-cta-glow {
   animation: phCtaGlow 1.25s ease-in-out infinite;
   position: relative;
