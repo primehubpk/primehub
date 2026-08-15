@@ -10,5 +10,15 @@ import Footer from '@/components/Footer';
 
 export default function HomePage() {
   const [selectedMaxPrice, setSelectedMaxPrice] = useState<number | null>(null);
-  return <><div className="min-h-screen bg-[#F4F4F1] text-[#14140F]"><Header/><HeroFlashBanner/><PriceBuckets selectedMaxPrice={selectedMaxPrice} onSelect={setSelectedMaxPrice}/><ProductGridRewards selectedMaxPrice={selectedMaxPrice}/><YouTubeGuide/><Footer/></div></>;
+  const [wholesaleSelected, setWholesaleSelected] = useState(false);
+  const selectPrice = (amount: number | null) => {
+    setSelectedMaxPrice(amount);
+    setWholesaleSelected(false);
+  };
+  const selectWholesale = () => {
+    setSelectedMaxPrice(null);
+    setWholesaleSelected((selected) => !selected);
+  };
+
+  return <><div className="min-h-screen bg-[#F4F4F1] text-[#14140F]"><Header/><HeroFlashBanner/><PriceBuckets selectedMaxPrice={selectedMaxPrice} wholesaleSelected={wholesaleSelected} onSelect={selectPrice} onWholesaleSelect={selectWholesale}/><ProductGridRewards selectedMaxPrice={selectedMaxPrice} wholesaleSelected={wholesaleSelected}/><YouTubeGuide/><Footer/></div></>;
 }

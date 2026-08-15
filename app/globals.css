@@ -4,18 +4,12 @@
 @tailwind components;
 @tailwind utilities;
 
-/* =====================================================================
-   SECTION: DESIGN TOKENS
-   Reference these as CSS variables anywhere, or wire them into
-   tailwind.config.js under theme.extend.colors for named classes
-   like bg-ph-red / text-ph-jade.
-===================================================================== */
 :root {
-  --ph-ink: #14140f;       /* primary text */
-  --ph-paper: #f4f4f1;     /* page background */
-  --ph-red: #e1352b;       /* urgency / sale / CTA */
-  --ph-gold: #ffb020;      /* price tag / discount accent */
-  --ph-jade: #0f6a5f;      /* trust / secondary CTA / success */
+  --ph-ink: #14140f;
+  --ph-paper: #f4f4f1;
+  --ph-red: #e1352b;
+  --ph-gold: #ffb020;
+  --ph-jade: #0f6a5f;
   --ph-jade-dark: #0b4f47;
 }
 
@@ -24,64 +18,94 @@ body {
   color: var(--ph-ink);
 }
 
-/* =====================================================================
-   SECTION: ANNOUNCEMENT MARQUEE
-   Used by components/Header.tsx (top scrolling strip)
-===================================================================== */
 @keyframes phMarquee {
-  from {
-    transform: translateX(0);
-  }
-  to {
-    transform: translateX(-50%);
-  }
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
 }
+.animate-marquee { animation: phMarquee 22s linear infinite; }
 
-.animate-marquee {
-  animation: phMarquee 22s linear infinite;
-}
-
-/* =====================================================================
-   SECTION: GLOWING DISCOUNT BADGE PULSE
-   Used by components/DayDeals.tsx and product discount badges
-===================================================================== */
 @keyframes phPulseGlow {
-  0%,
-  100% {
-    box-shadow: 0 0 0 0 rgba(225, 53, 43, 0.45);
+  0%, 100% { box-shadow: 0 0 0 0 rgba(225, 53, 43, 0.45); }
+  50% { box-shadow: 0 0 0 6px rgba(225, 53, 43, 0); }
+}
+.animate-pulse-glow { animation: phPulseGlow 2s ease-in-out infinite; }
+
+@keyframes phLiveDealBorder {
+  0%, 100% {
+    box-shadow: 0 0 0 1px rgba(255, 176, 32, 0.38), 0 10px 28px rgba(225, 53, 43, 0.18), 0 0 22px rgba(255, 209, 102, 0.16);
   }
   50% {
-    box-shadow: 0 0 0 6px rgba(225, 53, 43, 0);
+    box-shadow: 0 0 0 2px rgba(255, 209, 102, 0.95), 0 0 34px rgba(255, 176, 32, 0.55), 0 14px 38px rgba(15, 106, 95, 0.22);
   }
 }
 
-.animate-pulse-glow {
-  animation: phPulseGlow 2s ease-in-out infinite;
+@keyframes phLootPulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(225, 53, 43, 0.2); }
+  50% { transform: scale(1.025); box-shadow: 0 0 0 7px rgba(225, 53, 43, 0); }
 }
 
-/* =====================================================================
-   SECTION: MISC UTILITIES
-===================================================================== */
-
-/* hide scrollbar on horizontal swipe containers (CategorySwiper, DayDeals) */
-.scrollbar-hide::-webkit-scrollbar {
-  display: none;
-}
-.scrollbar-hide {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
+@keyframes phCtaGlow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 176, 32, 0.2), 0 8px 24px rgba(225, 53, 43, 0.22); }
+  50% { box-shadow: 0 0 0 8px rgba(255, 176, 32, 0), 0 0 34px rgba(255, 176, 32, 0.7), 0 12px 30px rgba(225, 53, 43, 0.35); }
 }
 
-/* soft pulse for skeleton/loading placeholders if needed later */
+@keyframes phCtaShine {
+  0% { transform: translateX(-140%) skewX(-18deg); opacity: 0; }
+  15% { opacity: 0.75; }
+  45%, 100% { transform: translateX(180%) skewX(-18deg); opacity: 0; }
+}
+
+/* The canvas now owns the real particle burst; keep the older CSS particle layer off. */
+.live-deal-celebration {
+  animation: phLiveDealBorder 2.1s ease-in-out infinite;
+  isolation: isolate;
+}
+main > div > div > section:has(> div > [class*="bg-gradient-to-r"]) .live-deal-celebration::after {
+  content: none !important;
+  animation: none !important;
+  background: none !important;
+}
+
+.live-deal-cta-glow {
+  animation: phCtaGlow 1.25s ease-in-out infinite;
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+.live-deal-cta-glow::after {
+  content: "";
+  position: absolute;
+  inset: -20% auto -20% -30%;
+  width: 24%;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.58), transparent);
+  animation: phCtaShine 2.2s ease-in-out infinite;
+}
+
+/* Override the previous pseudo-label implementation now that the CTA text is real JSX. */
+main > div > div > section:has(> div > [class*="bg-gradient-to-r"]) .live-deal-cta {
+  font-size: 12px !important;
+}
+main > div > div > section:has(> div > [class*="bg-gradient-to-r"]) .live-deal-cta::before {
+  content: none !important;
+}
+
+/* Dynamic stock bar uses the inline percentage calculated from Firestore stock. */
+
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
 @keyframes phSoftPulse {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.6;
-  }
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
 }
-.animate-soft-pulse {
-  animation: phSoftPulse 1.8s ease-in-out infinite;
+.animate-soft-pulse { animation: phSoftPulse 1.8s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .live-deal-celebration,
+  .live-deal-cta-glow,
+  .live-deal-cta-glow::after,
+  .animate-pulse-glow {
+    animation: none !important;
+  }
 }
