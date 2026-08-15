@@ -1,13 +1,14 @@
 'use client';
 
 import { useMemo } from 'react';
-import Link from 'next/link';
 import { Crown, Gem, Sparkles, SlidersHorizontal, Zap, Package } from 'lucide-react';
 import { useSettings } from '@/lib/useSettings';
 
 interface PriceBucketsProps {
   selectedMaxPrice: number | null;
+  wholesaleSelected: boolean;
   onSelect: (amount: number | null) => void;
+  onWholesaleSelect: () => void;
 }
 
 function bucketIcon(title: string) {
@@ -19,7 +20,7 @@ function bucketIcon(title: string) {
   return <Sparkles size={18} />;
 }
 
-export default function PriceBuckets({ selectedMaxPrice, onSelect }: PriceBucketsProps) {
+export default function PriceBuckets({ selectedMaxPrice, wholesaleSelected, onSelect, onWholesaleSelect }: PriceBucketsProps) {
   const { settings, loading } = useSettings();
   const buckets = useMemo(
     () => [...(settings.priceBuckets || [])].filter((bucket) => bucket.active).sort((a, b) => a.sortOrder - b.sortOrder).slice(0, 4),
@@ -35,13 +36,13 @@ export default function PriceBuckets({ selectedMaxPrice, onSelect }: PriceBucket
           <div className="mb-1 flex items-center gap-1.5 text-[#E1352B]"><Sparkles size={12} /><span className="text-[9px] font-black uppercase tracking-[0.2em]">Smart savings</span></div>
           <h2 className="text-xl font-black tracking-tight text-[#14140F]">Shop by budget</h2>
         </div>
-        {selectedMaxPrice !== null && <button type="button" onClick={() => onSelect(null)} className="inline-flex items-center gap-1.5 rounded-full bg-[#14140F] px-3 py-1.5 text-[10px] font-black text-white"><SlidersHorizontal size={12} />Clear</button>}
+        {(selectedMaxPrice !== null || wholesaleSelected) && <button type="button" onClick={() => { onSelect(null); if (wholesaleSelected) onWholesaleSelect(); }} className="inline-flex items-center gap-1.5 rounded-full bg-[#14140F] px-3 py-1.5 text-[10px] font-black text-white"><SlidersHorizontal size={12} />Clear</button>}
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {buckets.map((bucket) => {
           const wholesale = bucket.title.toLowerCase().includes('wholesale');
-          const selected = !wholesale && selectedMaxPrice === bucket.amount;
+          const selected = wholesale ? wholesaleSelected : selectedMaxPrice === bucket.amount && !wholesaleSelected;
           const accent = bucket.accent || (wholesale ? '#0F6A5F' : '#FFB020');
           const cardClass = 'relative w-full overflow-hidden rounded-[22px] border p-3.5 text-left transition active:scale-[0.98]';
           const inner = (
@@ -60,12 +61,8 @@ export default function PriceBuckets({ selectedMaxPrice, onSelect }: PriceBucket
               </p>
             </>
           );
-          return wholesale ? (
-            <Link key={bucket.id} href="/shop?wholesale=true" className={`${cardClass} border-black/6 bg-white text-[#14140F] shadow-[0_10px_28px_rgba(20,20,15,0.07)] hover:-translate-y-0.5`}>
-              {inner}
-            </Link>
-          ) : (
-            <button key={bucket.id} type="button" onClick={() => onSelect(selected ? null : (bucket.amount ?? null))} className={`${cardClass} ${selected ? 'border-[#14140F] bg-[#14140F] text-white shadow-[0_14px_32px_rgba(20,20,15,0.16)]' : 'border-black/6 bg-white text-[#14140F] shadow-[0_10px_28px_rgba(20,20,15,0.07)] hover:-translate-y-0.5'}`}>
+          return (
+            <button key={bucket.id} type="button" onClick={() => wholesale ? onWholesaleSelect() : onSelect(selected ? null : (bucket.amount ?? null))} className={`${cardClass} ${selected ? 'border-[#14140F] bg-[#14140F] text-white shadow-[0_14px_32px_rgba(20,20,15,0.16)]' : 'border-black/6 bg-white text-[#14140F] shadow-[0_10px_28px_rgba(20,20,15,0.07)] hover:-translate-y-0.5'}`}>
               {inner}
             </button>
           );
