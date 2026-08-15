@@ -23,19 +23,16 @@ jobs:
         shell: python
         run: |
           from pathlib import Path
-          import re
 
           path = Path('app/product/[id]/page.tsx')
           source = path.read_text(encoding='utf-8')
 
-          # Add per-card feedback state for the product-page weekly calendar.
           state_old = "  const [added, setAdded] = useState(false);\n  const [nowTick, setNowTick] = useState<number | null>(null);"
           state_new = "  const [added, setAdded] = useState(false);\n  const [weeklyAddedId, setWeeklyAddedId] = useState<string | null>(null);\n  const [nowTick, setNowTick] = useState<number | null>(null);"
           if state_old not in source:
               raise SystemExit('weeklyAddedId insertion point not found')
           source = source.replace(state_old, state_new, 1)
 
-          # Extract the existing celebration/unlock banner into one reusable JSX value.
           banner_start = '            {currentDeal && timing && nowTick !== null && ('
           banner_end = '\n\n            <div className="mt-5 flex flex-wrap items-center gap-2">'
           start = source.find(banner_start)
@@ -58,28 +55,31 @@ jobs:
               1,
           )
 
-          # On mobile, show the banner before the image. Desktop keeps it at the top of the details column.
           grid_marker = '        <div className="grid gap-5 px-3 md:grid-cols-[1.04fr_.96fr] md:px-5 md:pt-3">'
           if grid_marker not in source:
               raise SystemExit('product grid marker not found')
-          mobile_banner = '        <div className="px-3 pt-3 md:hidden">{celebrationBanner}</div>\n\n'
-          source = source.replace(grid_marker, mobile_banner + grid_marker, 1)
+          source = source.replace(
+              grid_marker,
+              '        <div className="px-3 pt-3 md:hidden">{celebrationBanner}</div>\n\n' + grid_marker,
+              1,
+          )
 
-          # Add a direct Zustand cart action for every card in the product-page calendar.
           handler_marker = '  if (loading) {'
           handler = '''  const addWeeklyDealToCart = (deal: WeeklyDeal) => {\n    const item = weeklyProducts[deal.productId];\n    if (!item) return;\n    const normal = Number(item.price || deal.originalPrice || 0);\n    const dealP = Number(deal.dealPrice || 0);\n    const itemTiming = nowTick !== null ? dealTiming(deal.day, new Date(nowTick)) : null;\n    const itemLive = Boolean(itemTiming?.isLive);\n    const price = itemLive && dealP > 0 ? dealP : normal;\n    const itemStock = Number(item.stock ?? item.quantity ?? item.inventory ?? 10);\n    if (price <= 0 || itemStock <= 0) return;\n    const image = item.imageUrl || (item as any)?.image || deal.imageUrl || '';\n    addItem({\n      id: item.id,\n      name: item.title || deal.title,\n      price,\n      originalPrice: itemLive ? Number((item as any).originalPrice || deal.originalPrice || price) : normal || price,\n      image,\n      imageUrl: image,\n      dealDay: itemLive ? deal.day : undefined,\n    });\n    setWeeklyAddedId(deal.id);\n    window.setTimeout(() => setWeeklyAddedId((current) => current === deal.id ? null : current), 1200);\n  };\n\n'''
           if handler_marker not in source:
               raise SystemExit('loading marker not found')
           source = source.replace(handler_marker, handler + handler_marker, 1)
 
-          # Replace the calendar's clickable whole-card Link with an article + image Link + real cart button.
-          pattern = re.compile(r'return <Link key=\\{deal\\.id\\} href=\\{`/product/\\$\\{deal\\.productId\\}`\\} className="group w-\\[210px\\][\\s\\S]*?</Link>; \\}\\)\\}</div></div></section>')
-          replacement = '''return <article key={deal.id} className="group w-[210px] shrink-0 snap-start overflow-hidden rounded-[22px] border border-black/8 bg-[#FCFCFA] transition hover:-translate-y-0.5 hover:shadow-md sm:w-[235px]">\n              <Link href={`/product/${deal.productId}`} className="block">\n                <div className="relative aspect-[4/3] overflow-hidden bg-[#F4F4F1]">{image ? <img src={image} alt={deal.title} className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]" /> : <div className="flex h-full items-center justify-center text-[9px] font-bold text-black/25">No image</div>}<span className={`absolute left-2 top-2 rounded-full px-2 py-1 text-[7px] font-black uppercase ${itemLive ? 'bg-[#E1352B] text-white' : 'bg-white/95 text-black'}`}>{itemLive ? '⚡ LIVE TODAY' : `🔒 ${WEEKDAY_LABELS[deal.day]}`}</span></div>\n              </Link>\n              <div className="p-3"><p className="text-[8px] font-black uppercase tracking-[0.16em] text-[#0F6A5F]">{WEEKDAY_LABELS[deal.day]} Deal</p><h3 className="mt-1 line-clamp-2 min-h-[36px] text-sm font-black">{item?.title || deal.title}</h3><div className="mt-2 flex flex-wrap items-baseline gap-2"><span className="font-[family-name:var(--font-mono)] text-base font-black text-[#E1352B]">{money(dealP)}</span>{normal > dealP && <span className="text-[9px] font-bold text-black/35 line-through">{money(normal)}</span>}</div>{itemSave > 0 && <p className="mt-1 text-[8px] font-black text-[#0F6A5F]">SAVE {itemSave}% • {money(normal - dealP)} off</p>}<div className="mt-2 flex items-center gap-1 text-[8px] font-bold text-black/40">{itemLive ? <Clock3 size={10} /> : <LockKeyhole size={10} />}{itemLive ? `Ends in ${itemCountdown ? `${itemCountdown.hours.toString().padStart(2, '0')}:${itemCountdown.minutes.toString().padStart(2, '0')}:${itemCountdown.seconds.toString().padStart(2, '0')}` : '—'}` : `Unlocks ${WEEKDAY_LABELS[deal.day]}`}</div><button type="button" disabled={!item || Number(item.stock ?? item.quantity ?? item.inventory ?? 10) <= 0 || weeklyAddedId === deal.id} onClick={(event) => { event.preventDefault(); event.stopPropagation(); addWeeklyDealToCart(deal); }} className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl bg-[#14140F] px-3 py-2.5 text-[8px] font-black uppercase text-white disabled:cursor-not-allowed disabled:opacity-40">{weeklyAddedId === deal.id ? '✓ ADDED TO CART' : '🛒 ADD TO CART'}</button></div>\n            </article>; })}</div></div></section>'''
-          updated, count = pattern.subn(replacement, source, count=1)
-          if count != 1:
-              raise SystemExit(f'weekly calendar card block not found (matches={count})')
-          source = updated
+          card_start = source.find('return <Link key={deal.id} href={`/product/${deal.productId}`')
+          card_end_marker = '</Link>; })}</div></div></section>'
+          card_end = source.find(card_end_marker, card_start)
+          if card_start < 0 or card_end < 0:
+              raise SystemExit(f'weekly calendar card block not found: start={card_start}, end={card_end}')
+          card_end += len(card_end_marker)
 
+          replacement = '''return <article key={deal.id} className="group w-[210px] shrink-0 snap-start overflow-hidden rounded-[22px] border border-black/8 bg-[#FCFCFA] transition hover:-translate-y-0.5 hover:shadow-md sm:w-[235px]">\n              <Link href={`/product/${deal.productId}`} className="block">\n                <div className="relative aspect-[4/3] overflow-hidden bg-[#F4F4F1]">{image ? <img src={image} alt={deal.title} className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]" /> : <div className="flex h-full items-center justify-center text-[9px] font-bold text-black/25">No image</div>}<span className={`absolute left-2 top-2 rounded-full px-2 py-1 text-[7px] font-black uppercase ${itemLive ? 'bg-[#E1352B] text-white' : 'bg-white/95 text-black'}`}>{itemLive ? '⚡ LIVE TODAY' : `🔒 ${WEEKDAY_LABELS[deal.day]}`}</span></div>\n              </Link>\n              <div className="p-3"><p className="text-[8px] font-black uppercase tracking-[0.16em] text-[#0F6A5F]">{WEEKDAY_LABELS[deal.day]} Deal</p><h3 className="mt-1 line-clamp-2 min-h-[36px] text-sm font-black">{item?.title || deal.title}</h3><div className="mt-2 flex flex-wrap items-baseline gap-2"><span className="font-[family-name:var(--font-mono)] text-base font-black text-[#E1352B]">{money(dealP)}</span>{normal > dealP && <span className="text-[9px] font-bold text-black/35 line-through">{money(normal)}</span>}</div>{itemSave > 0 && <p className="mt-1 text-[8px] font-black text-[#0F6A5F]">SAVE {itemSave}% • {money(normal - dealP)} off</p>}<div className="mt-2 flex items-center gap-1 text-[8px] font-bold text-black/40">{itemLive ? <Clock3 size={10} /> : <LockKeyhole size={10} />}{itemLive ? `Ends in ${itemCountdown ? `${itemCountdown.hours.toString().padStart(2, '0')}:${itemCountdown.minutes.toString().padStart(2, '0')}:${itemCountdown.seconds.toString().padStart(2, '0')}` : '—'}` : `Unlocks ${WEEKDAY_LABELS[deal.day]}`}</div><button type="button" disabled={!item || Number(item.stock ?? item.quantity ?? item.inventory ?? 10) <= 0 || weeklyAddedId === deal.id} onClick={(event) => { event.preventDefault(); event.stopPropagation(); addWeeklyDealToCart(deal); }} className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl bg-[#14140F] px-3 py-2.5 text-[8px] font-black uppercase text-white disabled:cursor-not-allowed disabled:opacity-40">{weeklyAddedId === deal.id ? '✓ ADDED TO CART' : '🛒 ADD TO CART'}</button></div>\n            </article>; })}</div></div></section>'''
+
+          source = source[:card_start] + replacement + source[card_end:]
           path.write_text(source, encoding='utf-8')
           print('Applied product-page mobile banner and weekly calendar cart changes.')
 
