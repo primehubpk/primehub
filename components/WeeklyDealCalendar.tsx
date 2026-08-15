@@ -29,7 +29,7 @@ export default function WeeklyDealCalendar({ weeklyDeals, weeklyProducts, nowTic
   const addDeal = (deal: WeeklyDeal) => {
     const item = weeklyProducts[deal.productId];
     const dealPrice = Number(deal.dealPrice || 0);
-    const stock = Number(item?.stock ?? item?.quantity ?? item?.inventory ?? 10);
+    const stock = item?.stock ?? 10;
     if (!item || dealPrice <= 0 || stock <= 0) return;
     const image = item.imageUrl || (item as any).image || ((item as any).images?.[0] ?? '');
     addItem({
@@ -66,7 +66,7 @@ export default function WeeklyDealCalendar({ weeklyDeals, weeklyProducts, nowTic
             const itemLive = Boolean(itemTiming?.isLive);
             const itemCountdown = itemTiming && nowTick !== null ? countdownParts(itemTiming.unlockAt.getTime() - nowTick) : null;
             const itemSave = discount(dealP, normal);
-            const stock = Number(item?.stock ?? item?.quantity ?? item?.inventory ?? 10);
+            const stock = item?.stock ?? 10;
             const canAdd = Boolean(item && dealP > 0 && stock > 0);
             return (
               <div key={deal.id} className="group w-[210px] shrink-0 snap-start overflow-hidden rounded-[22px] border border-black/8 bg-[#FCFCFA] transition hover:-translate-y-0.5 hover:shadow-md sm:w-[235px]">
