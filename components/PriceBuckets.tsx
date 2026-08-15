@@ -65,7 +65,7 @@ export default function PriceBuckets({ selectedMaxPrice, onSelect }: PriceBucket
               {inner}
             </Link>
           ) : (
-            <button key={bucket.id} type="button" onClick={() => onSelect(selected ? null : bucket.amount)} className={`${cardClass} ${selected ? 'border-[#14140F] bg-[#14140F] text-white shadow-[0_14px_32px_rgba(20,20,15,0.16)]' : 'border-black/6 bg-white text-[#14140F] shadow-[0_10px_28px_rgba(20,20,15,0.07)] hover:-translate-y-0.5'}`}>
+            <button key={bucket.id} type="button" onClick={() => onSelect(selected ? null : (bucket.amount ?? null))} className={`${cardClass} ${selected ? 'border-[#14140F] bg-[#14140F] text-white shadow-[0_14px_32px_rgba(20,20,15,0.16)]' : 'border-black/6 bg-white text-[#14140F] shadow-[0_10px_28px_rgba(20,20,15,0.07)] hover:-translate-y-0.5'}`}>
               {inner}
             </button>
           );
