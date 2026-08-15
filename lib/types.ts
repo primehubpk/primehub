@@ -14,7 +14,7 @@ export interface FreeDeliverySettings {
 export interface PriceBucket {
   id: string;
   title: string;
-  amount: number;
+  amount?: number | null;
   iconUrl: string;
   accent: string;
   sortOrder: number;
