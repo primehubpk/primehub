@@ -38,12 +38,12 @@ export default function PriceBuckets({ selectedMaxPrice, onSelect }: PriceBucket
         {selectedMaxPrice !== null && <button type="button" onClick={() => onSelect(null)} className="inline-flex items-center gap-1.5 rounded-full bg-[#14140F] px-3 py-1.5 text-[10px] font-black text-white"><SlidersHorizontal size={12} />Clear</button>}
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 md:flex md:gap-2.5 md:overflow-x-auto md:pb-2 md:[scrollbar-width:none]">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {buckets.map((bucket) => {
           const wholesale = bucket.title.toLowerCase().includes('wholesale');
           const selected = !wholesale && selectedMaxPrice === bucket.amount;
           const accent = bucket.accent || (wholesale ? '#0F6A5F' : '#FFB020');
-          const cardClass = 'relative min-w-0 overflow-hidden rounded-[22px] border p-3.5 text-left transition active:scale-[0.98] md:min-w-[148px] md:flex-1';
+          const cardClass = 'relative w-full overflow-hidden rounded-[22px] border p-3.5 text-left transition active:scale-[0.98]';
           const inner = (
             <>
               <div className="absolute -right-7 -top-7 h-24 w-24 rounded-full opacity-20 blur-md" style={{ background: accent }} />
