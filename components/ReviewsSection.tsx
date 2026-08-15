@@ -151,8 +151,7 @@ export default function ReviewsSection({ productId }: { productId: string }) {
       </form>
 
       <div className="mt-7 border-t border-black/8 pt-6">
-        <h3 className="text-sm font-black">Customer Reviews</h3>
-        <div className="mt-3 space-y-3">
+        <div className="space-y-3">
           {reviews.length === 0 && <p className="rounded-2xl bg-[#F4F4F1] p-4 text-xs font-bold text-black/45">No reviews yet. Be the first customer to share your experience.</p>}
           {reviews.map((review) => {
             const photo = review.imageUrl || review.photos?.[0] || '';
