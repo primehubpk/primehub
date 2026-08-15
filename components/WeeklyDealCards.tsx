@@ -59,7 +59,7 @@ export default function WeeklyDealCards({ deals, products, today, onAdded, added
           <p className="text-[8px] font-black uppercase tracking-[0.16em] text-[#E1352B]">{deal.day} Deal</p>
           <h3 className="mt-1.5 line-clamp-2 min-h-[40px] text-sm font-black">{title}</h3>
           <div className="mt-3 flex items-end gap-2"><span className="text-xl font-black text-[#E1352B]">Rs. {price.toLocaleString()}</span>{original > price && <span className="pb-0.5 text-xs text-black/35 line-through">Rs. {original.toLocaleString()}</span>}</div>
-          <button type="button" disabled={!inStock || addedId === deal.id} onClick={() => addToCart(deal)} className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-[#14140F] px-3 py-3 text-[10px] font-black text-white disabled:opacity-40">{addedId === deal.id ? <><Check size={14}/>ADDED TO CART</> : <><ShoppingCart size={14}/>ADD TO CART</>}</button>
+          <button type="button" disabled={!inStock || addedId === deal.id} onClick={() => addToCart(deal)} className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-[#14140F] px-3 py-3 text-[10px] font-black text-white disabled:cursor-not-allowed disabled:opacity-40" aria-label={`Add ${title} to cart`}>{addedId === deal.id ? <><Check size={14}/>ADDED TO CART</> : <><ShoppingCart size={14}/>ADD TO CART</>}</button>
         </div>
       </article>;
     })}
