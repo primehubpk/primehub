@@ -6,7 +6,6 @@ import { collection, doc, getDoc, getDocs } from 'firebase/firestore';
 import { Plus } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { useCartStore } from '@/lib/cartStore';
-import ReviewsSection from '@/components/ReviewsSection';
 
 type Product = {
   id: string;
@@ -168,7 +167,6 @@ export default function RecentlyViewed({ excludeId }: { excludeId?: string }) {
 
   return (
     <>
-      {excludeId && <ReviewsSection productId={excludeId} />}
       <SimilarRail products={similar} />
       <DiscoveryFeed products={selected} />
       <RecentRail products={recent.slice(0, 12)} />
