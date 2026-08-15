@@ -34,6 +34,8 @@ import { WEEKDAY_LABELS, WEEKDAY_ORDER, countdownParts, dealTiming } from '@/lib
 import type { Product as SharedProduct, WeeklyDeal } from '@/lib/types';
 import RecentlyViewed, { rememberProduct } from '@/components/RecentlyViewed';
 import ReviewsSection from '@/components/ReviewsSection';
+import MobileLiveDealBanner from '@/components/MobileLiveDealBanner';
+import WeeklyDealCalendar from '@/components/WeeklyDealCalendar';
 
 type Product = SharedProduct & {
   name?: string;
@@ -170,31 +172,15 @@ export default function ProductDetailPage() {
 
   useEffect(() => {
     if (!liveDeal || !confettiCanvasRef.current || typeof window === 'undefined') return;
-
     const canvas = confettiCanvasRef.current;
     const context = canvas.getContext('2d');
     if (!context) return;
-
-    let frame = 0;
     let animationFrame = 0;
     const startedAt = performance.now();
     const duration = 3000;
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const particles: Array<{
-      x: number;
-      y: number;
-      vx: number;
-      vy: number;
-      size: number;
-      rotation: number;
-      rotationSpeed: number;
-      gravity: number;
-      drag: number;
-      color: string;
-      shape: number;
-    }> = [];
+    const particles: Array<{ x: number; y: number; vx: number; vy: number; size: number; rotation: number; rotationSpeed: number; gravity: number; drag: number; color: string; shape: number }> = [];
     const colors = ['#FFD166', '#FFB020', '#E1352B', '#0F6A5F', '#FFFFFF', '#FF6B35'];
-
     const resize = () => {
       canvas.width = Math.floor(window.innerWidth * dpr);
       canvas.height = Math.floor(window.innerHeight * dpr);
@@ -202,71 +188,42 @@ export default function ProductDetailPage() {
       canvas.style.height = `${window.innerHeight}px`;
       context.setTransform(dpr, 0, 0, dpr, 0, 0);
     };
-
     const burst = (originX: number, direction: number) => {
       for (let i = 0; i < 85; i += 1) {
         const angle = (-Math.PI / 2) + direction * (Math.random() * 0.95 - 0.48);
         const speed = 7 + Math.random() * 11;
-        particles.push({
-          x: originX + (Math.random() - 0.5) * 16,
-          y: window.innerHeight - 18,
-          vx: Math.cos(angle) * speed,
-          vy: Math.sin(angle) * speed,
-          size: 4 + Math.random() * 6,
-          rotation: Math.random() * Math.PI,
-          rotationSpeed: (Math.random() - 0.5) * 0.28,
-          gravity: 0.2 + Math.random() * 0.12,
-          drag: 0.985,
-          color: colors[Math.floor(Math.random() * colors.length)],
-          shape: Math.random(),
-        });
+        particles.push({ x: originX + (Math.random() - 0.5) * 16, y: window.innerHeight - 18, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, size: 4 + Math.random() * 6, rotation: Math.random() * Math.PI, rotationSpeed: (Math.random() - 0.5) * 0.28, gravity: 0.2 + Math.random() * 0.12, drag: 0.985, color: colors[Math.floor(Math.random() * colors.length)], shape: Math.random() });
       }
     };
-
     resize();
     burst(window.innerWidth * 0.07, 1);
     burst(window.innerWidth * 0.93, -1);
     window.addEventListener('resize', resize);
-
     const draw = (now: number) => {
       const elapsed = now - startedAt;
       context.clearRect(0, 0, window.innerWidth, window.innerHeight);
-
       particles.forEach((particle) => {
         particle.vx *= particle.drag;
         particle.vy += particle.gravity;
         particle.x += particle.vx;
         particle.y += particle.vy;
         particle.rotation += particle.rotationSpeed;
-
         context.save();
         context.translate(particle.x, particle.y);
         context.rotate(particle.rotation);
         context.globalAlpha = Math.max(0, Math.min(1, 1 - Math.max(0, elapsed - 1700) / 1300));
         context.fillStyle = particle.color;
-        if (particle.shape > 0.5) {
-          context.fillRect(-particle.size / 2, -particle.size / 2, particle.size, particle.size * 0.62);
-        } else {
-          context.beginPath();
-          context.arc(0, 0, particle.size / 2, 0, Math.PI * 2);
-          context.fill();
-        }
+        if (particle.shape > 0.5) context.fillRect(-particle.size / 2, -particle.size / 2, particle.size, particle.size * 0.62);
+        else { context.beginPath(); context.arc(0, 0, particle.size / 2, 0, Math.PI * 2); context.fill(); }
         context.restore();
       });
-
-      if (elapsed < duration) {
-        animationFrame = window.requestAnimationFrame(draw);
-      } else {
-        context.clearRect(0, 0, window.innerWidth, window.innerHeight);
-      }
+      if (elapsed < duration) animationFrame = window.requestAnimationFrame(draw);
+      else context.clearRect(0, 0, window.innerWidth, window.innerHeight);
     };
-
     animationFrame = window.requestAnimationFrame(draw);
-
     return () => {
       window.removeEventListener('resize', resize);
       window.cancelAnimationFrame(animationFrame);
-      cancelAnimationFrame(frame);
       context.clearRect(0, 0, window.innerWidth, window.innerHeight);
     };
   }, [liveDeal]);
@@ -274,15 +231,7 @@ export default function ProductDetailPage() {
   const addProduct = () => {
     if (!product || currentPrice <= 0 || stock === 0) return;
     const image = images[0] || product.imageUrl || product.image || '';
-    const cartItem = {
-      id: product.id,
-      name: titleOf(product),
-      price: currentPrice,
-      originalPrice: liveDeal && savingsAmount > 0 ? normalForDeal : productOriginal || currentPrice,
-      image,
-      imageUrl: image,
-      dealDay: liveDeal && currentDeal ? currentDeal.day : undefined,
-    };
+    const cartItem = { id: product.id, name: titleOf(product), price: currentPrice, originalPrice: liveDeal && savingsAmount > 0 ? normalForDeal : productOriginal || currentPrice, image, imageUrl: image, dealDay: liveDeal && currentDeal ? currentDeal.day : undefined };
     for (let i = 0; i < quantity; i += 1) addItem(cartItem);
     setAdded(true);
     window.setTimeout(() => setAdded(false), 1200);
@@ -296,16 +245,7 @@ export default function ProductDetailPage() {
 
   const buyWhatsApp = () => {
     if (!product || currentPrice <= 0 || stock === 0) return;
-    const text = [
-      '🛍️ PrimeHub Deals — Product Order', '',
-      `Product: ${titleOf(product)}`,
-      `Quantity: ${quantity}`,
-      `Price: ${money(currentPrice)}`,
-      `Total: ${money(currentPrice * quantity)}`,
-      currentDeal ? `Weekly Deal: ${WEEKDAY_LABELS[currentDeal.day]}${liveDeal ? ' — LIVE' : ' — locked'}` : '',
-      `Product ID: ${product.id}`, '',
-      'I want to order this product.',
-    ].filter(Boolean).join('\n');
+    const text = ['🛍️ PrimeHub Deals — Product Order', '', `Product: ${titleOf(product)}`, `Quantity: ${quantity}`, `Price: ${money(currentPrice)}`, `Total: ${money(currentPrice * quantity)}`, currentDeal ? `Weekly Deal: ${WEEKDAY_LABELS[currentDeal.day]}${liveDeal ? ' — LIVE' : ' — locked'}` : '', `Product ID: ${product.id}`, '', 'I want to order this product.'].filter(Boolean).join('\n');
     const target = whatsappNumber ? `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(text)}` : `https://wa.me/?text=${encodeURIComponent(text)}`;
     window.open(target, '_blank', 'noopener,noreferrer');
   };
@@ -325,6 +265,8 @@ export default function ProductDetailPage() {
       {liveDeal && <canvas ref={confettiCanvasRef} aria-hidden="true" className="pointer-events-none fixed inset-0 z-[200] h-full w-full" />}
       <div className="mx-auto max-w-6xl">
         <header className="sticky top-0 z-30 flex items-center justify-between bg-[#F4F4F1]/92 px-3 py-3 backdrop-blur md:px-5"><Link href="/" className="flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-sm" aria-label="Back to home"><ArrowLeft size={17} /></Link><span className="text-[10px] font-black uppercase tracking-[0.24em] text-black/40">PrimeHub Product</span><button type="button" onClick={() => setWished((v) => !v)} className="flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-sm" aria-label={wished ? 'Remove from wishlist' : 'Add to wishlist'}><Heart size={17} className={wished ? 'text-[#E1352B]' : 'text-[#14140F]'} fill={wished ? 'currentColor' : 'none'} /></button></header>
+
+        <MobileLiveDealBanner live={liveDeal} countdown={countdown} />
 
         <div className="grid gap-5 px-3 md:grid-cols-[1.04fr_.96fr] md:px-5 md:pt-3">
           <section className="overflow-hidden rounded-[30px] border border-black/7 bg-white shadow-sm md:sticky md:top-[66px] md:self-start">
@@ -353,7 +295,7 @@ export default function ProductDetailPage() {
         </div>
       </div>
 
-      <section className="mx-auto mt-8 max-w-6xl px-3 md:px-5"><div className="rounded-[30px] border border-black/7 bg-white p-4 shadow-sm sm:p-5"><div className="flex items-end justify-between gap-3"><div><p className="text-[9px] font-black uppercase tracking-[0.22em] text-[#E1352B]">Weekly Deal Calendar</p><h2 className="mt-1 text-2xl font-black">🔥 Explore All Weekly Deals</h2><p className="mt-1 text-[10px] font-bold text-black/40">All seven days, one premium deal destination.</p></div><Link href="/weekly-deals" className="shrink-0 text-[9px] font-black uppercase tracking-wider text-[#0F6A5F]">View all</Link></div><div className="mt-5 flex snap-x gap-3 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">{weeklyDeals.map((deal) => { const item = weeklyProducts[deal.productId]; const image = item?.imageUrl || (item as any)?.image || deal.imageUrl || ''; const normal = Number(item?.price || deal.originalPrice || 0); const dealP = Number(deal.dealPrice || 0); const itemTiming = nowTick !== null ? dealTiming(deal.day, new Date(nowTick)) : null; const itemLive = Boolean(itemTiming?.isLive); const itemCountdown = itemTiming && nowTick !== null ? countdownParts(itemTiming.unlockAt.getTime() - nowTick) : null; const itemSave = dealDiscount(dealP, normal); return <Link key={deal.id} href={`/product/${deal.productId}`} className="group w-[210px] shrink-0 snap-start overflow-hidden rounded-[22px] border border-black/8 bg-[#FCFCFA] transition hover:-translate-y-0.5 hover:shadow-md sm:w-[235px]"><div className="relative aspect-[4/3] overflow-hidden bg-[#F4F4F1]">{image ? <img src={image} alt={deal.title} className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.03]" /> : <div className="flex h-full items-center justify-center text-[9px] font-bold text-black/25">No image</div>}<span className={`absolute left-2 top-2 rounded-full px-2 py-1 text-[7px] font-black uppercase ${itemLive ? 'bg-[#E1352B] text-white' : 'bg-white/95 text-black'}`}>{itemLive ? '⚡ LIVE TODAY' : `🔒 ${WEEKDAY_LABELS[deal.day]}`}</span></div><div className="p-3"><p className="text-[8px] font-black uppercase tracking-[0.16em] text-[#0F6A5F]">{WEEKDAY_LABELS[deal.day]} Deal</p><h3 className="mt-1 line-clamp-2 min-h-[36px] text-sm font-black">{item?.title || deal.title}</h3><div className="mt-2 flex flex-wrap items-baseline gap-2"><span className="font-[family-name:var(--font-mono)] text-base font-black text-[#E1352B]">{money(dealP)}</span>{normal > dealP && <span className="text-[9px] font-bold text-black/35 line-through">{money(normal)}</span>}</div>{itemSave > 0 && <p className="mt-1 text-[8px] font-black text-[#0F6A5F]">SAVE {itemSave}% • {money(normal - dealP)} off</p>}<div className="mt-2 flex items-center gap-1 text-[8px] font-bold text-black/40">{itemLive ? <Clock3 size={10} /> : <LockKeyhole size={10} />}{itemLive ? `Ends in ${itemCountdown ? `${itemCountdown.hours.toString().padStart(2, '0')}:${itemCountdown.minutes.toString().padStart(2, '0')}:${itemCountdown.seconds.toString().padStart(2, '0')}` : '—'}` : `Unlocks ${WEEKDAY_LABELS[deal.day]}`}</div></div></Link>; })}</div></div></section>
+      <WeeklyDealCalendar weeklyDeals={weeklyDeals} weeklyProducts={weeklyProducts} nowTick={nowTick} />
 
       <RecentlyViewed excludeId={id} />
       <ReviewsSection productId={id} />
