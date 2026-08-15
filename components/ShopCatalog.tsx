@@ -7,6 +7,8 @@ import { Search, SlidersHorizontal, X, ChevronRight, ShoppingBag, Check } from '
 import { db } from '@/lib/firebase';
 import { useSettings } from '@/lib/useSettings';
 import { useCartStore } from '@/lib/cartStore';
+import { useSearchParams } from 'next/navigation';
+import WholesaleBadge from '@/components/WholesaleBadge';
 
 type Product = {
   id: string;
@@ -23,6 +25,7 @@ type Product = {
   isFlashSale?: boolean;
   stock?: number;
   quantity?: number;
+  isWholesale?: boolean;
   [key: string]: any;
 };
 
@@ -70,6 +73,8 @@ export default function ShopCatalog({
   const [onlyDeals, setOnlyDeals] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [addedId, setAddedId] = useState<string | null>(null);
+  const searchParams = useSearchParams();
+  const wholesaleOnly = searchParams.get('wholesale') === 'true';
 
   useEffect(() => {
     let cancelled = false;
@@ -106,9 +111,10 @@ export default function ShopCatalog({
       const price = priceOf(p);
       const matchesPrice = maxPrice === 'all' || price <= Number(maxPrice);
       const matchesDeal = !onlyDeals || Boolean(p.isFlashSale);
-      return matchesSearch && selectedCat && matchesPrice && matchesDeal;
+      const matchesWholesale = !wholesaleOnly || Boolean(p.isWholesale);
+      return matchesSearch && selectedCat && matchesPrice && matchesDeal && matchesWholesale;
     });
-  }, [products, search, category, maxPrice, onlyDeals]);
+    }, [products, search, category, maxPrice, onlyDeals, wholesaleOnly]);
 
   const addProduct = (product: Product) => {
     const image = imageOf(product);
@@ -195,6 +201,7 @@ export default function ShopCatalog({
                         {image ? <img src={image} alt={titleOf(product)} loading="lazy" className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]" /> : <div className="flex h-full items-center justify-center text-[10px] font-bold text-black/25">No image</div>}
                         {discount > 0 && <span className="absolute left-2 top-2 rounded-full bg-[#E1352B] px-2 py-1 text-[8px] font-black text-white">-{discount}%</span>}
                         {product.isFlashSale && <span className="absolute right-2 top-2 rounded-full bg-[#14140F] px-2 py-1 text-[8px] font-black text-white">FLASH</span>}
+                        {product.isWholesale && <WholesaleBadge />}
                       </div>
                       <div className="p-3 pb-1"><p className="line-clamp-2 min-h-[30px] text-[11px] font-black leading-4">{titleOf(product)}</p><div className="mt-2 flex flex-wrap items-end gap-1.5"><span className="font-[family-name:var(--font-mono)] text-sm font-black text-[#E1352B]">Rs. {price.toLocaleString()}</span>{original > price && <span className="text-[9px] text-black/30 line-through">Rs. {original.toLocaleString()}</span>}</div></div>
                     </Link>
