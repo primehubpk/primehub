@@ -60,6 +60,221 @@ body {
 }
 
 /* =====================================================================
+   SECTION: LIVE DEAL FESTIVE CELEBRATION
+   Product detail only: these selectors intentionally require the
+   existing LIVE TODAY gradient banner. Locked/non-live product pages
+   keep their standard appearance.
+
+   Performance: only transform/opacity/box-shadow are animated; the
+   particle burst is a tiny CSS effect with no JS timer or canvas loop.
+===================================================================== */
+@keyframes phLiveDealBorder {
+  0%,
+  100% {
+    box-shadow: 0 0 0 1px rgba(255, 176, 32, 0.2), 0 10px 28px rgba(225, 53, 43, 0.16);
+  }
+  50% {
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.7), 0 0 28px rgba(255, 176, 32, 0.34), 0 14px 34px rgba(15, 106, 95, 0.18);
+  }
+}
+
+@keyframes phCelebrationParticles {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 14px, 0) scale(0.35) rotate(0deg);
+  }
+  12% {
+    opacity: 1;
+  }
+  55% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(0, -54px, 0) scale(1) rotate(24deg);
+  }
+}
+
+@keyframes phCelebrationShimmer {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(120%);
+  }
+}
+
+@keyframes phLootPulse {
+  0%,
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(225, 53, 43, 0.18);
+  }
+  50% {
+    transform: scale(1.025);
+    box-shadow: 0 0 0 7px rgba(225, 53, 43, 0);
+  }
+}
+
+@keyframes phCtaShine {
+  0% {
+    transform: translateX(-130%) skewX(-18deg);
+    opacity: 0;
+  }
+  15% {
+    opacity: 0.7;
+  }
+  45%,
+  100% {
+    transform: translateX(180%) skewX(-18deg);
+    opacity: 0;
+  }
+}
+
+/* The right-hand product-detail card is uniquely identified by the
+   existing gradient LIVE TODAY banner. */
+main > div > div > section:has(> div > [class*="bg-gradient-to-r"]) {
+  position: relative;
+}
+
+main > div > div > section:has(> div > [class*="bg-gradient-to-r"]) > div > [class*="bg-gradient-to-r"] {
+  animation: phLiveDealBorder 2.4s ease-in-out infinite;
+  isolation: isolate;
+}
+
+/* Lightweight 2–3 second party-popper burst on mount. */
+main > div > div > section:has(> div > [class*="bg-gradient-to-r"]) > div > [class*="bg-gradient-to-r"]::after {
+  content: "";
+  position: absolute;
+  inset: 18% 8% 22%;
+  z-index: 3;
+  pointer-events: none;
+  opacity: 0;
+  background-image:
+    radial-gradient(circle, #ffb020 0 2px, transparent 2.8px),
+    radial-gradient(circle, #ffffff 0 2px, transparent 2.8px),
+    radial-gradient(circle, #e1352b 0 2px, transparent 2.8px),
+    radial-gradient(circle, #0f6a5f 0 2px, transparent 2.8px),
+    radial-gradient(circle, #ffffff 0 1.5px, transparent 2.4px);
+  background-position: 8% 80%, 26% 70%, 55% 82%, 76% 68%, 94% 78%;
+  background-size: 13px 13px, 17px 17px, 11px 11px, 15px 15px, 9px 9px;
+  background-repeat: no-repeat;
+  animation: phCelebrationParticles 2.7s cubic-bezier(0.2, 0.75, 0.35, 1) 1 both;
+  will-change: transform, opacity;
+}
+
+/* Animated light sweep gives the live banner a premium festive shimmer. */
+main > div > div > section:has(> div > [class*="bg-gradient-to-r"]) > div > [class*="bg-gradient-to-r"] > [class*="bg-[#14140F]"] {
+  position: relative;
+  overflow: hidden;
+}
+
+main > div > div > section:has(> div > [class*="bg-gradient-to-r"]) > div > [class*="bg-gradient-to-r"] > [class*="bg-[#14140F]"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: 38%;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.16), transparent);
+  animation: phCelebrationShimmer 2.8s ease-in-out infinite;
+}
+
+/* Celebration tag + party emojis above the LIVE TODAY title. */
+main > div > div > section:has(> div > [class*="bg-gradient-to-r"]) > div > [class*="bg-gradient-to-r"] > [class*="bg-[#14140F]"] > div > div:first-child::before {
+  content: "🎉 MEGA CELEBRATION SALE — LOWEST PRICE EVER!";
+  display: inline-flex;
+  margin-bottom: 6px;
+  border: 1px solid rgba(255,255,255,0.14);
+  border-radius: 999px;
+  padding: 5px 9px;
+  background: rgba(255,255,255,0.08);
+  color: rgba(255,255,255,0.78);
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  line-height: 1.1;
+}
+
+main > div > div > section:has(> div > [class*="bg-gradient-to-r"]) > div > [class*="bg-gradient-to-r"] > [class*="bg-[#14140F]"] > div > div:first-child::after {
+  content: "🎉 🎆 💥";
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  pointer-events: none;
+  font-size: 17px;
+  letter-spacing: 3px;
+  opacity: 0.9;
+}
+
+/* Loot badge next to the live deal price. */
+main > div > div > section:has(> div > [class*="bg-gradient-to-r"]) > div > [class*="rounded-[24px]"] span[class*="text-3xl"] {
+  display: inline-block;
+  position: relative;
+}
+
+main > div > div > section:has(> div > [class*="bg-gradient-to-r"]) > div > [class*="rounded-[24px]"] span[class*="text-3xl"]::after {
+  content: "💣 LOOT DEAL!";
+  display: inline-flex;
+  margin-left: 9px;
+  vertical-align: middle;
+  border-radius: 999px;
+  padding: 5px 8px;
+  background: #14140f;
+  color: #ffffff;
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  animation: phLootPulse 1.6s ease-in-out infinite;
+}
+
+/* Pulse only the SAVE badge in the live-deal pricing card. */
+main > div > div > section:has(> div > [class*="bg-gradient-to-r"]) > div > [class*="rounded-[24px]"] span[class*="bg-[#0F6A5F]"][class*="px-3"][class*="py-1.5"] {
+  animation: phLootPulse 1.8s ease-in-out infinite;
+}
+
+/* Live primary CTA becomes CLAIM DEAL NOW and gets a restrained shine. */
+main > div > div > section:has(> div > [class*="bg-gradient-to-r"]) > div > [class*="mt-4"] button:first-child {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+main > div > div > section:has(> div > [class*="bg-gradient-to-r"]) > div > [class*="mt-4"] button:first-child::after {
+  content: "";
+  position: absolute;
+  inset: -20% auto -20% -30%;
+  width: 22%;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.5), transparent);
+  animation: phCtaShine 2.6s ease-in-out infinite;
+}
+
+main > div > div > section:has(> div > [class*="bg-gradient-to-r"]) > div > [class*="mt-4"] button:first-child {
+  font-size: 0;
+}
+
+main > div > div > section:has(> div > [class*="bg-gradient-to-r"]) > div > [class*="mt-4"] button:first-child::before {
+  content: "🎉 CLAIM DEAL NOW";
+  position: relative;
+  z-index: 2;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+/* Keep all celebration motion disabled for users who request reduced motion. */
+@media (prefers-reduced-motion: reduce) {
+  main > div > div > section:has(> div > [class*="bg-gradient-to-r"]) > div > [class*="bg-gradient-to-r"],
+  main > div > div > section:has(> div > [class*="bg-gradient-to-r"]) > div > [class*="bg-gradient-to-r"]::after,
+  main > div > div > section:has(> div > [class*="bg-gradient-to-r"]) > div > [class*="bg-gradient-to-r"] > [class*="bg-[#14140F]"]::after,
+  main > div > div > section:has(> div > [class*="bg-gradient-to-r"]) > div > [class*="rounded-[24px]"] span[class*="text-3xl"]::after,
+  main > div > div > section:has(> div > [class*="bg-gradient-to-r"]) > div > [class*="rounded-[24px]"] span[class*="bg-[#0F6A5F]"][class*="px-3"][class*="py-1.5"],
+  main > div > div > section:has(> div > [class*="bg-gradient-to-r"]) > div > [class*="mt-4"] button:first-child::after {
+    animation: none;
+  }
+}
+
+/* =====================================================================
    SECTION: MISC UTILITIES
 ===================================================================== */
 
