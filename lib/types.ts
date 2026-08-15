@@ -1,6 +1,6 @@
 // lib/types.ts
 // Shared TypeScript shapes for our Firestore collections.
-// Used by both the admin panel and the storefront components so both
+// Used by both the admin panel and storefront components so both
 // sides always agree on what a Product / Category / Order / Settings
 // document looks like.
 
@@ -14,7 +14,7 @@ export interface FreeDeliverySettings {
 export interface PriceBucket {
   id: string;
   title: string;
-  amount: number;
+  amount?: number | null;
   iconUrl: string;
   accent: string;
   sortOrder: number;
@@ -83,14 +83,14 @@ export interface SiteSettings {
     returnPolicy?: PolicyPageContent;
   };
   announcementText: string;
-  whatsappNumber: string; // digits only, no + or leading zeros
+  whatsappNumber: string;
   freeShippingCount: number;
   heroTitle: string;
   heroDiscountText: string;
-  heroCountdownEndTime: string; // ISO date string, e.g. "2026-08-10T20:00:00"
-  heroImageUrl: string; // Daily deal / hero creative, managed from Admin
-  heroButtonText: string; // CTA label
-  heroButtonLink: string; // CTA destination
+  heroCountdownEndTime: string;
+  heroImageUrl: string;
+  heroButtonText: string;
+  heroButtonLink: string;
 }
 
 export interface Product {
@@ -102,8 +102,9 @@ export interface Product {
   stock: number;
   isWeekendSpecial: boolean;
   isFlashSale: boolean;
+  isWholesale?: boolean;
   imageUrl: string;
-  videoUrl?: string; // optional YouTube Shorts / Instagram Reel / direct .mp4 link
+  videoUrl?: string;
 }
 
 export interface Category {
