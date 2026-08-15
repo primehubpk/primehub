@@ -2,7 +2,7 @@
 
 import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react';
 import { onSnapshot } from 'firebase/firestore';
-import { Check, Edit3, ImagePlus, Loader2, Minus, Plus, Search, Star, Tag, Trash2, X } from 'lucide-react';
+import { Edit3, ImagePlus, Loader2, Plus, Search, Star, Tag, Trash2, X } from 'lucide-react';
 import { adminCollection, createAdminDocument, deleteAdminDocument, getAdminDocument, setAdminDocument, type Product, updateAdminDocument, uploadImageToImgBB } from './shared';
 import type { DailyDeal, PriceBucket, Weekday, WeeklyDeal } from '@/lib/types';
 
@@ -62,23 +62,24 @@ export default function ProductsManager() {
 
   const shown = useMemo(() => products.filter(product => product.title.toLowerCase().includes(query.toLowerCase()) || String(product.category || '').toLowerCase().includes(query.toLowerCase())), [products, query]);
   const gallery = useMemo(() => media.filter(asset => `${asset.name || ''} ${asset.url}`.toLowerCase().includes(gallerySearch.toLowerCase())), [media, gallerySearch]);
-  const selectedImages = form.images;
 
   useEffect(() => {
-    const existing = new Map(variantRows.map(row => [`${row.color}::${row.size}`, row]));
-    const next: VariantRow[] = [];
-    colors.filter(color => color.name.trim()).forEach(color => sizes.forEach(size => {
-      const key = `${color.name.trim()}::${size}`;
-      const old = existing.get(key);
-      next.push({ id: old?.id || makeId(), color: color.name.trim(), size, stock: old?.stock ?? form.stock || '10', imageUrl: color.imageUrl || selectedImages[0] || '' });
-    }));
-    setVariantRows(next);
-  }, [colors, sizes]);
+    setVariantRows(current => {
+      const existing = new Map(current.map(row => [`${row.color}::${row.size}`, row]));
+      const next: VariantRow[] = [];
+      colors.filter(color => color.name.trim()).forEach(color => sizes.forEach(size => {
+        const key = `${color.name.trim()}::${size}`;
+        const old = existing.get(key);
+        next.push({ id: old?.id || makeId(), color: color.name.trim(), size, stock: old?.stock ?? (form.stock || '10'), imageUrl: color.imageUrl || form.images[0] || '' });
+      }));
+      return next;
+    });
+  }, [colors, sizes, form.stock, form.images]);
 
   function change(key: keyof typeof EMPTY_FORM, value: string | boolean | string[]) { setForm(current => ({ ...current, [key]: value })); }
   function toggleSize(size: string) { setSizes(current => current.includes(size) ? current.filter(item => item !== size) : [...current, size]); }
   function addCustomSize() { const value = customSize.trim(); if (!value || sizes.includes(value)) return; setSizes(current => [...current, value]); setCustomSize(''); }
-  function addColor() { const name = colorDraft.trim(); if (!name || colors.some(color => color.name.toLowerCase() === name.toLowerCase())) return; setColors(current => [...current, { id: makeId(), name, imageUrl: selectedImages[0] || '' }]); setColorDraft(''); }
+  function addColor() { const name = colorDraft.trim(); if (!name || colors.some(color => color.name.toLowerCase() === name.toLowerCase())) return; setColors(current => [...current, { id: makeId(), name, imageUrl: form.images[0] || '' }]); setColorDraft(''); }
   function removeColor(id: string) { setColors(current => current.filter(color => color.id !== id)); }
   function setColorImage(id: string, imageUrl: string) { setColors(current => current.map(color => color.id === id ? { ...color, imageUrl } : color)); }
   function removeVariantRow(id: string) { setVariantRows(current => current.filter(row => row.id !== id)); }
