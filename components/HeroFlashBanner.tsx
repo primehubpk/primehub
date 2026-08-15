@@ -97,7 +97,7 @@ export default function HeroFlashBanner() {
                   <span className="block text-[12px] font-black text-[#E1352B]">Rs. {dealPrice.toLocaleString()}</span>
                   <span className="mt-0.5 block text-[7px] font-black uppercase tracking-[0.08em] text-black/40">Normal Price</span>
                   <span className="block text-[9px] font-bold text-black/40 line-through">Rs. {normalPrice.toLocaleString()}</span>
-                  <button type="button" onClick={() => addDealToCart(deal)} className="mt-2 inline-flex items-center gap-1 rounded-full bg-[#14140F] px-2.5 py-1.5 text-[7px] font-black uppercase tracking-[0.08em] text-white hover:bg-[#0F6A5F]"><ShoppingCart size={8}/> Add to Cart</button>
+                  <button type="button" onClick={(event) => { event.preventDefault(); event.stopPropagation(); addDealToCart(deal); }} className="mt-2 inline-flex items-center gap-1 rounded-full bg-[#14140F] px-2.5 py-1.5 text-[7px] font-black uppercase tracking-[0.08em] text-white hover:bg-[#0F6A5F]"><ShoppingCart size={8}/> Add to Cart</button>
                   {timing && !isLive && <span className="sr-only">Unlocks {WEEKDAY_LABELS[key]} at the next weekly cycle.</span>}
                 </>}
               </span>
@@ -107,6 +107,29 @@ export default function HeroFlashBanner() {
       </div>
     </section>
 
-    {bigDeal?.active && bigDeal.title && <section className="group mx-4 mt-4 block overflow-hidden rounded-[30px] bg-[#0F6A5F] text-white shadow-[0_20px_52px_rgba(15,106,95,0.22)]"><div className="relative min-h-[390px] overflow-hidden">{bigDeal.imageUrl && <img src={bigDeal.imageUrl} alt={bigDeal.title} className="absolute inset-0 h-full w-full object-cover object-center opacity-95 transition duration-700 group-hover:scale-[1.02]" />}<div className="absolute inset-0 bg-gradient-to-t from-[#0B4F47]/94 via-[#0F6A5F]/28 to-transparent" /><div className="relative flex min-h-[390px] flex-col justify-end p-5 sm:p-8"><div className="mb-auto flex items-center justify-between gap-3"><span className="rounded-full bg-white/95 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.16em] text-[#0F6A5F]">Big Deal</span><span className="rounded-full bg-[#FFD16A] px-3 py-1.5 text-xs font-black text-[#14140F]">{discount > 0 ? `-${discount}% OFF` : 'LIMITED TIME'}</span></div><div className="max-w-lg"><h2 className="text-3xl font-black leading-none tracking-tight sm:text-5xl">{bigDeal.title}</h2><div className="mt-4 flex items-end gap-3"><span className="text-3xl font-black text-[#FFD16A]">Rs. {Number(bigDeal.dealPrice).toLocaleString()}</span>{Number(bigDeal.originalPrice) > Number(bigDeal.dealPrice) && <span className="pb-1 text-sm text-white/60 line-through">Rs. {Number(bigDeal.originalPrice).toLocaleString()}</span>}</div><div className="mt-4 flex flex-wrap items-center gap-2"><div className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-black/15 px-3 py-2.5 backdrop-blur-md"><Clock3 size={14}/><span className="text-[10px] font-bold uppercase tracking-wider text-white/80">Ends in</span><span className="font-[family-name:var(--font-mono)] text-sm font-bold">{String(countdown.hours + countdown.days * 24).padStart(2,'0')}:{String(countdown.minutes).padStart(2,'0')}:{String(countdown.seconds).padStart(2,'0')}</span></div><button type="button" onClick={addBigDealToCart} disabled={!bigDeal.productId} className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-xs font-black text-[#0F6A5F] disabled:cursor-not-allowed disabled:opacity-60"><ShoppingCart size={14}/> Add to Cart</button></div></div></div></div></section>}
+    {bigDeal?.active && bigDeal.title && <section className="mx-4 mt-4 overflow-hidden rounded-[30px] border border-black/8 bg-white shadow-[0_20px_52px_rgba(20,20,15,0.12)]">
+      <Link href={`/product/${bigDeal.productId}`} aria-label={`View ${bigDeal.title}`} className="group relative block aspect-[16/9] min-h-[240px] overflow-hidden bg-[#F4F4F1] sm:aspect-[2.2/1] sm:min-h-[320px]">
+        {bigDeal.imageUrl && <img src={bigDeal.imageUrl} alt={bigDeal.title} className="absolute inset-0 h-full w-full object-cover object-center transition duration-700 group-hover:scale-[1.02]" />}
+        <span className="absolute left-4 top-4 rounded-full bg-[#14140F] px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.16em] text-white shadow-lg sm:left-6 sm:top-6">BIG DEAL</span>
+        <span className="absolute right-4 top-4 rounded-full bg-[#FFD16A] px-3 py-1.5 text-[10px] font-black text-[#14140F] shadow-lg sm:right-6 sm:top-6">{discount > 0 ? `-${discount}% OFF` : 'LIMITED TIME'}</span>
+      </Link>
+      <div className="bg-white px-5 py-5 sm:px-8 sm:py-6">
+        <Link href={`/product/${bigDeal.productId}`} className="group/title block" aria-label={`View ${bigDeal.title}`}>
+          <h2 className="text-2xl font-black leading-tight tracking-tight text-[#14140F] transition group-hover/title:text-[#0F6A5F] sm:text-4xl">{bigDeal.title}</h2>
+        </Link>
+        <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2">
+          <span className="text-3xl font-black text-[#E1352B] sm:text-4xl">Rs. {Number(bigDeal.dealPrice).toLocaleString()}</span>
+          {Number(bigDeal.originalPrice) > Number(bigDeal.dealPrice) && <span className="text-sm font-bold text-black/40 line-through sm:text-base">Rs. {Number(bigDeal.originalPrice).toLocaleString()}</span>}
+        </div>
+        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="inline-flex w-fit items-center gap-2 rounded-xl border border-[#E1352B]/15 bg-[#FFF7F5] px-3 py-2.5 text-[#14140F]">
+            <Clock3 size={15} className="text-[#E1352B]" />
+            <span className="text-[9px] font-black uppercase tracking-wider text-black/50">Ends in</span>
+            <span className="font-[family-name:var(--font-mono)] text-sm font-black tabular-nums sm:text-base">{String(countdown.hours + countdown.days * 24).padStart(2,'0')}:{String(countdown.minutes).padStart(2,'0')}:{String(countdown.seconds).padStart(2,'0')}</span>
+          </div>
+          <button type="button" onClick={(event) => { event.preventDefault(); event.stopPropagation(); addBigDealToCart(); }} disabled={!bigDeal.productId} className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#14140F] px-5 py-3 text-xs font-black text-white transition hover:bg-[#0F6A5F] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"><ShoppingCart size={15}/> Add to Cart</button>
+        </div>
+      </div>
+    </section>}
   </>;
 }
