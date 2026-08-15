@@ -1,17 +1,103 @@
 'use client';
 
-// ==================== CUSTOMER PHOTO REVIEWS ====================
 import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { addDoc, collection, onSnapshot, query, serverTimestamp, where } from 'firebase/firestore';
 import { Star } from 'lucide-react';
 import { db } from '@/lib/firebase';
 
 type Review = { id: string; name: string; rating: number; comment: string; photos?: string[]; verified?: boolean; createdAt?: any };
+
 export default function ReviewsSection({ productId }: { productId: string }) {
-  const [reviews, setReviews] = useState<Review[]>([]); const [name, setName] = useState(''); const [rating, setRating] = useState(5); const [comment, setComment] = useState(''); const [photos, setPhotos] = useState<string[]>([]);
-  useEffect(() => onSnapshot(query(collection(db, 'reviews'), where('productId', '==', productId)), (snap) => setReviews(snap.docs.map((item) => ({ id: item.id, ...item.data() } as Review)))), [productId]);
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [name, setName] = useState('');
+  const [rating, setRating] = useState(5);
+  const [comment, setComment] = useState('');
+  const [photos, setPhotos] = useState<string[]>([]);
+  const [mountNode, setMountNode] = useState<HTMLElement | null>(null);
+
+  useEffect(() => {
+    const unsubscribe = onSnapshot(
+      query(collection(db, 'reviews'), where('productId', '==', productId)),
+      (snap) => setReviews(snap.docs.map((item) => ({ id: item.id, ...item.data() } as Review)))
+    );
+    return unsubscribe;
+  }, [productId]);
+
+  useEffect(() => {
+    const productGrid = document.querySelector('main > .mx-auto.max-w-6xl > .grid');
+    if (!productGrid?.parentElement) return;
+
+    const node = document.createElement('div');
+    node.className = 'product-reviews-slot';
+    productGrid.parentElement.insertBefore(node, productGrid.nextSibling);
+    setMountNode(node);
+
+    return () => {
+      node.remove();
+    };
+  }, []);
+
   const average = useMemo(() => reviews.length ? reviews.reduce((sum, item) => sum + item.rating, 0) / reviews.length : 0, [reviews]);
-  async function submit(event: FormEvent) { event.preventDefault(); if (!name.trim() || !comment.trim()) return; await addDoc(collection(db, 'reviews'), { productId, name: name.trim(), rating, comment: comment.trim(), photos, verified: false, createdAt: serverTimestamp() }); setName(''); setComment(''); setPhotos([]); setRating(5); }
-  async function upload(event: React.ChangeEvent<HTMLInputElement>) { const file = event.target.files?.[0]; if (!file) return; const form = new FormData(); form.append('image', file); const response = await fetch('https://api.imgbb.com/1/upload?key=f38fa84b03c7eaaeda2a4d3a164b116f', { method: 'POST', body: form }); const result = await response.json(); if (result.success) setPhotos((current) => [...current, result.data.url]); }
-  return <section className="mx-auto mt-8 max-w-5xl rounded-[28px] bg-white p-5 shadow-sm"><h2 className="text-xl font-black">Customer Reviews</h2><div className="mt-3 flex items-center gap-3"><b className="text-3xl">{average.toFixed(1)}</b><span className="flex text-[#FFB020]">{Array.from({length:5},(_,i)=><Star key={i} size={16} fill={i < Math.round(average) ? 'currentColor' : 'none'}/>)}</span><span className="text-xs text-black/40">{reviews.length} reviews</span></div><div className="mt-5 space-y-3">{reviews.map((review) => <article key={review.id} className="rounded-2xl bg-[#F4F4F1] p-4"><div className="flex items-center justify-between"><b className="text-sm">{review.name}</b>{review.verified && <span className="text-[9px] font-black text-[#0F6A5F]">VERIFIED PURCHASE</span>}</div><div className="mt-1 flex text-[#FFB020]">{Array.from({length:5},(_,i)=><Star key={i} size={12} fill={i < review.rating ? 'currentColor' : 'none'}/>)}</div><p className="mt-2 text-xs text-black/60">{review.comment}</p>{review.photos?.length ? <div className="mt-3 flex gap-2">{review.photos.map((photo) => <img key={photo} src={photo} alt="Customer review" className="h-16 w-16 rounded-xl object-cover" />)}</div> : null}</article>)}</div><form onSubmit={submit} className="mt-6 grid gap-2"><input required value={name} onChange={(e)=>setName(e.target.value)} placeholder="Your name" className="rounded-xl bg-[#F4F4F1] p-3 text-sm"/><select value={rating} onChange={(e)=>setRating(Number(e.target.value))} className="rounded-xl bg-[#F4F4F1] p-3 text-sm">{[5,4,3,2,1].map((value)=><option key={value} value={value}>{value} stars</option>)}</select><textarea required value={comment} onChange={(e)=>setComment(e.target.value)} placeholder="Share your experience" className="rounded-xl bg-[#F4F4F1] p-3 text-sm"/><button className="rounded-xl bg-[#14140F] py-3 text-xs font-black text-white">Submit review</button></form></section>;
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    if (!name.trim() || !comment.trim()) return;
+    await addDoc(collection(db, 'reviews'), {
+      productId,
+      name: name.trim(),
+      rating,
+      comment: comment.trim(),
+      photos,
+      verified: false,
+      createdAt: serverTimestamp(),
+    });
+    setName('');
+    setComment('');
+    setPhotos([]);
+    setRating(5);
+  }
+
+  async function upload(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const form = new FormData();
+    form.append('image', file);
+    const response = await fetch('https://api.imgbb.com/1/upload?key=f38fa84b03c7eaaeda2a4d3a164b116f', { method: 'POST', body: form });
+    const result = await response.json();
+    if (result.success) setPhotos((current) => [...current, result.data.url]);
+  }
+
+  if (!mountNode) return null;
+
+  return createPortal(
+    <section className="mx-auto mt-8 max-w-5xl rounded-[28px] bg-white p-5 shadow-sm">
+      <h2 className="text-xl font-black">Customer Reviews</h2>
+      <div className="mt-3 flex items-center gap-3">
+        <b className="text-3xl">{average.toFixed(1)}</b>
+        <span className="flex text-[#FFB020]">{Array.from({ length: 5 }, (_, i) => <Star key={i} size={16} fill={i < Math.round(average) ? 'currentColor' : 'none'} />)}</span>
+        <span className="text-xs text-black/40">{reviews.length} reviews</span>
+      </div>
+      <div className="mt-5 space-y-3">
+        {reviews.map((review) => (
+          <article key={review.id} className="rounded-2xl bg-[#F4F4F1] p-4">
+            <div className="flex items-center justify-between">
+              <b className="text-sm">{review.name}</b>
+              {review.verified && <span className="text-[9px] font-black text-[#0F6A5F]">VERIFIED PURCHASE</span>}
+            </div>
+            <div className="mt-1 flex text-[#FFB020]">{Array.from({ length: 5 }, (_, i) => <Star key={i} size={12} fill={i < review.rating ? 'currentColor' : 'none'} />)}</div>
+            <p className="mt-2 text-xs text-black/60">{review.comment}</p>
+            {review.photos?.length ? <div className="mt-3 flex gap-2">{review.photos.map((photo) => <img key={photo} src={photo} alt="Customer review" className="h-16 w-16 rounded-xl object-cover" />)}</div> : null}
+          </article>
+        ))}
+      </div>
+      <form onSubmit={submit} className="mt-6 grid gap-2">
+        <input required value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" className="rounded-xl bg-[#F4F4F1] p-3 text-sm" />
+        <select value={rating} onChange={(e) => setRating(Number(e.target.value))} className="rounded-xl bg-[#F4F4F1] p-3 text-sm">{[5, 4, 3, 2, 1].map((value) => <option key={value} value={value}>{value} stars</option>)}</select>
+        <textarea required value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Share your experience" className="rounded-xl bg-[#F4F4F1] p-3 text-sm" />
+        <button className="rounded-xl bg-[#14140F] py-3 text-xs font-black text-white">Submit review</button>
+      </form>
+    </section>,
+    mountNode
+  );
 }
