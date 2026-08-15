@@ -8,21 +8,24 @@ import { auth, db } from '@/lib/firebase';
 import { useCartStore } from '@/lib/cartStore';
 import { ProductUrgencyBadges } from '@/components/ProductCard';
 
-type Product={id:string;title?:string;name?:string;price?:number;compareAtPrice?:number;originalPrice?:number;imageUrl?:string;image?:string;images?:string[];category?:string;stock?:number;quantity?:number;isFlashSale?:boolean;isWholesale?:boolean|string;isWholesaleDeal?:boolean;tags?:string[];wholesalePrice?:number|string;videoUrl?:string;reelUrl?:string;[key:string]:any};
+type Product={id:string;title?:string;name?:string;price?:number;dealPrice?:number|string;compareAtPrice?:number;originalPrice?:number;imageUrl?:string;image?:string;images?:string[];category?:string;stock?:number;quantity?:number;isFlashSale?:boolean;isWholesale?:boolean|string;isWholesaleDeal?:boolean;dealType?:string;tags?:string[];wholesalePrice?:number|string;videoUrl?:string;reelUrl?:string;[key:string]:any};
 type Reward={id:string;productId?:string;pointsCost?:number;active?:boolean;stock?:number;imageUrl?:string;title?:string};
 type Sort='featured'|'low'|'high'|'discount';
 const GUEST_KEY='phdeals-guest-rewards';
-const title=(p:Product)=>p.title||p.name||'Untitled Product'; const image=(p:Product)=>p.imageUrl||p.image||p.images?.[0]||''; const price=(p:Product)=>Number(p.price??0); const original=(p:Product)=>Number(p.compareAtPrice??p.originalPrice??0); const discount=(p:Product)=>{const o=original(p),v=price(p);return o>v?Math.round(((o-v)/o)*100):0};
+const title=(p:Product)=>p.title||p.name||'Untitled Product'; const image=(p:Product)=>p.imageUrl||p.image||p.images?.[0]||''; const price=(p:Product)=>Number(p.price||p.dealPrice||0); const original=(p:Product)=>Number(p.compareAtPrice??p.originalPrice??0); const discount=(p:Product)=>{const o=original(p),v=price(p);return o>v?Math.round(((o-v)/o)*100):0};
 const sameImage=(a:string,b:string)=>Boolean(a&&b&&a.trim()===b.trim());
 
 function isWholesaleProduct(p: Product) {
  const wholesaleFlag = p.isWholesale === true || String(p.isWholesale).toLowerCase() === 'true';
  const wholesaleDealFlag = p.isWholesaleDeal === true || String(p.isWholesaleDeal).toLowerCase() === 'true';
+ const dealType = String(p.dealType ?? '').toLowerCase();
  const category = String(p.category ?? '').toLowerCase();
+ const productTitle = String(p.title ?? '').toLowerCase();
+ const productName = String(p.name ?? '').toLowerCase();
  const tags = Array.isArray(p.tags) ? p.tags : [];
  const wholesaleTag = tags.some(tag => String(tag).toLowerCase().includes('wholesale'));
  const hasWholesalePrice = Boolean(p.wholesalePrice);
- return wholesaleFlag || wholesaleDealFlag || category.includes('wholesale') || wholesaleTag || hasWholesalePrice;
+ return wholesaleFlag || wholesaleDealFlag || dealType === 'wholesale' || category.includes('wholesale') || productTitle.includes('wholesale') || productName.includes('wholesale') || productTitle.includes('deal box') || productName.includes('deal box') || wholesaleTag || hasWholesalePrice;
 }
 
 export default function ProductGridRewards({selectedMaxPrice=null,wholesaleSelected=false}:{selectedMaxPrice?:number|null;wholesaleSelected?:boolean}){
@@ -31,10 +34,7 @@ export default function ProductGridRewards({selectedMaxPrice=null,wholesaleSelec
  useEffect(()=>{const p=onSnapshot(collection(db,'products'),s=>{setProducts(s.docs.map(d=>({id:d.id,...d.data()}) as Product));setLoading(false)},()=>setLoading(false));const g=onSnapshot(collection(db,'reward_gifts'),s=>setGifts(s.docs.map(d=>({id:d.id,...d.data()}) as Reward).filter(x=>x.active!==false&&Number(x.pointsCost)>0)));return()=>{p();g()}},[]);
  const rewards=useMemo(()=>{const m:Record<string,{id:string;points:number;stock:number}>={};for(const g of gifts){let pid=g.productId;const rewardImage=g.imageUrl;if(!pid&&rewardImage){const match=products.find(p=>sameImage(image(p),rewardImage)||(Array.isArray(p.images)&&p.images.some(x=>sameImage(x,rewardImage))));if(match)pid=match.id}if(pid)m[pid]={id:g.id,points:Number(g.pointsCost),stock:Number(g.stock??1)}}return m},[gifts,products]);
  useEffect(()=>{let wu=()=>{};const au=onAuthStateChanged(auth,u=>{wu();setUid(u?.uid||null);if(u)wu=onSnapshot(doc(db,'user_rewards',u.uid),s=>setPoints(Number(s.data()?.points||0)));else{try{setPoints(Number(JSON.parse(localStorage.getItem(GUEST_KEY)||'{}')?.points||0))}catch{setPoints(0)}}});return()=>{au();wu()}},[]);
- const visible=useMemo(()=>products.filter(p=>{
-   if (wholesaleSelected) return isWholesaleProduct(p);
-   return selectedMaxPrice==null || price(p)<=selectedMaxPrice;
- }).sort((a,b)=>sort==='low'?price(a)-price(b):sort==='high'?price(b)-price(a):sort==='discount'?discount(b)-discount(a):Number(Boolean(b.isFlashSale))-Number(Boolean(a.isFlashSale))),[products,selectedMaxPrice,wholesaleSelected,sort]);
+ const visible=useMemo(()=>{const filtered=products.filter(p=>{if(wholesaleSelected)return isWholesaleProduct(p);if(selectedMaxPrice==null)return true;return price(p)<=selectedMaxPrice;});if(wholesaleSelected&&process.env.NODE_ENV!=='production')console.log('Filtered Wholesale Products:',filtered);return filtered.sort((a,b)=>sort==='low'?price(a)-price(b):sort==='high'?price(b)-price(a):sort==='discount'?discount(b)-discount(a):Number(Boolean(b.isFlashSale))-Number(Boolean(a.isFlashSale)));},[products,selectedMaxPrice,wholesaleSelected,sort]);
  function add(p:Product){const img=image(p);addItem({id:p.id,name:title(p),price:price(p),originalPrice:original(p)||price(p),image:img,imageUrl:img});setAdded(p.id);setTimeout(()=>setAdded(null),1100)}
  async function redeem(p:Product,r:{id:string;points:number;stock:number}){if(!uid){window.location.href='/login?redirect=/rewards#redeem-rewards';return}setNotice('');setRedeeming(p.id);try{await runTransaction(db,async tx=>{const w=doc(db,'user_rewards',uid),red=doc(collection(db,'reward_redemptions')),snap=await tx.get(w),current=Number(snap.data()?.points||0);if(current<r.points)throw new Error(`You need ${r.points-current} more points.`);if(r.stock<1)throw new Error('This reward is out of stock.');tx.set(w,{points:current-r.points,updatedAt:serverTimestamp()},{merge:true});tx.set(red,{userId:uid,giftId:r.id,productId:p.id,pointsCost:r.points,status:'pending',fulfillment:'reward',freeDelivery:true,deliveryFee:0,createdAt:serverTimestamp()})});setPoints(x=>Math.max(0,x-r.points));setNotice(`${title(p)} reward claimed. ${r.points} points deducted and FREE DELIVERY included.`)}catch(e){setNotice(e instanceof Error?e.message:'Redemption failed. Please try again.')}finally{setRedeeming(null)}}
  if(loading)return <section className="mt-8 px-4"><div className="mb-4 h-7 w-44 animate-pulse rounded-lg bg-black/8"/><div className="grid grid-cols-2 gap-3">{Array.from({length:6}).map((_,i)=><div key={i} className="aspect-[.8] animate-pulse rounded-[22px] bg-white"/> )}</div></section>;
