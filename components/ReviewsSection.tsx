@@ -119,7 +119,7 @@ export default function ReviewsSection({ productId }: { productId: string }) {
   if (!mountNode) return null;
 
   return createPortal(
-    <section className="mx-auto mt-8 max-w-5xl rounded-[28px] bg-white p-5 shadow-sm sm:p-6">
+    <section className="mx-auto mt-8 max-w-5xl rounded-[28px] border border-black/7 bg-white p-5 shadow-sm sm:p-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="text-[9px] font-black uppercase tracking-[0.2em] text-[#E1352B]">Customer Feedback</p>
@@ -132,34 +132,13 @@ export default function ReviewsSection({ productId }: { productId: string }) {
         </div>
       </div>
 
-      <div className="mt-5 space-y-3">
-        {reviews.length === 0 && <p className="rounded-2xl bg-[#F4F4F1] p-4 text-xs font-bold text-black/45">No reviews yet. Be the first customer to share your experience.</p>}
-        {reviews.map((review) => {
-          const photo = review.imageUrl || review.photos?.[0] || '';
-          return (
-            <article key={review.id} className="rounded-2xl bg-[#F4F4F1] p-4">
-              <div className="flex flex-wrap items-start justify-between gap-2">
-                <div>
-                  <b className="text-sm">{review.name}</b>
-                  <p className="mt-0.5 text-[9px] font-bold text-black/35">{formatReviewDate(review.createdAt)}</p>
-                </div>
-                {review.verified && <span className="text-[9px] font-black text-[#0F6A5F]">VERIFIED PURCHASE</span>}
-              </div>
-              <div className="mt-2 flex text-[#FFB020]">{Array.from({ length: 5 }, (_, i) => <Star key={i} size={13} fill={i < Number(review.rating || 0) ? 'currentColor' : 'none'} />)}</div>
-              <p className="mt-2 text-xs leading-5 text-black/60">{review.comment}</p>
-              {photo && <a href={photo} target="_blank" rel="noreferrer" className="mt-3 inline-block overflow-hidden rounded-xl border border-black/8 bg-white" aria-label="Open customer product photo"><img src={photo} alt="Customer product review" className="h-24 w-24 object-cover transition hover:scale-105" /></a>}
-            </article>
-          );
-        })}
-      </div>
-
-      <form onSubmit={submit} className="mt-6 grid gap-2.5 rounded-2xl border border-black/8 bg-[#FCFCFA] p-4">
+      <form onSubmit={submit} className="mt-6 grid gap-2.5">
         <h3 className="text-sm font-black">Share your experience</h3>
         <input required value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" className="rounded-xl bg-[#F4F4F1] p-3 text-sm outline-none focus:ring-2 focus:ring-black/10" />
         <select value={rating} onChange={(e) => setRating(Number(e.target.value))} className="rounded-xl bg-[#F4F4F1] p-3 text-sm outline-none">{[5, 4, 3, 2, 1].map((value) => <option key={value} value={value}>{value} star{value === 1 ? '' : 's'}</option>)}</select>
         <textarea required value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Write your review" rows={4} className="rounded-xl bg-[#F4F4F1] p-3 text-sm outline-none focus:ring-2 focus:ring-black/10" />
 
-        <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-dashed border-black/15 bg-white p-3">
+        <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-dashed border-black/15 bg-[#FCFCFA] p-3">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#F4F4F1]"><ImagePlus size={18} /></span>
           <span className="min-w-0 flex-1"><span className="block text-xs font-black">Add product photo</span><span className="block text-[9px] font-bold text-black/40">JPG, PNG or other image • max 8MB</span></span>
           <input type="file" accept="image/*" onChange={upload} className="sr-only" />
@@ -170,6 +149,30 @@ export default function ReviewsSection({ productId }: { productId: string }) {
 
         <button type="submit" disabled={submitting || uploading} className="rounded-xl bg-[#14140F] py-3 text-xs font-black text-white disabled:cursor-not-allowed disabled:opacity-50">{submitting ? 'Submitting…' : 'Submit review'}</button>
       </form>
+
+      <div className="mt-7 border-t border-black/8 pt-6">
+        <h3 className="text-sm font-black">Customer Reviews</h3>
+        <div className="mt-3 space-y-3">
+          {reviews.length === 0 && <p className="rounded-2xl bg-[#F4F4F1] p-4 text-xs font-bold text-black/45">No reviews yet. Be the first customer to share your experience.</p>}
+          {reviews.map((review) => {
+            const photo = review.imageUrl || review.photos?.[0] || '';
+            return (
+              <article key={review.id} className="rounded-2xl bg-[#F4F4F1] p-4">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div>
+                    <b className="text-sm">{review.name}</b>
+                    <p className="mt-0.5 text-[9px] font-bold text-black/35">{formatReviewDate(review.createdAt)}</p>
+                  </div>
+                  {review.verified && <span className="text-[9px] font-black text-[#0F6A5F]">VERIFIED PURCHASE</span>}
+                </div>
+                <div className="mt-2 flex text-[#FFB020]">{Array.from({ length: 5 }, (_, i) => <Star key={i} size={13} fill={i < Number(review.rating || 0) ? 'currentColor' : 'none'} />)}</div>
+                <p className="mt-2 text-xs leading-5 text-black/60">{review.comment}</p>
+                {photo && <a href={photo} target="_blank" rel="noreferrer" className="mt-3 inline-block overflow-hidden rounded-xl border border-black/8 bg-white" aria-label="Open customer product photo"><img src={photo} alt="Customer product review" className="h-24 w-24 object-cover transition hover:scale-105" /></a>}
+              </article>
+            );
+          })}
+        </div>
+      </div>
     </section>,
     mountNode
   );
