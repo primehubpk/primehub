@@ -2,17 +2,20 @@
 
 import Link from 'next/link';
 import { Check, ShoppingCart } from 'lucide-react';
-import type { Product, WeeklyDeal } from '@/lib/types';
+import type { Product, WeeklyDeal, Weekday } from '@/lib/types';
+import { useCartStore } from '@/lib/cartStore';
 
 type Props = {
   deals: WeeklyDeal[];
   products: Record<string, Product>;
-  today: string | null;
+  today: Weekday | null;
   onAdded?: (dealId: string) => void;
   addedId?: string | null;
 };
 
 export default function WeeklyDealCards({ deals, products, today, onAdded, addedId }: Props) {
+  const addItem = useCartStore((state) => state.addItem);
+
   const addToCart = (deal: WeeklyDeal) => {
     const product = products[deal.productId];
     const regularPrice = Number(product?.price || deal.originalPrice || 0);
@@ -20,20 +23,16 @@ export default function WeeklyDealCards({ deals, products, today, onAdded, added
     const isLive = today === deal.day && dealPrice > 0;
     const price = isLive ? dealPrice : regularPrice;
     const image = product?.imageUrl || deal.imageUrl || '';
-    if (!product || price <= 0 || Number(product.stock ?? 0) <= 0 || typeof window === 'undefined') return;
-    window.dispatchEvent(new CustomEvent('primehub:add-weekly-deal', {
-      detail: {
-        item: {
-          id: product.id,
-          name: product.title || deal.title,
-          price,
-          originalPrice: isLive ? Number(product.originalPrice || deal.originalPrice || price) : regularPrice,
-          image: image || undefined,
-          imageUrl: image || undefined,
-          dealDay: isLive ? deal.day : undefined,
-        },
-      },
-    }));
+    if (!product || price <= 0 || Number(product.stock ?? 0) <= 0) return;
+    addItem({
+      id: product.id,
+      name: product.title || deal.title,
+      price,
+      originalPrice: isLive ? Number(product.originalPrice || deal.originalPrice || price) : regularPrice,
+      image: image || undefined,
+      imageUrl: image || undefined,
+      dealDay: isLive ? deal.day : undefined,
+    });
     onAdded?.(deal.id);
   };
 
