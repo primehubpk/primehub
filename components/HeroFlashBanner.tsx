@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
-import { Clock3, Gift, Sparkles, Star, Tags, Trophy, WandSparkles, ShoppingCart } from 'lucide-react';
+import { Clock3, Gift, Sparkles, Star, Tags, Trophy, WandSparkles, ShoppingCart, LockKeyhole } from 'lucide-react';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { useSettings } from '@/lib/useSettings';
 import { useCartStore } from '@/lib/cartStore';
@@ -14,20 +14,60 @@ const DAYS: Array<{ key: Weekday; label: string; Icon: typeof Gift }> = [
   { key: 'wednesday', label: 'Wednesday Deal', Icon: Star }, { key: 'thursday', label: 'Thursday Deal', Icon: Tags }, { key: 'friday', label: 'Friday Deal', Icon: Trophy }, { key: 'saturday', label: 'Saturday Deal', Icon: WandSparkles },
 ];
 
-function pakistanDay() { return new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Karachi', weekday: 'long' }).format(new Date()).toLowerCase() as Weekday; }
-function pakistanParts() { const now = new Date(); const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Karachi', weekday: 'long', year: 'numeric', month: 'numeric', day: 'numeric' }).formatToParts(now); return { year: Number(parts.find((p) => p.type === 'year')?.value), month: Number(parts.find((p) => p.type === 'month')?.value), day: Number(parts.find((p) => p.type === 'day')?.value), now }; }
-function millisecondsUntilPakistanMidnight() { const current = pakistanParts(); const tomorrowUtc = Date.UTC(current.year, current.month - 1, current.day + 1, 0, 0, 0) - 5 * 60 * 60 * 1000; return Math.max(0, tomorrowUtc - current.now.getTime()); }
-function countdownParts(milliseconds: number) { const total = Math.floor(milliseconds / 1000); return { hours: Math.floor(total / 3600), minutes: Math.floor((total % 3600) / 60), seconds: total % 60 }; }
+function pakistanParts() {
+  const now = new Date();
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Karachi', weekday: 'long', year: 'numeric', month: 'numeric', day: 'numeric',
+  }).formatToParts(now);
+  return {
+    now,
+    weekday: parts.find((p) => p.type === 'weekday')?.value.toLowerCase() as Weekday,
+    year: Number(parts.find((p) => p.type === 'year')?.value),
+    month: Number(parts.find((p) => p.type === 'month')?.value),
+    day: Number(parts.find((p) => p.type === 'day')?.value),
+  };
+}
+
+function countdownToNextUnlock(targetDay: Weekday, now: Date) {
+  const current = pakistanParts();
+  const currentIndex = DAYS.findIndex(({ key }) => key === current.weekday);
+  const targetIndex = DAYS.findIndex(({ key }) => key === targetDay);
+  let daysUntil = (targetIndex - currentIndex + 7) % 7;
+  if (daysUntil === 0) daysUntil = 7;
+  const targetUtc = Date.UTC(current.year, current.month - 1, current.day + daysUntil, 0, 0, 0) - (5 * 60 * 60 * 1000);
+  return Math.max(0, targetUtc - now.getTime());
+}
+
+function countdownParts(milliseconds: number) {
+  const total = Math.max(0, Math.floor(milliseconds / 1000));
+  return {
+    days: Math.floor(total / 86400),
+    hours: Math.floor((total % 86400) / 3600),
+    minutes: Math.floor((total % 3600) / 60),
+    seconds: total % 60,
+  };
+}
+
+function millisecondsUntilPakistanMidnight(now: Date) {
+  const current = pakistanParts();
+  const tomorrowUtc = Date.UTC(current.year, current.month - 1, current.day + 1, 0, 0, 0) - (5 * 60 * 60 * 1000);
+  return Math.max(0, tomorrowUtc - now.getTime());
+}
+
+function liveCountdown(now: Date) {
+  const value = countdownParts(millisecondsUntilPakistanMidnight(now));
+  return { hours: value.hours + (value.days * 24), minutes: value.minutes, seconds: value.seconds };
+}
 
 export default function HeroFlashBanner() {
   const { settings } = useSettings();
   const [nowTick, setNowTick] = useState(Date.now());
   const [products, setProducts] = useState<Record<string, Product>>({});
-  const todayKey = pakistanDay();
+  const todayKey = pakistanParts().weekday;
   const weeklyDeals = settings.weeklyDeals || [];
   const bigDeal = settings.dailyDeal;
   const addItem = useCartStore((state) => state.addItem);
-  const countdown = useMemo(() => { const end = bigDeal?.endAt ? new Date(bigDeal.endAt).getTime() : 0; return countdownParts(end > nowTick ? end - nowTick : millisecondsUntilPakistanMidnight()); }, [bigDeal?.endAt, nowTick]);
+  const countdown = useMemo(() => { const end = bigDeal?.endAt ? new Date(bigDeal.endAt).getTime() : 0; return countdownParts(end > nowTick ? end - nowTick : millisecondsUntilPakistanMidnight(new Date(nowTick))); }, [bigDeal?.endAt, nowTick]);
   const discount = bigDeal && bigDeal.originalPrice > bigDeal.dealPrice ? Math.round(((bigDeal.originalPrice - bigDeal.dealPrice) / bigDeal.originalPrice) * 100) : 0;
 
   useEffect(() => { const timer = window.setInterval(() => setNowTick(Date.now()), 1000); return () => window.clearInterval(timer); }, []);
@@ -43,7 +83,7 @@ export default function HeroFlashBanner() {
     const product = products[deal.productId];
     const regularPrice = Number(product?.price || deal.originalPrice || deal.dealPrice || 0);
     const dealPrice = Number(deal.dealPrice || 0);
-    const isLiveToday = deal.day === todayKey && deal.active !== false && dealPrice > 0;
+    const isLiveToday = deal.day === todayKey && dealPrice > 0;
     const price = isLiveToday ? dealPrice : regularPrice;
     if (!deal.productId || price <= 0 || Number(product?.stock ?? 1) <= 0) return;
     const image = product?.imageUrl || deal.imageUrl;
@@ -66,18 +106,26 @@ export default function HeroFlashBanner() {
         <div className="flex gap-2 overflow-x-auto px-3 py-3.5 sm:px-5 [scrollbar-width:none]">
           {orderedDays.map(({ key, label, Icon }) => {
             const active = key === todayKey;
-            const deal = weeklyDeals.find((item) => item.day === key && item.active !== false && Number(item.dealPrice) > 0);
-            const dealDiscount = deal && Number(deal.originalPrice || 0) > Number(deal.dealPrice) ? Math.round(((Number(deal.originalPrice) - Number(deal.dealPrice)) / Number(deal.originalPrice)) * 100) : 0;
+            const deal = weeklyDeals.find((item) => item.day === key && Number(item.dealPrice) > 0);
             const product = deal ? products[deal.productId] : undefined;
             const regularPrice = Number(product?.price || deal?.originalPrice || 0);
             const dealPrice = Number(deal?.dealPrice || 0);
-            const isLiveToday = Boolean(deal && active && deal.active !== false && dealPrice > 0);
+            const isLiveToday = Boolean(deal && active && dealPrice > 0);
             const displayPrice = isLiveToday ? dealPrice : regularPrice;
+            const dealDiscount = isLiveToday && deal && Number(deal.originalPrice || 0) > dealPrice ? Math.round(((Number(deal.originalPrice) - dealPrice) / Number(deal.originalPrice)) * 100) : 0;
+            const unlock = countdownParts(countdownToNextUnlock(key, new Date(nowTick)));
+            const live = liveCountdown(new Date(nowTick));
             const cardClass = active ? 'border-emerald-500 bg-white text-[#14140F] shadow-[0_12px_28px_rgba(16,185,129,0.16)]' : deal ? 'border-[#E1352B]/20 bg-gradient-to-b from-[#FFF9F5] to-white text-[#14140F] shadow-[0_10px_24px_rgba(225,53,43,0.10)] hover:-translate-y-1 hover:border-[#E1352B]/45 hover:shadow-[0_14px_30px_rgba(225,53,43,0.18)]' : 'border-black/7 bg-[#FCFBF8] text-[#14140F] hover:-translate-y-0.5 hover:border-[#0F6A5F]/25 hover:shadow-[0_10px_26px_rgba(20,20,15,0.08)]';
-            return <div key={key} className={'group relative min-w-[112px] flex-1 overflow-hidden rounded-[20px] border-2 text-center transition duration-200 ' + cardClass}>
-              {active && <span className="absolute right-2 top-2 z-20 rounded-full bg-emerald-500 px-1.5 py-0.5 text-[6px] font-black uppercase tracking-[0.08em] text-white shadow-sm">Live today</span>}
+            return <div key={key} className={'group relative min-w-[145px] flex-1 overflow-hidden rounded-[20px] border-2 text-center transition duration-200 ' + cardClass}>
+              {isLiveToday && <span className="absolute right-2 top-2 z-20 rounded-full bg-emerald-500 px-1.5 py-0.5 text-[6px] font-black uppercase tracking-[0.08em] text-white shadow-sm">LIVE</span>}
               {deal?.imageUrl ? <Link href={`/product/${deal.productId}`} aria-label={`View ${deal.title}`} className="block"><span className="relative block aspect-[4/3] w-full overflow-hidden"><img src={deal.imageUrl} alt={label} className="h-full w-full object-cover transition duration-200 group-hover:scale-105" /><span className="absolute left-1.5 top-1.5 rounded-full bg-[#E1352B] px-1.5 py-0.5 text-[6px] font-black uppercase tracking-[0.08em] text-white shadow-sm">{isLiveToday ? 'Sale' : label}</span>{isLiveToday && dealDiscount > 0 && <span className="absolute bottom-1.5 right-1.5 rounded-full bg-[#FFD16A] px-1.5 py-0.5 text-[7px] font-black text-[#14140F] shadow-sm">-{dealDiscount}%</span>}</span></Link> : <span className="flex aspect-[4/3] w-full items-center justify-center overflow-hidden bg-[#F4F4F1] text-[#0F6A5F]"><Icon size={18} strokeWidth={2.3} /></span>}
-              <span className="relative z-10 block px-2.5 pb-3 pt-2"><span className="block whitespace-nowrap text-[10px] font-black uppercase tracking-[0.07em] text-[#14140F]">{active ? "TODAY'S DEAL" : label}</span>{deal && displayPrice > 0 && <><span className="mt-1 block text-[9px] font-bold text-[#E1352B]">Rs. {displayPrice.toLocaleString()}</span>{isLiveToday && regularPrice > displayPrice && <span className="block text-[8px] text-black/35 line-through">Rs. {regularPrice.toLocaleString()}</span>}<button type="button" onClick={() => addDealToCart(deal)} className="mt-1 inline-flex items-center gap-1 rounded-full bg-[#14140F] px-2 py-1 text-[7px] font-black uppercase tracking-[0.08em] text-white hover:bg-[#0F6A5F]"><ShoppingCart size={8}/> Add to Cart</button></>}</span>
+              <span className="relative z-10 block px-2.5 pb-3 pt-2">
+                <span className="block whitespace-nowrap text-[10px] font-black uppercase tracking-[0.07em] text-[#14140F]">{isLiveToday ? "TODAY'S DEAL" : label}</span>
+                {deal && displayPrice > 0 && <>
+                  {isLiveToday ? <><span className="mt-1 block text-[9px] font-bold text-[#E1352B]">Rs. {displayPrice.toLocaleString()}</span><span className="mt-0.5 block text-[7px] font-bold text-emerald-700">🟢 LIVE • {String(live.hours).padStart(2, '0')}:{String(live.minutes).padStart(2, '0')}:{String(live.seconds).padStart(2, '0')}</span>{regularPrice > displayPrice && <span className="block text-[8px] text-black/35 line-through">Rs. {regularPrice.toLocaleString()}</span>}</> : <><span className="mt-1 flex items-center justify-center gap-1 text-[7px] font-black uppercase tracking-[0.04em] text-black/55"><LockKeyhole size={9} /> 🔒 Unlocks Next {label.replace(' Deal', '')}</span><span className="mt-0.5 block font-[family-name:var(--font-mono)] text-[9px] font-black text-[#0F6A5F]">{unlock.days}d {String(unlock.hours).padStart(2, '0')}h {String(unlock.minutes).padStart(2, '0')}m {String(unlock.seconds).padStart(2, '0')}s</span>{displayPrice > 0 && <span className="mt-0.5 block text-[8px] text-black/40">Normal Rs. {displayPrice.toLocaleString()}</span>}</>}
+                  <button type="button" onClick={() => addDealToCart(deal)} className="mt-1 inline-flex items-center gap-1 rounded-full bg-[#14140F] px-2 py-1 text-[7px] font-black uppercase tracking-[0.08em] text-white hover:bg-[#0F6A5F]"><ShoppingCart size={8}/> Add to Cart</button>
+                </>}
+              </span>
             </div>;
           })}
         </div>
