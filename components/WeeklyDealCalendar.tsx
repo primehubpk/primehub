@@ -31,15 +31,22 @@ export default function WeeklyDealCalendar({ weeklyDeals, weeklyProducts, nowTic
     const dealPrice = Number(deal.dealPrice || 0);
     const stock = item?.stock ?? 10;
     if (!item || dealPrice <= 0 || stock <= 0) return;
+
+    const normalPrice = Number(item.price || deal.originalPrice || 0);
+    const itemTiming = nowTick !== null ? dealTiming(deal.day, new Date(nowTick)) : null;
+    const itemLive = Boolean(itemTiming?.isLive);
+    const price = itemLive ? dealPrice : normalPrice;
+    if (price <= 0) return;
+
     const image = item.imageUrl || (item as any).image || ((item as any).images?.[0] ?? '');
     addItem({
       id: item.id,
       name: item.title || (item as any).name || deal.title,
-      price: dealPrice,
-      originalPrice: Number(item.price || deal.originalPrice || dealPrice),
+      price,
+      originalPrice: itemLive ? normalPrice : normalPrice,
       image,
       imageUrl: image,
-      dealDay: deal.day,
+      dealDay: itemLive ? deal.day : undefined,
     });
     setAddedId(deal.id);
     window.setTimeout(() => setAddedId(null), 1200);
