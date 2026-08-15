@@ -8,7 +8,7 @@ import { db } from '@/lib/firebase';
 import { useCartStore } from '@/lib/cartStore';
 import { useSettings } from '@/lib/useSettings';
 import type { Product, WeeklyDeal } from '@/lib/types';
-import { WEEKDAY_LABELS, WEEKDAY_ORDER, countdownParts, dealTiming, pakistanNowWeekday } from '@/lib/weeklyDealUtils';
+import { WEEKDAY_LABELS, WEEKDAY_ORDER, countdownParts, dealTiming } from '@/lib/weeklyDealUtils';
 
 export default function WeeklyDealProductExtras({ productId }: { productId: string }) {
   const { settings } = useSettings();
@@ -30,13 +30,12 @@ export default function WeeklyDealProductExtras({ productId }: { productId: stri
 
   const deals = settings.weeklyDeals || [];
   const currentDeal = deals.find((deal) => deal.productId === productId && deal.active !== false && Number(deal.dealPrice) > 0);
-  const today = nowTick === null ? null : pakistanNowWeekday(new Date(nowTick));
   const timing = currentDeal && nowTick !== null ? dealTiming(currentDeal.day, new Date(nowTick)) : null;
   const live = Boolean(currentDeal && timing?.isLive);
   const product = products[productId];
   const normalPrice = Number(product?.price || currentDeal?.originalPrice || 0);
   const dealPrice = Number(currentDeal?.dealPrice || 0);
-  const savings = live && normalPrice > dealPrice ? normalPrice - dealPrice : 0;
+  const savings = normalPrice > dealPrice ? normalPrice - dealPrice : 0;
   const countdown = timing && nowTick !== null ? countdownParts(timing.unlockAt.getTime() - nowTick) : null;
 
   const otherDeals = useMemo(() => deals.filter((deal) => deal.active !== false && deal.productId && deal.productId !== productId).sort((a, b) => WEEKDAY_ORDER.indexOf(a.day) - WEEKDAY_ORDER.indexOf(b.day)), [deals, productId]);
@@ -53,14 +52,10 @@ export default function WeeklyDealProductExtras({ productId }: { productId: stri
           </div>
           <div className="rounded-2xl bg-[#F4F4F1] px-3 py-2 text-right"><p className="text-[8px] font-black uppercase tracking-[0.16em] text-black/40">{live ? 'Deal price' : 'Deal price when unlocked'}</p><p className="font-[family-name:var(--font-mono)] text-lg font-black text-[#E1352B]">Rs. {dealPrice.toLocaleString()}</p></div>
         </div>
-        {live ? (
-          <div className="mt-4 grid gap-3 sm:grid-cols-3">
-            <div className="rounded-2xl bg-[#0F6A5F] p-3 text-white sm:col-span-2"><div className="flex items-center gap-2"><Clock3 size={14} /><span className="text-[9px] font-black uppercase tracking-wider text-white/75">Deal ends in</span></div><p className="mt-1 font-[family-name:var(--font-mono)] text-xl font-black">{countdown ? `${countdown.hours.toString().padStart(2,'0')}:${countdown.minutes.toString().padStart(2,'0')}:${countdown.seconds.toString().padStart(2,'0')}` : '00:00:00'}</p></div>
-            <div className="rounded-2xl bg-[#F4F4F1] p-3"><p className="text-[8px] font-black uppercase tracking-[0.16em] text-black/40">Normal price</p><p className="mt-1 text-lg font-black line-through text-black/40">Rs. {normalPrice.toLocaleString()}</p><p className="mt-1 text-[10px] font-black text-[#0F6A5F]">You save Rs. {savings.toLocaleString()}</p></div>
-          </div>
-        ) : (
-          <div className="mt-4 rounded-2xl bg-[#F4F4F1] p-3"><div className="flex items-center gap-2"><Clock3 size={14} className="text-[#0F6A5F]" /><span className="text-[9px] font-black uppercase tracking-wider text-black/45">Unlock countdown</span></div><p className="mt-1 font-[family-name:var(--font-mono)] text-xl font-black">{countdown ? `${countdown.days}d ${countdown.hours}h ${countdown.minutes.toString().padStart(2,'0')}m ${countdown.seconds.toString().padStart(2,'0')}s` : '—'}</p><p className="mt-1 text-[10px] font-bold text-black/45">The special price activates automatically when {WEEKDAY_LABELS[currentDeal.day]} begins.</p></div>
-        )}
+        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          <div className="rounded-2xl bg-[#0F6A5F] p-3 text-white sm:col-span-2"><div className="flex items-center gap-2"><Clock3 size={14} /><span className="text-[9px] font-black uppercase tracking-wider text-white/75">{live ? 'Deal ends in' : 'Unlocks in'}</span></div><p className="mt-1 font-[family-name:var(--font-mono)] text-xl font-black">{countdown ? `${countdown.days}d ${countdown.hours.toString().padStart(2,'0')}h ${countdown.minutes.toString().padStart(2,'0')}m ${countdown.seconds.toString().padStart(2,'0')}s` : '—'}</p><p className="mt-1 text-[9px] font-bold text-white/65">{live ? 'The deal price is active for today and locks again at midnight.' : `The special price activates automatically when ${WEEKDAY_LABELS[currentDeal.day]} begins.`}</p></div>
+          <div className="rounded-2xl bg-[#F4F4F1] p-3"><p className="text-[8px] font-black uppercase tracking-[0.16em] text-black/40">Normal price</p><p className="mt-1 text-lg font-black line-through text-black/40">Rs. {normalPrice.toLocaleString()}</p><p className="mt-1 text-[10px] font-black text-[#0F6A5F]">You save Rs. {savings.toLocaleString()} when unlocked</p></div>
+        </div>
       </div>
 
       {otherDeals.length > 0 && (
