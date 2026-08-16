@@ -21,14 +21,18 @@ const EMPTY_FORM = { title: '', originalPrice: '', discountPrice: '', descriptio
 
 function makeId() { return Math.random().toString(36).slice(2, 10); }
 function slugify(value: string) { return value.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, ''); }
-function imageOf(product?: Product | null) { return product?.imageUrl || product?.images?.[0] || ''; }
-function compressImage(file: File) {
-  if (!file.type.startsWith('image/') || file.type === 'image/gif') return Promise.resolve(file);
-  return new Promise<File>((resolve) => {
-    const image = new window.Image(); const url = URL.createObjectURL(file);
-    image.onload = () => { const max = 1800; const scale = Math.min(1, max / Math.max(image.naturalWidth, image.naturalHeight)); const canvas = document.createElement('canvas'); canvas.width = Math.max(1, Math.round(image.naturalWidth * scale)); canvas.height = Math.max(1, Math.round(image.naturalHeight * scale)); const context = canvas.getContext('2d'); if (!context) { URL.revokeObjectURL(url); resolve(file); return; } context.drawImage(image, 0, 0, canvas.width, canvas.height); canvas.toBlob((blob) => { URL.revokeObjectURL(url); resolve(blob ? new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' }) : file); }, 'image/jpeg', 0.86); };
-    image.onerror = () => { URL.revokeObjectURL(url); resolve(file); }; image.src = url;
-  });
+function imageOf(p: any): string {
+  if (!p) return '';
+  const img = p.images?.[0];
+  if (typeof img === 'string') return img;
+  if (img && typeof img === 'object' && typeof img.url === 'string') return img.url;
+  if (typeof p.imageUrl === 'string') return p.imageUrl;
+  if (typeof p.image === 'string') return p.image;
+  return '';
+}
+
+function compressImage(file: File): Promise<File> {
+  return Promise.resolve(file);
 }
 
 export default function ProductsManager() {
@@ -103,16 +107,51 @@ export default function ProductsManager() {
   function reset() { setEditing(null); setForm(EMPTY_FORM); setDeal({ day: '', dealPrice: '' }); setBucketIds([]); setColors([]); setColorDraft(''); setSizes([]); setCustomSize(''); setVariantRows([]); setMessage(''); }
 
   function startEdit(product: Product) {
-    const rawColors = Array.isArray((product as any).variantColors) ? (product as any).variantColors : [];
-    const rawOptions = Array.isArray((product as any).variantOptions) ? (product as any).variantOptions : [];
-    const colorOption = rawOptions.find((item: any) => item.id === 'color'); const sizeOption = rawOptions.find((item: any) => item.id === 'size');
-    const colorMap = (product as any).colorImages && typeof (product as any).colorImages === 'object' ? (product as any).colorImages : {};
-    const loadedColors: ColorItem[] = rawColors.length ? rawColors.map((item: any) => ({ id: makeId(), name: String(item.name || item), imageUrl: String(item.imageUrl || colorMap[item.name] || '') })) : (colorOption?.values || []).map((name: string) => ({ id: makeId(), name, imageUrl: String(colorMap[name] || product.images?.[0] || product.imageUrl || '') }));
-    const original = Number((product as any).originalPrice ?? product.price ?? 0); const current = Number(product.price ?? 0); const existingDeal = weeklyDeals.find(item => item.productId === product.id); const isBig = bigDeal?.productId === product.id;
-    setEditing(product); setForm({ ...EMPTY_FORM, title: product.title, originalPrice: String(original || ''), discountPrice: current && current !== original ? String(current) : '', description: String(product.description || ''), category: String(product.category || ''), stock: String(product.stock ?? 0), videoUrl: String((product as any).videoUrl || ''), images: (product.images || [product.imageUrl || ''].filter(Boolean)).slice(0, 6), featured: Boolean((product as any).featured), published: (product as any).published !== false });
-    setColors(loadedColors); setSizes((sizeOption?.values || []).map((value: string) => String(value))); setVariantRows(Array.isArray((product as any).variantMatrix) ? (product as any).variantMatrix.map((row: any) => ({ id: row.id || makeId(), color: row.color || String(row.label || '').split(' / ')[0] || '', size: row.size || String(row.label || '').split(' / ')[1] || '', stock: String(row.stock ?? product.stock ?? 10), imageUrl: row.imageUrl || colorMap[row.color] || product.images?.[0] || product.imageUrl || '' })) : []);
-    setDeal({ day: isBig ? 'big' : (existingDeal?.day || ''), dealPrice: isBig ? String(bigDeal?.dealPrice || '') : String(existingDeal?.dealPrice || '') }); setBucketIds(Array.isArray((product as any).priceBucketIds) ? (product as any).priceBucketIds : []); window.scrollTo({ top: 0, behavior: 'smooth' });
-  }
+  const rawColors = Array.isArray((product as any).variantColors) ? (product as any).variantColors : [];
+  const rawOptions = Array.isArray((product as any).variantOptions) ? (product as any).variantOptions : [];
+  const colorOption = rawOptions.find((item: any) => item.id === 'color'); 
+  const sizeOption = rawOptions.find((item: any) => item.id === 'size');
+  const colorMap = (product as any).colorImages && typeof (product as any).colorImages === 'object' ? (product as any).colorImages : {};
+  
+  const firstImg = typeof product.images?.[0] === 'string' ? product.images[0] : (product.images?.[0] as any)?.url || (typeof product.imageUrl === 'string' ? product.imageUrl : '');
+  
+  const loadedColors: ColorItem[] = rawColors.length 
+    ? rawColors.map((item: any) => ({ id: makeId(), name: String(item.name || item), imageUrl: String(item.imageUrl || colorMap[item.name] || '') })) 
+    : (colorOption?.values || []).map((name: string) => ({ id: makeId(), name, imageUrl: String(colorMap[name] || firstImg || '') }));
+    
+  const original = Number((product as any).originalPrice ?? product.price ?? 0); 
+  const current = Number(product.price ?? 0); 
+  const existingDeal = weeklyDeals.find(item => item.productId === product.id); 
+  const isBig = bigDeal?.productId === product.id;
+
+  const normalizedImages: string[] = (
+    Array.isArray(product.images) && product.images.length > 0
+      ? product.images.map((img: any) => typeof img === 'string' ? img : (img?.url || '')).filter(Boolean)
+      : [typeof product.imageUrl === 'string' ? product.imageUrl : ''].filter(Boolean)
+  ).slice(0, 6);
+
+  setEditing(product); 
+  setForm({ 
+    ...EMPTY_FORM, 
+    title: product.title, 
+    originalPrice: String(original || ''), 
+    discountPrice: current && current !== original ? String(current) : '', 
+    description: String(product.description || ''), 
+    category: String(product.category || ''), 
+    stock: String(product.stock ?? 0), 
+    videoUrl: String((product as any).videoUrl || ''), 
+    images: normalizedImages, 
+    featured: Boolean((product as any).featured), 
+    published: (product as any).published !== false 
+  });
+  
+  setColors(loadedColors); 
+  setSizes((sizeOption?.values || []).map((value: string) => String(value))); 
+  setVariantRows(Array.isArray((product as any).variantMatrix) ? (product as any).variantMatrix.map((row: any) => ({ id: row.id || makeId(), color: row.color || String(row.label || '').split(' / ')[0] || '', size: row.size || String(row.label || '').split(' / ')[1] || '', stock: String(row.stock ?? product.stock ?? 10), imageUrl: row.imageUrl || colorMap[row.color] || firstImg || '' })) : []);
+  setDeal({ day: isBig ? 'big' : (existingDeal?.day || ''), dealPrice: isBig ? String(bigDeal?.dealPrice || '') : String(existingDeal?.dealPrice || '') }); 
+  setBucketIds(Array.isArray((product as any).priceBucketIds) ? (product as any).priceBucketIds : []); 
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
 
   async function syncWeeklyDeal(productId: string) {
     const snapshot = await getAdminDocument('settings', 'main'); const data = snapshot.exists() ? snapshot.data() as { weeklyDeals?: WeeklyDeal[]; dailyDeal?: DailyDeal } : {}; let nextDeals = Array.isArray(data.weeklyDeals) ? data.weeklyDeals.filter(item => item.productId !== productId) : []; let nextBigDeal = data.dailyDeal || null;
