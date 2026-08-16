@@ -3,7 +3,7 @@ import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, setDoc, updateDoc 
 import { db } from '@/lib/firebase';
 
 export interface Product { id: string; title: string; price: number; originalPrice?: number; category: string; stock: number; imageUrl?: string; images?: string[]; description?: string; isFlashSale?: boolean; isWeekendSpecial?: boolean; [key: string]: unknown }
-export interface Category { id: string; title: string; iconUrl?: string; active?: boolean; order?: number; [key: string]: unknown }
+export interface Category { id: string; title: string; iconUrl?: string; imageUrl?: string; active?: boolean; order?: number; sortOrder?: number; slug?: string; [key: string]: unknown }
 export interface Order { id: string; customer: { name?: string; phone?: string; city?: string; [key: string]: unknown }; items: Array<{ title?: string; quantity?: number; price?: number; [key: string]: unknown }>; total?: number; subtotal?: number; status?: string; createdAt?: unknown; [key: string]: unknown }
 export interface VendorRequest { id: string; supplierName?: string; businessName?: string; whatsappNumber?: string; city?: string; productTitle?: string; wholesalePrice?: number; stock?: number; category?: string; description?: string; photos?: string[]; status?: string; [key: string]: unknown }
 export interface SiteSettings { announcementText?: string; whatsappNumber?: string; freeShippingCount?: number; [key: string]: unknown }
@@ -64,8 +64,15 @@ export async function uploadImageToImgBB(file: File): Promise<string> {
 export const adminCollection = (name: string) => collection(db, name);
 export const getAdminDocument = (name: string, id: string) => getDoc(doc(db, name, id));
 export const listAdminDocuments = (name: string) => getDocs(collection(db, name));
-export const createAdminDocument = (name: string, value: Record<string, any>) => addDoc(collection(db, name), value);
-export const updateAdminDocument = (name: string, id: string, value: Record<string, any>) => updateDoc(doc(db, name, id), value);
+
+function normalizeAdminDocument(name: string, value: Record<string, any>) {
+  if (name !== 'categories') return value;
+  const imageUrl = typeof value.imageUrl === 'string' ? value.imageUrl : typeof value.iconUrl === 'string' ? value.iconUrl : '';
+  return { ...value, imageUrl, iconUrl: typeof value.iconUrl === 'string' ? value.iconUrl : imageUrl };
+}
+
+export const createAdminDocument = (name: string, value: Record<string, any>) => addDoc(collection(db, name), normalizeAdminDocument(name, value));
+export const updateAdminDocument = (name: string, id: string, value: Record<string, any>) => updateDoc(doc(db, name, id), normalizeAdminDocument(name, value));
 export const setAdminDocument = (name: string, id: string, value: Record<string, any>) => setDoc(doc(db, name, id), value, { merge: true });
 export const deleteAdminDocument = (name: string, id: string) => deleteDoc(doc(db, name, id));
 
