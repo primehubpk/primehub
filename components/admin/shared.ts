@@ -20,8 +20,6 @@ export type AdminPermission =
 export interface AdminProfile { id: string; email?: string; displayName?: string; role: AdminRole; permissions: AdminPermission[]; active: boolean; lastLoginAt?: unknown; createdAt?: unknown; [key: string]: unknown }
 
 // ==================== FAST MEDIA UPLOAD ====================
-const IMGBB_KEY = 'f38fa84b03c7eaaeda2a4d3a164b116f';
-
 async function compressImageForUpload(file: File): Promise<File> {
   if (typeof window === 'undefined' || !file.type.startsWith('image/')) return file;
   const bitmap = await createImageBitmap(file);
@@ -53,11 +51,11 @@ export async function uploadImageToImgBB(file: File): Promise<string> {
   const optimized = await compressImageForUpload(file);
   const form = new FormData();
   form.append('image', optimized);
-  const response = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_KEY}`, { method: 'POST', body: form });
-  if (!response.ok) throw new Error(`Image upload failed (${response.status}).`);
-  const result = await response.json();
-  if (!result.success || !result.data?.url) throw new Error('Image upload failed. Please try again.');
-  return result.data.url as string;
+  // The ImgBB API key stays server-side. The upload route deliberately sends no expiration parameter.
+  const response = await fetch('/api/upload/imgbb', { method: 'POST', body: form, cache: 'no-store' });
+  const result = await response.json().catch(() => null);
+  if (!response.ok || !result?.success || typeof result.url !== 'string') throw new Error(result?.error || 'Image upload failed. Please try again.');
+  return result.url;
 }
 
 // ==================== FIRESTORE ADMIN UTILITIES ====================
