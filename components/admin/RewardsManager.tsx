@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
+import { onSnapshot } from 'firebase/firestore';
 import { Trophy, Gift, Disc, Calendar, History, Upload, Search, X, Check, Trash2, Edit3 } from 'lucide-react';
 import { adminCollection, createAdminDocument, updateAdminDocument, deleteAdminDocument, setAdminDocument, uploadImageToImgBB } from './shared';
 
@@ -39,22 +40,22 @@ export default function RewardsManager({ products = [] }: { products?: any[] }) 
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    const unsub = adminCollection('reward_gifts', (docs) => {
-      setGifts(docs as GiftReward[]);
+    const unsub = onSnapshot(adminCollection('reward_gifts'), (s) => {
+      setGifts(s.docs.map(d => ({ id: d.id, ...d.data() } as GiftReward)));
     });
     return () => unsub();
   }, []);
 
   useEffect(() => {
-    const unsub = adminCollection('media_assets', (docs) => {
-      setMediaAssets(docs);
+    const unsub = onSnapshot(adminCollection('media_assets'), (s) => {
+      setMediaAssets(s.docs.map(d => ({ id: d.id, ...d.data() })));
     });
     return () => unsub();
   }, []);
 
   useEffect(() => {
-    const unsub = adminCollection('settings', (docs) => {
-      const d: any = docs.find((x: any) => x.id === 'rewards')?.data || {};
+    const unsub = onSnapshot(adminCollection('settings'), (s) => {
+      const d: any = s.docs.find(x => x.id === 'rewards')?.data();
       if (d) setSettings((prev: any) => ({ ...prev, ...d }));
     });
     return () => unsub();
