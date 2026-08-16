@@ -73,7 +73,7 @@ function normalizeAdminDocument(name: string, value: Record<string, any>) {
 
 export const createAdminDocument = (name: string, value: Record<string, any>) => addDoc(collection(db, name), normalizeAdminDocument(name, value));
 export const updateAdminDocument = (name: string, id: string, value: Record<string, any>) => updateDoc(doc(db, name, id), normalizeAdminDocument(name, value));
-export const setAdminDocument = (name: string, id: string, value: Record<string, any>) => setDoc(doc(db, name, id), value, { merge: true });
+export const setAdminDocument = (name: string, id: string, value: Record<string, any>) => setDoc(doc(db, name, id), normalizeAdminDocument(name, value), { merge: true });
 export const deleteAdminDocument = (name: string, id: string) => deleteDoc(doc(db, name, id));
 
 export async function writeAdminAuditLog(action: string, entity: string, entityId?: string, metadata: Record<string, unknown> = {}) {
