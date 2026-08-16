@@ -110,7 +110,11 @@ export interface Product {
 export interface Category {
   id: string;
   title: string;
-  iconUrl: string;
+  slug?: string;
+  iconUrl?: string;
+  imageUrl?: string;
+  active?: boolean;
+  sortOrder?: number;
 }
 
 export interface OrderItem {
