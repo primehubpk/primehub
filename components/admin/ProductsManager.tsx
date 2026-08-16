@@ -21,14 +21,18 @@ const EMPTY_FORM = { title: '', originalPrice: '', discountPrice: '', descriptio
 
 function makeId() { return Math.random().toString(36).slice(2, 10); }
 function slugify(value: string) { return value.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, ''); }
-function imageOf(product?: Product | null) { return product?.imageUrl || product?.images?.[0] || ''; }
-function compressImage(file: File) {
-  if (!file.type.startsWith('image/') || file.type === 'image/gif') return Promise.resolve(file);
-  return new Promise<File>((resolve) => {
-    const image = new window.Image(); const url = URL.createObjectURL(file);
-    image.onload = () => { const max = 1800; const scale = Math.min(1, max / Math.max(image.naturalWidth, image.naturalHeight)); const canvas = document.createElement('canvas'); canvas.width = Math.max(1, Math.round(image.naturalWidth * scale)); canvas.height = Math.max(1, Math.round(image.naturalHeight * scale)); const context = canvas.getContext('2d'); if (!context) { URL.revokeObjectURL(url); resolve(file); return; } context.drawImage(image, 0, 0, canvas.width, canvas.height); canvas.toBlob((blob) => { URL.revokeObjectURL(url); resolve(blob ? new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' }) : file); }, 'image/jpeg', 0.86); };
-    image.onerror = () => { URL.revokeObjectURL(url); resolve(file); }; image.src = url;
-  });
+function imageOf(p: any): string {
+  if (!p) return '';
+  const img = p.images?.[0];
+  if (typeof img === 'string') return img;
+  if (img && typeof img === 'object' && typeof img.url === 'string') return img.url;
+  if (typeof p.imageUrl === 'string') return p.imageUrl;
+  if (typeof p.image === 'string') return p.image;
+  return '';
+}
+
+function compressImage(file: File): Promise<File> {
+  return Promise.resolve(file);
 }
 
 export default function ProductsManager() {
