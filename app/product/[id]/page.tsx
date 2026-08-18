@@ -54,25 +54,26 @@ type Product = SharedProduct & {
   [key: string]: any;
 };
 
-function titleOf(p: Product) {
-  return p.title || p.name || 'PrimeHub Deal';
+function titleOf(p?: Product | null) {
+  return p?.title || p?.name || 'PrimeHub Deal';
 }
 
-function regularPriceOf(p: Product) {
-  return Number(p.price || 0);
+function regularPriceOf(p?: Product | null) {
+  return Number(p?.price || 0);
 }
 
-function originalPriceOf(p: Product) {
-  return Number(p.compareAtPrice ?? p.originalPrice ?? p.price ?? 0);
+function originalPriceOf(p?: Product | null) {
+  return Number(p?.compareAtPrice ?? p?.originalPrice ?? p?.price ?? 0);
 }
 
-function imagesOf(p: Product) {
+function imagesOf(p?: Product | null) {
+  if (!p) return [];
   const list = [...(Array.isArray(p.images) ? p.images : []), p.imageUrl, p.image].filter(Boolean) as string[];
   return [...new Set(list)];
 }
 
-function videoOf(p: Product) {
-  return p.videoUrl || p.reelUrl || '';
+function videoOf(p?: Product | null) {
+  return p?.videoUrl || p?.reelUrl || '';
 }
 
 function money(value: number) {
@@ -254,6 +255,17 @@ export default function ProductDetailPage() {
     return <main className="min-h-screen bg-[#F4F4F1] px-4 pb-28 pt-4"><div className="mx-auto max-w-6xl"><div className="mb-4 h-10 w-10 animate-pulse rounded-full bg-black/8" /><div className="grid gap-4 md:grid-cols-[1.05fr_.95fr]"><div className="aspect-square animate-pulse rounded-[30px] bg-white md:aspect-[4/3]" /><div className="rounded-[30px] bg-white p-6"><div className="h-8 w-4/5 animate-pulse rounded bg-black/8" /><div className="mt-5 h-16 w-1/2 animate-pulse rounded bg-black/8" /><div className="mt-5 h-28 animate-pulse rounded-2xl bg-black/8" /></div></div></div></main>;
   }
 
+  if (failed || !product) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[#F4F4F1] px-5">
+        <div className="w-full max-w-sm rounded-[28px] bg-white p-6 text-center shadow-sm">
+          <p className="text-sm font-bold text-black/60">Product not found</p>
+          <Link href="/" className="mt-4 inline-block rounded-xl bg-[#14140F] px-4 py-2 text-xs font-black text-white">Back to Home</Link>
+        </div>
+      </main>
+    );
+  }
+
   let bannerCountdown = '-';
   if (countdown) {
     const h = countdown.hours.toString().padStart(2, '0');
@@ -350,7 +362,7 @@ export default function ProductDetailPage() {
               {product?.category && <span className="rounded-full bg-[#0F6A5F]/10 px-2.5 py-1 text-[9px] font-black uppercase tracking-wider text-[#0F6A5F]">{product.category}</span>}
               {product?.isFlashSale && <span className="flex items-center gap-1 rounded-full bg-[#14140F] px-2.5 py-1 text-[9px] font-black text-white"><Zap size={10} />Flash Sale</span>}
             </div>
-            <h1 className="mt-3 text-2xl font-black leading-tight tracking-tight text-[#14140F] sm:text-3xl md:text-[34px]">{product ? titleOf(product) : ''}</h1>
+            <h1 className="mt-3 text-2xl font-black leading-tight tracking-tight text-[#14140F] sm:text-3xl md:text-[34px]">{titleOf(product)}</h1>
             {(rating > 0 || reviews > 0) && (
               <div className="mt-3 flex items-center gap-2">
                 <span className="flex items-center gap-1 rounded-full bg-[#FFB020]/15 px-2.5 py-1.5 text-[10px] font-black"><Star size={11} fill="currentColor" />{rating ? rating.toFixed(1) : 'New'}</span>
