@@ -258,11 +258,13 @@ export default function ProductDetailPage() {
     return <main className="flex min-h-screen items-center justify-center bg-[#F4F4F1] px-5"><div className="w-full max-w-sm rounded-[28px] bg-white p-8 text-center shadow-sm"><div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-black/5"><ShoppingBag size={22} className="text-black/35" /></div><h1 className="mt-4 text-lg font-black">Product not found</h1><p className="mt-1 text-xs leading-5 text-black/45">This deal may have been removed or is no longer available.</p><Link href="/" className="mt-5 inline-flex rounded-full bg-[#14140F] px-5 py-3 text-[10px] font-black text-white">Back to Deals</Link></div></main>;
   }
 
-const bannerCountdown = countdown
-  ? (liveDeal
-      ? `${countdown.hours.toString().padStart(2, '0')}:${countdown.minutes.toString().padStart(2, '0')}:${countdown.seconds.toString().padStart(2, '0')}`
-      : `${countdown.days}d ${countdown.hours.toString().padStart(2, '0')}:${countdown.minutes.toString().padStart(2, '0')}:${countdown.seconds.toString().padStart(2, '0')}`)
-  : '—';
+let bannerCountdown = '-';
+if (countdown) {
+  const h = countdown.hours.toString().padStart(2, '0');
+  const m = countdown.minutes.toString().padStart(2, '0');
+  const s = countdown.seconds.toString().padStart(2, '0');
+  bannerCountdown = liveDeal ? `${h}:${m}:${s}` : `${countdown.days}d ${h}:${m}:${s}`;
+}
   return (
     <main className="min-h-screen bg-[#F4F4F1] pb-28">
       {liveDeal && <canvas ref={confettiCanvasRef} aria-hidden="true" className="pointer-events-none fixed inset-0 z-[200] h-full w-full" />}
