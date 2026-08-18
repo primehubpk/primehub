@@ -281,7 +281,7 @@ export default function ProductDetailPage() {
             <h1 className="mt-3 text-2xl font-black leading-tight tracking-tight text-[#14140F] sm:text-3xl md:text-[34px]">{titleOf(product)}</h1>
             {(rating > 0 || reviews > 0) && <div className="mt-3 flex items-center gap-2"><span className="flex items-center gap-1 rounded-full bg-[#FFB020]/15 px-2.5 py-1.5 text-[10px] font-black"><Star size={11} fill="currentColor" />{rating ? rating.toFixed(1) : 'New'}</span>{reviews > 0 && <span className="text-[10px] font-bold text-black/40">{reviews.toLocaleString()} reviews</span>}</div>}
 
-{currentDeal && !liveDeal ? (
+             {currentDeal && !liveDeal ? (
               <div className="mt-5 overflow-hidden rounded-[24px] border border-black/10 bg-white shadow-sm">
                 {/* Upper Tier: Buy Today (Regular Price) */}
                 <div className="border-b border-black/8 bg-[#FCFCFA] p-4 sm:p-5">
@@ -293,6 +293,39 @@ export default function ProductDetailPage() {
                     <span className="rounded-full bg-[#0F6A5F]/10 px-3 py-1.5 text-[9px] font-black text-[#0F6A5F]">Ready to Dispatch</span>
                   </div>
                 </div>
+
+                {/* Lower Tier: Locked Flash Deal */}
+                <div className="border-2 border-[#D4A72C]/40 bg-[#FFF9E8] p-4 sm:p-5">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[#D4A72C]">
+                        🔒 {((currentDeal as any)?.dayName || (currentDeal as any)?.day) ? `${String((currentDeal as any)?.dayName || (currentDeal as any)?.day).toUpperCase()} FLASH DEAL` : 'UPCOMING FLASH DEAL'}
+                      </p>
+                      <div className="mt-2 flex items-baseline gap-2">
+                        <span className="font-mono text-2xl font-black text-[#14140F] sm:text-3xl">{money(currentDeal.dealPrice)}</span>
+                        <span className="font-mono text-sm text-black/35 line-through">{money(regularPrice)}</span>
+                      </div>
+                    </div>
+                    {dealDiscount(currentDeal.dealPrice, regularPrice) && (
+                      <span className="rounded-full bg-[#D4A72C]/20 px-2.5 py-1 text-[9px] font-black text-[#8C6D1F]">
+                        Save {dealDiscount(currentDeal.dealPrice, regularPrice)}%
+                      </span>
+                    )}
+                  </div>
+                  <div className="mt-3 flex items-center gap-1.5 text-[10px] font-bold text-black/60">
+                    <span>⏳</span>
+                    <span>Unlocks on {String((currentDeal as any)?.dayName || (currentDeal as any)?.day || 'deal day')} at 12:00 AM</span>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="mt-5 rounded-[24px] border border-black/7 bg-[#FCFCFA] p-4 sm:p-5">
+                <p className="text-[9px] font-black uppercase tracking-[0.16em] text-black/40">Price</p>
+                <div className="mt-1 flex items-baseline gap-2">
+                  <span className="font-mono text-3xl font-black text-[#14140F] sm:text-4xl">{money(regularPrice)}</span>
+                </div>
+              </div>
+            )}
 
                 {/* Lower Tier: Locked Flash Deal */}
                 <div className="border-2 border-[#D4A72C]/40 bg-[#FFF9E8] p-4 sm:p-5">
