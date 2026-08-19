@@ -1,0 +1,22 @@
+import type { ChangeEvent, FormEvent, KeyboardEvent } from 'react';
+import type { DailyDeal, PriceBucket, Weekday, WeeklyDeal } from '@/lib/types';
+import type { Product } from '../shared';
+export type { Product };
+export type CategoryOption={id:string;title:string;active?:boolean;sortOrder?:number};
+export type MediaAsset={id:string;name?:string;url:string;type?:string};
+export type ColorItem={id:string;name:string;imageUrl:string};
+export type VariantRow={id:string;color:string;size:string;stock:string;imageUrl:string};
+export type DealChoice={day:Weekday|'big'|'';dealPrice:string};
+export type ProductFormState={title:string;originalPrice:string;discountPrice:string;description:string;category:string;stock:string;videoUrl:string;images:string[];featured:boolean;published:boolean};
+export type ProductFormProps={form:ProductFormState;categories:CategoryOption[];priceBuckets:PriceBucket[];deal:DealChoice;bucketIds:string[];colors:ColorItem[];colorDraft:string;sizes:string[];customSize:string;variantRows:VariantRow[];busy:boolean;uploadingSlot:number|null;uploadingColor:string|null;editing:Product|null;showGallery:boolean;gallerySearch:string;gallery:MediaAsset[];onSubmit:(event:FormEvent<HTMLFormElement>)=>void;onChange:(key:keyof ProductFormState,value:string|boolean|string[])=>void;onUpload:(event:ChangeEvent<HTMLInputElement>)=>Promise<void>;onSetMainImage:(index:number)=>void;onRemoveImage:(index:number)=>void;onColorDraftChange:(value:string)=>void;onColorKeyDown:(event:KeyboardEvent<HTMLInputElement>)=>void;onAddColor:()=>void;onRemoveColor:(id:string)=>void;onSetColorImage:(id:string,imageUrl:string)=>void;onUploadColorPhoto:(id:string,event:ChangeEvent<HTMLInputElement>)=>Promise<void>;onToggleSize:(size:string)=>void;onCustomSizeChange:(value:string)=>void;onCustomSizeKeyDown:(event:KeyboardEvent<HTMLInputElement>)=>void;onAddCustomSize:()=>void;onRemoveVariantRow:(id:string)=>void;onUpdateVariantStock:(id:string,stock:string)=>void;onDealChange:(deal:DealChoice)=>void;onBucketToggle:(id:string,checked:boolean)=>void;onGallerySearchChange:(value:string)=>void;onToggleGallery:()=>void;onReset:()=>void};
+export type ProductGalleryProps={form:ProductFormState;busy:boolean;uploadingSlot:number|null;showGallery:boolean;gallerySearch:string;gallery:MediaAsset[];onUpload:(event:ChangeEvent<HTMLInputElement>)=>Promise<void>;onSetMainImage:(index:number)=>void;onRemoveImage:(index:number)=>void;onGallerySearchChange:(value:string)=>void;onToggleGallery:()=>void;onChangeImages:(images:string[])=>void};
+export type ProductVariantsProps=Pick<ProductFormProps,'form'|'colors'|'colorDraft'|'sizes'|'customSize'|'variantRows'|'uploadingColor'|'onColorDraftChange'|'onColorKeyDown'|'onAddColor'|'onRemoveColor'|'onSetColorImage'|'onUploadColorPhoto'|'onToggleSize'|'onCustomSizeChange'|'onCustomSizeKeyDown'|'onAddCustomSize'|'onRemoveVariantRow'|'onUpdateVariantStock'>;
+export type ProductDealSettingsProps=Pick<ProductFormProps,'deal'|'priceBuckets'|'bucketIds'|'onDealChange'|'onBucketToggle'>;
+export type ProductListProps={products:Product[];query:string;onQueryChange:(value:string)=>void;onEdit:(product:Product)=>void;onDelete:(product:Product)=>void};
+export type ProductRowProps={product:Product;onEdit:(product:Product)=>void;onDelete:(product:Product)=>void};
+export const DAYS:Array<{key:Weekday;label:string}>=[{key:'monday',label:'Monday Deal'},{key:'tuesday',label:'Tuesday Deal'},{key:'wednesday',label:'Wednesday Deal'},{key:'thursday',label:'Thursday Deal'},{key:'friday',label:'Friday Deal'},{key:'saturday',label:'Saturday Deal'},{key:'sunday',label:'Sunday Deal'}];
+export const QUICK_SIZES=['2.4','2.6','2.8','2.10','Free Size'];
+export const EMPTY_FORM:ProductFormState={title:'',originalPrice:'',discountPrice:'',description:'',category:'',stock:'0',videoUrl:'',images:[],featured:false,published:true};
+export function makeId(){return Math.random().toString(36).slice(2,10)}
+export function slugify(value:string){return value.toLowerCase().trim().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'')}
+export function imageOf(product:Product):string{if(!product)return '';const img=product.images?.[0];if(typeof img==='string')return img;if(img&&typeof img==='object'&&typeof img.url==='string')return img.url;if(typeof product.imageUrl==='string')return product.imageUrl;if(typeof (product as {image?:unknown}).image==='string')return (product as {image:string}).image;return ''}
