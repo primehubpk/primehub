@@ -1,0 +1,12 @@
+'use client';
+import { CheckCircle2, ImagePlus, Save, X } from 'lucide-react';
+import type { CategoryFormProps } from './CategoryTypes';
+export default function CategoryForm({ form, editingId, isSaving, uploading, fileInputRef, onTitleChange, onSlugChange, onOpenGallery, onUploadDevice, onActiveChange, onSubmit, onCancel }: CategoryFormProps) {
+  return <form onSubmit={onSubmit} className="mt-5 grid gap-3 rounded-2xl border border-black/10 bg-white p-5 md:grid-cols-4">
+    <label className="text-xs font-semibold">Category Name<input type="text" value={form.title} onChange={(e) => onTitleChange(e.target.value)} placeholder="e.g. Bangles" required className="mt-1.5 w-full rounded-lg border border-black/15 px-3 py-2 text-sm" /></label>
+    <label className="text-xs font-semibold">Slug<input type="text" value={form.slug} onChange={(e) => onSlugChange(e.target.value)} placeholder="bangles" required className="mt-1.5 w-full rounded-lg border border-black/15 px-3 py-2 text-sm" /></label>
+    <div className="text-xs font-semibold"><span>Category image</span><div className="mt-1.5 flex flex-wrap gap-2"><button type="button" onClick={onOpenGallery} className="inline-flex items-center justify-center gap-2 rounded-lg border border-black/15 px-3 py-2 text-xs font-black"><ImagePlus size={14} /> Media Gallery</button><button type="button" disabled={uploading} onClick={onUploadDevice} className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#14140F] px-3 py-2 text-xs font-black text-white disabled:opacity-50"><ImagePlus size={14} /> {uploading ? 'Uploading...' : 'Upload from device'}</button>{form.iconUrl && <img src={form.iconUrl} alt="Selected" className="h-9 w-9 rounded-lg object-cover" />}</div></div>
+    <label className="flex items-end gap-2 pb-2 text-xs font-bold"><input type="checkbox" checked={form.active} onChange={(e) => onActiveChange(e.target.checked)} /> Show on homepage</label>
+    <div className="flex gap-2 md:col-span-4"><button type="submit" disabled={isSaving || uploading} className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-[#14140F] px-5 py-2.5 text-sm font-semibold text-white">{editingId ? <Save size={15} /> : <CheckCircle2 size={15} />}{isSaving ? 'Saving...' : editingId ? 'Save Category' : 'Add Category'}</button>{editingId && <button type="button" onClick={onCancel} className="inline-flex items-center gap-2 rounded-lg border border-black/10 px-5 py-2.5"><X size={15} />Cancel</button>}</div>
+  </form>;
+}
