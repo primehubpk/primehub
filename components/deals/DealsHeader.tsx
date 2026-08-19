@@ -1,0 +1,4 @@
+'use client';
+import Link from 'next/link';
+import { ArrowLeft,Sparkles } from 'lucide-react';
+export default function DealsHeader(){return <><Link href="/" className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2.5 text-[10px] font-black shadow-sm"><ArrowLeft size={14}/> Back to Home</Link><header className="mt-5 overflow-hidden rounded-[30px] bg-white p-6 shadow-sm md:p-8"><div className="flex items-center gap-2 text-[#E1352B]"><Sparkles size={18}/><span className="text-[9px] font-black uppercase tracking-[0.24em]">PrimeHub Weekly Deals</span></div><h1 className="mt-2 text-3xl font-black tracking-tight md:text-5xl">7 Days. 7 Deals.</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-black/50">Every deal repeats automatically each week using Pakistan time. Past days never expire — they roll forward to their next occurrence.</p></header></>}

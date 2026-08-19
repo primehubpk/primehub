@@ -1,0 +1,7 @@
+'use client';
+import { Tag } from 'lucide-react';
+import type { WeeklyDeal,Weekday } from '@/lib/types';
+import { DAYS,statusForDay } from './DealsTypes';
+import type { DealProducts,DealStatus } from './DealsTypes';
+import DealCard from './DealCard';
+export default function DealGrid({weeklyDeals,products,today,addingId,onAdd}:{weeklyDeals:WeeklyDeal[];products:DealProducts;today:Weekday;addingId:string|null;onAdd:(deal:WeeklyDeal,status:DealStatus)=>void}){if(!weeklyDeals.length)return <section className="mt-5 rounded-[30px] bg-white p-10 text-center shadow-sm"><Tag className="mx-auto h-10 w-10 text-black/20"/><h2 className="mt-4 text-2xl font-black">No Weekly Deals Scheduled</h2><p className="mt-2 text-xs text-black/45">Add real products and special prices from Admin → Deals.</p></section>;return <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">{DAYS.map(({key,label})=>{const deal=weeklyDeals.find(item=>item.day===key);if(!deal)return <article key={key} className="rounded-[28px] border border-dashed border-black/10 bg-white p-5 text-center shadow-sm"><p className="text-[9px] font-black uppercase tracking-[0.2em] text-black/35">{label} Deal</p><h2 className="mt-3 text-lg font-black">No deal scheduled</h2><p className="mt-1 text-xs text-black/40">Admin has not assigned a product yet.</p></article>;return <DealCard key={deal.id} deal={deal} label={label} status={statusForDay(key,today)} product={products[deal.productId]||null} adding={addingId===deal.id} onAdd={onAdd}/>})}</div>}
