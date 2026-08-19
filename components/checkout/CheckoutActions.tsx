@@ -1,0 +1,3 @@
+'use client';
+import { CheckCircle2, Loader2, MessageCircle } from 'lucide-react';
+export default function CheckoutActions({placing,whatsappOrder}:{placing:boolean;whatsappOrder:()=>void}){return <><button type="submit" disabled={placing} className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl bg-[#14140F] py-4 text-xs font-black text-white disabled:opacity-60">{placing?<Loader2 size={16} className="animate-spin"/>:<CheckCircle2 size={16}/>} {placing?'Placing Order...':'Place Order'}</button><button type="button" onClick={whatsappOrder} className="mt-2 flex w-full items-center justify-center gap-2 rounded-2xl bg-[#0F6A5F] py-4 text-xs font-black text-white"><MessageCircle size={16}/>Order via WhatsApp Instead</button></>}
