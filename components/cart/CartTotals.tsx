@@ -1,0 +1,1 @@
+export default function CartTotals({subtotal}:{subtotal:number}){return <div className="flex items-center justify-between"><span className="text-xs font-bold text-black/50">Subtotal</span><span className="font-[family-name:var(--font-mono)] text-xl font-black">Rs. {subtotal.toLocaleString()}</span></div>}

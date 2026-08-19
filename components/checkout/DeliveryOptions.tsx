@@ -1,0 +1,1 @@
+export default function DeliveryOptions(){return <p className="mt-3 rounded-2xl bg-[#0F6A5F]/8 p-3 text-[9px] font-bold leading-4 text-[#0F6A5F]">🚚 Free delivery eligibility is calculated from the cart item count.</p>}
