@@ -83,18 +83,20 @@ function variantRows(product: VariantModalProduct): ProductVariantRow[] {
   const sizeOptions = sizeValues.length ? sizeValues : ['Standard'];
 
   return colorOptions.flatMap((color) =>
-    sizeOptions.map((size) => ({
-      color,
-      size,
-      stock: 1,
-      price: product.price,
-      imageUrl:
-        typeof product.variantColors?.[0] === 'object'
-          ? product.variantColors?.find(
-              (value) => typeof value === 'object' && value.name === color,
-            )?.imageUrl
-          : undefined,
-    })),
+    sizeOptions.map((size) => {
+      const matchedColor = (product.variantColors as any[])?.find(
+        (c) => typeof c === 'object' && c !== null && c?.name === color,
+      );
+      const colorImage = (matchedColor as any)?.imageUrl || undefined;
+
+      return {
+        color,
+        size,
+        stock: 1,
+        price: product.price,
+        imageUrl: colorImage,
+      };
+    }),
   );
 }
 
