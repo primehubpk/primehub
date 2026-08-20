@@ -13,8 +13,8 @@ type WeekendProduct = {
   id: string;
   title?: string;
   name?: string;
-  price?: number;
-  originalPrice?: number;
+  price?: number | string;
+  originalPrice?: number | string;
   imageUrl?: string;
   image?: string;
   images?: ImageValue[];
@@ -72,7 +72,7 @@ export default function DayDeals() {
     );
 
     if (hasVariants) {
-      openVariantModal(product, 'cart');
+      openVariantModal(product as any, 'cart');
       return;
     }
 
