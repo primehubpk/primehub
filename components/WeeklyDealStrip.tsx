@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { doc, getDoc, onSnapshot } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 import Link from 'next/link';
 import { ArrowRight, Clock3, ShoppingBag } from 'lucide-react';
 import type { WeeklyDeal } from '@/lib/types';
