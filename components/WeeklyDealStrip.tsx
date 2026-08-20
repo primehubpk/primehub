@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type MouseEvent } from 'react';
 import { doc, getDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import Link from 'next/link';
@@ -12,6 +12,7 @@ type DealProduct = VariantModalProduct & {
   stock?: number;
   quantity?: number;
   inventory?: number;
+  options?: unknown[];
 };
 
 const DAYS: WeeklyDeal['day'][] = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
@@ -25,8 +26,8 @@ function getToday(): WeeklyDeal['day'] { return DAYS[new Date().getDay()]; }
 function hasVariants(product: DealProduct): boolean {
   return Boolean(
     (Array.isArray(product.variants) && product.variants.length > 0) ||
-    (Array.isArray(product.variantOptions) && product.variantOptions.length > 0) ||
     (Array.isArray(product.options) && product.options.length > 0) ||
+    (Array.isArray(product.variantOptions) && product.variantOptions.length > 0) ||
     product.hasVariants,
   );
 }
@@ -50,7 +51,7 @@ function numericPrice(value: unknown): number {
 
 export default function WeeklyDealStrip() {
   const [deals, setDeals] = useState<WeeklyDeal[]>([]);
-  const [adding, setAdding] = useState<string | null>(null);
+  const [loadingDealId, setLoadingDealId] = useState<string | null>(null);
   const today = getToday();
   const addItem = useCartStore((state) => state.addItem);
   const openVariantModal = useCartStore((state) => state.openVariantModal);
@@ -67,34 +68,55 @@ export default function WeeklyDealStrip() {
 
   if (!orderedDeals.some((deal) => deal.active)) return null;
 
-  async function handleAddToCart(deal: WeeklyDeal) {
-    if (!deal.productId || adding === deal.productId) return;
-    setAdding(deal.productId);
-    try {
-      const snapshot = await getDoc(doc(db, 'products', deal.productId));
-      if (!snapshot.exists()) return;
-      const product = { id: snapshot.id, ...snapshot.data() } as DealProduct;
-      const image = getProductImage(product);
-      const dealPrice = numericPrice(deal.dealPrice || product.price);
-      const originalPrice = numericPrice(deal.originalPrice || product.compareAtPrice || product.originalPrice || dealPrice);
-      const modalProduct: DealProduct = { ...product, price: dealPrice, originalPrice, image, imageUrl: image };
+  async function handleDealAddToCart(e: MouseEvent, deal: WeeklyDeal) {
+    e.preventDefault();
+    e.stopPropagation();
 
-      if (hasVariants(product) && typeof openVariantModal === 'function') {
-        openVariantModal(modalProduct, 'cart');
+    const targetId = deal.productId || deal.id;
+    if (!targetId) return;
+
+    setLoadingDealId(deal.id || targetId);
+    try {
+      const snap = await getDoc(doc(db, 'products', targetId));
+      const fullProduct = snap.exists() ? { id: snap.id, ...snap.data() } : deal;
+      const product = fullProduct as DealProduct;
+      const image = getProductImage(product);
+      const productPrice = numericPrice((product as any).price);
+      const dealPrice = numericPrice(deal.dealPrice || (product as any).dealPrice || productPrice);
+      const originalPrice = numericPrice(
+        deal.originalPrice ||
+        (product as any).normalPrice ||
+        product.originalPrice ||
+        product.compareAtPrice ||
+        productPrice ||
+        dealPrice,
+      );
+      const productWithDealPrice: DealProduct = {
+        ...product,
+        price: dealPrice,
+        originalPrice: originalPrice || dealPrice,
+        image,
+        imageUrl: image,
+      };
+
+      if (hasVariants(productWithDealPrice) && typeof openVariantModal === 'function') {
+        openVariantModal(productWithDealPrice, 'cart');
         return;
       }
 
       addItem({
-        id: product.id,
-        name: product.title || product.name || deal.title || 'PrimeHub Deal',
+        id: productWithDealPrice.id,
+        name: productWithDealPrice.title || productWithDealPrice.name || deal.title || 'PrimeHub Deal',
         price: dealPrice,
         originalPrice: originalPrice || dealPrice,
         image,
         imageUrl: image,
         dealDay: deal.day,
       });
+    } catch (error) {
+      console.error('Error fetching deal product variants:', error);
     } finally {
-      setAdding(null);
+      setLoadingDealId(null);
     }
   }
 
@@ -112,6 +134,7 @@ export default function WeeklyDealStrip() {
             if (!deal.active) return null;
             const dayLabel = DAY_LABELS[deal.day];
             const href = deal.productId ? `/product/${deal.productId}` : (deal.buttonLink || '/shop');
+            const isLoading = loadingDealId === (deal.id || deal.productId);
             return (
               <article key={deal.id || deal.day} className={`min-w-[180px] shrink-0 snap-start overflow-hidden rounded-[24px] bg-white shadow-sm ${deal.day === today ? 'ring-2 ring-[#E1352B]' : ''}`}>
                 <Link href={href} className="block">
@@ -133,8 +156,8 @@ export default function WeeklyDealStrip() {
                 </Link>
                 {deal.productId && (
                   <div className="px-3 pb-3">
-                    <button type="button" onClick={() => handleAddToCart(deal)} disabled={adding === deal.productId} className="flex w-full items-center justify-center gap-1 rounded-xl bg-[#14140F] px-2 py-2.5 text-[8px] font-black text-white disabled:opacity-50">
-                      <ShoppingBag size={11} />{adding === deal.productId ? 'ADDING...' : 'ADD TO CART'}
+                    <button type="button" onClick={(e) => handleDealAddToCart(e, deal)} disabled={isLoading} className="flex w-full items-center justify-center gap-1 rounded-xl bg-[#14140F] px-2 py-2.5 text-[8px] font-black text-white disabled:opacity-50">
+                      <ShoppingBag size={11} />{isLoading ? 'LOADING...' : 'ADD TO CART'}
                     </button>
                     <Link href={href} className="mt-2 flex items-center justify-center gap-1 text-[8px] font-black text-[#E1352B]">{deal.buttonText || 'View Deal'} <ArrowRight size={10} /></Link>
                   </div>
