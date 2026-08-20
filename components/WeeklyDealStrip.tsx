@@ -6,6 +6,7 @@ import { db } from '@/lib/firebase';
 import Link from 'next/link';
 import { ArrowRight, Clock3 } from 'lucide-react';
 import type { WeeklyDeal } from '@/lib/types';
+import { pakistanNowWeekday } from '@/lib/weeklyDealUtils';
 
 const DAYS: WeeklyDeal['day'][] = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
 const DAY_LABELS: Record<WeeklyDeal['day'], string> = {
@@ -19,7 +20,7 @@ const DAY_LABELS: Record<WeeklyDeal['day'], string> = {
 };
 
 function getToday(): WeeklyDeal['day'] {
-  return DAYS[new Date().getDay()];
+  return pakistanNowWeekday();
 }
 
 export default function WeeklyDealStrip() {
@@ -61,6 +62,7 @@ export default function WeeklyDealStrip() {
             if (!deal.active) return null;
 
             const dayLabel = DAY_LABELS[deal.day];
+            const dayDealTitle = `${dayLabel.toUpperCase()} DEAL`;
             const href = deal.buttonLink || (deal.productId ? `/product/${deal.productId}` : '/shop');
 
             return (
@@ -68,13 +70,13 @@ export default function WeeklyDealStrip() {
                 href={href}
                 key={deal.id || deal.day}
                 className={`min-w-[180px] shrink-0 snap-start overflow-hidden rounded-[24px] bg-white shadow-sm ${deal.day === today ? 'ring-2 ring-[#E1352B]' : ''}`}
-                aria-label={`Open ${dayLabel} Deal`}
+                aria-label={`Open ${dayDealTitle}`}
               >
                 <div className="relative h-28 bg-[#14140F]">
                   {deal.imageUrl && (
                     <img
                       src={deal.imageUrl}
-                      alt={`${dayLabel} Deal`}
+                      alt={dayDealTitle}
                       className="h-full w-full object-cover opacity-85"
                       draggable={false}
                     />
@@ -91,7 +93,7 @@ export default function WeeklyDealStrip() {
                 </div>
 
                 <div className="p-3">
-                  <p className="truncate text-[10px] font-black">{dayLabel} Deal</p>
+                  <p className="truncate text-[10px] font-black uppercase">{dayDealTitle}</p>
                   <div className="mt-1 flex items-center gap-2">
                     {deal.originalPrice > 0 && (
                       <span className="text-[8px] text-black/30 line-through">Rs. {deal.originalPrice}</span>
