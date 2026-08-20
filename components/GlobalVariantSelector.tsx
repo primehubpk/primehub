@@ -1,6 +1,10 @@
 'use client';
 
-import { useCartStore, getVariantRows, type VariantModalProduct } from '@/lib/cartStore';
+import {
+  normalizeProductVariants,
+  useCartStore,
+  type VariantModalProduct,
+} from '@/lib/cartStore';
 import VariantSelectorBottomSheet from '@/components/product-detail/VariantSelectorBottomSheet';
 import type { ProductVariantSelection } from '@/lib/types';
 
@@ -28,7 +32,8 @@ export default function GlobalVariantSelector() {
 
   if (!product || !mode) return null;
 
-  const rows = getVariantRows(product);
+  const normalized = normalizeProductVariants(product);
+  const rows = normalized.rows;
   const basePrice = Number(product.price ?? 0);
   const originalPrice = Number(product.compareAtPrice ?? product.originalPrice ?? basePrice);
   const title = product.title || product.name || 'PrimeHub Deal';
@@ -42,7 +47,7 @@ export default function GlobalVariantSelector() {
         (!selection.size || row.size === selection.size),
     );
     const price = Number(selected?.price ?? basePrice) || basePrice;
-    const image = String(selected?.imageUrl || (product ? imageOf(product) : ''));
+    const image = String(selected?.imageUrl || imageOf(product));
     const variantIdentity = Object.entries(selection)
       .filter(([, value]) => Boolean(value))
       .sort(([a], [b]) => a.localeCompare(b))
@@ -71,7 +76,7 @@ export default function GlobalVariantSelector() {
 
   return (
     <VariantSelectorBottomSheet
-      product={product as any}
+      product={product}
       rows={rows}
       open
       mode={mode}
