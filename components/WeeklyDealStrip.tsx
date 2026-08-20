@@ -14,7 +14,7 @@ function getToday(): WeeklyDeal['day'] { return DAYS[new Date().getDay()]; }
 
 type WeeklyDealProduct = WeeklyDeal & {
   name?: string;
-  price?: number;
+  price?: number | string;
   image?: string;
   images?: Array<string | { url?: string }>;
   variants?: any[];
@@ -56,7 +56,7 @@ export default function WeeklyDealStrip() {
     );
 
     if (hasVariants) {
-      openVariantModal(product, 'cart');
+      openVariantModal(product as any, 'cart');
       return;
     }
 
