@@ -13,6 +13,7 @@ const DAY_LABELS: Record<WeeklyDeal['day'], string> = { sunday: 'Sunday', monday
 function getToday(): WeeklyDeal['day'] { return DAYS[new Date().getDay()]; }
 
 type WeeklyDealProduct = WeeklyDeal & {
+  productId: string;
   name?: string;
   price?: number | string;
   image?: string;
@@ -20,6 +21,8 @@ type WeeklyDealProduct = WeeklyDeal & {
   variants?: any[];
   variantColors?: any;
   variantSizes?: any;
+  colors?: any;
+  sizes?: any;
   hasVariants?: boolean;
 };
 
@@ -47,30 +50,21 @@ export default function WeeklyDealStrip() {
     event.preventDefault();
     event.stopPropagation();
 
-    const product = deal as WeeklyDealProduct;
-    const hasVariants = Boolean(
-      (product.variants && product.variants.length > 0) ||
-      (product.variantColors && product.variantColors.length > 0) ||
-      (product.variantSizes && product.variantSizes.length > 0) ||
-      product.hasVariants,
-    );
+    // Weekly deals are lightweight schedule records. Let the global modal opener
+    // hydrate the canonical products/{productId} document before deciding whether
+    // a variant selector is needed.
+    const dealProduct = {
+      ...(deal as WeeklyDealProduct),
+      id: deal.productId,
+      productId: deal.productId,
+      price: deal.dealPrice,
+      originalPrice: deal.originalPrice,
+      image: deal.imageUrl,
+      imageUrl: deal.imageUrl,
+      title: deal.title,
+    };
 
-    if (hasVariants) {
-      openVariantModal(product as any, 'cart');
-      return;
-    }
-
-    const price = Number(product.dealPrice || product.price || 0);
-    const image = imageOf(product);
-    addItem({
-      id: product.id,
-      productId: product.productId,
-      name: product.title || product.name || `${DAY_LABELS[product.day]} Deal`,
-      price,
-      originalPrice: Number(product.originalPrice || price),
-      image,
-      imageUrl: image,
-    });
+    void openVariantModal(dealProduct as any, 'cart');
   }
 
   return (
