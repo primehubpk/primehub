@@ -8,8 +8,16 @@ type GlobalProduct = VariantModalProduct & {
   stock?: number;
 };
 
-function imageOf(product: GlobalProduct) {
-  return product.imageUrl || product.image || product.images?.[0] || '';
+function imageOf(product?: GlobalProduct | null | any): string {
+  if (!product) return '';
+  if (typeof product.image === 'string' && product.image) return product.image;
+  if (typeof product.imageUrl === 'string' && product.imageUrl) return product.imageUrl;
+  if (Array.isArray(product.images) && product.images.length > 0) {
+    const first = product.images[0];
+    if (typeof first === 'string') return first;
+    if (first && typeof first === 'object' && first.url) return first.url;
+  }
+  return '';
 }
 
 export default function GlobalVariantSelector() {
@@ -26,13 +34,15 @@ export default function GlobalVariantSelector() {
   const title = product.title || product.name || 'PrimeHub Deal';
 
   function confirm(selection: ProductVariantSelection, quantity: number) {
+    if (!product) return;
+
     const selected = rows.find(
       (row) =>
         (!selection.color || row.color === selection.color) &&
         (!selection.size || row.size === selection.size),
     );
     const price = Number(selected?.price ?? basePrice) || basePrice;
-    const image = String(selected?.imageUrl || imageOf(product));
+    const image = String(selected?.imageUrl || (product ? imageOf(product) : ''));
     const variantIdentity = Object.entries(selection)
       .filter(([, value]) => Boolean(value))
       .sort(([a], [b]) => a.localeCompare(b))
