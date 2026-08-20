@@ -18,11 +18,14 @@ type WeekendProduct = {
   imageUrl?: string;
   image?: string;
   images?: ImageValue[];
+  productId?: string;
   variantMatrix?: any[];
   variants?: any[];
   variantColors?: any;
   variantSizes?: any;
   variantOptions?: any;
+  colors?: any;
+  sizes?: any;
   hasVariants?: boolean;
 };
 function isWeekend() {
@@ -47,7 +50,6 @@ function isImgBB(src: string) {
 
 export default function DayDeals() {
   const [deals, setDeals] = useState<WeekendProduct[]>([]);
-  const addItem = useCartStore((state) => state.addItem);
   const openVariantModal = useCartStore((state) => state.openVariantModal);
   const weekendActive = isWeekend();
 
@@ -64,29 +66,17 @@ export default function DayDeals() {
     event.preventDefault();
     event.stopPropagation();
 
-    const hasVariants = Boolean(
-      (product.variants && product.variants.length > 0) ||
-      (product.variantColors && product.variantColors.length > 0) ||
-      (product.variantSizes && product.variantSizes.length > 0) ||
-      product.hasVariants,
-    );
-
-    if (hasVariants) {
-      openVariantModal(product as any, 'cart');
-      return;
-    }
-
-    const image = getDealImageUrl(product);
-    const price = Number(product.price || 0);
-    addItem({
+    // Always route Big Deal through the global opener. It hydrates the canonical
+    // products/{productId} document before deciding whether variants exist.
+    const dealProduct = {
+      ...product,
       id: product.id,
-      productId: product.id,
-      name: titleOf(product),
-      price,
-      originalPrice: Number(product.originalPrice || price),
-      image,
-      imageUrl: image,
-    });
+      productId: product.productId || product.id,
+      image: getDealImageUrl(product),
+      imageUrl: product.imageUrl || getDealImageUrl(product),
+    };
+
+    void openVariantModal(dealProduct as any, 'cart');
   }
 
   if (!deals.length) return null;
