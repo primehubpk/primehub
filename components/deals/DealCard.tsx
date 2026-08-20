@@ -1,6 +1,120 @@
 'use client';
+
 import Link from 'next/link';
 import { ShoppingBag } from 'lucide-react';
 import type { DealCardProps } from './DealsTypes';
-import { imageOf,regularPriceOf,statusLabel,statusStyles } from './DealsTypes';
-export default function DealCard({deal,label,status,product,adding,onAdd}:DealCardProps){const regularPrice=regularPriceOf(product,deal),dealPrice=Number(deal.dealPrice||0),discount=regularPrice>dealPrice&&dealPrice>0?Math.round(((regularPrice-dealPrice)/regularPrice)*100):0,image=imageOf(product,deal),title=product?.title||deal.title||`${label} Deal`,stock=Number(product?.stock??0),canBuy=Boolean(product&&stock>0&&regularPrice>0),productHref=product?.id?`/product/${product.id}`:deal.productId?`/product/${deal.productId}`:`/deals/${deal.day}`;return <article className="group overflow-hidden rounded-[28px] border border-black/5 bg-white shadow-[0_12px_40px_rgba(0,0,0,0.06)] transition hover:-translate-y-0.5"><Link href={productHref} className="block"><div className="relative aspect-square bg-[#F4F4F1]">{image?<img src={image} alt={title} className="h-full w-full object-cover"/>:<div className="flex h-full items-center justify-center text-xs font-bold text-black/25">No product image</div>}<div className="absolute left-3 right-3 top-3 flex items-start justify-between gap-2"><span className={`rounded-full border px-2.5 py-1.5 text-[8px] font-black uppercase tracking-wide ${statusStyles(status)}`}>{statusLabel(status)}</span>{discount>0&&<span className="rounded-full bg-[#E1352B] px-2.5 py-1.5 text-[9px] font-black text-white">-{discount}% OFF</span>}</div></div><div className="p-4"><p className="text-[9px] font-black uppercase tracking-[0.2em] text-[#E1352B]">{label.toUpperCase()} DEAL</p><h2 className="mt-1.5 line-clamp-2 min-h-[44px] text-lg font-black">{title}</h2><div className="mt-3 flex items-end gap-2"><span className="font-[family-name:var(--font-mono)] text-xl font-black text-[#E1352B]">Rs. {dealPrice>0?dealPrice.toLocaleString():'—'}</span>{regularPrice>dealPrice&&<span className="pb-0.5 text-xs text-black/35 line-through">Rs. {regularPrice.toLocaleString()}</span>}</div><p className="mt-1 text-[10px] text-black/40">{status==='live'?'Special price active today.':status==='upcoming'?'Special price unlocks on this day.':'Special price returns next week.'}</p></div></Link><div className="mt-4 flex gap-2 px-4 pb-4"><button type="button" disabled={!canBuy||adding} onClick={(e)=>{e.preventDefault();e.stopPropagation();onAdd(deal,status)}} className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-[#14140F] px-3 py-3 text-[10px] font-black text-white disabled:cursor-not-allowed disabled:opacity-35"><ShoppingBag size={14}/>{adding?'ADDED':status==='live'?'ADD TO CART':'SHOP NOW'}</button><Link href={`/deals/${deal.day}`} className="inline-flex items-center justify-center rounded-xl border border-black/10 px-3 py-3 text-[10px] font-black">VIEW</Link></div></article>}
+import { imageOf, regularPriceOf, statusLabel, statusStyles } from './DealsTypes';
+import { useCartStore } from '@/lib/cartStore';
+
+export default function DealCard({ deal, label, status, product, adding, onAdd }: DealCardProps) {
+  const addItem = useCartStore((state) => state.addItem);
+  const openVariantModal = useCartStore((state) => state.openVariantModal);
+
+  const regularPrice = regularPriceOf(product, deal);
+  const dealPrice = Number(deal.dealPrice || 0);
+  const discount = regularPrice > dealPrice && dealPrice > 0
+    ? Math.round(((regularPrice - dealPrice) / regularPrice) * 100)
+    : 0;
+  const image = imageOf(product, deal);
+  const title = product?.title || deal.title || `${label} Deal`;
+  const stock = Number(product?.stock ?? 0);
+  const canBuy = Boolean(product && stock > 0 && regularPrice > 0);
+  const productHref = product?.id
+    ? `/product/${product.id}`
+    : deal.productId
+      ? `/product/${deal.productId}`
+      : `/deals/${deal.day}`;
+
+  function handleAddToCart(event: React.MouseEvent<HTMLButtonElement>) {
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (!product) return;
+
+    const hasVariants = Boolean(
+      (product.variants && product.variants.length > 0) ||
+      (product.variantOptions && product.variantOptions.length > 0) ||
+      (product.options && Array.isArray(product.options) && product.options.length > 0) ||
+      product.hasVariants,
+    );
+
+    if (hasVariants && typeof openVariantModal === 'function') {
+      const modalProduct = {
+        ...product,
+        price: dealPrice > 0 ? dealPrice : regularPrice,
+        originalPrice: regularPrice,
+        image,
+        imageUrl: image,
+      };
+      if (openVariantModal(modalProduct, 'cart')) return;
+    }
+
+    addItem({
+      id: product.id,
+      name: title,
+      price: dealPrice > 0 ? dealPrice : regularPrice,
+      originalPrice: regularPrice,
+      image,
+      imageUrl: image,
+      dealDay: status === 'live' ? deal.day : undefined,
+    });
+
+    onAdd(deal, status);
+  }
+
+  return (
+    <article className="group overflow-hidden rounded-[28px] border border-black/5 bg-white shadow-[0_12px_40px_rgba(0,0,0,0.06)] transition hover:-translate-y-0.5">
+      <Link href={productHref} className="block">
+        <div className="relative aspect-square bg-[#F4F4F1]">
+          {image ? (
+            <img src={image} alt={title} className="h-full w-full object-cover" />
+          ) : (
+            <div className="flex h-full items-center justify-center text-xs font-bold text-black/25">
+              No product image
+            </div>
+          )}
+          <div className="absolute left-3 right-3 top-3 flex items-start justify-between gap-2">
+            <span className={`rounded-full border px-2.5 py-1.5 text-[8px] font-black uppercase tracking-wide ${statusStyles(status)}`}>
+              {statusLabel(status)}
+            </span>
+            {discount > 0 && (
+              <span className="rounded-full bg-[#E1352B] px-2.5 py-1.5 text-[9px] font-black text-white">
+                -{discount}% OFF
+              </span>
+            )}
+          </div>
+        </div>
+        <div className="p-4">
+          <p className="text-[9px] font-black uppercase tracking-[0.2em] text-[#E1352B]">{label.toUpperCase()} DEAL</p>
+          <h2 className="mt-1.5 line-clamp-2 min-h-[44px] text-lg font-black">{title}</h2>
+          <div className="mt-3 flex items-end gap-2">
+            <span className="font-[family-name:var(--font-mono)] text-xl font-black text-[#E1352B]">
+              Rs. {dealPrice > 0 ? dealPrice.toLocaleString() : '—'}
+            </span>
+            {regularPrice > dealPrice && (
+              <span className="pb-0.5 text-xs text-black/35 line-through">Rs. {regularPrice.toLocaleString()}</span>
+            )}
+          </div>
+          <p className="mt-1 text-[10px] text-black/40">
+            {status === 'live' ? 'Special price active today.' : status === 'upcoming' ? 'Special price unlocks on this day.' : 'Special price returns next week.'}
+          </p>
+        </div>
+      </Link>
+
+      <div className="mt-4 flex gap-2 px-4 pb-4">
+        <button
+          type="button"
+          disabled={!canBuy || adding}
+          onClick={handleAddToCart}
+          className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-[#14140F] px-3 py-3 text-[10px] font-black text-white disabled:cursor-not-allowed disabled:opacity-35"
+        >
+          <ShoppingBag size={14} />
+          {adding ? 'ADDED' : status === 'live' ? 'ADD TO CART' : 'SHOP NOW'}
+        </button>
+        <Link href={`/deals/${deal.day}`} className="inline-flex items-center justify-center rounded-xl border border-black/10 px-3 py-3 text-[10px] font-black">
+          VIEW
+        </Link>
+      </div>
+    </article>
+  );
+}
