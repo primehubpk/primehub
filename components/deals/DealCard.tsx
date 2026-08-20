@@ -1,12 +1,13 @@
 'use client';
 
+import type { MouseEvent } from 'react';
 import Link from 'next/link';
 import { ShoppingBag } from 'lucide-react';
 import type { DealCardProps } from './DealsTypes';
 import { imageOf, regularPriceOf, statusLabel, statusStyles } from './DealsTypes';
 import { useCartStore } from '@/lib/cartStore';
 
-export default function DealCard({ deal, label, status, product, adding, onAdd }: DealCardProps) {
+export default function DealCard({ deal, label, status, product, adding }: DealCardProps) {
   const addItem = useCartStore((state) => state.addItem);
   const openVariantModal = useCartStore((state) => state.openVariantModal);
 
@@ -25,7 +26,7 @@ export default function DealCard({ deal, label, status, product, adding, onAdd }
       ? `/product/${deal.productId}`
       : `/deals/${deal.day}`;
 
-  function handleAddToCart(event: React.MouseEvent<HTMLButtonElement>) {
+  function handleAddToCart(event: MouseEvent<HTMLButtonElement>) {
     event.preventDefault();
     event.stopPropagation();
 
@@ -34,7 +35,7 @@ export default function DealCard({ deal, label, status, product, adding, onAdd }
     const hasVariants = Boolean(
       (product.variants && product.variants.length > 0) ||
       (product.variantOptions && product.variantOptions.length > 0) ||
-      (product.options && Array.isArray(product.options) && product.options.length > 0) ||
+      (Array.isArray(product.options) && product.options.length > 0) ||
       product.hasVariants,
     );
 
@@ -58,8 +59,6 @@ export default function DealCard({ deal, label, status, product, adding, onAdd }
       imageUrl: image,
       dealDay: status === 'live' ? deal.day : undefined,
     });
-
-    onAdd(deal, status);
   }
 
   return (
