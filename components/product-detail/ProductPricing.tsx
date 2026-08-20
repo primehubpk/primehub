@@ -41,10 +41,10 @@ export default function ProductPricing({ product, rating, reviews, currentDeal, 
 
       {!liveDeal && countdown && <div className="px-4 pt-4 sm:px-5">
         <p className="mb-2 text-center text-[8px] font-black uppercase tracking-[0.2em] text-black/40">Unlocks in</p>
-        <div className="grid grid-cols-3 gap-2">
-          {[['days', countdown.days], ['hours', countdown.hours], ['minutes', countdown.minutes], ['seconds', countdown.seconds]].filter(([unit]) => unit !== 'days' || countdown.days > 0).map(([unit, value]) => <div key={String(unit)} className="rounded-2xl border border-black/6 bg-white px-2 py-2.5 text-center shadow-sm">
-            <div className="font-[family-name:var(--font-mono)] text-lg font-black leading-none text-[#14140F]">{String(value).padStart(2, '0')}</div>
-            <div className="mt-1 text-[7px] font-black uppercase tracking-wider text-black/35">{unit === 'hours' ? 'hrs' : unit === 'minutes' ? 'min' : unit === 'seconds' ? 'sec' : 'days'}</div>
+        <div className="grid grid-cols-4 gap-1.5 sm:gap-2">
+          {[['days', countdown.days], ['hours', countdown.hours], ['minutes', countdown.minutes], ['seconds', countdown.seconds]].filter(([unit]) => unit !== 'days' || countdown.days > 0).map(([unit, value]) => <div key={String(unit)} className="rounded-2xl border border-black/6 bg-white px-1.5 py-2.5 text-center shadow-sm sm:px-2">
+            <div className="font-[family-name:var(--font-mono)] text-base font-black leading-none text-[#14140F] sm:text-lg">{String(value).padStart(2, '0')}</div>
+            <div className="mt-1 text-[6px] font-black uppercase tracking-wider text-black/35 sm:text-[7px]">{unit === 'hours' ? 'hrs' : unit === 'minutes' ? 'min' : unit === 'seconds' ? 'sec' : 'days'}</div>
           </div>)}
         </div>
       </div>}
