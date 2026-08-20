@@ -1,7 +1,9 @@
 /** Global persistent cart state + global variant selector trigger. */
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
+import { doc, getDoc } from 'firebase/firestore';
 import type { ProductVariantRow, ProductVariantSelection, Weekday } from '@/lib/types';
+import { db } from '@/lib/firebase';
 
 export const FREE_DELIVERY_THRESHOLD = 5;
 
@@ -22,6 +24,7 @@ export interface CartItem {
 
 export interface VariantModalProduct {
   id: string;
+  productId?: string;
   title?: string;
   name?: string;
   price?: number | string;
@@ -65,7 +68,7 @@ interface CartState {
   minimizeCart: () => void;
   expandMiniCart: () => void;
   toggleDrawer: () => void;
-  openVariantModal: (product: VariantModalProduct, mode: 'cart' | 'buy') => boolean;
+  openVariantModal: (product: VariantModalProduct, mode: 'cart' | 'buy') => Promise<boolean>;
   closeVariantModal: () => void;
   getCartCount: () => number;
   getSubtotal: () => number;
@@ -87,6 +90,22 @@ function asStrings(value: unknown): string[] {
       return '';
     })
     .filter(Boolean);
+}
+
+function hasProductVariants(product: VariantModalProduct): boolean {
+  return Boolean(
+    (Array.isArray(product.variants) && product.variants.length > 0) ||
+      (Array.isArray(product.variantMatrix) && product.variantMatrix.length > 0) ||
+      (Array.isArray(product.variantColors) && product.variantColors.length > 0) ||
+      (Array.isArray(product.variantSizes) && product.variantSizes.length > 0) ||
+      (Array.isArray(product.colors) && product.colors.length > 0) ||
+      (Array.isArray(product.sizes) && product.sizes.length > 0) ||
+      product.hasVariants,
+  );
+}
+
+function variantDataMissing(product: VariantModalProduct): boolean {
+  return !hasProductVariants(product);
 }
 
 function rowValue(row: ProductVariantRow, key: 'color' | 'size'): string {
@@ -287,10 +306,52 @@ export const useCartStore = create<CartState>()(
           isDrawerOpen: !state.isDrawerOpen,
           isMiniCollapsed: state.isDrawerOpen ? state.isMiniCollapsed : false,
         })),
-      openVariantModal: (product, mode) => {
-        const normalized = normalizeProductVariants(product);
-        if (!normalized.hasVariants) return false;
-        set({ variantModalProduct: product, variantModalMode: mode });
+      openVariantModal: async (product, mode) => {
+        let resolvedProduct = product;
+
+        if (variantDataMissing(product)) {
+          const productId = String(product.productId || product.id || '').trim();
+          if (productId) {
+            try {
+              const productSnap = await getDoc(doc(db, 'products', productId));
+              if (productSnap.exists()) {
+                resolvedProduct = {
+                  ...product,
+                  id: productSnap.id,
+                  productId: productSnap.id,
+                  ...productSnap.data(),
+                } as VariantModalProduct;
+              }
+            } catch {
+              // Keep the lightweight deal object and fall through to direct-add.
+            }
+          }
+        }
+
+        if (!hasProductVariants(resolvedProduct)) {
+          const image =
+            resolvedProduct.image ||
+            resolvedProduct.imageUrl ||
+            (Array.isArray(resolvedProduct.images)
+              ? typeof resolvedProduct.images[0] === 'string'
+                ? resolvedProduct.images[0]
+                : String((resolvedProduct.images[0] as Record<string, unknown> | undefined)?.url || '')
+              : '');
+          const price = Number(resolvedProduct.price || 0);
+          const originalPrice = Number(resolvedProduct.originalPrice || resolvedProduct.compareAtPrice || price);
+          get().addItem({
+            id: resolvedProduct.id,
+            productId: resolvedProduct.productId || resolvedProduct.id,
+            name: resolvedProduct.title || resolvedProduct.name || 'PrimeHub Deal',
+            price,
+            originalPrice,
+            image,
+            imageUrl: image,
+          });
+          return false;
+        }
+
+        set({ variantModalProduct: resolvedProduct, variantModalMode: mode });
         return true;
       },
       closeVariantModal: () => set({ variantModalProduct: null, variantModalMode: null }),
