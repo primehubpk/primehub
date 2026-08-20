@@ -32,7 +32,8 @@ export default function DailyDealHero() {
   if (config.heroEnabled === false) return null;
 
   const image = config.heroImageUrl || config.dailyDealImageUrl || '';
-  const title = config.heroTitle || config.dailyDealLabel || 'TODAY’S DEAL';
+  const dayName = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Karachi', weekday: 'long' }).format(new Date()).toUpperCase();
+  const title = `${dayName} DEAL`;
   const subtitle = config.heroSubtitle || 'Limited-time price. Updated daily.';
   const price = config.dailyDealPrice;
   const oldPrice = config.dailyDealOldPrice;
