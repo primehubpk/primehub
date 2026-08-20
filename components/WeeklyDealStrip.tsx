@@ -30,12 +30,16 @@ function hasVariants(product: DealProduct): boolean {
   );
 }
 
-function productImage(product: DealProduct): string {
-  if (product.image) return product.image;
-  if (product.imageUrl) return product.imageUrl;
+function getProductImage(product: any): string {
+  if (!product) return '';
+  if (typeof product.image === 'string' && product.image) return product.image;
+  if (typeof product.imageUrl === 'string' && product.imageUrl) return product.imageUrl;
   const first = product.images?.[0];
   if (typeof first === 'string') return first;
-  return first?.url || '';
+  if (first && typeof first === 'object') {
+    return String((first as any).url || (first as any).src || '');
+  }
+  return '';
 }
 
 function numericPrice(value: unknown): number {
@@ -69,7 +73,7 @@ export default function WeeklyDealStrip() {
       const snapshot = await getDoc(doc(db, 'products', deal.productId));
       if (!snapshot.exists()) return;
       const product = { id: snapshot.id, ...snapshot.data() } as DealProduct;
-      const image = productImage(product);
+      const image = getProductImage(product);
       const dealPrice = numericPrice(deal.dealPrice || product.price);
       const originalPrice = numericPrice(deal.originalPrice || product.compareAtPrice || product.originalPrice || dealPrice);
       const modalProduct: DealProduct = { ...product, price: dealPrice, originalPrice, image, imageUrl: image };
