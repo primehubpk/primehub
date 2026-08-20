@@ -97,6 +97,33 @@ const discount = (p: Product) => {
 
 const sameImage = (a: string, b: string) => Boolean(a && b && a.trim() === b.trim());
 
+function getModalProduct(p: Product): Product {
+  const rawOptions = Array.isArray(p.options) ? p.options : [];
+  const existingVariantOptions = Array.isArray(p.variantOptions) ? p.variantOptions : [];
+
+  const normalizedOptions = rawOptions
+    .map((option: any, index: number) => {
+      if (!option || typeof option !== 'object') return null;
+      const id = String(option.id ?? option.name ?? option.label ?? `option-${index}`);
+      const values = Array.isArray(option.values)
+        ? option.values.map((value: unknown) => String(value)).filter(Boolean)
+        : Array.isArray(option.options)
+          ? option.options.map((value: unknown) => String(value)).filter(Boolean)
+          : [];
+      return values.length > 0 ? { id, values } : null;
+    })
+    .filter((option): option is { id: string; values: string[] } => Boolean(option));
+
+  if (!normalizedOptions.length || existingVariantOptions.length > 0) {
+    return p;
+  }
+
+  return {
+    ...p,
+    variantOptions: normalizedOptions,
+  };
+}
+
 export default function ProductGridRewards({
   selectedMaxPrice = null,
   wholesaleSelected = false,
@@ -293,9 +320,19 @@ export default function ProductGridRewards({
 
   function add(p: Product) {
     const img = image(p);
+    const modalProduct = getModalProduct(p);
+    const hasVariants = Boolean(
+      (Array.isArray(modalProduct.variants) && modalProduct.variants.length > 0) ||
+      (Array.isArray(modalProduct.variantMatrix) && modalProduct.variantMatrix.length > 0) ||
+      (Array.isArray(modalProduct.variantColors) && modalProduct.variantColors.length > 0) ||
+      (Array.isArray(modalProduct.variantSizes) && modalProduct.variantSizes.length > 0) ||
+      (Array.isArray(modalProduct.variantOptions) && modalProduct.variantOptions.length > 0) ||
+      (Array.isArray(modalProduct.options) && modalProduct.options.length > 0) ||
+      modalProduct.hasVariants === true,
+    );
 
-    if (typeof openVariantModal === 'function') {
-      const opened = openVariantModal(p as any, 'cart');
+    if (hasVariants && typeof openVariantModal === 'function') {
+      const opened = openVariantModal(modalProduct as any, 'cart');
       if (opened) return;
     }
 
