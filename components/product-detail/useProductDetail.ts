@@ -2,10 +2,10 @@ import { useEffect, useMemo, useState } from 'react';
 import { collection, doc, getDoc, getDocs } from 'firebase/firestore';
 import { useParams, useRouter } from 'next/navigation';
 import { db } from '@/lib/firebase';
-import { useCartStore } from '@/lib/cartStore';
+import { getVariantRows, useCartStore } from '@/lib/cartStore';
 import { useSettings } from '@/lib/useSettings';
 import { WEEKDAY_LABELS, WEEKDAY_ORDER, countdownParts, dealTiming } from '@/lib/weeklyDealUtils';
-import type { ProductVariantRow, ProductVariantSelection, WeeklyDeal } from '@/lib/types';
+import type { ProductVariantSelection, WeeklyDeal } from '@/lib/types';
 import { rememberProduct } from '@/components/RecentlyViewed';
 import { dealDiscount, imagesOf, originalPriceOf, regularPriceOf, titleOf, type Product, type ProductDetailModel, money } from './ProductDetailTypes';
 
@@ -16,7 +16,7 @@ export function useProductDetail(): ProductDetailModel {
  useEffect(()=>{let cancelled=false;async function load(){if(!id)return;setLoading(true);try{const [productSnap,productsSnap]=await Promise.all([getDoc(doc(db,'products',id)),getDocs(collection(db,'products'))]);if(cancelled)return;if(!productSnap.exists()){setProduct(null);setFailed(true);}else{const nextProduct={id:productSnap.id,...productSnap.data()} as Product;setProduct(nextProduct);rememberProduct(productSnap.id);}const nextProducts:Record<string,Product>={};productsSnap.forEach(item=>{nextProducts[item.id]={id:item.id,...item.data()} as Product;});setWeeklyProducts(nextProducts);}catch{if(!cancelled)setFailed(true);}finally{if(!cancelled)setLoading(false);}}load();return()=>{cancelled=true;};},[id]);
  const images=useMemo(()=>product?imagesOf(product):[],[product]);
  const regularPrice=product?regularPriceOf(product):0,productOriginal=product?originalPriceOf(product):0,stock=Number(product?.stock??product?.quantity??product?.inventory??10),rating=Number(product?.rating||0),reviews=Number(product?.reviews||0);
- const variantRows=useMemo<ProductVariantRow[]>(()=>{const rows=Array.isArray(product?.variantMatrix)?product.variantMatrix:[];return rows.map(row=>({...row,stock:Number(row.stock??0)}));},[product]);
+ const variantRows=useMemo(()=>product?getVariantRows(product):[],[product]);
  const weeklyDeals=useMemo(()=>((settings.weeklyDeals||[]) as WeeklyDeal[]).filter(deal=>deal.active!==false&&deal.productId&&Number(deal.dealPrice)>0).sort((a,b)=>WEEKDAY_ORDER.indexOf(a.day)-WEEKDAY_ORDER.indexOf(b.day)),[settings.weeklyDeals]);
  const currentDeal=useMemo(()=>weeklyDeals.find(deal=>deal.productId===id),[weeklyDeals,id]),timing=currentDeal&&nowTick!==null?dealTiming(currentDeal.day,new Date(nowTick)):null,liveDeal=Boolean(currentDeal&&timing?.isLive),dealPrice=currentDeal?Number(currentDeal.dealPrice||0):0,normalForDeal=currentDeal?Number(weeklyProducts[id]?.price||currentDeal.originalPrice||regularPrice):productOriginal,savingsAmount=currentDeal&&dealPrice>0&&normalForDeal>dealPrice?normalForDeal-dealPrice:0,savingsPercent=dealDiscount(dealPrice,normalForDeal),countdown=timing&&nowTick!==null?countdownParts(timing.unlockAt.getTime()-nowTick):null,currentPrice=liveDeal&&dealPrice>0?dealPrice:regularPrice,whatsappNumber=String(settings.whatsappNumber||'').replace(/\D/g,''),maxQuantity=stock>0?stock:undefined,stockProgress=Math.max(0,Math.min(100,(stock/Math.max(stock,50))*100)),bannerCountdown=countdown?(liveDeal?`${countdown.hours.toString().padStart(2,'0')}:${countdown.minutes.toString().padStart(2,'0')}:${countdown.seconds.toString().padStart(2,'0')}`:`${countdown.days}d ${countdown.hours.toString().padStart(2,'0')}:${countdown.minutes.toString().padStart(2,'0')}:${countdown.seconds.toString().padStart(2,'0')}`):'—';
  const hasVariants=variantRows.length>0;
