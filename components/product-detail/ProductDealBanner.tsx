@@ -1,9 +1,10 @@
 'use client';
-import { LockKeyhole } from 'lucide-react';
-import { WEEKDAY_LABELS } from '@/lib/weeklyDealUtils';
+
 import type { WeeklyDeal } from '@/lib/types';
+
 type Props = { currentDeal?: WeeklyDeal; liveDeal: boolean; bannerCountdown: string; timing: unknown; nowTick: number | null };
-export default function ProductDealBanner({ currentDeal, liveDeal, bannerCountdown, timing, nowTick }: Props) {
-  if (!currentDeal || !timing || nowTick === null) return null;
-  return liveDeal ? <div className="live-deal-celebration relative overflow-hidden rounded-[24px] bg-gradient-to-r from-[#8a4b00] via-[#FFD166] to-[#0F6A5F] p-[2px] shadow-lg"><div className="rounded-[22px] bg-gradient-to-br from-[#2b1600] via-[#14140F] to-[#063b35] p-4 text-white sm:p-5"><div className="flex flex-wrap items-center justify-between gap-3"><div><div className="mb-1 text-[8px] font-black uppercase tracking-[0.14em] text-[#FFD166]">🎉 MEGA CELEBRATION SALE — LOWEST PRICE EVER!</div><div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-white/80"><span className="h-2 w-2 animate-pulse rounded-full bg-[#FFB020]" />Live Deal <span aria-hidden="true">🎉 🎆 💥</span></div><p className="mt-1 text-xl font-black sm:text-2xl">⚡ LIVE TODAY'S DEAL</p></div><div className="rounded-2xl bg-white/10 px-4 py-3 text-center ring-1 ring-[#FFD166]/30"><p className="text-[8px] font-black uppercase tracking-[0.18em] text-white/60">Ends in</p><p className="mt-1 font-[family-name:var(--font-mono)] text-xl font-black tracking-tight">{bannerCountdown}</p></div></div></div></div> : <div className="rounded-[24px] border border-black/8 bg-[#F4F4F1] p-4 sm:p-5"><div className="flex flex-wrap items-center justify-between gap-3"><div><div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-[#0F6A5F]"><LockKeyhole size={13} />Weekly Deal</div><p className="mt-1 text-xl font-black sm:text-2xl">🔒 {WEEKDAY_LABELS[currentDeal.day]} DEAL</p></div><div className="rounded-2xl bg-white px-4 py-3 text-center shadow-sm"><p className="text-[8px] font-black uppercase tracking-[0.18em] text-black/40">Unlocks in</p><p className="mt-1 font-[family-name:var(--font-mono)] text-lg font-black">{bannerCountdown}</p></div></div><p className="mt-4 text-[10px] font-bold leading-5 text-black/50">Special deal price unlocks on {WEEKDAY_LABELS[currentDeal.day]}. You can buy now or wait for the deal!</p></div>;
+
+export default function ProductDealBanner({ currentDeal }: Props) {
+  if (!currentDeal) return null;
+  return null;
 }
