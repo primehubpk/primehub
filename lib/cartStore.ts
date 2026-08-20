@@ -2,20 +2,199 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import type { ProductVariantRow, ProductVariantSelection, Weekday } from '@/lib/types';
-export const FREE_DELIVERY_THRESHOLD=5;
-export interface CartItem{id:string|number;name:string;price:number;originalPrice:number;image?:string;imageUrl?:string;qty:number;dealDay?:Weekday;productId?:string;variant?:ProductVariantSelection;}
-export interface VariantModalProduct{id:string;title?:string;name?:string;price?:number;originalPrice?:number;compareAtPrice?:number;imageUrl?:string;image?:string;images?:string[];variantMatrix?:ProductVariantRow[];variants?:ProductVariantRow[];variantColors?:Array<{name:string;imageUrl?:string}>|string[];variantOptions?:Array<{id:string;values:string[]}>;[key:string]:unknown;}
-interface CartState{items:CartItem[];isDrawerOpen:boolean;isMiniCollapsed:boolean;variantModalProduct:VariantModalProduct|null;variantModalMode:'cart'|'buy'|null;addItem:(item:Omit<CartItem,'qty'>)=>void;removeItem:(id:string|number)=>void;updateQty:(id:string|number,qty:number)=>void;clearCart:()=>void;openDrawer:()=>void;closeDrawer:()=>void;minimizeCart:()=>void;expandMiniCart:()=>void;toggleDrawer:()=>void;openVariantModal:(product:VariantModalProduct,mode:'cart'|'buy')=>boolean;closeVariantModal:()=>void;getCartCount:()=>number;getSubtotal:()=>number;getItemsToFreeDelivery:()=>number;getDeliveryProgress:()=>number;}
-function variantRows(product:VariantModalProduct){
- if(Array.isArray(product.variants)&&product.variants.length)return product.variants;
- if(Array.isArray(product.variantMatrix)&&product.variantMatrix.length)return product.variantMatrix;
- const colors=(product.variantColors||[]).map(v=>typeof v==='string'?v:v.name).filter(Boolean);
- const options=product.variantOptions||[]; const sizeValues=options.find(o=>/size/i.test(o.id))?.values||options.find(o=>o.id!=='color')?.values||[]; const colorValues=colors.length?colors:options.find(o=>/color/i.test(o.id))?.values||[];
- if(!colorValues.length&&!sizeValues.length)return [];
- const cs=colorValues.length?colorValues:['Standard']; const ss=sizeValues.length?sizeValues:['Standard'];
- return cs.flatMap(color=>ss.map(size=>({color,size,stock:1,price:product.price,imageUrl:typeof product.variantColors?.[0]==='object'?product.variantColors?.find(v=>typeof v==='object'&&v.name===color)?.imageUrl:undefined})));
+
+export const FREE_DELIVERY_THRESHOLD = 5;
+
+type VariantModalImage = string | { url?: string } | Record<string, unknown>;
+
+export interface CartItem {
+  id: string | number;
+  name: string;
+  price: number;
+  originalPrice: number;
+  image?: string;
+  imageUrl?: string;
+  qty: number;
+  dealDay?: Weekday;
+  productId?: string;
+  variant?: ProductVariantSelection;
 }
-function variantKey(variant?:ProductVariantSelection){return variant?Object.entries(variant).filter(([,v])=>v).sort(([a],[b])=>a.localeCompare(b)).map(([k,v])=>`${k}:${v}`).join('|'):'';}
-function resolveVisibleProductImage(item:Omit<CartItem,'qty'>){if(item.image||item.imageUrl||typeof document==='undefined')return item.image||item.imageUrl||'';const match=Array.from(document.images).find(i=>i.alt.trim().toLowerCase()===item.name.trim().toLowerCase());return match?.currentSrc||match?.src||'';}
-export const useCartStore=create<CartState>()(persist((set,get)=>({items:[],isDrawerOpen:false,isMiniCollapsed:false,variantModalProduct:null,variantModalMode:null,addItem:item=>{const resolvedImage=resolveVisibleProductImage(item),normalized={...item,id:item.id||`${item.productId||''}:${variantKey(item.variant)}`,image:item.image||item.imageUrl||resolvedImage,imageUrl:item.imageUrl||item.image||resolvedImage};set(state=>{const existing=state.items.find(i=>i.id===normalized.id);return{items:existing?state.items.map(i=>i.id===normalized.id?{...i,...normalized,qty:i.qty+1}:i):[...state.items,{...normalized,qty:1}],isDrawerOpen:true,isMiniCollapsed:false};});},removeItem:id=>set(s=>({items:s.items.filter(i=>i.id!==id)})),updateQty:(id,qty)=>set(s=>({items:qty<=0?s.items.filter(i=>i.id!==id):s.items.map(i=>i.id===id?{...i,qty}:i)})),clearCart:()=>set({items:[],isDrawerOpen:false,isMiniCollapsed:false}),openDrawer:()=>set({isDrawerOpen:true,isMiniCollapsed:false}),closeDrawer:()=>set({isDrawerOpen:false}),minimizeCart:()=>set({isDrawerOpen:false,isMiniCollapsed:true}),expandMiniCart:()=>set({isDrawerOpen:true,isMiniCollapsed:false}),toggleDrawer:()=>set(s=>({isDrawerOpen:!s.isDrawerOpen,isMiniCollapsed:s.isDrawerOpen?s.isMiniCollapsed:false})),openVariantModal:(product,mode)=>{if(!variantRows(product).length)return false;set({variantModalProduct:product,variantModalMode:mode});return true;},closeVariantModal:()=>set({variantModalProduct:null,variantModalMode:null}),getCartCount:()=>get().items.reduce((s,i)=>s+i.qty,0),getSubtotal:()=>get().items.reduce((s,i)=>s+i.price*i.qty,0),getItemsToFreeDelivery:()=>Math.max(0,FREE_DELIVERY_THRESHOLD-get().items.reduce((s,i)=>s+i.qty,0)),getDeliveryProgress:()=>Math.min(100,Math.round(get().items.reduce((s,i)=>s+i.qty,0)/FREE_DELIVERY_THRESHOLD*100))}),{name:'phdeals-cart',storage:createJSONStorage(()=>localStorage),partialize:s=>({items:s.items})}));
-export function getVariantRows(product:VariantModalProduct){return variantRows(product);}
+
+export interface VariantModalProduct {
+  id: string;
+  title?: string;
+  name?: string;
+  price?: number;
+  originalPrice?: number;
+  compareAtPrice?: number;
+  imageUrl?: string;
+  image?: string;
+  images?: VariantModalImage[];
+  variantMatrix?: ProductVariantRow[];
+  variants?: ProductVariantRow[];
+  variantColors?: Array<{ name: string; imageUrl?: string }> | string[];
+  variantOptions?: Array<{ id: string; values: string[] }>;
+  [key: string]: unknown;
+}
+
+interface CartState {
+  items: CartItem[];
+  isDrawerOpen: boolean;
+  isMiniCollapsed: boolean;
+  variantModalProduct: VariantModalProduct | null;
+  variantModalMode: 'cart' | 'buy' | null;
+  addItem: (item: Omit<CartItem, 'qty'>) => void;
+  removeItem: (id: string | number) => void;
+  updateQty: (id: string | number, qty: number) => void;
+  clearCart: () => void;
+  openDrawer: () => void;
+  closeDrawer: () => void;
+  minimizeCart: () => void;
+  expandMiniCart: () => void;
+  toggleDrawer: () => void;
+  openVariantModal: (product: VariantModalProduct, mode: 'cart' | 'buy') => boolean;
+  closeVariantModal: () => void;
+  getCartCount: () => number;
+  getSubtotal: () => number;
+  getItemsToFreeDelivery: () => number;
+  getDeliveryProgress: () => number;
+}
+
+function variantRows(product: VariantModalProduct): ProductVariantRow[] {
+  if (Array.isArray(product.variants) && product.variants.length) return product.variants;
+  if (Array.isArray(product.variantMatrix) && product.variantMatrix.length) return product.variantMatrix;
+
+  const colors = (product.variantColors || [])
+    .map((value) => (typeof value === 'string' ? value : value.name))
+    .filter(Boolean);
+  const options = product.variantOptions || [];
+  const sizeValues =
+    options.find((option) => /size/i.test(option.id))?.values ||
+    options.find((option) => option.id !== 'color')?.values ||
+    [];
+  const colorValues =
+    colors.length > 0
+      ? colors
+      : options.find((option) => /color/i.test(option.id))?.values || [];
+
+  if (!colorValues.length && !sizeValues.length) return [];
+
+  const colorOptions = colorValues.length ? colorValues : ['Standard'];
+  const sizeOptions = sizeValues.length ? sizeValues : ['Standard'];
+
+  return colorOptions.flatMap((color) =>
+    sizeOptions.map((size) => ({
+      color,
+      size,
+      stock: 1,
+      price: product.price,
+      imageUrl:
+        typeof product.variantColors?.[0] === 'object'
+          ? product.variantColors?.find(
+              (value) => typeof value === 'object' && value.name === color,
+            )?.imageUrl
+          : undefined,
+    })),
+  );
+}
+
+function variantKey(variant?: ProductVariantSelection): string {
+  return variant
+    ? Object.entries(variant)
+        .filter(([, value]) => value)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([key, value]) => `${key}:${value}`)
+        .join('|')
+    : '';
+}
+
+function resolveVisibleProductImage(item: Omit<CartItem, 'qty'>): string {
+  if (item.image || item.imageUrl || typeof document === 'undefined') {
+    return item.image || item.imageUrl || '';
+  }
+
+  const match = Array.from(document.images).find(
+    (image) => image.alt.trim().toLowerCase() === item.name.trim().toLowerCase(),
+  );
+  return match?.currentSrc || match?.src || '';
+}
+
+export const useCartStore = create<CartState>()(
+  persist(
+    (set, get) => ({
+      items: [],
+      isDrawerOpen: false,
+      isMiniCollapsed: false,
+      variantModalProduct: null,
+      variantModalMode: null,
+      addItem: (item) => {
+        const resolvedImage = resolveVisibleProductImage(item);
+        const normalized = {
+          ...item,
+          id: item.id || `${item.productId || ''}:${variantKey(item.variant)}`,
+          image: item.image || item.imageUrl || resolvedImage,
+          imageUrl: item.imageUrl || item.image || resolvedImage,
+        };
+
+        set((state) => {
+          const existing = state.items.find((current) => current.id === normalized.id);
+          return {
+            items: existing
+              ? state.items.map((current) =>
+                  current.id === normalized.id
+                    ? { ...current, ...normalized, qty: current.qty + 1 }
+                    : current,
+                )
+              : [...state.items, { ...normalized, qty: 1 }],
+            isDrawerOpen: true,
+            isMiniCollapsed: false,
+          };
+        });
+      },
+      removeItem: (id) => set((state) => ({ items: state.items.filter((item) => item.id !== id) })),
+      updateQty: (id, qty) =>
+        set((state) => ({
+          items:
+            qty <= 0
+              ? state.items.filter((item) => item.id !== id)
+              : state.items.map((item) => (item.id === id ? { ...item, qty } : item)),
+        })),
+      clearCart: () => set({ items: [], isDrawerOpen: false, isMiniCollapsed: false }),
+      openDrawer: () => set({ isDrawerOpen: true, isMiniCollapsed: false }),
+      closeDrawer: () => set({ isDrawerOpen: false }),
+      minimizeCart: () => set({ isDrawerOpen: false, isMiniCollapsed: true }),
+      expandMiniCart: () => set({ isDrawerOpen: true, isMiniCollapsed: false }),
+      toggleDrawer: () =>
+        set((state) => ({
+          isDrawerOpen: !state.isDrawerOpen,
+          isMiniCollapsed: state.isDrawerOpen ? state.isMiniCollapsed : false,
+        })),
+      openVariantModal: (product, mode) => {
+        if (!variantRows(product).length) return false;
+        set({ variantModalProduct: product, variantModalMode: mode });
+        return true;
+      },
+      closeVariantModal: () => set({ variantModalProduct: null, variantModalMode: null }),
+      getCartCount: () => get().items.reduce((sum, item) => sum + item.qty, 0),
+      getSubtotal: () => get().items.reduce((sum, item) => sum + item.price * item.qty, 0),
+      getItemsToFreeDelivery: () =>
+        Math.max(0, FREE_DELIVERY_THRESHOLD - get().items.reduce((sum, item) => sum + item.qty, 0)),
+      getDeliveryProgress: () =>
+        Math.min(
+          100,
+          Math.round(
+            (get().items.reduce((sum, item) => sum + item.qty, 0) / FREE_DELIVERY_THRESHOLD) * 100,
+          ),
+        ),
+    }),
+    {
+      name: 'phdeals-cart',
+      storage: createJSONStorage(() => localStorage),
+      partialize: (state) => ({ items: state.items }),
+    },
+  ),
+);
+
+export function getVariantRows(product: VariantModalProduct): ProductVariantRow[] {
+  return variantRows(product);
+}
