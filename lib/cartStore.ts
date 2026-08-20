@@ -24,9 +24,9 @@ export interface VariantModalProduct {
   id: string;
   title?: string;
   name?: string;
-  price?: number;
-  originalPrice?: number;
-  compareAtPrice?: number;
+  price?: number | string;
+  originalPrice?: number | string;
+  compareAtPrice?: number | string;
   imageUrl?: string;
   image?: string;
   images?: VariantModalImage[];
@@ -38,6 +38,7 @@ export interface VariantModalProduct {
   sizes?: string[];
   variantOptions?: Array<{ id: string; values: string[] }>;
   hasVariants?: boolean;
+  stock?: number;
   colorImages?: Record<string, string>;
   [key: string]: unknown;
 }
@@ -109,11 +110,6 @@ function rowImage(row: ProductVariantRow, color: string, colorImageMap: Record<s
   return colorItems.find((item) => item.name === color)?.imageUrl || undefined;
 }
 
-/**
- * Single source of truth for all product variant shapes saved by the admin.
- * It preserves configured color/size order, hydrates matrix rows, and fills
- * missing matrix combinations from the configured option lists.
- */
 export function normalizeProductVariants(product: VariantModalProduct): NormalizedProductVariants {
   const directRows = Array.isArray(product.variants) ? product.variants : [];
   const matrixRows = Array.isArray(product.variantMatrix) ? product.variantMatrix : [];
@@ -201,9 +197,6 @@ export function normalizeProductVariants(product: VariantModalProduct): Normaliz
     });
   });
 
-  // Preserve every configured Color × Size combination. Existing matrix rows
-  // retain their exact stock/price/image; missing rows remain visible but are
-  // marked unavailable instead of disappearing from the selector.
   const rows = colorItems.flatMap((color) =>
     sizes.map((size) => {
       const key = `${color.name}::${size}`;
