@@ -4,6 +4,7 @@ import { doc, onSnapshot } from 'firebase/firestore';
 import Link from 'next/link';
 import { ArrowRight, Clock3, ShoppingCart } from 'lucide-react';
 import type { WeeklyDeal } from '@/lib/types';
+import { db } from '@/lib/firebase';
 import { useCartStore } from '@/lib/cartStore';
 
 const DAYS: WeeklyDeal['day'][] = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
