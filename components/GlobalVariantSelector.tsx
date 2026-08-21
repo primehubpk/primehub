@@ -5,6 +5,7 @@ import {
   useCartStore,
   type VariantModalProduct,
 } from '@/lib/cartStore';
+import { getEffectivePrice } from '@/lib/dealPricing';
 import VariantSelectorBottomSheet from '@/components/product-detail/VariantSelectorBottomSheet';
 import type { ProductVariantSelection } from '@/lib/types';
 
@@ -34,8 +35,8 @@ export default function GlobalVariantSelector() {
 
   const normalized = normalizeProductVariants(product);
   const rows = normalized.rows;
-  const basePrice = Number(product.price ?? 0);
-  const originalPrice = Number(product.compareAtPrice ?? product.originalPrice ?? basePrice);
+  const basePrice = getEffectivePrice(product);
+  const originalPrice = Number(product.compareAtPrice ?? product.originalPrice ?? product.price ?? basePrice);
   const title = product.title || product.name || 'PrimeHub Deal';
 
   function confirm(selection: ProductVariantSelection, quantity: number) {
@@ -46,7 +47,7 @@ export default function GlobalVariantSelector() {
         (!selection.color || row.color === selection.color) &&
         (!selection.size || row.size === selection.size),
     );
-    const price = Number(selected?.price ?? basePrice) || basePrice;
+    const price = getEffectivePrice(product, selected);
     const image = String(selected?.imageUrl || imageOf(product));
     const variantIdentity = Object.entries(selection)
       .filter(([, value]) => Boolean(value))
