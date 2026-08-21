@@ -126,8 +126,15 @@ export default function Footer({ onWholesaleSelect }: { onWholesaleSelect?: () =
               </a>
 
               <div className="grid grid-cols-2 gap-2">
-                <Link href="/contact" className="flex items-start gap-2 rounded-2xl border border-white/10 bg-white/5 p-3 text-[9px] font-black text-white/70 transition hover:bg-white/10"><Globe2 className="mt-0.5 h-4 w-4 shrink-0 text-[#FFB020]" /><span>Global Shipping Available.<span className="mt-1 block font-normal leading-4 text-white/45">We deliver our premium bangles worldwide with secure packaging.</span></span></Link>
-                <button type="button" onClick={handleWholesaleClick} className="flex min-h-[72px] items-center gap-2 rounded-2xl border border-yellow-600/30 bg-white/5 p-3.5 text-left text-[9px] font-black text-[#FFB020] backdrop-blur-md transition hover:bg-white/[0.08] hover:border-yellow-600/40"><ShoppingBag size={14} /> Wholesale Deals <ArrowUpRight size={11} /></button>
+                <Link href="/contact" className="flex min-h-[72px] items-start gap-2 rounded-2xl border border-white/10 bg-white/5 p-3 text-[9px] font-black text-white/70 transition hover:bg-white/10"><Globe2 className="mt-0.5 h-4 w-4 shrink-0 text-[#FFB020]" /><span>Global Shipping Available.<span className="mt-1 block font-normal leading-4 text-white/45">We deliver our premium bangles worldwide with secure packaging.</span></span></Link>
+                <button type="button" onClick={handleWholesaleClick} className="flex min-h-[72px] items-start gap-2 rounded-2xl border border-yellow-600/30 bg-white/5 p-3 text-left backdrop-blur-md transition hover:bg-white/[0.08] hover:border-yellow-600/40">
+                  <ShoppingBag size={14} className="mt-0.5 shrink-0 text-yellow-600/80" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[9px] font-black text-white">Wholesale Deals</span>
+                    <span className="mt-1 block text-[8px] font-normal leading-4 text-white/60">Bulk orders for businesses. Get special pricing on large quantities.</span>
+                  </span>
+                  <ArrowUpRight size={11} className="mt-0.5 shrink-0 text-white/40" />
+                </button>
               </div>
             </div>
           </div>
