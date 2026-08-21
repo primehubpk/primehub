@@ -75,11 +75,13 @@ export default function VariantSelectorBottomSheet({
   const selectedColor = colors.find((item) => item.name === color);
   const stock = stockOf(selected);
   const selectedPrice = Number(selected?.price ?? currentPrice) || currentPrice;
+  const hasActiveDeal = currentPrice > 0 && selectedPrice > currentPrice;
+  const displayPrice = hasActiveDeal ? currentPrice : selectedPrice;
   const fallbackImage = imageValue(product.imageUrl) || imageValue(product.image);
   const selectedImage = String(
     selected?.imageUrl || selectedColor?.imageUrl || fallbackImage || imageValue(product.images?.[0]),
   );
-  const valid = Boolean(selected && stock > 0 && selectedPrice > 0);
+  const valid = Boolean(selected && stock > 0 && displayPrice > 0);
   const safeQty = Math.min(Math.max(1, qty), Math.max(1, stock));
 
   if (!open) return null;
@@ -105,9 +107,19 @@ export default function VariantSelectorBottomSheet({
           </div>
           <div className="min-w-0 flex-1">
             <p className="line-clamp-2 text-sm font-black">{titleOf(product as any)}</p>
-            <div className="mt-1 flex items-center gap-2">
-              <p className="text-sm font-black text-[#E1352B]">{money(selectedPrice)}</p>
-              {originalPrice > selectedPrice ? (
+            <div className="mt-1 flex flex-wrap items-center gap-2">
+              {hasActiveDeal && originalPrice > selectedPrice ? (
+                <span className="text-[10px] font-bold text-black/30 line-through">
+                  {money(originalPrice)}
+                </span>
+              ) : null}
+              {hasActiveDeal ? (
+                <span className="text-[10px] font-bold text-black/35 line-through">
+                  {money(selectedPrice)}
+                </span>
+              ) : null}
+              <p className="text-sm font-black text-[#E1352B]">{money(displayPrice)}</p>
+              {!hasActiveDeal && originalPrice > selectedPrice ? (
                 <span className="text-[10px] font-bold text-black/30 line-through">
                   {money(originalPrice)}
                 </span>
@@ -227,8 +239,8 @@ export default function VariantSelectorBottomSheet({
                   : 'Select an available option'}
               </span>
               {selected && stock > 0 ? (
-                <span className="text-[10px] font-bold text-black/35">
-                  {money(selectedPrice)} each
+                <span className={`text-[10px] font-bold ${hasActiveDeal ? 'text-[#E1352B]' : 'text-black/35'}`}>
+                  {money(displayPrice)} each
                 </span>
               ) : null}
             </div>
