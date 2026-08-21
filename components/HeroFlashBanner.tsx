@@ -8,6 +8,7 @@ import { collection, onSnapshot } from 'firebase/firestore';
 import { useSettings } from '@/lib/useSettings';
 import { useCartStore } from '@/lib/cartStore';
 import { db } from '@/lib/firebase';
+import { getEffectivePrice } from '@/lib/dealPricing';
 import type { Product, Weekday } from '@/lib/types';
 import { WEEKDAY_LABELS, WEEKDAY_ORDER, dealTiming, pakistanNowWeekday, countdownParts } from '@/lib/weeklyDealUtils';
 
@@ -127,8 +128,9 @@ export default function HeroFlashBanner() {
     const product = products[deal.productId];
     const normalPrice = Number(product?.price || deal.originalPrice || 0);
     const specialPrice = Number(deal.dealPrice || 0);
-    const isLive = todayKey === deal.day && specialPrice > 0;
-    const price = isLive ? specialPrice : normalPrice;
+    const dealDay = deal.day ? `${deal.day.charAt(0).toUpperCase()}${deal.day.slice(1)}` : undefined;
+    const price = getEffectivePrice({ price: normalPrice, dealPrice: specialPrice, dealDay }, new Date(nowTick || Date.now()));
+    const isLive = todayKey === deal.day && specialPrice > 0 && price === specialPrice;
     if (!deal.productId || price <= 0 || Number((product as ProductDealFields | undefined)?.stock ?? 1) <= 0) return;
 
     const image = product?.imageUrl || deal.imageUrl;

@@ -7,9 +7,12 @@ import {
 } from '@/lib/cartStore';
 import VariantSelectorBottomSheet from '@/components/product-detail/VariantSelectorBottomSheet';
 import type { ProductVariantSelection } from '@/lib/types';
+import { getEffectivePrice, getPakistanDay } from '@/lib/dealPricing';
 
 type GlobalProduct = VariantModalProduct & {
   stock?: number;
+  dealPrice?: number | string;
+  dealDay?: string;
 };
 
 function imageOf(product?: GlobalProduct | null | any): string {
@@ -36,6 +39,16 @@ export default function GlobalVariantSelector() {
   const rows = normalized.rows;
   const basePrice = Number(product.price ?? 0);
   const originalPrice = Number(product.compareAtPrice ?? product.originalPrice ?? basePrice);
+  const explicitDealPrice = Number(product.dealPrice ?? 0);
+  const dealDay = product.dealDay || (originalPrice > basePrice ? getPakistanDay() : undefined);
+  const effectiveProductPrice = getEffectivePrice(
+    {
+      price: explicitDealPrice > 0 ? originalPrice : basePrice,
+      dealPrice: explicitDealPrice > 0 ? explicitDealPrice : basePrice,
+      dealDay,
+    },
+    new Date(),
+  );
   const title = product.title || product.name || 'PrimeHub Deal';
 
   function confirm(selection: ProductVariantSelection, quantity: number) {
@@ -46,7 +59,16 @@ export default function GlobalVariantSelector() {
         (!selection.color || row.color === selection.color) &&
         (!selection.size || row.size === selection.size),
     );
-    const price = Number(selected?.price ?? basePrice) || basePrice;
+    const variantPrice = Number(selected?.price ?? basePrice) || basePrice;
+    const price = getEffectivePrice(
+      {
+        price: effectiveProductPrice,
+        dealPrice: effectiveProductPrice,
+        dealDay: dealDay || undefined,
+      },
+      new Date(),
+    );
+    const finalPrice = dealDay ? price : variantPrice;
     const image = String(selected?.imageUrl || imageOf(product));
     const variantIdentity = Object.entries(selection)
       .filter(([, value]) => Boolean(value))
@@ -60,8 +82,8 @@ export default function GlobalVariantSelector() {
         id,
         productId: product.id,
         name: title,
-        price,
-        originalPrice: originalPrice || price,
+        price: finalPrice,
+        originalPrice: originalPrice || finalPrice,
         image,
         imageUrl: image,
         variant: selection,
@@ -81,7 +103,7 @@ export default function GlobalVariantSelector() {
       open
       mode={mode}
       quantity={1}
-      currentPrice={basePrice}
+      currentPrice={effectiveProductPrice}
       originalPrice={originalPrice}
       onClose={close}
       onConfirm={confirm}
