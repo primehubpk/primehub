@@ -5,6 +5,13 @@ export type DealPriceInput = {
   price: number;
   dealPrice?: number;
   dealDay?: string;
+  isBigDeal?: boolean;
+  isDailyDeal?: boolean;
+  isFlashSale?: boolean;
+  startAt?: string | number | Date;
+  endAt?: string | number | Date;
+  originalPrice?: number;
+  normalPrice?: number;
 };
 
 /** Returns the current Pakistan (Asia/Karachi) weekday without relying on browser timezone. */
@@ -20,13 +27,35 @@ export function isDealActive(dealDay?: string, now = new Date()): boolean {
   return !!dealDay && DEAL_DAYS.includes(dealDay as DealDay) && dealDay === getPakistanDay(now);
 }
 
-/** Single pricing rule: scheduled/future deals use regular price; only today's PKT deal price is active. */
-export function getEffectivePrice(product: DealPriceInput, now = new Date()): number {
-  const regularPrice = Number(product.price || 0);
-  const dealPrice = Number(product.dealPrice || 0);
-  return isDealActive(product.dealDay, now) && dealPrice > 0 && dealPrice < regularPrice
-    ? dealPrice
-    : regularPrice;
+function isTimestampActive(product: DealPriceInput, now: Date): boolean {
+  const start = product.startAt == null ? NaN : new Date(product.startAt).getTime();
+  const end = product.endAt == null ? NaN : new Date(product.endAt).getTime();
+  if (Number.isFinite(start) && now.getTime() < start) return false;
+  if (Number.isFinite(end) && now.getTime() >= end) return false;
+  return Number.isFinite(start) || Number.isFinite(end);
+}
+
+/**
+ * Unified price resolution. Active Big/Daily/Flash deals always win over a
+ * selected variant's regular price. Scheduled weekly deals are evaluated in PKT.
+ */
+export function getEffectivePrice(product: any, selectedVariant?: any): number {
+  const now = new Date();
+  const dealPrice = Number(product?.dealPrice || 0);
+  const regularPrice = Number(product?.price || 0);
+  const activeByFlag = Boolean(product?.isBigDeal || product?.isDailyDeal || product?.isFlashSale);
+  const activeByTimestamp = isTimestampActive(product || {}, now);
+  const activeByWeekday = isDealActive(product?.dealDay, now);
+
+  if ((activeByFlag || activeByTimestamp || activeByWeekday) && dealPrice > 0) {
+    return dealPrice;
+  }
+
+  if (selectedVariant && Number(selectedVariant.price) > 0) {
+    return Number(selectedVariant.price);
+  }
+
+  return dealPrice > 0 ? dealPrice : regularPrice;
 }
 
 export function getDealStatus(dealDay?: string, now = new Date()) {
