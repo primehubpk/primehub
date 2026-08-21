@@ -287,7 +287,7 @@ export default function HeroFlashBanner() {
         return (
           <section className="mx-4 mt-4 overflow-hidden rounded-[30px] border border-black/8 bg-white shadow-[0_20px_52px_rgba(20,20,15,0.12)]">
             <Link href={`/product/${deal.productId}`} aria-label={`View ${title}`} className="block">
-              <div className="relative w-full aspect-[4/3] sm:aspect-[16/10] overflow-hidden rounded-[26px] bg-neutral-100 shadow-inner">
+              <div className="relative w-full aspect-square overflow-hidden rounded-[26px] bg-neutral-100 shadow-inner">
                 {productImage ? (
                   <Image
                     src={productImage}
