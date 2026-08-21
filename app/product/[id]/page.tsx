@@ -173,6 +173,7 @@ export default function ProductDetailPage() {
               rating={rating}
               reviews={reviews}
               currentDeal={currentDeal}
+              activeDeal={liveDeal && !currentDeal}
               liveDeal={liveDeal}
               dealPrice={dealPrice}
               regularPrice={regularPrice}
@@ -252,7 +253,7 @@ export default function ProductDetailPage() {
         mode={variantMode}
         quantity={quantity}
         currentPrice={currentPrice}
-        originalPrice={productOriginal}
+        originalPrice={normalForDeal}
         onClose={closeVariantSelector}
         onConfirm={confirmVariant}
       />
