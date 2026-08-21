@@ -87,6 +87,10 @@ function asStrings(value: unknown): string[] {
     .filter(Boolean);
 }
 
+function normalizeKey(value: unknown): string {
+  return String(value ?? '').trim().toLowerCase();
+}
+
 function rowValue(row: ProductVariantRow, key: 'color' | 'size'): string {
   const record = row as Record<string, unknown>;
   const direct = record[key] ?? record[`variant${key[0].toUpperCase()}${key.slice(1)}`];
@@ -99,10 +103,15 @@ function rowValue(row: ProductVariantRow, key: 'color' | 'size'): string {
   return '';
 }
 
+function findColorImage(color: string, colorImageMap: Record<string, string>): string | undefined {
+  const wanted = normalizeKey(color);
+  const match = Object.entries(colorImageMap).find(([name, url]) => normalizeKey(name) === wanted && typeof url === 'string' && url);
+  return match?.[1];
+}
+
 function rowImage(row: ProductVariantRow, color: string, colorImageMap: Record<string, string>, colorItems: Array<{ name: string; imageUrl?: string }>): string | undefined {
   if (typeof row.imageUrl === 'string' && row.imageUrl) return row.imageUrl;
-  if (colorImageMap[color]) return colorImageMap[color];
-  return colorItems.find((item) => item.name === color)?.imageUrl || undefined;
+  return findColorImage(color, colorImageMap) || colorItems.find((item) => normalizeKey(item.name) === normalizeKey(color))?.imageUrl || undefined;
 }
 
 export function normalizeProductVariants(product: VariantModalProduct): NormalizedProductVariants {
@@ -113,21 +122,27 @@ export function normalizeProductVariants(product: VariantModalProduct): Normaliz
   const addColor = (name: string, imageUrl?: string) => {
     const clean = name.trim();
     if (!clean) return;
-    const existing = colorItems.find((item) => item.name === clean);
-    if (existing) { if (!existing.imageUrl && imageUrl) existing.imageUrl = imageUrl; return; }
+    const existing = colorItems.find((item) => normalizeKey(item.name) === normalizeKey(clean));
+    if (existing) {
+      if (!existing.imageUrl && imageUrl) existing.imageUrl = imageUrl;
+      return;
+    }
     colorItems.push({ name: clean, imageUrl });
   };
   if (Array.isArray(product.variantColors)) product.variantColors.forEach((item) => {
-    if (typeof item === 'string') addColor(item, product.colorImages?.[item]);
-    else if (item && typeof item === 'object') addColor(item.name, item.imageUrl || product.colorImages?.[item.name]);
+    if (typeof item === 'string') addColor(item, findColorImage(item, product.colorImages || {}));
+    else if (item && typeof item === 'object') addColor(item.name, item.imageUrl || findColorImage(item.name, product.colorImages || {}));
   });
-  asStrings(product.colors).forEach((color) => addColor(color, product.colorImages?.[color]));
+  asStrings(product.colors).forEach((color) => addColor(color, findColorImage(color, product.colorImages || {})));
   const optionColors = product.variantOptions?.find((option) => /color/i.test(String(option.id)))?.values;
-  asStrings(optionColors).forEach((color) => addColor(color, product.colorImages?.[color]));
+  asStrings(optionColors).forEach((color) => addColor(color, findColorImage(color, product.colorImages || {})));
   const rawRows = sourceRows.map((row, index) => ({ ...row, id: row.id || `variant-${index}`, color: rowValue(row, 'color'), size: rowValue(row, 'size') }));
   rawRows.forEach((row) => { if (row.color) addColor(row.color, rowImage(row, row.color, product.colorImages || {}, colorItems)); });
   const sizes: string[] = [];
-  const addSize = (value: string) => { const clean = value.trim(); if (clean && !sizes.includes(clean)) sizes.push(clean); };
+  const addSize = (value: string) => {
+    const clean = value.trim();
+    if (clean && !sizes.some((item) => normalizeKey(item) === normalizeKey(clean))) sizes.push(clean);
+  };
   asStrings(product.variantSizes).forEach(addSize);
   asStrings(product.sizes).forEach(addSize);
   const optionSizes = product.variantOptions?.find((option) => /size/i.test(String(option.id)))?.values;
@@ -141,11 +156,25 @@ export function normalizeProductVariants(product: VariantModalProduct): Normaliz
   rawRows.forEach((row) => {
     const color = row.color || colorItems[0].name;
     const size = row.size || sizes[0];
-    const key = `${color}::${size}`;
+    const key = `${normalizeKey(color)}::${normalizeKey(size)}`;
     if (rowMap.has(key)) return;
-    rowMap.set(key, { ...row, color, size, stock: Math.max(0, Number(row.stock ?? 0)), price: row.price == null ? Number(product.price ?? 0) : Number(row.price), imageUrl: rowImage(row, color, product.colorImages || {}, colorItems) });
+    rowMap.set(key, {
+      ...row,
+      color,
+      size,
+      stock: Math.max(0, Number(row.stock ?? 0)),
+      price: row.price == null ? Number(product.price ?? 0) : Number(row.price),
+      imageUrl: rowImage(row, color, product.colorImages || {}, colorItems),
+    });
   });
-  const rows = colorItems.flatMap((color) => sizes.map((size) => rowMap.get(`${color.name}::${size}`) || { id: `variant-${encodeURIComponent(color.name)}-${encodeURIComponent(size)}`, color: color.name, size, stock: 0, price: Number(product.price ?? 0), imageUrl: color.imageUrl }));
+  const rows = colorItems.flatMap((color) => sizes.map((size) => rowMap.get(`${normalizeKey(color.name)}::${normalizeKey(size)}`) || {
+    id: `variant-${encodeURIComponent(color.name)}-${encodeURIComponent(size)}`,
+    color: color.name,
+    size,
+    stock: 0,
+    price: Number(product.price ?? 0),
+    imageUrl: color.imageUrl,
+  }));
   return { hasVariants: true, colors: colorItems, sizes, rows };
 }
 
