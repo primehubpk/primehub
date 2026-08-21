@@ -1,5 +1,5 @@
 // lib/useSettings.ts
-// Shared live storefront settings reader. The admin panel writes settings/main.
+// Shared live storefront settings reader. The admin panel writes settings/main, settings/policy and settings/contact.
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -14,6 +14,7 @@ const DEFAULT_SETTINGS: SiteSettings = {
   dailyDeal: { productId: '', imageUrl: '', title: '', originalPrice: 0, dealPrice: 0, startAt: '', endAt: '', buttonText: 'View Big Deal', buttonLink: '/deals/big', active: false },
   youtubeGuide: { enabled: true, title: 'How To Order & List Products on PrimeHub Deals', videoId: 'dQw4w9WgXcQ', description: 'Watch this quick guide to learn how to order and list products on PrimeHub Deals.' },
   policies: { privacyPolicy: { title: 'Privacy Policy', content: '' }, terms: { title: 'Terms of Service', content: '' }, returnPolicy: { title: 'Return Policy', content: '' } },
+  contact: { whatsappNumber: '', email: '', physicalAddress: '' },
   weeklyDeals: [],
   freeDelivery: { enabled: true, itemThreshold: 5, message: 'Add {remaining} more item{plural} to unlock FREE DELIVERY', unlockedMessage: 'FREE DELIVERY UNLOCKED 🎉' },
   priceBuckets: [
@@ -26,6 +27,9 @@ const DEFAULT_SETTINGS: SiteSettings = {
 
 type RawSettings = Partial<SiteSettings> & Record<string, any>;
 
+type RawPolicy = { privacyPolicy?: string; returnPolicy?: string; terms?: string } & Record<string, any>;
+type RawContact = { whatsappNumber?: string; email?: string; physicalAddress?: string } & Record<string, any>;
+
 function resolveAnnouncement(mainData: RawSettings, legacyData?: RawSettings): string {
   const candidates = [mainData.announcementText, mainData.topAnnouncement, mainData.topAnnouncementText, mainData.announcement, mainData.announcementBarText, legacyData?.announcementText, legacyData?.topAnnouncement, legacyData?.topAnnouncementText, legacyData?.announcement, legacyData?.announcementBarText];
   const match = candidates.find((value) => typeof value === 'string' && value.trim());
@@ -36,15 +40,45 @@ export function useSettings() {
   const [settings, setSettings] = useState<SiteSettings>(DEFAULT_SETTINGS);
   const [loading, setLoading] = useState(true);
   useEffect(() => {
-    let mainData: RawSettings = {}; let legacyData: RawSettings = {}; let mainReady = false;
+    let mainData: RawSettings = {};
+    let legacyData: RawSettings = {};
+    let policyData: RawPolicy = {};
+    let contactData: RawContact = {};
+    let mainReady = false;
+    let policyReady = false;
+    let contactReady = false;
+
     const publish = () => {
       const merged: RawSettings = { ...DEFAULT_SETTINGS, ...legacyData, ...mainData };
-      setSettings({ ...merged, announcementText: resolveAnnouncement(mainData, legacyData) } as SiteSettings);
-      if (mainReady) setLoading(false);
+      const mainWhatsApp = typeof mainData.whatsappNumber === 'string' ? mainData.whatsappNumber : '';
+      const contactWhatsApp = typeof contactData.whatsappNumber === 'string' ? contactData.whatsappNumber : '';
+      const privacyPolicy = typeof policyData.privacyPolicy === 'string' ? policyData.privacyPolicy : DEFAULT_SETTINGS.policies?.privacyPolicy?.content || '';
+      const returnPolicy = typeof policyData.returnPolicy === 'string' ? policyData.returnPolicy : DEFAULT_SETTINGS.policies?.returnPolicy?.content || '';
+      setSettings({
+        ...merged,
+        announcementText: resolveAnnouncement(mainData, legacyData),
+        whatsappNumber: contactWhatsApp || mainWhatsApp || DEFAULT_SETTINGS.whatsappNumber,
+        contact: {
+          whatsappNumber: contactWhatsApp || mainWhatsApp || '',
+          email: typeof contactData.email === 'string' ? contactData.email : '',
+          physicalAddress: typeof contactData.physicalAddress === 'string' ? contactData.physicalAddress : '',
+        },
+        policies: {
+          ...DEFAULT_SETTINGS.policies,
+          ...(merged.policies || {}),
+          privacyPolicy: { title: 'Privacy Policy', content: privacyPolicy },
+          returnPolicy: { title: 'Return Policy', content: returnPolicy },
+        },
+      } as SiteSettings);
+      if (mainReady && policyReady && contactReady) setLoading(false);
     };
+
     const unsubscribeMain = onSnapshot(doc(db, 'settings', 'main'), (snap) => { mainReady = true; mainData = snap.exists() ? (snap.data() as RawSettings) : {}; publish(); }, () => { mainReady = true; publish(); });
     const unsubscribeLegacy = onSnapshot(doc(db, 'settings', 'general'), (snap) => { legacyData = snap.exists() ? (snap.data() as RawSettings) : {}; publish(); }, () => publish());
-    return () => { unsubscribeMain(); unsubscribeLegacy(); };
+    const unsubscribePolicy = onSnapshot(doc(db, 'settings', 'policy'), (snap) => { policyReady = true; policyData = snap.exists() ? (snap.data() as RawPolicy) : {}; publish(); }, () => { policyReady = true; publish(); });
+    const unsubscribeContact = onSnapshot(doc(db, 'settings', 'contact'), (snap) => { contactReady = true; contactData = snap.exists() ? (snap.data() as RawContact) : {}; publish(); }, () => { contactReady = true; publish(); });
+
+    return () => { unsubscribeMain(); unsubscribeLegacy(); unsubscribePolicy(); unsubscribeContact(); };
   }, []);
-  return { settings, loading };
+  return { settings, loading, policy: settings.policies, contact: settings.contact };
 }
