@@ -287,39 +287,68 @@ export default function HeroFlashBanner() {
         const productImage = productData?.imageUrl || deal.imageUrl;
 
         return (
-          <section className="mx-4 mt-4 overflow-hidden rounded-[28px] border border-black/8 bg-[#14140F] text-white shadow-[0_18px_55px_rgba(20,20,15,0.18)]">
-            <div className="relative overflow-hidden">
-              {productImage && <Image src={productImage} alt={title} width={900} height={700} className="h-auto max-h-[460px] w-full object-cover" priority />}
-              <div className="absolute inset-0 bg-gradient-to-t from-[#14140F]/95 via-[#14140F]/35 to-transparent" />
-              <div className="absolute inset-x-0 bottom-0 p-5 sm:p-7">
-                <div className="flex items-end justify-between gap-4">
-                  <div>
-                    <p className="text-[8px] font-black uppercase tracking-[0.22em] text-[#FFB020]">Big Deal</p>
-                    <h2 className="mt-1 text-2xl font-black tracking-tight sm:text-4xl">{title}</h2>
-                    <div className="mt-2 flex items-end gap-2">
-                      <span className="text-2xl font-black text-[#FFB020]">Rs. {currentPrice.toLocaleString()}</span>
-                      {normalPrice > currentPrice && <span className="text-xs font-bold text-white/45 line-through">Rs. {normalPrice.toLocaleString()}</span>}
-                    </div>
-                    {savedAmount > 0 && <p className="mt-1 text-[9px] font-bold text-white/55">You save Rs. {savedAmount.toLocaleString()}</p>}
-                  </div>
-                  <div className="flex shrink-0 flex-col gap-2">
-                    <button
-                      type="button"
-                      onClick={(event) => {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        addBigDealToCart();
-                      }}
-                      disabled={stock <= 0}
-                      className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#FFB020] px-4 py-3 text-[9px] font-black uppercase tracking-[0.08em] text-[#14140F] shadow-lg hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      <ShoppingCart size={13} /> Add to Cart
-                    </button>
-                    <Link href={`/product/${deal.productId}`} className="inline-flex items-center justify-center rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-[9px] font-black uppercase tracking-[0.08em] text-white backdrop-blur hover:bg-white/15">
-                      View Deal
-                    </Link>
-                  </div>
+          <section className="mx-4 mt-4 overflow-hidden rounded-[30px] border border-black/8 bg-white shadow-[0_20px_52px_rgba(20,20,15,0.12)]">
+            <Link href={`/product/${deal.productId}`} aria-label={`View ${title}`} className="block">
+              <div className="relative w-full aspect-square overflow-hidden rounded-[26px] bg-neutral-100 shadow-inner">
+                {productImage ? (
+                  <Image
+                    src={productImage}
+                    alt={title}
+                    fill
+                    unoptimized
+                    className="object-cover object-center w-full h-full"
+                    onError={(event) => {
+                      event.currentTarget.src = '/placeholder.png';
+                    }}
+                  />
+                ) : (
+                  <div className="flex h-full items-center justify-center text-sm font-black uppercase tracking-[0.18em] text-black/30">Big Deal</div>
+                )}
+
+                <div className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-black/80 px-3 py-1.5 text-[10px] font-black text-white shadow backdrop-blur-md">
+                  <span>🔥</span> BIG DEAL OF THE DAY
                 </div>
+
+                {savedAmount > 0 && (
+                  <div className="absolute right-3 top-3 inline-flex items-center rounded-full bg-[#0F6A5F] px-3 py-1.5 text-[11px] font-black text-white shadow">
+                    Save Rs. {savedAmount.toLocaleString()}
+                  </div>
+                )}
+              </div>
+            </Link>
+
+            <div className="bg-white px-5 py-5 sm:px-8 sm:py-6">
+              <Link href={`/product/${deal.productId}`} className="group/title block" aria-label={`View ${title}`}>
+                <h2 className="line-clamp-2 text-2xl font-black leading-tight tracking-tight text-[#14140F] transition group-hover/title:text-[#0F6A5F] sm:text-4xl">{title}</h2>
+              </Link>
+
+              <div className="mt-4 flex flex-wrap items-center gap-2.5">
+                <span className="text-3xl font-black text-[#E1352B] sm:text-4xl">Rs. {currentPrice.toLocaleString()}</span>
+                {normalPrice > currentPrice && (
+                  <span className="text-sm font-bold text-black/40 line-through sm:text-base">Rs. {normalPrice.toLocaleString()}</span>
+                )}
+              </div>
+
+              {stock > 0 && stock <= 10 && (
+                <div className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/15 px-3 py-1 text-[11px] font-black text-amber-700">
+                  <span className="h-2 w-2 rounded-full bg-amber-500 animate-ping" />
+                  Only {stock} left in stock - order soon!
+                </div>
+              )}
+
+              <div className="mt-4">
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    addBigDealToCart();
+                  }}
+                  disabled={!deal.productId || !product || stock <= 0 || currentPrice <= 0}
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#14140F] px-5 py-3 text-xs font-black text-white transition hover:bg-[#0F6A5F] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+                >
+                  <ShoppingCart size={15} /> Add to Cart
+                </button>
               </div>
             </div>
           </section>
