@@ -20,7 +20,7 @@ export default function ProductPricing({ product, rating, reviews, currentDeal, 
   const dealDay = currentDeal ? WEEKDAY_LABELS[currentDeal.day] : '';
 
   return <>
-    <div className="mt-5 flex flex-wrap items-center gap-2">{product.category && <span className="rounded-full bg-[#0F6A5F]/10 px-2.5 py-1 text-[9px] font-black uppercase tracking-wider text-[#0F6A5F]">{product.category}</span>}{product.isFlashSale && <span className="flex items-center gap-1 rounded-full bg-[#14140F] px-2.5 py-1 text-[9px] font-black text-white"><Zap size={10} />Flash Sale</span>}</div>
+    <div className="mt-3 flex flex-wrap items-center gap-2">{product.isFlashSale && <span className="flex items-center gap-1 rounded-full bg-[#14140F] px-2.5 py-1 text-[9px] font-black text-white"><Zap size={10} />Flash Sale</span>}</div>
     <h1 className="mt-3 text-2xl font-black leading-tight tracking-tight text-[#14140F] sm:text-3xl md:text-[34px]">{titleOf(product)}</h1>
     {(rating > 0 || reviews > 0) && <div className="mt-3 flex items-center gap-2"><span className="flex items-center gap-1 rounded-full bg-[#FFB020]/15 px-2.5 py-1.5 text-[10px] font-black"><Star size={11} fill="currentColor" />{rating ? rating.toFixed(1) : 'New'}</span>{reviews > 0 && <span className="text-[10px] font-bold text-black/40">{reviews.toLocaleString()} reviews</span>}</div>}
 
