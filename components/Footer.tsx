@@ -48,7 +48,7 @@ function WhatsAppIcon() {
   );
 }
 
-export default function Footer({ onWholesaleSelect }: { onWholesaleSelect?: () => void }) {
+export default function Footer({ onWholesaleActivate }: { onWholesaleActivate?: () => void }) {
   const { contact } = useSettings();
   const whatsapp = normalizeWhatsApp(contact?.whatsappNumber || '');
   const whatsappHref = whatsapp ? `https://wa.me/${whatsapp}` : '/contact';
@@ -56,8 +56,8 @@ export default function Footer({ onWholesaleSelect }: { onWholesaleSelect?: () =
   const address = contact?.physicalAddress?.trim() || FALLBACK_ADDRESS;
 
   const handleWholesaleClick = () => {
-    if (onWholesaleSelect) {
-      onWholesaleSelect();
+    if (onWholesaleActivate) {
+      onWholesaleActivate();
       window.setTimeout(() => {
         const productGrid = Array.from(document.querySelectorAll('section')).find((section) =>
           section.querySelector('h2')?.textContent?.trim().includes('Discover deals'),
@@ -108,7 +108,7 @@ export default function Footer({ onWholesaleSelect }: { onWholesaleSelect?: () =
             </div>
 
             <div className="space-y-2.5">
-              <a href={whatsappHref} target={whatsapp ? '_blank' : undefined} rel={whatsapp ? 'noreferrer' : undefined} className="group flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.07] p-3.5 backdrop-blur-md transition hover:border-[#25D366]/40 hover:bg-white/10">
+              <a href={whatsappHref} target={whatsapp ? '_blank' : undefined} rel={whatsapp ? 'noreferrer' : undefined} className="group flex min-h-[72px] items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.07] p-3.5 backdrop-blur-md transition hover:border-[#25D366]/40 hover:bg-white/10">
                 <WhatsAppIcon />
                 <span className="min-w-0 flex-1">
                   <b className="block text-[10px] uppercase tracking-[0.14em] text-[#25D366]">Official Support</b>
@@ -124,7 +124,7 @@ export default function Footer({ onWholesaleSelect }: { onWholesaleSelect?: () =
 
               <div className="grid grid-cols-2 gap-2">
                 <Link href="/contact" className="flex items-start gap-2 rounded-2xl border border-white/10 bg-white/5 p-3 text-[9px] font-black text-white/70 transition hover:bg-white/10"><Globe2 className="mt-0.5 h-4 w-4 shrink-0 text-[#FFB020]" /><span>Global Shipping Available.<span className="mt-1 block font-normal leading-4 text-white/45">We deliver our premium bangles worldwide with secure packaging.</span></span></Link>
-                <button type="button" onClick={handleWholesaleClick} className="flex items-center gap-2 rounded-2xl border border-[#FFB020]/30 bg-[#FFB020]/10 p-3 text-left text-[9px] font-black text-[#FFB020] transition hover:bg-[#FFB020]/20"><ShoppingBag size={14} /> Wholesale Deals <ArrowUpRight size={11} /></button>
+                <button type="button" onClick={handleWholesaleClick} className="flex min-h-[72px] items-center gap-2 rounded-2xl border border-yellow-600/30 bg-white/5 p-3.5 text-left text-[9px] font-black text-[#FFB020] backdrop-blur-md transition hover:bg-white/[0.08] hover:border-yellow-600/40"><ShoppingBag size={14} /> Wholesale Deals <ArrowUpRight size={11} /></button>
               </div>
             </div>
           </div>
