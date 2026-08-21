@@ -8,7 +8,7 @@ import { db } from '@/lib/firebase';
 import { SiteSettings } from '@/lib/types';
 
 const DEFAULT_SETTINGS: SiteSettings = {
-  announcementText: 'PrimeHub Deals', whatsappNumber: '923001234567', freeShippingCount: 5,
+  announcementText: 'PrimeHub Deals', whatsappNumber: '', freeShippingCount: 5,
   heroTitle: 'Flash Sale', heroDiscountText: 'Up to 70% Off', heroCountdownEndTime: new Date(Date.now() + 2 * 3600 * 1000).toISOString(),
   heroImageUrl: '', heroButtonText: "Shop Today's Deal", heroButtonLink: '#',
   dailyDeal: { productId: '', imageUrl: '', title: '', originalPrice: 0, dealPrice: 0, startAt: '', endAt: '', buttonText: 'View Big Deal', buttonLink: '/deals/big', active: false },
