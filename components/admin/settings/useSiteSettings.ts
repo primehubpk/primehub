@@ -7,6 +7,13 @@ import { auth } from '@/lib/firebase';
 import type { DailyDeal, PriceBucket } from '@/lib/types';
 import { DEFAULT_BIG_DEAL, DEFAULT_BUCKETS, DEFAULT_SETTINGS, Settings } from './SiteSettingsTypes';
 
+function normalizeWhatsAppNumber(value: string): string {
+  const digits = value.replace(/\D/g, '');
+  if (digits.startsWith('00')) return digits.slice(2);
+  if (digits.startsWith('0')) return `92${digits.slice(1)}`;
+  return digits;
+}
+
 export default function useSiteSettings() {
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [loading, setLoading] = useState(true);
@@ -20,17 +27,28 @@ export default function useSiteSettings() {
   const [changingPassword, setChangingPassword] = useState(false);
 
   useEffect(() => {
-    getAdminDocument('settings', 'main').then((snap) => {
-      if (snap.exists()) {
-        const data = snap.data() as Partial<Settings>;
-        setSettings((s) => ({
-          ...s,
-          ...data,
-          dailyDeal: { ...DEFAULT_BIG_DEAL, ...(data.dailyDeal || {}) },
-          priceBuckets: Array.isArray(data.priceBuckets) && data.priceBuckets.length ? data.priceBuckets : DEFAULT_BUCKETS,
-        }));
-      }
-    }).finally(() => setLoading(false));
+    Promise.all([
+      getAdminDocument('settings', 'main'),
+      getAdminDocument('settings', 'policy'),
+      getAdminDocument('settings', 'contact'),
+    ]).then(([mainSnap, policySnap, contactSnap]) => {
+      const main = mainSnap.exists() ? (mainSnap.data() as Partial<Settings>) : {};
+      const policy = policySnap.exists() ? policySnap.data() : {};
+      const contact = contactSnap.exists() ? contactSnap.data() : {};
+      const mainWhatsApp = typeof main.whatsappNumber === 'string' ? main.whatsappNumber : '';
+      const contactWhatsApp = typeof contact.whatsappNumber === 'string' ? contact.whatsappNumber : '';
+      setSettings((s) => ({
+        ...s,
+        ...main,
+        whatsappNumber: contactWhatsApp || mainWhatsApp,
+        contactEmail: typeof contact.email === 'string' ? contact.email : '',
+        physicalAddress: typeof contact.physicalAddress === 'string' ? contact.physicalAddress : '',
+        privacyPolicy: typeof policy.privacyPolicy === 'string' ? policy.privacyPolicy : '',
+        returnPolicy: typeof policy.returnPolicy === 'string' ? policy.returnPolicy : '',
+        dailyDeal: { ...DEFAULT_BIG_DEAL, ...(main.dailyDeal || {}) },
+        priceBuckets: Array.isArray(main.priceBuckets) && main.priceBuckets.length ? main.priceBuckets : DEFAULT_BUCKETS,
+      }));
+    }).catch(() => setToast('Unable to load site settings.')).finally(() => setLoading(false));
   }, []);
 
   const update = <K extends keyof Settings>(key: K, value: Settings[K]) => setSettings((s) => ({ ...s, [key]: value }));
@@ -59,16 +77,29 @@ export default function useSiteSettings() {
     if (d.active && Number(d.dealPrice) >= Number(d.originalPrice)) { setToast('Big Deal price must be lower than original price.'); return; }
     setSaving(true);
     try {
-      await setAdminDocument('settings', 'main', {
-        announcementText: settings.announcementText.trim(),
-        whatsappNumber: settings.whatsappNumber.trim(),
-        freeShippingCount: Number(settings.freeDeliveryThreshold || 0),
-        freeDelivery: { enabled: true, itemThreshold: Number(settings.freeDeliveryThreshold || 0), message: 'Add {remaining} more item{plural} to unlock FREE DELIVERY', unlockedMessage: 'FREE DELIVERY UNLOCKED 🎉' },
-        storePolicyInfo: settings.storePolicyInfo.trim(),
-        priceBuckets: settings.priceBuckets.map((b, i) => ({ ...b, sortOrder: i + 1, amount: Number(b.amount) || 0 })),
-        dailyDeal: { ...d, title: d.title.trim(), originalPrice: Number(d.originalPrice) || 0, dealPrice: Number(d.dealPrice) || 0, buttonLink: d.buttonLink.trim() || '/deals/big', buttonText: d.buttonText.trim() || 'Shop Big Deal' },
-      });
-      setToast('Settings and Big Deal saved.');
+      const whatsappNumber = normalizeWhatsAppNumber(settings.whatsappNumber);
+      await Promise.all([
+        setAdminDocument('settings', 'main', {
+          announcementText: settings.announcementText.trim(),
+          whatsappNumber,
+          freeShippingCount: Number(settings.freeDeliveryThreshold || 0),
+          freeDelivery: { enabled: true, itemThreshold: Number(settings.freeDeliveryThreshold || 0), message: 'Add {remaining} more item{plural} to unlock FREE DELIVERY', unlockedMessage: 'FREE DELIVERY UNLOCKED 🎉' },
+          storePolicyInfo: settings.storePolicyInfo.trim(),
+          priceBuckets: settings.priceBuckets.map((b, i) => ({ ...b, sortOrder: i + 1, amount: Number(b.amount) || 0 })),
+          dailyDeal: { ...d, title: d.title.trim(), originalPrice: Number(d.originalPrice) || 0, dealPrice: Number(d.dealPrice) || 0, buttonLink: d.buttonLink.trim() || '/deals/big', buttonText: d.buttonText.trim() || 'Shop Big Deal' },
+        }),
+        setAdminDocument('settings', 'policy', {
+          privacyPolicy: settings.privacyPolicy.trim(),
+          returnPolicy: settings.returnPolicy.trim(),
+        }),
+        setAdminDocument('settings', 'contact', {
+          whatsappNumber,
+          email: settings.contactEmail.trim(),
+          physicalAddress: settings.physicalAddress.trim(),
+        }),
+      ]);
+      setSettings((s) => ({ ...s, whatsappNumber }));
+      setToast('Settings, contact and policies saved.');
     } catch { setToast('Unable to save settings.'); }
     finally { setSaving(false); }
   }
