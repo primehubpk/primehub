@@ -49,12 +49,27 @@ function hasProductVariants(product?: Product): boolean {
   );
 }
 
+type ProductDealFields = Product & {
+  stock?: number | string;
+  quantity?: number | string;
+  dealPrice?: number | string;
+  originalPrice?: number | string;
+  normalPrice?: number | string;
+};
+
+type BigDealFields = NonNullable<ReturnType<typeof useSettings>['settings']['dailyDeal']> & {
+  dealPrice?: number | string;
+  normalPrice?: number | string;
+  originalPrice?: number | string;
+  stock?: number | string;
+};
+
 export default function HeroFlashBanner() {
   const { settings } = useSettings();
   const [nowTick, setNowTick] = useState<number | null>(null);
   const [products, setProducts] = useState<Record<string, Product>>({});
   const weeklyDeals = settings.weeklyDeals || [];
-  const bigDeal = settings.dailyDeal;
+  const bigDeal = settings.dailyDeal as BigDealFields | undefined;
   const addItem = useCartStore((state) => state.addItem);
   const openVariantModal = useCartStore((state) => state.openVariantModal);
 
@@ -100,8 +115,10 @@ export default function HeroFlashBanner() {
         : fallback.days * 86400000 + fallback.hours * 3600000 + fallback.minutes * 60000 + fallback.seconds * 1000,
     );
   }, [bigDeal?.endAt, nowTick]);
-  const discount = bigDeal && bigDeal.originalPrice > bigDeal.dealPrice
-    ? Math.round(((bigDeal.originalPrice - bigDeal.dealPrice) / bigDeal.originalPrice) * 100)
+  void countdown;
+
+  const discount = bigDeal && Number(bigDeal.originalPrice) > Number(bigDeal.dealPrice)
+    ? Math.round(((Number(bigDeal.originalPrice) - Number(bigDeal.dealPrice)) / Number(bigDeal.originalPrice)) * 100)
     : 0;
   const orderedDays = useMemo(() => {
     if (!todayKey) return DAYS;
@@ -115,7 +132,7 @@ export default function HeroFlashBanner() {
     const specialPrice = Number(deal.dealPrice || 0);
     const isLive = todayKey === deal.day && specialPrice > 0;
     const price = isLive ? specialPrice : normalPrice;
-    if (!deal.productId || price <= 0 || Number(product?.stock ?? 1) <= 0) return;
+    if (!deal.productId || price <= 0 || Number((product as ProductDealFields | undefined)?.stock ?? 1) <= 0) return;
 
     const image = product?.imageUrl || deal.imageUrl;
     const productWithDealPrice = {
@@ -146,16 +163,19 @@ export default function HeroFlashBanner() {
   function addBigDealToCart() {
     if (!bigDeal?.productId) return;
     const product = products[bigDeal.productId];
-    const price = Number(bigDeal.dealPrice || product?.price || 0);
-    if (price <= 0 || Number(product?.stock ?? 1) <= 0) return;
+    const productData = product as ProductDealFields | undefined;
+    const currentPrice = Number(bigDeal.dealPrice || productData?.dealPrice || productData?.price || 0);
+    const normalPrice = Number(bigDeal.normalPrice || productData?.originalPrice || productData?.normalPrice || currentPrice);
+    const stock = Number(productData?.stock ?? productData?.quantity ?? bigDeal.stock ?? 0);
+    if (currentPrice <= 0 || stock <= 0) return;
 
-    const image = product?.imageUrl || bigDeal.imageUrl;
+    const image = productData?.imageUrl || bigDeal.imageUrl;
     const productWithDealPrice = {
       ...product,
       id: bigDeal.productId,
       title: product?.title || bigDeal.title,
-      price,
-      originalPrice: Number(bigDeal.originalPrice || product?.originalPrice || product?.price || price),
+      price: currentPrice,
+      originalPrice: normalPrice,
       image,
       imageUrl: image,
     } as Product;
@@ -167,8 +187,8 @@ export default function HeroFlashBanner() {
     addItem({
       id: bigDeal.productId,
       name: productWithDealPrice.title || bigDeal.title,
-      price,
-      originalPrice: productWithDealPrice.originalPrice || price,
+      price: currentPrice,
+      originalPrice: productWithDealPrice.originalPrice || currentPrice,
       image,
       imageUrl: image,
     });
@@ -241,7 +261,7 @@ export default function HeroFlashBanner() {
                           event.stopPropagation();
                           addDealToCart(deal);
                         }}
-                        disabled={!product || Number(product.stock ?? 1) <= 0}
+                        disabled={!product || Number((product as ProductDealFields).stock ?? 1) <= 0}
                         className="mt-2 inline-flex items-center gap-1 rounded-full bg-[#14140F] px-2.5 py-1.5 text-[7px] font-black uppercase tracking-[0.08em] text-white hover:bg-[#0F6A5F] disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         <ShoppingCart size={8} /> Add to Cart
@@ -256,38 +276,78 @@ export default function HeroFlashBanner() {
         </div>
       </section>
 
-      {bigDeal?.active && bigDeal.title && (
-        <section className="mx-4 mt-4 overflow-hidden rounded-[30px] border border-black/8 bg-white shadow-[0_20px_52px_rgba(20,20,15,0.12)]">
-          <Link href={`/product/${bigDeal.productId}`} aria-label={`View ${bigDeal.title}`} className="group relative block aspect-[16/9] min-h-[240px] overflow-hidden bg-[#F4F4F1] sm:aspect-[2.2/1] sm:min-h-[320px]">
-            {bigDeal.imageUrl && <Image src={bigDeal.imageUrl} alt={bigDeal.title} fill priority sizes="(max-width: 640px) 100vw, 92vw" className="object-cover object-center transition duration-700 group-hover:scale-[1.02]" />}
-            <span className="absolute left-4 top-4 rounded-full bg-[#14140F] px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.16em] text-white shadow-lg sm:left-6 sm:top-6">BIG DEAL</span>
-            <span className="absolute right-4 top-4 rounded-full bg-[#FFD16A] px-3 py-1.5 text-[10px] font-black text-[#14140F] shadow-lg sm:right-6 sm:top-6">{discount > 0 ? `-${discount}% OFF` : 'LIMITED TIME'}</span>
-          </Link>
-          <div className="bg-white px-5 py-5 sm:px-8 sm:py-6">
-            <Link href={`/product/${bigDeal.productId}`} className="group/title block" aria-label={`View ${bigDeal.title}`}>
-              <h2 className="text-2xl font-black leading-tight tracking-tight text-[#14140F] transition group-hover/title:text-[#0F6A5F] sm:text-4xl">{bigDeal.title}</h2>
+      {bigDeal?.active && bigDeal.title && (() => {
+        const product = bigDeal.productId ? products[bigDeal.productId] : undefined;
+        const productData = product as ProductDealFields | undefined;
+        const deal = bigDeal;
+        const currentPrice = Number(deal.dealPrice || productData?.dealPrice || productData?.price || 0);
+        const normalPrice = Number(deal.normalPrice || productData?.originalPrice || productData?.normalPrice || currentPrice);
+        const discountPercent = normalPrice > currentPrice
+          ? Math.round(((normalPrice - currentPrice) / normalPrice) * 100)
+          : 0;
+        const savedAmount = normalPrice > currentPrice ? normalPrice - currentPrice : 0;
+        const stock = Number(productData?.stock ?? productData?.quantity ?? deal.stock ?? 0);
+        const image = productData?.imageUrl || deal.imageUrl;
+
+        return (
+          <section className="mx-4 mt-4 overflow-hidden rounded-[30px] border border-black/8 bg-white shadow-[0_20px_52px_rgba(20,20,15,0.12)]">
+            <Link href={`/product/${deal.productId}`} aria-label={`View ${deal.title}`} className="group relative block aspect-[16/10] w-full overflow-hidden rounded-3xl bg-neutral-100 sm:aspect-[16/9]">
+              {image ? (
+                <Image src={image} alt={deal.title} fill priority sizes="(max-width: 640px) 100vw, 92vw" className="object-contain object-center p-3 transition duration-700 group-hover:scale-[1.015] sm:p-6" />
+              ) : (
+                <div className="flex h-full items-center justify-center text-sm font-black uppercase tracking-[0.18em] text-black/30">Big Deal</div>
+              )}
+              <div className="absolute inset-0 bg-gradient-to-t from-[#14140F]/25 via-transparent to-transparent" />
+              <span className="absolute left-4 top-4 rounded-full border border-[#FFD16A]/30 bg-[#14140F]/95 px-3.5 py-2 text-[9px] font-black uppercase tracking-[0.16em] text-[#FFD16A] shadow-lg sm:left-6 sm:top-6">🔥 BIG DEAL OF THE DAY</span>
+              {discountPercent > 0 && (
+                <span className="absolute right-4 top-4 rounded-full bg-[#E1352B] px-3.5 py-2 text-[10px] font-black text-white shadow-lg sm:right-6 sm:top-6">-{discountPercent}% OFF</span>
+              )}
             </Link>
-            <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2">
-              <span className="text-3xl font-black text-[#E1352B] sm:text-4xl">Rs. {Number(bigDeal.dealPrice).toLocaleString()}</span>
-              {Number(bigDeal.originalPrice) > Number(bigDeal.dealPrice) && <span className="text-sm font-bold text-black/40 line-through sm:text-base">Rs. {Number(bigDeal.originalPrice).toLocaleString()}</span>}
+
+            <div className="bg-white px-5 py-5 sm:px-8 sm:py-6">
+              <Link href={`/product/${deal.productId}`} className="group/title block" aria-label={`View ${deal.title}`}>
+                <h2 className="text-2xl font-black leading-tight tracking-tight text-[#14140F] transition group-hover/title:text-[#0F6A5F] sm:text-4xl">{deal.title}</h2>
+              </Link>
+
+              {stock > 0 && stock <= 10 && (
+                <div className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/15 px-3 py-1 text-[11px] font-black text-amber-700">
+                  <span className="h-2 w-2 rounded-full bg-amber-500 animate-ping" />
+                  Only {stock} left in stock - order soon!
+                </div>
+              )}
+
+              <div className="mt-4 flex flex-wrap items-center gap-2.5">
+                <span className="text-3xl font-black text-[#E1352B] sm:text-4xl">Rs. {currentPrice.toLocaleString()}</span>
+                {normalPrice > currentPrice && (
+                  <span className="text-sm font-bold text-black/40 line-through sm:text-base">Rs. {normalPrice.toLocaleString()}</span>
+                )}
+                {savedAmount > 0 && (
+                  <span className="rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-black text-emerald-700">Save Rs. {savedAmount.toLocaleString()}</span>
+                )}
+              </div>
+
+              <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-[0.1em] text-black/45">
+                  <Clock3 size={13} />
+                  {deal.endAt ? 'Limited-time deal' : 'Deal available today'}
+                </div>
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    addBigDealToCart();
+                  }}
+                  disabled={!deal.productId || !product || stock <= 0 || currentPrice <= 0}
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#14140F] px-5 py-3 text-xs font-black text-white transition hover:bg-[#0F6A5F] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+                >
+                  <ShoppingCart size={15} /> Add to Cart
+                </button>
+              </div>
             </div>
-            <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <button
-                type="button"
-                onClick={(event) => {
-                  event.preventDefault();
-                  event.stopPropagation();
-                  addBigDealToCart();
-                }}
-                disabled={!bigDeal.productId || !products[bigDeal.productId]}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#14140F] px-5 py-3 text-xs font-black text-white transition hover:bg-[#0F6A5F] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
-              >
-                <ShoppingCart size={15} /> Add to Cart
-              </button>
-            </div>
-          </div>
-        </section>
-      )}
+          </section>
+        );
+      })()}
     </>
   );
 }
