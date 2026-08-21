@@ -19,10 +19,6 @@ export default function HomePage() {
     setSelectedMaxPrice(null);
     setWholesaleSelected((selected) => !selected);
   };
-  const selectWholesaleFromFooter = () => {
-    setSelectedMaxPrice(null);
-    setWholesaleSelected(true);
-  };
 
-  return <><div className="min-h-screen bg-[#F4F4F1] text-[#14140F]"><Header/><HeroFlashBanner/><PriceBuckets selectedMaxPrice={selectedMaxPrice} wholesaleSelected={wholesaleSelected} onSelect={selectPrice} onWholesaleSelect={selectWholesale}/><ProductGridRewards selectedMaxPrice={selectedMaxPrice} wholesaleSelected={wholesaleSelected}/><YouTubeGuide/><Footer onWholesaleSelect={selectWholesaleFromFooter}/></div></>;
+  return <><div className="min-h-screen bg-[#F4F4F1] text-[#14140F]"><Header/><HeroFlashBanner/><PriceBuckets selectedMaxPrice={selectedMaxPrice} wholesaleSelected={wholesaleSelected} onSelect={selectPrice} onWholesaleSelect={selectWholesale}/><ProductGridRewards selectedMaxPrice={selectedMaxPrice} wholesaleSelected={wholesaleSelected}/><YouTubeGuide/><Footer onWholesaleSelect={selectWholesale}/></div></>;
 }
