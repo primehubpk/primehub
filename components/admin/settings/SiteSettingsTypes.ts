@@ -6,6 +6,10 @@ import type { DailyDeal, PriceBucket } from '@/lib/types';
 export type Settings = {
   announcementText: string;
   whatsappNumber: string;
+  contactEmail: string;
+  physicalAddress: string;
+  privacyPolicy: string;
+  returnPolicy: string;
   freeDeliveryThreshold: number;
   storePolicyInfo: string;
   priceBuckets: PriceBucket[];
@@ -40,4 +44,15 @@ export const DEFAULT_BUCKETS: PriceBucket[] = [
 ];
 
 export const DEFAULT_BIG_DEAL: DailyDeal = { productId: '', imageUrl: '', title: '', originalPrice: 0, dealPrice: 0, startAt: '', endAt: '', buttonText: 'Shop Big Deal', buttonLink: '/deals/big', active: false };
-export const DEFAULT_SETTINGS: Settings = { announcementText: '', whatsappNumber: '', freeDeliveryThreshold: 5, storePolicyInfo: '', priceBuckets: DEFAULT_BUCKETS, dailyDeal: DEFAULT_BIG_DEAL };
+export const DEFAULT_SETTINGS: Settings = {
+  announcementText: '',
+  whatsappNumber: '',
+  contactEmail: '',
+  physicalAddress: '',
+  privacyPolicy: '',
+  returnPolicy: '',
+  freeDeliveryThreshold: 5,
+  storePolicyInfo: '',
+  priceBuckets: DEFAULT_BUCKETS,
+  dailyDeal: DEFAULT_BIG_DEAL,
+};
