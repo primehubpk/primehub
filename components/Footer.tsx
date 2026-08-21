@@ -48,7 +48,7 @@ function WhatsAppIcon() {
   );
 }
 
-export default function Footer({ onWholesaleActivate }: { onWholesaleActivate?: () => void }) {
+export default function Footer({ onWholesaleSelect }: { onWholesaleSelect?: () => void }) {
   const { contact } = useSettings();
   const whatsapp = normalizeWhatsApp(contact?.whatsappNumber || '');
   const whatsappHref = whatsapp ? `https://wa.me/${whatsapp}` : '/contact';
@@ -56,18 +56,21 @@ export default function Footer({ onWholesaleActivate }: { onWholesaleActivate?: 
   const address = contact?.physicalAddress?.trim() || FALLBACK_ADDRESS;
 
   const handleWholesaleClick = () => {
-    if (onWholesaleActivate) {
-      onWholesaleActivate();
-      window.setTimeout(() => {
-        const productGrid = Array.from(document.querySelectorAll('section')).find((section) =>
-          section.querySelector('h2')?.textContent?.trim().includes('Discover deals'),
-        );
-        productGrid?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }, 0);
-      return;
+    const wholesaleCard = Array.from(document.querySelectorAll('button')).find((button) =>
+      button.textContent?.toLowerCase().includes('wholesale deals'),
+    );
+    const wholesaleAlreadyActive = wholesaleCard?.className.includes('bg-[#14140F]');
+
+    if (onWholesaleSelect && !wholesaleAlreadyActive) {
+      onWholesaleSelect();
     }
 
-    window.location.href = '/shop?wholesale=1';
+    window.setTimeout(() => {
+      const productGrid = Array.from(document.querySelectorAll('section')).find((section) =>
+        section.querySelector('h2')?.textContent?.trim().includes('Discover deals'),
+      );
+      productGrid?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 0);
   };
 
   return (
