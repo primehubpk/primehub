@@ -12,6 +12,7 @@ export type Settings = {
   returnPolicy: string;
   freeDeliveryThreshold: number;
   storePolicyInfo: string;
+  youtubeGuideUrl: string;
   priceBuckets: PriceBucket[];
   dailyDeal: DailyDeal;
 };
@@ -53,6 +54,7 @@ export const DEFAULT_SETTINGS: Settings = {
   returnPolicy: '',
   freeDeliveryThreshold: 5,
   storePolicyInfo: '',
+  youtubeGuideUrl: '',
   priceBuckets: DEFAULT_BUCKETS,
   dailyDeal: DEFAULT_BIG_DEAL,
 };
