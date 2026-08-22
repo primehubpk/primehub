@@ -62,7 +62,31 @@ export default function PriceBuckets({ selectedMaxPrice, wholesaleSelected, onSe
             </>
           );
           return (
-            <button key={bucket.id} type="button" onClick={() => wholesale ? onWholesaleSelect() : onSelect(selected ? null : (bucket.amount ?? null))} className={`${cardClass} ${selected ? 'border-[#14140F] bg-[#14140F] text-white shadow-[0_14px_32px_rgba(20,20,15,0.16)]' : 'border-black/6 bg-white text-[#14140F] shadow-[0_10px_28px_rgba(20,20,15,0.07)] hover:-translate-y-0.5'}`}>
+            <button
+              key={bucket.id}
+              type="button"
+              onClick={() => {
+                if (wholesale) {
+                  onWholesaleSelect();
+                } else {
+                  onSelect(selected ? null : (bucket.amount ?? null));
+                }
+                setTimeout(() => {
+                  const element = document.getElementById('discover-deals-section');
+                  if (element) {
+                    const headerOffset = 90; // Offset for sticky header
+                    const elementPosition = element.getBoundingClientRect().top;
+                    const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+
+                    window.scrollTo({
+                      top: offsetPosition,
+                      behavior: 'smooth'
+                    });
+                  }
+                }, 100);
+              }}
+              className={`${cardClass} ${selected ? 'border-[#14140F] bg-[#14140F] text-white shadow-[0_14px_32px_rgba(20,20,15,0.16)]' : 'border-black/6 bg-white text-[#14140F] shadow-[0_10px_28px_rgba(20,20,15,0.07)] hover:-translate-y-0.5'}`}
+            >
               {inner}
             </button>
           );
