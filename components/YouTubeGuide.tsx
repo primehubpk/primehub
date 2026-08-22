@@ -27,7 +27,7 @@ function getYouTubeVideoId(value: string) {
 
 export default function YouTubeGuide() {
   const { settings } = useSettings();
-  const guideUrl = settings.youtubeGuideUrl?.trim() || DEFAULT_GUIDE_URL;
+  const guideUrl = (settings as any).youtubeGuideUrl?.trim() || DEFAULT_GUIDE_URL;
   const videoId = useMemo(() => getYouTubeVideoId(guideUrl), [guideUrl]);
 
   if (!videoId) return null;
