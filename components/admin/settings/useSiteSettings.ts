@@ -47,6 +47,7 @@ export default function useSiteSettings() {
         returnPolicy: typeof policy.returnPolicy === 'string' ? policy.returnPolicy : '',
         dailyDeal: { ...DEFAULT_BIG_DEAL, ...(main.dailyDeal || {}) },
         priceBuckets: Array.isArray(main.priceBuckets) && main.priceBuckets.length ? main.priceBuckets : DEFAULT_BUCKETS,
+        youtubeGuideUrl: typeof main.youtubeGuideUrl === 'string' ? main.youtubeGuideUrl : '',
       }));
     }).catch(() => setToast('Unable to load site settings.')).finally(() => setLoading(false));
   }, []);
@@ -82,6 +83,7 @@ export default function useSiteSettings() {
         setAdminDocument('settings', 'main', {
           announcementText: settings.announcementText.trim(),
           whatsappNumber,
+          youtubeGuideUrl: settings.youtubeGuideUrl.trim(),
           freeShippingCount: Number(settings.freeDeliveryThreshold || 0),
           freeDelivery: { enabled: true, itemThreshold: Number(settings.freeDeliveryThreshold || 0), message: 'Add {remaining} more item{plural} to unlock FREE DELIVERY', unlockedMessage: 'FREE DELIVERY UNLOCKED 🎉' },
           storePolicyInfo: settings.storePolicyInfo.trim(),
@@ -98,7 +100,7 @@ export default function useSiteSettings() {
           physicalAddress: settings.physicalAddress.trim(),
         }),
       ]);
-      setSettings((s) => ({ ...s, whatsappNumber }));
+      setSettings((s) => ({ ...s, whatsappNumber, youtubeGuideUrl: settings.youtubeGuideUrl.trim() }));
       setToast('Settings, contact and policies saved.');
     } catch { setToast('Unable to save settings.'); }
     finally { setSaving(false); }
