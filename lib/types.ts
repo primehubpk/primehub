@@ -7,7 +7,7 @@ export interface DailyDeal { productId:string; imageUrl:string; title:string; or
 export interface YouTubeGuideSettings { enabled:boolean; title:string; videoId:string; description:string; }
 export interface PolicyPageContent { title:string; content:string; }
 export interface ContactSettings { whatsappNumber:string; email:string; physicalAddress:string; }
-export interface SiteSettings { freeDelivery?:FreeDeliverySettings; priceBuckets?:PriceBucket[]; weeklyDeals?:WeeklyDeal[]; dailyDeal?:DailyDeal; youtubeGuide?:YouTubeGuideSettings; policies?:{privacyPolicy?:PolicyPageContent;terms?:PolicyPageContent;returnPolicy?:PolicyPageContent}; contact?:ContactSettings; announcementText:string; whatsappNumber:string; freeShippingCount:number; heroTitle:string; heroDiscountText:string; heroCountdownEndTime:string; heroImageUrl:string; heroButtonText:string; heroButtonLink:string; }
+export interface SiteSettings { freeDelivery?:FreeDeliverySettings; priceBuckets?:PriceBucket[]; weeklyDeals?:WeeklyDeal[]; dailyDeal?:DailyDeal; youtubeGuide?:YouTubeGuideSettings; youtubeGuideUrl?:string; policies?:{privacyPolicy?:PolicyPageContent;terms?:PolicyPageContent;returnPolicy?:PolicyPageContent}; contact?:ContactSettings; announcementText:string; whatsappNumber:string; freeShippingCount:number; heroTitle:string; heroDiscountText:string; heroCountdownEndTime:string; heroImageUrl:string; heroButtonText:string; heroButtonLink:string; }
 export interface ProductVariantSelection { color?:string; size?:string; }
 export interface ProductVariantRow { id?:string; color?:string; size?:string; stock?:number|string; imageUrl?:string; price?:number|string; [key:string]:unknown; }
 export interface ProductVariantColor { name:string; imageUrl?:string; }
