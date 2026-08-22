@@ -8,7 +8,6 @@ import { useSettings } from '@/lib/useSettings';
 
 const MAP_HREF = 'https://www.google.com/maps/search/?api=1&query=Prime+Hub+Sabir+Bangles+Store+Shop+217+Street+7+Gulistan+Colony+Mustafabad+Dharampura+Lahore';
 const FALLBACK_ADDRESS = 'Shop No. 217, Street No. 7, Gulistan Colony, Mustafabad, Dharampura, Lahore';
-const ADDRESS_DETAIL = 'Prime Hub (Sabir Bangles Store) · Near Aftab Masjid, School Road';
 
 const TRUST_BADGES = [
   { icon: Wallet, label: 'Cash on Delivery', text: 'Pay when your order arrives' },
@@ -42,7 +41,7 @@ function WhatsAppIcon() {
   return (
     <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#25D366] text-white shadow-lg shadow-[#25D366]/20">
       <svg viewBox="0 0 24 24" className="h-6 w-6 fill-current" aria-hidden="true">
-        <path d="M20.52 3.48A11.86 11.86 0 0 0 12.06 0C5.5 0 .16 5.34.16 11.9c0 2.1.55 4.15 1.6 5.96L.06 24l6.28-1.65a11.93 11.93 0 0 0 5.72 1.46h.01c6.56 0 11.9-5.34 11.9-11.9 0-3.18-1.24-6.16-3.45-8.43ZM12.07 21.8h-.01a9.9 9.9 0 0 1-5.05-1.38l-.36-.21-3.73.98.99-3.64-.23-.37a9.87 9.87 0 0 1-1.51-5.28C2.17 6.45 6.6 2.02 12.07 2.02c2.65 0 5.14 1.03 7.01 2.9a9.85 9.85 0 0 1 2.9 7.02c0 5.47-4.43 9.9-9.91 9.9Zm5.43-7.42c-.3-.15-1.78-.88-2.06-.98-.28-.1-.48-.15-.68.15-.2.3-.78.98-.96 1.18-.18.2-.35.22-.65.07-.3-.15-1.25-.46-2.38-1.46-.88-.78-1.48-1.74-1.66-2.04-.17-.3-.02-.46.13-.61.14-.14.3-.35.45-.52.15-.17.2-.3.3-.5.1-.2.05-.37-.02-.52-.07-.15-.68-1.64-.93-2.25-.24-.58-.49-.5-.68-.51h-.58c-.2 0-.52.07-.8.37-.27.3-1.04 1.02-1.04 2.48s1.07 2.87 1.22 3.07c.15.2 2.1 3.2 5.09 4.49.71.31 1.26.49 1.69.63.71.23 1.36.2 1.87.12.57-.08 1.78-.73 2.03-1.43.25-.7.25-1.3.17-1.43-.07-.12-.27-.2-.57-.35Z" />
+        <path d="M20.52 3.48A11.86 11.86 0 0 0 12.06 0C5.5 .0.16 5.34.16 11.9c0 2.1.55 4.15 1.6 5.96L.06 24l6.28-1.65a11.93 11.93 0 0 0 5.72 1.46h.01c6.56 0 11.9-5.34 11.9-11.9 0-3.18-1.24-6.16-3.45-8.43ZM12.07 21.8h-.01a9.9 9.9 0 0 1-5.05-1.38l-.36-.21-3.73.98.99-3.64-.23-.37a9.87 9.87 0 0 1-1.51-5.28C2.17 6.45 6.6 2.02 12.07 2.02c2.65 0 5.14 1.03 7.01 2.9a9.85 9.85 0 0 1 2.9 7.02c0 5.47-4.43 9.9-9.91 9.9Zm5.43-7.42c-.3-.15-1.78-.88-2.06-.98-.28-.1-.48-.15-.68.15-.2.3-.78.98-.96 1.18-.18.2-.35.22-.65.07-.3-.15-1.25-.46-2.38-1.46-.88-.78-1.48-1.74-1.66-2.04-.17-.3-.02-.46.13-.61.14-.14.3-.35.45-.52.15-.17.2-.3.3-.5.1-.2.05-.37-.02-.52-.07-.15-.68-1.64-.93-2.25-.24-.58-.49-.5-.68-.51h-.58c-.2 0-.52.07-.8.37-.27.3-1.04 1.02-1.04 2.48s1.07 2.87 1.22 3.07c.15.2 2.1 3.2 5.09 4.49.71.31 1.26.49 1.69.63.71.23 1.36.2 1.87.12.57-.08 1.78-.73 2.03-1.43.25-.7.25-1.3.17-1.43-.07-.12-.27-.2-.57-.35Z" />
       </svg>
     </span>
   );
@@ -122,7 +121,7 @@ export default function Footer({ onWholesaleSelect }: { onWholesaleSelect?: () =
 
               <a href={MAP_HREF} target="_blank" rel="noreferrer" className="flex items-start gap-2.5 rounded-2xl border border-white/10 bg-white/5 p-3 transition hover:bg-white/10">
                 <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-[#FFB020]" />
-                <span><b className="block text-[10px] text-white">Our location</b><span className="text-[9px] leading-4 text-white/45">{address}<br />{ADDRESS_DETAIL}</span></span>
+                <span><b className="block text-[10px] text-white">Our location</b><span className="text-[9px] leading-4 text-white/45">{address}</span></span>
               </a>
 
               <div className="grid grid-cols-2 gap-2">
