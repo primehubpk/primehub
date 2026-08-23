@@ -211,12 +211,13 @@ export default function HeroFlashBanner() {
             {orderedDays.map(({ key, label, Icon }) => {
               const deal = weeklyDeals.find((item) => item.day === key && Number(item.dealPrice) > 0);
               const product = deal ? products[deal.productId] : undefined;
+              const dealRecord = deal as (typeof deal & { normalPrice?: number; price?: number }) | undefined;
               const normalPrice = Number(product?.price || deal?.originalPrice || 0);
               const dealPrice = Number(deal?.dealPrice || 0);
+              const savings = Math.round(
+                Number(dealRecord?.normalPrice || deal?.originalPrice || 0) - Number(deal?.dealPrice || dealRecord?.price || 0),
+              );
               const isLive = Boolean(deal && todayKey === key && dealPrice > 0);
-              const dealDiscount = deal && Number(deal.originalPrice || 0) > dealPrice
-                ? Math.round(((Number(deal.originalPrice) - dealPrice) / Number(deal.originalPrice)) * 100)
-                : 0;
               const timing = nowTick !== null ? dealTiming(key, new Date(nowTick)) : null;
               const cardClass = isLive
                 ? 'border-emerald-500 bg-white text-[#14140F] shadow-[0_12px_28px_rgba(16,185,129,0.16)]'
@@ -226,17 +227,28 @@ export default function HeroFlashBanner() {
 
               return (
                 <div key={key} className={'group relative min-w-[145px] flex-1 overflow-hidden rounded-[20px] border-2 text-center transition duration-200 ' + cardClass}>
-                  {isLive && <span className="absolute right-2 top-2 z-20 rounded-full bg-emerald-500 px-1.5 py-0.5 text-[6px] font-black uppercase tracking-[0.08em] text-white shadow-sm">LIVE</span>}
                   {deal?.imageUrl ? (
                     <Link href={`/product/${deal.productId}`} aria-label={`View ${deal.title}`} className="block">
                       <span className="relative block aspect-[4/3] w-full overflow-hidden">
                         <Image src={deal.imageUrl} alt={label} fill priority={isLive} sizes="(max-width: 640px) 145px, (max-width: 1024px) 20vw, 180px" className="object-cover transition duration-200 group-hover:scale-105" />
                         <span className="absolute left-1.5 top-1.5 rounded-full bg-[#E1352B] px-1.5 py-0.5 text-[6px] font-black uppercase tracking-[0.08em] text-white shadow-sm">{isLive ? 'Sale' : label}</span>
-                        {isLive && dealDiscount > 0 && <span className="absolute bottom-1.5 right-1.5 rounded-full bg-[#FFD16A] px-1.5 py-0.5 text-[7px] font-black text-[#14140F] shadow-sm">-{dealDiscount}%</span>}
+                        {isLive && <span className="absolute bottom-1.5 left-1.5 rounded-full bg-emerald-500 px-1.5 py-0.5 text-[6px] font-black uppercase tracking-[0.08em] text-white shadow-sm">LIVE</span>}
+                        {savings > 0 && (
+                          <span className="absolute right-1.5 top-1.5 z-20 inline-flex items-center rounded-full bg-[#0F6A5F] px-2 py-1 text-[7px] font-black text-white shadow-[0_6px_16px_rgba(15,106,95,0.45)]">
+                            Save Rs. {savings.toLocaleString()}
+                          </span>
+                        )}
                       </span>
                     </Link>
                   ) : (
-                    <span className="flex aspect-[4/3] w-full items-center justify-center overflow-hidden bg-[#F4F4F1] text-[#0F6A5F]"><Icon size={18} strokeWidth={2.3} /></span>
+                    <span className="relative flex aspect-[4/3] w-full items-center justify-center overflow-hidden bg-[#F4F4F1] text-[#0F6A5F]">
+                      <Icon size={18} strokeWidth={2.3} />
+                      {savings > 0 && (
+                        <span className="absolute right-1.5 top-1.5 z-20 inline-flex items-center rounded-full bg-[#0F6A5F] px-2 py-1 text-[7px] font-black text-white shadow-[0_6px_16px_rgba(15,106,95,0.45)]">
+                          Save Rs. {savings.toLocaleString()}
+                        </span>
+                      )}
+                    </span>
                   )}
 
                   <span className="relative z-10 block px-2.5 pb-3 pt-2">

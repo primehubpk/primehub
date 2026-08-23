@@ -135,6 +135,10 @@ export default function WeeklyDealStrip() {
             const dayLabel = DAY_LABELS[deal.day];
             const href = deal.productId ? `/product/${deal.productId}` : (deal.buttonLink || '/shop');
             const isLoading = loadingDealId === (deal.id || deal.productId);
+            const dealRecord = deal as WeeklyDeal & { normalPrice?: number; price?: number };
+            const savings = Math.round(
+              Number(dealRecord.normalPrice || deal.originalPrice || 0) - Number(deal.dealPrice || dealRecord.price || 0),
+            );
             return (
               <article key={deal.id || deal.day} className={`min-w-[180px] shrink-0 snap-start overflow-hidden rounded-[24px] bg-white shadow-sm ${deal.day === today ? 'ring-2 ring-[#E1352B]' : ''}`}>
                 <Link href={href} className="block">
@@ -142,7 +146,12 @@ export default function WeeklyDealStrip() {
                     {deal.imageUrl && <img src={deal.imageUrl} alt={deal.title || `${dayLabel} Deal`} className="h-full w-full object-cover opacity-85" draggable={false} />}
                     <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
                     <span className="pointer-events-none absolute left-3 top-3 rounded-full bg-[#FFB020] px-2 py-1 text-[7px] font-black">{dayLabel}</span>
-                    {deal.day === today && <span className="pointer-events-none absolute right-3 top-3 rounded-full bg-[#E1352B] px-2 py-1 text-[7px] font-black text-white">TODAY</span>}
+                    {deal.day === today && <span className="pointer-events-none absolute bottom-3 left-3 rounded-full bg-[#E1352B] px-2 py-1 text-[7px] font-black text-white">TODAY</span>}
+                    {savings > 0 && (
+                      <span className="pointer-events-none absolute right-3 top-3 z-10 inline-flex items-center rounded-full bg-[#0F6A5F] px-2 py-1 text-[8px] font-black text-white shadow-[0_6px_16px_rgba(15,106,95,0.45)]">
+                        Save Rs. {savings.toLocaleString()}
+                      </span>
+                    )}
                   </div>
                   <div className="p-3">
                     <p className="text-[9px] font-black uppercase tracking-[0.2em] text-[#E1352B]">{dayLabel.toUpperCase()} DEAL</p>
