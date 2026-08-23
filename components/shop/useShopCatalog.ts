@@ -6,8 +6,24 @@ import { useSearchParams } from 'next/navigation';
 import { db } from '@/lib/firebase';
 import { useSettings } from '@/lib/useSettings';
 import { useCartStore } from '@/lib/cartStore';
-import { categoryLabel, productMatchesCategory, slugifyCategory } from '@/lib/categoryUtils';
+import { categoryHref, categoryLabel, productMatchesCategory, slugifyCategory } from '@/lib/categoryUtils';
 import { Product, Category, ShopCatalogModel, imageOf, priceOf, originalOf, titleOf } from './ShopTypes';
+
+function isWholesaleProduct(product: Product, wholesaleBucketIds: Set<string>) {
+  if (product.isWholesale) return true;
+  const buckets = Array.isArray(product.priceBuckets)
+    ? product.priceBuckets
+    : Array.isArray(product.buckets)
+      ? product.buckets
+      : [];
+  const directMatch = buckets.some((bucket) => {
+    if (typeof bucket === 'string') return bucket.toLowerCase().includes('wholesale');
+    const label = String(bucket?.name ?? bucket?.title ?? '').toLowerCase();
+    return label.includes('wholesale') || (bucket?.id != null && wholesaleBucketIds.has(String(bucket.id)));
+  });
+  const idMatch = Array.isArray(product.priceBucketIds) && product.priceBucketIds.some((id) => wholesaleBucketIds.has(String(id)));
+  return directMatch || idMatch;
+}
 
 export function useShopCatalog(initialCategory?: string, initialQuery = ''): ShopCatalogModel {
   const { settings } = useSettings();
@@ -22,7 +38,7 @@ export function useShopCatalog(initialCategory?: string, initialQuery = ''): Sho
   const [addedId, setAddedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const searchParams = useSearchParams();
-  const wholesaleOnly = searchParams.get('wholesale') === 'true';
+  const [wholesaleOnly, setWholesaleOnly] = useState(searchParams.get('wholesale') === 'true');
 
   useEffect(() => {
     setCategory(initialCategory ? slugifyCategory(decodeURIComponent(initialCategory)) || initialCategory : 'all');
@@ -57,6 +73,11 @@ export function useShopCatalog(initialCategory?: string, initialQuery = ''): Sho
     [settings.priceBuckets],
   );
 
+  const wholesaleBucketIds = useMemo(
+    () => new Set(buckets.filter((bucket) => String(bucket.title || '').toLowerCase().includes('wholesale')).map((bucket) => String(bucket.id))),
+    [buckets],
+  );
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return products.filter((p) => {
@@ -66,12 +87,41 @@ export function useShopCatalog(initialCategory?: string, initialQuery = ''): Sho
       const catId = String(p.categoryId || '').toLowerCase();
       const matchesSearch = !q || title.includes(q) || cat.includes(q) || catId.includes(q);
       const selectedCat = productMatchesCategory(category, p, categories);
-      const matchesPrice = maxPrice === 'all' || priceOf(p) <= Number(maxPrice);
+      const matchesPrice = wholesaleOnly || maxPrice === 'all' || !Number(maxPrice) || priceOf(p) <= Number(maxPrice);
       const matchesDeal = !onlyDeals || Boolean(p.isFlashSale);
-      const matchesWholesale = !wholesaleOnly || Boolean(p.isWholesale);
+      const matchesWholesale = !wholesaleOnly || isWholesaleProduct(p, wholesaleBucketIds);
       return matchesSearch && selectedCat && matchesPrice && matchesDeal && matchesWholesale;
     });
-  }, [products, categories, search, category, maxPrice, onlyDeals, wholesaleOnly]);
+  }, [products, categories, search, category, maxPrice, onlyDeals, wholesaleOnly, wholesaleBucketIds]);
+
+  const rails = useMemo(() => {
+    const used = new Set<string>();
+    const ordered = [...categories]
+      .filter((item) => item.active !== false)
+      .sort((a, b) => Number(a.sortOrder ?? 999) - Number(b.sortOrder ?? 999));
+
+    const grouped = ordered.map((item) => {
+      const title = item.title || item.name || item.id;
+      const items = filtered.filter((product) => productMatchesCategory(slugifyCategory(item.slug || title), product, [item]));
+      items.forEach((product) => used.add(product.id));
+      return { id: item.id, title, href: categoryHref(item), products: items };
+    }).filter((rail) => rail.products.length > 0);
+
+    const leftovers = new Map<string, Product[]>();
+    filtered.forEach((product) => {
+      if (used.has(product.id)) return;
+      const title = String(product.category || 'More to explore').trim() || 'More to explore';
+      const list = leftovers.get(title) || [];
+      list.push(product);
+      leftovers.set(title, list);
+    });
+
+    leftovers.forEach((items, title) => {
+      grouped.push({ id: slugifyCategory(title) || title, title, href: categoryHref(title), products: items });
+    });
+
+    return grouped;
+  }, [filtered, categories]);
 
   const resolvedCategoryLabel = useMemo(() => categoryLabel(category, categories), [category, categories]);
 
@@ -101,6 +151,7 @@ export function useShopCatalog(initialCategory?: string, initialQuery = ''): Sho
     wholesaleOnly,
     buckets,
     filtered,
+    rails,
     categoryLabel: resolvedCategoryLabel,
     loading,
     setSearch,
@@ -108,6 +159,7 @@ export function useShopCatalog(initialCategory?: string, initialQuery = ''): Sho
     setMaxPrice,
     setOnlyDeals,
     setFiltersOpen,
+    setWholesaleOnly,
     addProduct,
   };
 }

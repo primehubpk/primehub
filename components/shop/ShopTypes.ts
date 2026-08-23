@@ -12,13 +12,15 @@ export type Category = {
 };
 
 export type FilterState = { search: string; category: string; maxPrice: string; onlyDeals: boolean; filtersOpen: boolean };
+export type CategoryRail = { id: string; title: string; href: string; products: Product[] };
 export type ShopCatalogActions = {
   setSearch: Dispatch<SetStateAction<string>>; setCategory: Dispatch<SetStateAction<string>>;
   setMaxPrice: Dispatch<SetStateAction<string>>; setOnlyDeals: Dispatch<SetStateAction<boolean>>;
-  setFiltersOpen: Dispatch<SetStateAction<boolean>>; addProduct: (product: Product) => void;
+  setFiltersOpen: Dispatch<SetStateAction<boolean>>; setWholesaleOnly: (value: boolean) => void;
+  addProduct: (product: Product) => void;
 };
 export type ShopCatalogModel = FilterState & ShopCatalogActions & {
-  products: Product[]; categories: Category[]; filtered: Product[]; buckets: any[];
+  products: Product[]; categories: Category[]; filtered: Product[]; rails: CategoryRail[]; buckets: any[];
   addedId: string | null; wholesaleOnly: boolean; categoryLabel: string; loading: boolean;
 };
 

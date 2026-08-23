@@ -39,28 +39,11 @@ export default function PriceBuckets({ selectedMaxPrice, wholesaleSelected, onSe
         {(selectedMaxPrice !== null || wholesaleSelected) && <button type="button" onClick={() => { onSelect(null); if (wholesaleSelected) onWholesaleSelect(); }} className="inline-flex items-center gap-1.5 rounded-full bg-[#14140F] px-3 py-1.5 text-[10px] font-black text-white"><SlidersHorizontal size={12} />Clear</button>}
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="flex gap-2.5 overflow-x-auto pb-1 scrollbar-hide sm:grid sm:grid-cols-4 sm:overflow-visible">
         {buckets.map((bucket) => {
-          const wholesale = bucket.title.toLowerCase().includes('wholesale');
+          const wholesale = bucket.title.toLowerCase().includes('wholesale') || !bucket.amount;
           const selected = wholesale ? wholesaleSelected : selectedMaxPrice === bucket.amount && !wholesaleSelected;
           const accent = bucket.accent || (wholesale ? '#0F6A5F' : '#FFB020');
-          const cardClass = 'relative w-full overflow-hidden rounded-[22px] border p-3.5 text-left transition active:scale-[0.98]';
-          const inner = (
-            <>
-              <div className="absolute -right-7 -top-7 h-24 w-24 rounded-full opacity-20 blur-md" style={{ background: accent }} />
-              <div className="relative flex items-center justify-between">
-                <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-2xl text-[#14140F] shadow-sm" style={{ background: accent }}>
-                  {bucket.iconUrl ? <img src={bucket.iconUrl} alt="" className="h-full w-full object-cover" /> : bucketIcon(bucket.title)}
-                </div>
-                <span className="rounded-full border border-[#E1352B]/15 bg-[#E1352B]/8 px-2 py-1 text-[8px] font-black uppercase tracking-wider text-[#E1352B]">Hot</span>
-              </div>
-              <p className="relative mt-3 text-[8px] font-black uppercase tracking-[0.16em] opacity-45">{wholesale ? 'Bulk savings' : 'Best finds'}</p>
-              <p className="relative mt-0.5 text-base font-black leading-tight">{bucket.title}</p>
-              <p className="relative mt-1 font-[family-name:var(--font-mono)] text-[9px] opacity-50">
-                {wholesale || !bucket.amount ? 'Special wholesale pricing' : `Products ≤ Rs. ${bucket.amount.toLocaleString()}`}
-              </p>
-            </>
-          );
           return (
             <button
               key={bucket.id}
@@ -74,20 +57,31 @@ export default function PriceBuckets({ selectedMaxPrice, wholesaleSelected, onSe
                 setTimeout(() => {
                   const element = document.getElementById('discover-deals-section');
                   if (element) {
-                    const headerOffset = 90; // Offset for sticky header
+                    const headerOffset = 90;
                     const elementPosition = element.getBoundingClientRect().top;
                     const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
-
-                    window.scrollTo({
-                      top: offsetPosition,
-                      behavior: 'smooth'
-                    });
+                    window.scrollTo({ top: offsetPosition, behavior: 'smooth' });
                   }
                 }, 100);
               }}
-              className={`${cardClass} ${selected ? 'border-[#14140F] bg-[#14140F] text-white shadow-[0_14px_32px_rgba(20,20,15,0.16)]' : 'border-black/6 bg-white text-[#14140F] shadow-[0_10px_28px_rgba(20,20,15,0.07)] hover:-translate-y-0.5'}`}
+              className={`relative min-w-[168px] shrink-0 overflow-hidden rounded-[28px] border px-4 py-3.5 text-left transition active:scale-[0.98] sm:min-w-0 ${
+                selected ? 'border-white/20 text-white shadow-[0_14px_34px_rgba(15,106,95,0.22)]' : 'border-white/50 text-[#14140F] shadow-[0_10px_28px_rgba(20,20,15,0.06)]'
+              }`}
+              style={selected ? { background: `linear-gradient(135deg, ${accent}, #14140F)` } : { background: `linear-gradient(135deg, rgba(255,255,255,0.86), ${accent}22)` }}
             >
-              {inner}
+              <div className="absolute inset-0 backdrop-blur-md" />
+              <div className="relative">
+                <div className="flex items-center justify-between">
+                  <div className={`flex h-10 w-10 items-center justify-center overflow-hidden rounded-full shadow-sm ${selected ? 'bg-white/15 text-white' : 'bg-white/80 text-[#14140F]'}`}>
+                    {bucket.iconUrl ? <img src={bucket.iconUrl} alt="" className="h-full w-full object-cover" /> : bucketIcon(bucket.title)}
+                  </div>
+                  <span className={`rounded-full px-2 py-1 text-[8px] font-black uppercase tracking-wider ${wholesale ? 'bg-[#FFB020]/20 text-[#8A5A00]' : selected ? 'bg-white/12 text-white' : 'bg-[#E1352B]/10 text-[#E1352B]'}`}>
+                    {wholesale ? 'Bulk Deals' : 'Hot'}
+                  </span>
+                </div>
+                <p className={`mt-3 text-[8px] font-black uppercase tracking-[0.16em] ${selected ? 'text-white/60' : 'text-black/40'}`}>{wholesale ? 'Special Wholesale Pricing' : bucket.title}</p>
+                <p className="mt-0.5 text-sm font-black leading-tight">{wholesale ? 'Bulk Deals' : `Under Rs. ${Number(bucket.amount).toLocaleString()}`}</p>
+              </div>
             </button>
           );
         })}
