@@ -40,6 +40,16 @@ export function dealTiming(day: Weekday, now = new Date()) {
   return { isLive, unlockAt: isLive ? pakistanMidnightForDate(current.year, current.month, current.day + 1) : nextUnlockAt(day, now) };
 }
 
+export function weeklyDealSavings(deal: {
+  normalPrice?: unknown;
+  originalPrice?: unknown;
+  dealPrice?: unknown;
+}) {
+  const normal = Number(deal.normalPrice) || Number(deal.originalPrice) || 0;
+  const dealP = Number(deal.dealPrice) || 0;
+  return Math.max(0, normal - dealP);
+}
+
 export function countdownParts(ms: number) {
   const total = Math.max(0, Math.floor(ms / 1000));
   return {

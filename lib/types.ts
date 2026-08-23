@@ -2,7 +2,7 @@
 export interface FreeDeliverySettings { enabled:boolean; itemThreshold:number; message:string; unlockedMessage:string; }
 export interface PriceBucket { id:string; title:string; amount?:number|null; iconUrl:string; accent:string; sortOrder:number; active:boolean; }
 export type Weekday='sunday'|'monday'|'tuesday'|'wednesday'|'thursday'|'friday'|'saturday';
-export interface WeeklyDeal { id:string; day:Weekday; label:string; productId:string; imageUrl:string; title:string; originalPrice:number; dealPrice:number; startAt:string; endAt:string; buttonText:string; buttonLink:string; active:boolean; }
+export interface WeeklyDeal { id:string; day:Weekday; label:string; productId:string; imageUrl:string; title:string; normalPrice?:number; originalPrice:number; dealPrice:number; startAt:string; endAt:string; buttonText:string; buttonLink:string; active:boolean; }
 export interface DailyDeal { productId:string; imageUrl:string; title:string; originalPrice:number; dealPrice:number; startAt:string; endAt:string; buttonText:string; buttonLink:string; active:boolean; }
 export interface YouTubeGuideSettings { enabled:boolean; title:string; videoId:string; description:string; }
 export interface PolicyPageContent { title:string; content:string; }

@@ -10,7 +10,7 @@ import { useCartStore } from '@/lib/cartStore';
 import { db } from '@/lib/firebase';
 import { getEffectivePrice } from '@/lib/dealPricing';
 import type { Product, Weekday } from '@/lib/types';
-import { WEEKDAY_LABELS, WEEKDAY_ORDER, dealTiming, pakistanNowWeekday, countdownParts } from '@/lib/weeklyDealUtils';
+import { WEEKDAY_LABELS, WEEKDAY_ORDER, dealTiming, pakistanNowWeekday, countdownParts, weeklyDealSavings } from '@/lib/weeklyDealUtils';
 
 const DAYS: Array<{ key: Weekday; label: string; Icon: typeof Gift }> = [
   { key: 'sunday', label: 'Sunday Deal', Icon: Gift },
@@ -211,12 +211,9 @@ export default function HeroFlashBanner() {
             {orderedDays.map(({ key, label, Icon }) => {
               const deal = weeklyDeals.find((item) => item.day === key && Number(item.dealPrice) > 0);
               const product = deal ? products[deal.productId] : undefined;
-              const dealRecord = deal as (typeof deal & { normalPrice?: number; price?: number }) | undefined;
-              const normalPrice = Number(product?.price || deal?.originalPrice || 0);
               const dealPrice = Number(deal?.dealPrice || 0);
-              const savings = Math.round(
-                Number(dealRecord?.normalPrice || deal?.originalPrice || 0) - Number(deal?.dealPrice || dealRecord?.price || 0),
-              );
+              const savings = deal ? weeklyDealSavings(deal) : 0;
+              const normalPrice = Number(deal?.normalPrice) || Number(deal?.originalPrice) || 0;
               const isLive = Boolean(deal && todayKey === key && dealPrice > 0);
               const timing = nowTick !== null ? dealTiming(key, new Date(nowTick)) : null;
               const cardClass = isLive
@@ -234,7 +231,7 @@ export default function HeroFlashBanner() {
                         <span className="absolute left-1.5 top-1.5 rounded-full bg-[#E1352B] px-1.5 py-0.5 text-[6px] font-black uppercase tracking-[0.08em] text-white shadow-sm">{isLive ? 'Sale' : label}</span>
                         {isLive && <span className="absolute bottom-1.5 left-1.5 rounded-full bg-emerald-500 px-1.5 py-0.5 text-[6px] font-black uppercase tracking-[0.08em] text-white shadow-sm">LIVE</span>}
                         {savings > 0 && (
-                          <span className="absolute right-1.5 top-1.5 z-20 inline-flex items-center rounded-full bg-[#0F6A5F] px-2 py-1 text-[7px] font-black text-white shadow-[0_6px_16px_rgba(15,106,95,0.45)]">
+                          <span className="absolute right-2 top-2 z-20 rounded-md bg-[#0F6A5F] px-2 py-0.5 text-[10px] font-semibold text-white shadow-sm">
                             Save Rs. {savings.toLocaleString()}
                           </span>
                         )}
@@ -244,7 +241,7 @@ export default function HeroFlashBanner() {
                     <span className="relative flex aspect-[4/3] w-full items-center justify-center overflow-hidden bg-[#F4F4F1] text-[#0F6A5F]">
                       <Icon size={18} strokeWidth={2.3} />
                       {savings > 0 && (
-                        <span className="absolute right-1.5 top-1.5 z-20 inline-flex items-center rounded-full bg-[#0F6A5F] px-2 py-1 text-[7px] font-black text-white shadow-[0_6px_16px_rgba(15,106,95,0.45)]">
+                        <span className="absolute right-2 top-2 z-20 rounded-md bg-[#0F6A5F] px-2 py-0.5 text-[10px] font-semibold text-white shadow-sm">
                           Save Rs. {savings.toLocaleString()}
                         </span>
                       )}

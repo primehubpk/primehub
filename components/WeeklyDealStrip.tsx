@@ -6,6 +6,7 @@ import { db } from '@/lib/firebase';
 import Link from 'next/link';
 import { ArrowRight, Clock3, ShoppingBag } from 'lucide-react';
 import type { WeeklyDeal } from '@/lib/types';
+import { weeklyDealSavings } from '@/lib/weeklyDealUtils';
 import { useCartStore, type VariantModalProduct } from '@/lib/cartStore';
 
 type DealProduct = VariantModalProduct & {
@@ -135,10 +136,7 @@ export default function WeeklyDealStrip() {
             const dayLabel = DAY_LABELS[deal.day];
             const href = deal.productId ? `/product/${deal.productId}` : (deal.buttonLink || '/shop');
             const isLoading = loadingDealId === (deal.id || deal.productId);
-            const dealRecord = deal as WeeklyDeal & { normalPrice?: number; price?: number };
-            const savings = Math.round(
-              Number(dealRecord.normalPrice || deal.originalPrice || 0) - Number(deal.dealPrice || dealRecord.price || 0),
-            );
+            const savings = weeklyDealSavings(deal);
             return (
               <article key={deal.id || deal.day} className={`min-w-[180px] shrink-0 snap-start overflow-hidden rounded-[24px] bg-white shadow-sm ${deal.day === today ? 'ring-2 ring-[#E1352B]' : ''}`}>
                 <Link href={href} className="block">
@@ -148,7 +146,7 @@ export default function WeeklyDealStrip() {
                     <span className="pointer-events-none absolute left-3 top-3 rounded-full bg-[#FFB020] px-2 py-1 text-[7px] font-black">{dayLabel}</span>
                     {deal.day === today && <span className="pointer-events-none absolute bottom-3 left-3 rounded-full bg-[#E1352B] px-2 py-1 text-[7px] font-black text-white">TODAY</span>}
                     {savings > 0 && (
-                      <span className="pointer-events-none absolute right-3 top-3 z-10 inline-flex items-center rounded-full bg-[#0F6A5F] px-2 py-1 text-[8px] font-black text-white shadow-[0_6px_16px_rgba(15,106,95,0.45)]">
+                      <span className="pointer-events-none absolute right-2 top-2 z-10 rounded-md bg-[#0F6A5F] px-2 py-0.5 text-[10px] font-semibold text-white shadow-sm">
                         Save Rs. {savings.toLocaleString()}
                       </span>
                     )}
