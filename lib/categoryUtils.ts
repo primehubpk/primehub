@@ -7,8 +7,9 @@ export type CategoryRef = {
 };
 
 export const CATEGORY_ALIASES: Record<string, string[]> = {
-  'antique-bangles': ['bangles', 'antique-bangle', 'antique bangles'],
-  bangles: ['antique-bangles', 'antique-bangle', 'antique bangles'],
+  'antique-bangles': ['bangles', 'bangle', 'antique-bangle', 'antique bangles'],
+  bangles: ['antique-bangles', 'bangle', 'antique-bangle', 'antique bangles'],
+  bangle: ['antique-bangles', 'bangles', 'antique-bangle', 'antique bangles'],
 };
 
 export function slugifyCategory(value: string): string {
@@ -22,7 +23,7 @@ export function slugifyCategory(value: string): string {
 export function categoryHref(category: CategoryRef | string): string {
   const slug = typeof category === 'string'
     ? slugifyCategory(category)
-    : slugifyCategory(category.slug || category.title || category.name || category.id || '');
+    : slugifyCategory(category.title || category.name || category.slug || category.id || '');
   return slug ? `/category/${slug}` : '/shop';
 }
 
