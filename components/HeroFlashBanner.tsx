@@ -231,7 +231,7 @@ export default function HeroFlashBanner() {
                         <span className="absolute left-1.5 top-1.5 rounded-full bg-[#E1352B] px-1.5 py-0.5 text-[6px] font-black uppercase tracking-[0.08em] text-white shadow-sm">{isLive ? 'Sale' : label}</span>
                         {isLive && <span className="absolute bottom-1.5 left-1.5 rounded-full bg-emerald-500 px-1.5 py-0.5 text-[6px] font-black uppercase tracking-[0.08em] text-white shadow-sm">LIVE</span>}
                         {savings > 0 && (
-                          <span className="absolute right-2 top-2 z-20 rounded-md bg-[#0F6A5F] px-2 py-0.5 text-[10px] font-semibold text-white shadow-sm">
+                          <span className="absolute right-1.5 top-1.5 z-20 rounded-md bg-[#0F6A5F] px-1.5 py-0.5 text-[7px] font-medium leading-none text-white shadow-sm">
                             Save Rs. {savings.toLocaleString()}
                           </span>
                         )}
@@ -241,7 +241,7 @@ export default function HeroFlashBanner() {
                     <span className="relative flex aspect-[4/3] w-full items-center justify-center overflow-hidden bg-[#F4F4F1] text-[#0F6A5F]">
                       <Icon size={18} strokeWidth={2.3} />
                       {savings > 0 && (
-                        <span className="absolute right-2 top-2 z-20 rounded-md bg-[#0F6A5F] px-2 py-0.5 text-[10px] font-semibold text-white shadow-sm">
+                        <span className="absolute right-1.5 top-1.5 z-20 rounded-md bg-[#0F6A5F] px-1.5 py-0.5 text-[7px] font-medium leading-none text-white shadow-sm">
                           Save Rs. {savings.toLocaleString()}
                         </span>
                       )}
