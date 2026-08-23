@@ -1,7 +1,8 @@
 // ==================== ADMIN SHARED TYPES ====================
-import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, setDoc, updateDoc } from 'firebase/firestore';
-import { getAuth } from 'firebase/auth';
+import { collection, doc, getDoc, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+
+const ADMIN_SESSION_KEY = 'primehub_admin_auth';
 
 export interface Product { id: string; title: string; price: number; originalPrice?: number; category: string; stock: number; imageUrl?: string; images?: Array<string | { url?: string }>; description?: string; isFlashSale?: boolean; isWeekendSpecial?: boolean; [key: string]: unknown }
 export interface Category { id: string; title: string; iconUrl?: string; imageUrl?: string; active?: boolean; order?: number; sortOrder?: number; slug?: string; [key: string]: unknown }
@@ -14,33 +15,37 @@ export type AdminRole = 'super_admin' | 'admin' | 'manager' | 'editor' | 'suppor
 export type AdminPermission = 'dashboard.view'|'products.view'|'products.manage'|'categories.view'|'categories.manage'|'deals.view'|'deals.manage'|'orders.view'|'orders.manage'|'customers.view'|'customers.manage'|'inventory.view'|'inventory.manage'|'marketing.view'|'marketing.manage'|'content.view'|'content.manage'|'analytics.view'|'settings.view'|'settings.manage'|'suppliers.view'|'suppliers.manage'|'security.view'|'security.manage';
 export interface AdminProfile { id: string; email?: string; displayName?: string; role: AdminRole; permissions: AdminPermission[]; active: boolean; lastLoginAt?: unknown; createdAt?: unknown; [key: string]: unknown }
 
-/**
- * ImgBB uploads are deliberately passed through our authenticated server route.
- * Do not add client-side ImgBB API calls here. The original file is sent without
- * canvas/WebP/JPEG recompression so the bytes ImgBB receives are the bytes selected
- * by the admin.
- */
-export async function uploadImageToImgBB(file: File): Promise<string> {
-  if (!file.type.startsWith('image/')) throw new Error('Only image files are allowed.');
-  if (file.size > 10 * 1024 * 1024) throw new Error('Image must be 10MB or smaller.');
-  const user = getAuth().currentUser;
-  if (!user) throw new Error('Admin authentication required.');
-  const token = await user.getIdToken();
-  const form = new FormData();
-  form.append('image', file, file.name || 'upload');
-  const response = await fetch('/api/upload/imgbb', {
+function requireAdminSession() {
+  if (typeof window === 'undefined' || window.localStorage.getItem(ADMIN_SESSION_KEY) !== 'true') {
+    throw new Error('Admin session required.');
+  }
+}
+
+async function adminWrite(action: 'create' | 'update' | 'set' | 'delete', name: string, id?: string, value?: Record<string, any>) {
+  requireAdminSession();
+  const response = await fetch('/api/admin/firestore', {
     method: 'POST',
-    headers: { Authorization: `Bearer ${token}` },
-    body: form,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action, name, id, value }),
+    credentials: 'same-origin',
     cache: 'no-store',
   });
   const result = await response.json().catch(() => null);
-  if (!response.ok || !result?.success || typeof result.url !== 'string') {
-    throw new Error(result?.error || 'Image upload failed. Please try again.');
-  }
-  if (!/^https:\/\/i\.ibb\.co\//i.test(result.url)) {
-    throw new Error('Upload returned a non-CDN image URL.');
-  }
+  if (!response.ok || !result?.success) throw new Error(result?.error || 'Admin operation failed.');
+  return result;
+}
+
+/** ImgBB uploads use the simple admin session instead of Firebase Auth. */
+export async function uploadImageToImgBB(file: File): Promise<string> {
+  if (!file.type.startsWith('image/')) throw new Error('Only image files are allowed.');
+  if (file.size > 10 * 1024 * 1024) throw new Error('Image must be 10MB or smaller.');
+  requireAdminSession();
+  const form = new FormData();
+  form.append('image', file, file.name || 'upload');
+  const response = await fetch('/api/upload/imgbb', { method: 'POST', body: form, credentials: 'same-origin', cache: 'no-store' });
+  const result = await response.json().catch(() => null);
+  if (!response.ok || !result?.success || typeof result.url !== 'string') throw new Error(result?.error || 'Image upload failed. Please try again.');
+  if (!/^https:\/\/i\.ibb\.co\//i.test(result.url)) throw new Error('Upload returned a non-CDN image URL.');
   return result.url;
 }
 
@@ -52,10 +57,10 @@ function normalizeAdminDocument(name: string, value: Record<string, any>) {
   const imageUrl = typeof value.imageUrl === 'string' ? value.imageUrl : typeof value.iconUrl === 'string' ? value.iconUrl : '';
   return { ...value, imageUrl, iconUrl: typeof value.iconUrl === 'string' ? value.iconUrl : imageUrl };
 }
-export const createAdminDocument = (name: string, value: Record<string, any>) => addDoc(collection(db, name), normalizeAdminDocument(name, value));
-export const updateAdminDocument = (name: string, id: string, value: Record<string, any>) => updateDoc(doc(db, name, id), normalizeAdminDocument(name, value));
-export const setAdminDocument = (name: string, id: string, value: Record<string, any>) => setDoc(doc(db, name, id), normalizeAdminDocument(name, value), { merge: true });
-export const deleteAdminDocument = (name: string, id: string) => deleteDoc(doc(db, name, id));
-export async function writeAdminAuditLog(action: string, entity: string, entityId?: string, metadata: Record<string, unknown> = {}) { const actor = (await import('firebase/auth')).getAuth().currentUser; if (!actor) throw new Error('Admin authentication required.'); await addDoc(collection(db, 'admin_audit_logs'), { action, entity, entityId: entityId || null, actorUid: actor.uid, actorEmail: actor.email || null, metadata, createdAt: new Date().toISOString() }); }
+export const createAdminDocument = (name: string, value: Record<string, any>) => adminWrite('create', name, undefined, normalizeAdminDocument(name, value));
+export const updateAdminDocument = (name: string, id: string, value: Record<string, any>) => adminWrite('update', name, id, normalizeAdminDocument(name, value));
+export const setAdminDocument = (name: string, id: string, value: Record<string, any>) => adminWrite('set', name, id, normalizeAdminDocument(name, value));
+export const deleteAdminDocument = (name: string, id: string) => adminWrite('delete', name, id);
+export async function writeAdminAuditLog(action: string, entity: string, entityId?: string, metadata: Record<string, unknown> = {}) { requireAdminSession(); await adminWrite('create', 'admin_audit_logs', undefined, { action, entity, entityId: entityId || null, actorUid: 'local-admin', actorEmail: 'primehubpk1@gmail.com', metadata, createdAt: new Date().toISOString() }); }
 export function pakistanDayKey(date = new Date()) { return new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Karachi', weekday: 'long' }).format(date).toLowerCase(); }
 export function isWithinSchedule(startAt?: string, endAt?: string, now = new Date()) { const start = startAt ? new Date(startAt).getTime() : Number.NEGATIVE_INFINITY; const end = endAt ? new Date(endAt).getTime() : Number.POSITIVE_INFINITY; const current = now.getTime(); return Number.isFinite(current) && current >= start && current <= end; }

@@ -3,12 +3,11 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Eye, EyeOff, LockKeyhole, LogOut, ShieldCheck } from 'lucide-react';
-import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
 
 const ADMIN_EMAIL = 'primehubpk1@gmail.com';
 const ADMIN_PASSWORD = 'junaid00';
-const SESSION_KEY = 'admin_session_auth';
+const SESSION_KEY = 'primehub_admin_auth';
+const SESSION_COOKIE = 'primehub_admin_auth';
 
 type Props = { children: React.ReactNode };
 
@@ -23,41 +22,42 @@ export default function AdminAuthGuard({ children }: Props) {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    return onAuthStateChanged(auth, (user) => {
-      const isAdmin = user?.email?.trim().toLowerCase() === ADMIN_EMAIL;
-      setAuthenticated(isAdmin);
-      setChecking(false);
-
-      if (isAdmin) window.localStorage.setItem(SESSION_KEY, 'true');
-      else window.localStorage.removeItem(SESSION_KEY);
-    });
+    const isAuthenticated = window.localStorage.getItem(SESSION_KEY) === 'true';
+    setAuthenticated(isAuthenticated);
+    setChecking(false);
   }, []);
 
-  async function login(event: FormEvent) {
+  function setSession() {
+    window.localStorage.setItem(SESSION_KEY, 'true');
+    document.cookie = `${SESSION_COOKIE}=true; Path=/; Max-Age=604800; SameSite=Lax`;
+  }
+
+  function clearSession() {
+    window.localStorage.removeItem(SESSION_KEY);
+    document.cookie = `${SESSION_COOKIE}=; Path=/; Max-Age=0; SameSite=Lax`;
+  }
+
+  function login(event: FormEvent) {
     event.preventDefault();
     setError('');
     setBusy(true);
 
-    if (email.trim().toLowerCase() !== ADMIN_EMAIL) {
-      setError('Invalid admin email.');
+    const normalizedEmail = email.trim().toLowerCase();
+    const expectedPassword = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || ADMIN_PASSWORD;
+
+    if (normalizedEmail !== ADMIN_EMAIL || password !== expectedPassword) {
+      setError('Invalid password. Please enter correct credentials.');
       setBusy(false);
       return;
     }
 
-    try {
-      await signInWithEmailAndPassword(auth, ADMIN_EMAIL, password);
-      setAuthenticated(true);
-      window.localStorage.setItem(SESSION_KEY, 'true');
-      router.replace('/admin');
-    } catch {
-      setError('Invalid password. Please enter correct credentials.');
-      setBusy(false);
-    }
+    setSession();
+    setAuthenticated(true);
+    router.replace('/admin');
   }
 
-  async function logout() {
-    await signOut(auth).catch(() => undefined);
-    window.localStorage.removeItem(SESSION_KEY);
+  function logout() {
+    clearSession();
     setAuthenticated(false);
     setPassword('');
     router.replace('/admin');
