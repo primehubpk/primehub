@@ -3,6 +3,8 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Eye, EyeOff, LockKeyhole, LogOut, ShieldCheck } from 'lucide-react';
+import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'firebase/auth';
+import { auth } from '@/lib/firebase';
 
 const ADMIN_EMAIL = 'primehubpk1@gmail.com';
 const ADMIN_PASSWORD = 'junaid00';
@@ -21,26 +23,40 @@ export default function AdminAuthGuard({ children }: Props) {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    setAuthenticated(window.localStorage.getItem(SESSION_KEY) === 'true');
-    setChecking(false);
+    return onAuthStateChanged(auth, (user) => {
+      const isAdmin = user?.email?.trim().toLowerCase() === ADMIN_EMAIL;
+      setAuthenticated(isAdmin);
+      setChecking(false);
+
+      if (isAdmin) window.localStorage.setItem(SESSION_KEY, 'true');
+      else window.localStorage.removeItem(SESSION_KEY);
+    });
   }, []);
 
-  function login(event: FormEvent) {
+  async function login(event: FormEvent) {
     event.preventDefault();
     setError('');
     setBusy(true);
 
-    if (email.trim().toLowerCase() === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
-      window.localStorage.setItem(SESSION_KEY, 'true');
+    if (email.trim().toLowerCase() !== ADMIN_EMAIL) {
+      setError('Invalid admin email.');
+      setBusy(false);
+      return;
+    }
+
+    try {
+      await signInWithEmailAndPassword(auth, ADMIN_EMAIL, password);
       setAuthenticated(true);
+      window.localStorage.setItem(SESSION_KEY, 'true');
       router.replace('/admin');
-    } else {
+    } catch {
       setError('Invalid password. Please enter correct credentials.');
       setBusy(false);
     }
   }
 
-  function logout() {
+  async function logout() {
+    await signOut(auth).catch(() => undefined);
     window.localStorage.removeItem(SESSION_KEY);
     setAuthenticated(false);
     setPassword('');
