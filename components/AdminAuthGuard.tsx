@@ -3,11 +3,10 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Eye, EyeOff, LockKeyhole, LogOut, ShieldCheck } from 'lucide-react';
-import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'firebase/auth';
+import { onAuthStateChanged, signInWithCustomToken, signOut } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 
 const ADMIN_EMAIL = 'primehubpk1@gmail.com';
-const ADMIN_PASSWORD = 'junaid00';
 const SESSION_KEY = 'admin_session_auth';
 
 type Props = { children: React.ReactNode };
@@ -24,7 +23,7 @@ export default function AdminAuthGuard({ children }: Props) {
 
   useEffect(() => {
     return onAuthStateChanged(auth, (user) => {
-      const isAdmin = user?.email?.trim().toLowerCase() === ADMIN_EMAIL;
+      const isAdmin = user?.uid === 'BZfIarsxGkXwZUIEcfFXa9u7Ge02' && user?.email === ADMIN_EMAIL;
       setAuthenticated(isAdmin);
       setChecking(false);
 
@@ -45,12 +44,24 @@ export default function AdminAuthGuard({ children }: Props) {
     }
 
     try {
-      await signInWithEmailAndPassword(auth, ADMIN_EMAIL, password);
+      const response = await fetch('/api/admin/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: ADMIN_EMAIL, password }),
+        cache: 'no-store',
+      });
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok || !data?.success || typeof data.customToken !== 'string') {
+        throw new Error(data?.error || 'Invalid password. Please enter correct credentials.');
+      }
+
+      await signInWithCustomToken(auth, data.customToken);
       setAuthenticated(true);
       window.localStorage.setItem(SESSION_KEY, 'true');
       router.replace('/admin');
-    } catch {
-      setError('Invalid password. Please enter correct credentials.');
+    } catch (loginError) {
+      setError(loginError instanceof Error ? loginError.message : 'Invalid password. Please enter correct credentials.');
       setBusy(false);
     }
   }
