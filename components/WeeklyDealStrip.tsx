@@ -146,7 +146,7 @@ export default function WeeklyDealStrip() {
                     <span className="pointer-events-none absolute left-3 top-3 rounded-full bg-[#FFB020] px-2 py-1 text-[7px] font-black">{dayLabel}</span>
                     {deal.day === today && <span className="pointer-events-none absolute bottom-3 left-3 rounded-full bg-[#E1352B] px-2 py-1 text-[7px] font-black text-white">TODAY</span>}
                     {savings > 0 && (
-                      <span className="pointer-events-none absolute right-2 top-2 z-10 max-w-[132px] whitespace-nowrap rounded-md bg-[#0F6A5F] px-2 py-0.5 text-[8px] font-semibold leading-tight text-white shadow-sm">
+                      <span className="pointer-events-none absolute right-2 top-2 z-10 rounded-md bg-[#0F6A5F] px-2 py-0.5 text-[10px] font-semibold text-white shadow-sm">
                         Save Rs. {savings.toLocaleString()}
                       </span>
                     )}
