@@ -1,16 +1,12 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { collection, onSnapshot } from 'firebase/firestore';
-import { Heart, MoreHorizontal, Search, ShoppingCart, Tag, UserRound, ShieldCheck, Sparkles } from 'lucide-react';
-import { db } from '@/lib/firebase';
+import { Heart, Search, ShoppingCart, Tag, UserRound, ShieldCheck } from 'lucide-react';
 import { useCartStore } from '@/lib/cartStore';
 import { useSettings } from '@/lib/useSettings';
 import LiveSearchBar from '@/components/LiveSearchBar';
-import { categoryHref } from '@/lib/categoryUtils';
 
-type StoreCategory = { id: string; title: string; slug?: string; iconUrl?: string; imageUrl?: string; sortOrder?: number; active?: boolean };
 function AnnouncementBar({ text }: { text: string }) {
   const announcement = text?.trim() || 'PrimeHub Deals';
   return <div className="overflow-hidden bg-[#090909] py-2.5 text-white" role="region" aria-label="Announcement">
@@ -26,14 +22,10 @@ function AnnouncementBar({ text }: { text: string }) {
 }
 
 export default function Header() {
-  const router = useRouter(); const [searchQuery, setSearchQuery] = useState(''); const [categories, setCategories] = useState<StoreCategory[]>([]); const { settings } = useSettings();
+  const router = useRouter(); const [searchQuery, setSearchQuery] = useState(''); const { settings } = useSettings();
   const cartCount = useCartStore((s) => s.getCartCount()); const cartItemCount = useCartStore((s) => s.items.reduce((sum, i) => sum + i.qty, 0)); const openDrawer = useCartStore((s) => s.openDrawer);
   const deliveryThreshold = Math.max(1, Number(settings.freeDelivery?.itemThreshold ?? settings.freeShippingCount ?? 5)); const itemsToGo = Math.max(0, deliveryThreshold - cartItemCount); const deliveryProgress = Math.min(100, Math.round((cartItemCount / deliveryThreshold) * 100));
-  useEffect(() => onSnapshot(collection(db, 'categories'), (snapshot) => setCategories(snapshot.docs.map((item) => ({ id: item.id, ...item.data() }) as StoreCategory)), () => setCategories([])), []);
-  const visibleCategories = useMemo(() => categories.filter((category) => (category.active ?? true) && category.title.trim()).sort((a, b) => Number(a.sortOrder ?? 999) - Number(b.sortOrder ?? 999) || a.title.localeCompare(b.title)).slice(0, 12), [categories]);
-  const activeCategoryCount = useMemo(() => categories.filter((category) => (category.active ?? true) && category.title.trim()).length, [categories]);
   const submitSearch = (event: React.FormEvent<HTMLFormElement>) => { event.preventDefault(); const query = searchQuery.trim(); router.push(query ? `/shop?q=${encodeURIComponent(query)}` : '/shop'); };
-  const openCategory = (category: StoreCategory) => router.push(categoryHref(category));
 
   return <>
     <AnnouncementBar text={settings.announcementText} />
@@ -49,6 +41,5 @@ export default function Header() {
         <div className="mt-2 md:hidden"><div className="mb-1 flex items-center justify-between text-[10px] font-bold"><span className="text-[#0F6A5F]">{itemsToGo === 0 ? 'Free delivery unlocked!' : `Add ${itemsToGo} more item${itemsToGo === 1 ? '' : 's'} for FREE delivery`}</span><span className="text-black/40">{cartItemCount}/{deliveryThreshold}</span></div><div className="h-1.5 overflow-hidden rounded-full bg-black/10"><div className="h-full rounded-full bg-[#0F6A5F]" style={{ width: `${deliveryProgress}%` }}/></div></div>
       </div>
     </header>
-    <div className="border-b border-black/8 bg-[#F8F7F3]"><div className="mx-auto max-w-7xl px-4 py-3.5 sm:px-6 lg:px-8"><div className="flex items-center gap-2.5 overflow-x-auto pb-1 [scrollbar-width:none]"><button type="button" onClick={() => router.push('/shop')} className="flex shrink-0 items-center gap-2 rounded-2xl border border-black/10 bg-[#14140F] px-3 py-2 text-[10px] font-black text-white shadow-sm"><MoreHorizontal size={15}/>All Categories</button>{visibleCategories.map((category) => <button key={category.id} type="button" onClick={() => openCategory(category)} className="group flex min-w-[88px] shrink-0 flex-col items-center gap-1.5 rounded-2xl px-2 py-1.5 text-[9px] font-black text-black/75"><span className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#FFF0C9] text-[#B77900] ring-1 ring-black/5"><span className="block h-full w-full overflow-hidden rounded-full">{category.imageUrl || category.iconUrl ? <img src={category.imageUrl || category.iconUrl} alt={category.title} className="h-full w-full object-cover" /> : <span className="flex h-full w-full items-center justify-center"><Sparkles size={18}/></span>}</span></span><span className="max-w-[96px] truncate">{category.title}</span></button>)}{activeCategoryCount > 12 && <button type="button" onClick={() => router.push('/shop')} className="flex shrink-0 flex-col items-center gap-1.5 rounded-2xl px-2 py-1.5 text-[9px] font-black"><MoreHorizontal className="h-14 w-14 rounded-full bg-[#FFF0C9] p-2.5 text-[#B77900]"/><span>More</span></button>}</div></div></div>
   </>;
 }

@@ -21,5 +21,19 @@ export default function HomePage() {
     setWholesaleSelected((selected) => !selected);
   };
 
-  return <><div className="min-h-screen bg-[#F4F4F1] text-[#14140F]"><Header/><HeroFlashBanner/><CategorySwiper/><PriceBuckets selectedMaxPrice={selectedMaxPrice} wholesaleSelected={wholesaleSelected} onSelect={selectPrice} onWholesaleSelect={selectWholesale}/><div id="discover-deals-section"><ProductGridRewards selectedMaxPrice={selectedMaxPrice} wholesaleSelected={wholesaleSelected}/></div><YouTubeGuide/><Footer onWholesaleSelect={selectWholesale}/></div></>;
+  return (
+    <>
+      <div className="min-h-screen bg-[#F4F4F1] text-[#14140F]">
+        <Header />
+        <HeroFlashBanner />
+        <CategorySwiper />
+        <PriceBuckets selectedMaxPrice={selectedMaxPrice} wholesaleSelected={wholesaleSelected} onSelect={selectPrice} onWholesaleSelect={selectWholesale} />
+        <div id="discover-deals-section">
+          <ProductGridRewards selectedMaxPrice={selectedMaxPrice} wholesaleSelected={wholesaleSelected} />
+        </div>
+        <YouTubeGuide />
+        <Footer onWholesaleSelect={selectWholesale} />
+      </div>
+    </>
+  );
 }

@@ -58,7 +58,7 @@ export default function CatalogProductCard({ product, addedId, addProduct, compa
           onClick={handleAdd}
           className={`flex w-full items-center justify-center gap-1.5 rounded-xl py-2.5 text-[9px] font-black transition active:scale-[0.98] ${unavailable ? 'cursor-not-allowed bg-black/5 text-black/25' : added ? 'bg-[#0F6A5F] text-white' : 'bg-[#14140F] text-white hover:bg-[#E1352B]'}`}
         >
-          {unavailable ? 'Unavailable' : added ? <><Check size={13} />Added to Cart</> : <><ShoppingBag size={13} />{hasVariants ? 'Select Options' : 'Add to Cart'}</>}
+          {unavailable ? 'Unavailable' : added ? <><Check size={13} />Added to Cart</> : <><ShoppingBag size={13} />Add to Cart</>}
         </button>
       </div>
     </article>
