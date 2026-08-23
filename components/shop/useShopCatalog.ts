@@ -7,7 +7,7 @@ import { db } from '@/lib/firebase';
 import { useSettings } from '@/lib/useSettings';
 import { useCartStore } from '@/lib/cartStore';
 import { categoryHref, categoryLabel, productMatchesCategory, slugifyCategory } from '@/lib/categoryUtils';
-import { Product, Category, ShopCatalogModel, imageOf, priceOf, originalOf, titleOf } from './ShopTypes';
+import { Product, Category, ShopCatalogModel, imageOf, priceOf, originalOf, productHasVariants, titleOf } from './ShopTypes';
 
 function isWholesaleProduct(product: Product, wholesaleBucketIds: Set<string>) {
   if (product.isWholesale) return true;
@@ -28,6 +28,7 @@ function isWholesaleProduct(product: Product, wholesaleBucketIds: Set<string>) {
 export function useShopCatalog(initialCategory?: string, initialQuery = ''): ShopCatalogModel {
   const { settings } = useSettings();
   const addItem = useCartStore((state) => state.addItem);
+  const openVariantModal = useCartStore((state) => state.openVariantModal);
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [search, setSearch] = useState(initialQuery);
@@ -127,6 +128,7 @@ export function useShopCatalog(initialCategory?: string, initialQuery = ''): Sho
 
   const addProduct = (product: Product) => {
     const image = imageOf(product);
+    if (productHasVariants(product) && openVariantModal({ ...product, image, imageUrl: image }, 'cart')) return;
     addItem({
       id: product.id,
       name: titleOf(product),

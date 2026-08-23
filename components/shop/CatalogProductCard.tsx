@@ -1,7 +1,10 @@
+'use client';
+
 import Link from 'next/link';
 import { Check, ShoppingBag } from 'lucide-react';
 import WholesaleBadge from '@/components/WholesaleBadge';
-import { Product, discountOf, imageOf, originalOf, priceOf, titleOf } from './ShopTypes';
+import { useCartStore } from '@/lib/cartStore';
+import { Product, availableStockOf, discountOf, imageOf, originalOf, priceOf, productHasVariants, titleOf } from './ShopTypes';
 
 type Props = {
   product: Product;
@@ -11,13 +14,21 @@ type Props = {
 };
 
 export default function CatalogProductCard({ product, addedId, addProduct, compact = false }: Props) {
+  const openVariantModal = useCartStore((state) => state.openVariantModal);
   const price = priceOf(product);
   const original = originalOf(product);
   const discount = discountOf(product);
   const image = imageOf(product);
-  const stock = Number(product.stock ?? product.quantity ?? 0);
+  const hasVariants = productHasVariants(product);
+  const stock = availableStockOf(product);
   const unavailable = stock <= 0;
   const added = addedId === product.id;
+
+  function handleAdd() {
+    if (unavailable) return;
+    if (hasVariants && openVariantModal({ ...product, image, imageUrl: image }, 'cart')) return;
+    addProduct(product);
+  }
 
   return (
     <article className={`group overflow-hidden rounded-[22px] border border-black/6 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg ${compact ? 'w-[168px] shrink-0 snap-start sm:w-[186px]' : 'w-full'}`}>
@@ -44,10 +55,10 @@ export default function CatalogProductCard({ product, addedId, addProduct, compa
         <button
           type="button"
           disabled={unavailable}
-          onClick={() => addProduct(product)}
+          onClick={handleAdd}
           className={`flex w-full items-center justify-center gap-1.5 rounded-xl py-2.5 text-[9px] font-black transition active:scale-[0.98] ${unavailable ? 'cursor-not-allowed bg-black/5 text-black/25' : added ? 'bg-[#0F6A5F] text-white' : 'bg-[#14140F] text-white hover:bg-[#E1352B]'}`}
         >
-          {unavailable ? 'Unavailable' : added ? <><Check size={13} />Added to Cart</> : <><ShoppingBag size={13} />Add to Cart</>}
+          {unavailable ? 'Unavailable' : added ? <><Check size={13} />Added to Cart</> : <><ShoppingBag size={13} />{hasVariants ? 'Select Options' : 'Add to Cart'}</>}
         </button>
       </div>
     </article>
