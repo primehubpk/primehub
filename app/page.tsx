@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Header from '@/components/Header';
 import HeroFlashBanner from '@/components/HeroFlashBanner';
+import CategorySwiper from '@/components/CategorySwiper';
 import PriceBuckets from '@/components/PriceBuckets';
 import ProductGridRewards from '@/components/ProductGridRewards';
 import YouTubeGuide from '@/components/YouTubeGuide';
@@ -20,5 +21,5 @@ export default function HomePage() {
     setWholesaleSelected((selected) => !selected);
   };
 
-  return <><div className="min-h-screen bg-[#F4F4F1] text-[#14140F]"><Header/><HeroFlashBanner/><PriceBuckets selectedMaxPrice={selectedMaxPrice} wholesaleSelected={wholesaleSelected} onSelect={selectPrice} onWholesaleSelect={selectWholesale}/><div id="discover-deals-section"><ProductGridRewards selectedMaxPrice={selectedMaxPrice} wholesaleSelected={wholesaleSelected}/></div><YouTubeGuide/><Footer onWholesaleSelect={selectWholesale}/></div></>;
+  return <><div className="min-h-screen bg-[#F4F4F1] text-[#14140F]"><Header/><HeroFlashBanner/><CategorySwiper/><PriceBuckets selectedMaxPrice={selectedMaxPrice} wholesaleSelected={wholesaleSelected} onSelect={selectPrice} onWholesaleSelect={selectWholesale}/><div id="discover-deals-section"><ProductGridRewards selectedMaxPrice={selectedMaxPrice} wholesaleSelected={wholesaleSelected}/></div><YouTubeGuide/><Footer onWholesaleSelect={selectWholesale}/></div></>;
 }

@@ -8,9 +8,9 @@ import { db } from '@/lib/firebase';
 import { useCartStore } from '@/lib/cartStore';
 import { useSettings } from '@/lib/useSettings';
 import LiveSearchBar from '@/components/LiveSearchBar';
+import { categoryHref } from '@/lib/categoryUtils';
 
 type StoreCategory = { id: string; title: string; slug?: string; iconUrl?: string; imageUrl?: string; sortOrder?: number; active?: boolean };
-function slugify(value: string) { return value.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, ''); }
 function AnnouncementBar({ text }: { text: string }) {
   const announcement = text?.trim() || 'PrimeHub Deals';
   return <div className="overflow-hidden bg-[#090909] py-2.5 text-white" role="region" aria-label="Announcement">
@@ -33,7 +33,7 @@ export default function Header() {
   const visibleCategories = useMemo(() => categories.filter((category) => (category.active ?? true) && category.title.trim()).sort((a, b) => Number(a.sortOrder ?? 999) - Number(b.sortOrder ?? 999) || a.title.localeCompare(b.title)).slice(0, 12), [categories]);
   const activeCategoryCount = useMemo(() => categories.filter((category) => (category.active ?? true) && category.title.trim()).length, [categories]);
   const submitSearch = (event: React.FormEvent<HTMLFormElement>) => { event.preventDefault(); const query = searchQuery.trim(); router.push(query ? `/shop?q=${encodeURIComponent(query)}` : '/shop'); };
-  const openCategory = (category: StoreCategory) => router.push(`/category/${encodeURIComponent(category.slug || slugify(category.title))}`);
+  const openCategory = (category: StoreCategory) => router.push(categoryHref(category));
 
   return <>
     <AnnouncementBar text={settings.announcementText} />
