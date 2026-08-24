@@ -25,7 +25,7 @@ function bucketIcon(title: string) {
 export default function PriceBuckets({ selectedMaxPrice, wholesaleSelected, onSelect, onWholesaleSelect }: PriceBucketsProps) {
   const { settings, loading } = useSettings();
   const buckets = useMemo<PriceBucket[]>(
-    () => sortPriceBuckets([...(settings.priceBuckets || [])].filter((bucket) => bucket.active)).slice(0, 4),
+    () => sortPriceBuckets([...(settings.priceBuckets || [])].filter((bucket) => bucket.active)),
     [settings.priceBuckets]
   );
 
@@ -41,7 +41,7 @@ export default function PriceBuckets({ selectedMaxPrice, wholesaleSelected, onSe
         {(selectedMaxPrice !== null || wholesaleSelected) && <button type="button" onClick={() => { onSelect(null); if (wholesaleSelected) onWholesaleSelect(); }} className="inline-flex items-center gap-1.5 rounded-full bg-[#14140F] px-3 py-1.5 text-[10px] font-black text-white"><SlidersHorizontal size={12} />Clear</button>}
       </div>
 
-      <div className="flex gap-2.5 overflow-x-auto pb-1 scrollbar-hide sm:grid sm:grid-cols-4 sm:overflow-visible">
+      <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
         {buckets.map((bucket) => {
           const wholesale = isWholesalePriceBucket(bucket);
           const selected = wholesale ? wholesaleSelected : selectedMaxPrice === bucket.amount && !wholesaleSelected;
@@ -66,7 +66,7 @@ export default function PriceBuckets({ selectedMaxPrice, wholesaleSelected, onSe
                   }
                 }, 100);
               }}
-              className={`relative min-w-[168px] shrink-0 overflow-hidden rounded-[28px] border px-4 py-3.5 text-left transition active:scale-[0.98] sm:min-w-0 ${
+              className={`relative w-full overflow-hidden rounded-[28px] border px-4 py-3.5 text-left transition active:scale-[0.98] ${
                 selected ? 'border-white/20 text-white shadow-[0_14px_34px_rgba(15,106,95,0.22)]' : 'border-white/50 text-[#14140F] shadow-[0_10px_28px_rgba(20,20,15,0.06)]'
               }`}
               style={selected ? { background: `linear-gradient(135deg, ${accent}, #14140F)` } : { background: `linear-gradient(135deg, rgba(255,255,255,0.86), ${accent}22)` }}
