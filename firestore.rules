@@ -46,13 +46,36 @@ service cloud.firestore {
     match /reward_redemptions/{redemptionId} {
       allow create: if signedIn()
         && request.resource.data.userId == request.auth.uid
-        && request.resource.data.giftId is string
-        && request.resource.data.pointsCost is int
-        && request.resource.data.pointsCost > 0
+        && request.resource.data.status == 'pending'
+        && request.resource.data.createdAt is timestamp
+        && (
+          (request.resource.data.giftId is string
+            && request.resource.data.pointsCost is int
+            && request.resource.data.pointsCost > 0)
+          ||
+          (request.resource.data.wheelWinId is string
+            && request.resource.data.pointsCost is int
+            && request.resource.data.pointsCost == 0)
+        );
+      allow read: if isAdmin() || (signedIn() && resource.data.userId == request.auth.uid);
+      allow update, delete: if isAdmin();
+    }
+    match /reward_wins/{winId} {
+      allow create: if signedIn()
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.prizeId is string
+        && request.resource.data.name is string
+        && request.resource.data.type is string
         && request.resource.data.status == 'pending'
         && request.resource.data.createdAt is timestamp;
       allow read: if isAdmin() || (signedIn() && resource.data.userId == request.auth.uid);
-      allow update, delete: if isAdmin();
+      allow update: if isAdmin() || (
+        signedIn()
+        && resource.data.userId == request.auth.uid
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.status in ['pending', 'redeemed']
+      );
+      allow delete: if isAdmin();
     }
     match /user_rewards/{userId} {
       allow read: if isAdmin() || (signedIn() && request.auth.uid == userId);
