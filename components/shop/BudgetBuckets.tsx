@@ -87,7 +87,7 @@ export default function BudgetBuckets({ buckets, maxPrice, setMaxPrice, wholesal
                 </span>
                 <span className="min-w-0">
                   <span className={`block text-[8px] font-black uppercase tracking-[0.16em] ${selected ? 'text-white/70' : 'text-black/40'}`}>
-                    {wholesale ? 'Bulk Deals' : bucket.title}
+                    {wholesale ? 'Wholesale Deals' : bucket.title}
                   </span>
                   <span className="mt-0.5 block truncate text-[12px] font-black leading-4">
                     {wholesale ? 'Special Wholesale Pricing' : `Under Rs. ${Number(bucket.amount).toLocaleString()}`}

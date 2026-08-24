@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { Check, ShoppingBag } from 'lucide-react';
 import WholesaleBadge from '@/components/WholesaleBadge';
 import { useCartStore } from '@/lib/cartStore';
+import { isWholesaleProduct } from '@/lib/wholesale';
 import { Product, availableStockOf, discountOf, imageOf, originalOf, priceOf, productHasVariants, titleOf } from './ShopTypes';
 
 type Props = {
@@ -41,7 +42,7 @@ export default function CatalogProductCard({ product, addedId, addProduct, compa
           )}
           {discount > 0 && <span className="absolute left-2 top-2 rounded-full bg-[#E1352B] px-2 py-1 text-[8px] font-black text-white">-{discount}%</span>}
           {product.isFlashSale && <span className="absolute right-2 top-2 rounded-full bg-[#14140F] px-2 py-1 text-[8px] font-black text-white">FLASH</span>}
-          {product.isWholesale && <WholesaleBadge />}
+          {isWholesaleProduct(product) && <WholesaleBadge />}
         </div>
         <div className="p-3 pb-1">
           <p className="line-clamp-2 min-h-[30px] text-[11px] font-black leading-4">{titleOf(product)}</p>

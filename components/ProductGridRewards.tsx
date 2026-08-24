@@ -26,6 +26,7 @@ import {
 import { auth, db } from '@/lib/firebase';
 import { useCartStore } from '@/lib/cartStore';
 import { ProductUrgencyBadges } from '@/components/ProductCard';
+import { isWholesaleProduct } from '@/lib/wholesale';
 
 type Product = {
   id: string;
@@ -243,7 +244,7 @@ export default function ProductGridRewards({
 
     const filtered = products.filter((product) => {
       if (wholesaleSelected) {
-        return product.isWholesale === true;
+        return isWholesaleProduct(product);
       }
 
       if (hasNumericBudget) {

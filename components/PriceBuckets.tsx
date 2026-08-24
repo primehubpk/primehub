@@ -76,11 +76,11 @@ export default function PriceBuckets({ selectedMaxPrice, wholesaleSelected, onSe
                     {bucket.iconUrl ? <img src={bucket.iconUrl} alt="" className="h-full w-full object-cover" /> : bucketIcon(bucket.title)}
                   </div>
                   <span className={`rounded-full px-2 py-1 text-[8px] font-black uppercase tracking-wider ${wholesale ? 'bg-[#FFB020]/20 text-[#8A5A00]' : selected ? 'bg-white/12 text-white' : 'bg-[#E1352B]/10 text-[#E1352B]'}`}>
-                    {wholesale ? 'Bulk Deals' : 'Hot'}
+                    {wholesale ? 'Wholesale' : 'Hot'}
                   </span>
                 </div>
                 <p className={`mt-3 text-[8px] font-black uppercase tracking-[0.16em] ${selected ? 'text-white/60' : 'text-black/40'}`}>{wholesale ? 'Special Wholesale Pricing' : bucket.title}</p>
-                <p className="mt-0.5 text-sm font-black leading-tight">{wholesale ? 'Bulk Deals' : `Under Rs. ${Number(bucket.amount).toLocaleString()}`}</p>
+                <p className="mt-0.5 text-sm font-black leading-tight">{wholesale ? 'Wholesale Deals' : `Under Rs. ${Number(bucket.amount).toLocaleString()}`}</p>
               </div>
             </button>
           );

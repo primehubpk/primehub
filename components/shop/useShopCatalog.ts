@@ -7,11 +7,8 @@ import { db } from '@/lib/firebase';
 import { useSettings } from '@/lib/useSettings';
 import { useCartStore } from '@/lib/cartStore';
 import { categoryHref, categoryLabel, productMatchesCategory, slugifyCategory } from '@/lib/categoryUtils';
+import { isWholesaleProduct } from '@/lib/wholesale';
 import { Product, Category, ShopCatalogModel, imageOf, priceOf, originalOf, productHasVariants, titleOf } from './ShopTypes';
-
-function isWholesaleProduct(product: Product) {
-  return product.isWholesale === true;
-}
 
 export function useShopCatalog(initialCategory?: string, initialQuery = ''): ShopCatalogModel {
   const { settings } = useSettings();
@@ -70,7 +67,7 @@ export function useShopCatalog(initialCategory?: string, initialQuery = ''): Sho
       const cat = String(p.category || '').toLowerCase();
       const catId = String(p.categoryId || '').toLowerCase();
       const matchesSearch = !q || title.includes(q) || cat.includes(q) || catId.includes(q);
-      const selectedCat = productMatchesCategory(category, p, categories);
+      const selectedCat = wholesaleOnly || productMatchesCategory(category, p, categories);
       const matchesPrice = wholesaleOnly || maxPrice === 'all' || !Number(maxPrice) || priceOf(p) <= Number(maxPrice);
       const matchesDeal = !onlyDeals || Boolean(p.isFlashSale);
       const matchesWholesale = !wholesaleOnly || isWholesaleProduct(p);
