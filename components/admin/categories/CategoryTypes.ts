@@ -18,5 +18,6 @@ export const DEFAULT_BUCKETS: PriceBucket[] = [
   { id: 'under-99', title: 'Under 99', amount: 99, iconUrl: '', accent: '#E1352B', sortOrder: 1, active: true },
   { id: 'under-299', title: 'Under 299', amount: 299, iconUrl: '', accent: '#D99A17', sortOrder: 2, active: true },
   { id: 'under-999', title: 'Under 999', amount: 999, iconUrl: '', accent: '#0F6A5F', sortOrder: 3, active: true },
+  { id: 'wholesale-deal', title: 'Wholesale Deal', amount: null, iconUrl: '', accent: '#0F6A5F', sortOrder: 4, active: true },
 ];
 export function slugify(value: string) { return value.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, ''); }
