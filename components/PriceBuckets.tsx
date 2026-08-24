@@ -3,6 +3,8 @@
 import { useMemo } from 'react';
 import { Crown, Gem, Sparkles, SlidersHorizontal, Zap, Package } from 'lucide-react';
 import { useSettings } from '@/lib/useSettings';
+import { isWholesalePriceBucket, sortPriceBuckets } from '@/lib/priceBucketUtils';
+import type { PriceBucket } from '@/lib/types';
 
 interface PriceBucketsProps {
   selectedMaxPrice: number | null;
@@ -22,8 +24,8 @@ function bucketIcon(title: string) {
 
 export default function PriceBuckets({ selectedMaxPrice, wholesaleSelected, onSelect, onWholesaleSelect }: PriceBucketsProps) {
   const { settings, loading } = useSettings();
-  const buckets = useMemo(
-    () => [...(settings.priceBuckets || [])].filter((bucket) => bucket.active).sort((a, b) => a.sortOrder - b.sortOrder).slice(0, 4),
+  const buckets = useMemo<PriceBucket[]>(
+    () => sortPriceBuckets([...(settings.priceBuckets || [])].filter((bucket) => bucket.active)).slice(0, 4),
     [settings.priceBuckets]
   );
 
@@ -41,7 +43,7 @@ export default function PriceBuckets({ selectedMaxPrice, wholesaleSelected, onSe
 
       <div className="flex gap-2.5 overflow-x-auto pb-1 scrollbar-hide sm:grid sm:grid-cols-4 sm:overflow-visible">
         {buckets.map((bucket) => {
-          const wholesale = bucket.title.toLowerCase().includes('wholesale') || !bucket.amount;
+          const wholesale = isWholesalePriceBucket(bucket);
           const selected = wholesale ? wholesaleSelected : selectedMaxPrice === bucket.amount && !wholesaleSelected;
           const accent = bucket.accent || (wholesale ? '#0F6A5F' : '#FFB020');
           return (
