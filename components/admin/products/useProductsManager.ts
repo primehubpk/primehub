@@ -276,6 +276,7 @@ export function useProductsManager() {
       images: normalizedImages,
       featured: Boolean((product as any).featured),
       published: (product as any).published !== false,
+      isWholesale: (product as any).isWholesale === true,
     });
     setColors(loadedColors);
     setSizes((sizeOption?.values || []).map((value: string) => String(value)));
@@ -369,7 +370,7 @@ export function useProductsManager() {
       const variantOptions = [{ id: 'color', name: 'Color', values: cleanColors.map(color => color.name) }, { id: 'size', name: 'Size', values: cleanSizes }];
       const colorImages = Object.fromEntries(cleanColors.map(color => [color.name, color.imageUrl]));
       const variantMatrix = variantRows.map(row => ({ id: row.id, label: `${row.color} / ${row.size}`, color: row.color, size: row.size, stock: Math.max(0, Number(row.stock || 0)), imageUrl: row.imageUrl || colorImages[row.color] || form.images[0] || '', sku: '', price: String(salePrice), salePrice: '', active: true }));
-      const payload = { title: form.title.trim(), slug: slugify(form.title), price: salePrice, originalPrice, description: form.description, category: form.category, stock: Math.max(0, Number(form.stock || 0)), videoUrl: form.videoUrl.trim(), imageUrl: form.images[0] || '', images: form.images.slice(0, 6), colorImages, variantColors: cleanColors, variantOptions, variantMatrix, featured: form.featured, published: form.published, priceBucketIds: bucketIds, updatedAt: new Date().toISOString() };
+      const payload = { title: form.title.trim(), slug: slugify(form.title), price: salePrice, originalPrice, description: form.description, category: form.category, stock: Math.max(0, Number(form.stock || 0)), videoUrl: form.videoUrl.trim(), imageUrl: form.images[0] || '', images: form.images.slice(0, 6), colorImages, variantColors: cleanColors, variantOptions, variantMatrix, featured: form.featured, published: form.published, isWholesale: form.isWholesale === true, priceBucketIds: bucketIds, updatedAt: new Date().toISOString() };
       let productId = editing?.id || '';
       if (editing) await updateAdminDocument('products', editing.id, payload);
       else productId = (await createAdminDocument('products', { ...payload, isFlashSale: false, isWeekendSpecial: false, createdAt: new Date().toISOString() })).id;

@@ -26,7 +26,6 @@ import {
 import { auth, db } from '@/lib/firebase';
 import { useCartStore } from '@/lib/cartStore';
 import { ProductUrgencyBadges } from '@/components/ProductCard';
-import { useSettings } from '@/lib/useSettings';
 
 type Product = {
   id: string;
@@ -131,7 +130,6 @@ export default function ProductGridRewards({
   selectedMaxPrice?: number | null;
   wholesaleSelected?: boolean;
 }) {
-  const { settings } = useSettings();
   const [products, setProducts] = useState<Product[]>([]);
   const [gifts, setGifts] = useState<Reward[]>([]);
   const [points, setPoints] = useState(0);
@@ -242,45 +240,10 @@ export default function ProductGridRewards({
   const visible = useMemo(() => {
     const hasNumericBudget = selectedMaxPrice !== null;
     const hasSelectedFilter = wholesaleSelected || hasNumericBudget;
-    const bucketList = Array.isArray(settings.priceBuckets)
-      ? settings.priceBuckets
-      : [];
-
-    const wholesaleBucketIds = new Set(
-      bucketList
-        .filter((bucket) => String(bucket.title ?? '').toLowerCase().includes('wholesale'))
-        .map((bucket) => String(bucket.id)),
-    );
-
-    const matchesWholesaleBucket = (product: Product) => {
-      const buckets = Array.isArray(product.priceBuckets)
-        ? product.priceBuckets
-        : Array.isArray(product.buckets)
-          ? product.buckets
-          : [];
-
-      const directMatch = buckets.some((bucket) => {
-        if (typeof bucket === 'string') {
-          return bucket.toLowerCase().includes('wholesale');
-        }
-
-        const label = String(bucket?.name ?? bucket?.title ?? '').toLowerCase();
-        return (
-          label.includes('wholesale') ||
-          (bucket?.id != null && wholesaleBucketIds.has(String(bucket.id)))
-        );
-      });
-
-      const idMatch =
-        Array.isArray(product.priceBucketIds) &&
-        product.priceBucketIds.some((id) => wholesaleBucketIds.has(String(id)));
-
-      return directMatch || idMatch;
-    };
 
     const filtered = products.filter((product) => {
       if (wholesaleSelected) {
-        return matchesWholesaleBucket(product);
+        return product.isWholesale === true;
       }
 
       if (hasNumericBudget) {
@@ -312,7 +275,6 @@ export default function ProductGridRewards({
     return filtered;
   }, [
     products,
-    settings.priceBuckets,
     selectedMaxPrice,
     wholesaleSelected,
     sort,

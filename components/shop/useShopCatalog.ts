@@ -9,20 +9,8 @@ import { useCartStore } from '@/lib/cartStore';
 import { categoryHref, categoryLabel, productMatchesCategory, slugifyCategory } from '@/lib/categoryUtils';
 import { Product, Category, ShopCatalogModel, imageOf, priceOf, originalOf, productHasVariants, titleOf } from './ShopTypes';
 
-function isWholesaleProduct(product: Product, wholesaleBucketIds: Set<string>) {
-  if (product.isWholesale) return true;
-  const buckets = Array.isArray(product.priceBuckets)
-    ? product.priceBuckets
-    : Array.isArray(product.buckets)
-      ? product.buckets
-      : [];
-  const directMatch = buckets.some((bucket) => {
-    if (typeof bucket === 'string') return bucket.toLowerCase().includes('wholesale');
-    const label = String(bucket?.name ?? bucket?.title ?? '').toLowerCase();
-    return label.includes('wholesale') || (bucket?.id != null && wholesaleBucketIds.has(String(bucket.id)));
-  });
-  const idMatch = Array.isArray(product.priceBucketIds) && product.priceBucketIds.some((id) => wholesaleBucketIds.has(String(id)));
-  return directMatch || idMatch;
+function isWholesaleProduct(product: Product) {
+  return product.isWholesale === true;
 }
 
 export function useShopCatalog(initialCategory?: string, initialQuery = ''): ShopCatalogModel {
@@ -74,11 +62,6 @@ export function useShopCatalog(initialCategory?: string, initialQuery = ''): Sho
     [settings.priceBuckets],
   );
 
-  const wholesaleBucketIds = useMemo(
-    () => new Set(buckets.filter((bucket) => String(bucket.title || '').toLowerCase().includes('wholesale')).map((bucket) => String(bucket.id))),
-    [buckets],
-  );
-
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return products.filter((p) => {
@@ -90,10 +73,10 @@ export function useShopCatalog(initialCategory?: string, initialQuery = ''): Sho
       const selectedCat = productMatchesCategory(category, p, categories);
       const matchesPrice = wholesaleOnly || maxPrice === 'all' || !Number(maxPrice) || priceOf(p) <= Number(maxPrice);
       const matchesDeal = !onlyDeals || Boolean(p.isFlashSale);
-      const matchesWholesale = !wholesaleOnly || isWholesaleProduct(p, wholesaleBucketIds);
+      const matchesWholesale = !wholesaleOnly || isWholesaleProduct(p);
       return matchesSearch && selectedCat && matchesPrice && matchesDeal && matchesWholesale;
     });
-  }, [products, categories, search, category, maxPrice, onlyDeals, wholesaleOnly, wholesaleBucketIds]);
+  }, [products, categories, search, category, maxPrice, onlyDeals, wholesaleOnly]);
 
   const rails = useMemo(() => {
     const used = new Set<string>();

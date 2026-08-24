@@ -20,6 +20,7 @@ export type ProductSyncInput = {
   priceBucketIds?: string[];
   isFlashSale?: boolean;
   isWeekendSpecial?: boolean;
+  isWholesale?: boolean;
 };
 
 export type ProductSyncResult = {
@@ -82,6 +83,7 @@ export function validateProductInput(body: unknown): ProductSyncInput {
       : [],
     isFlashSale: Boolean(input.isFlashSale),
     isWeekendSpecial: Boolean(input.isWeekendSpecial),
+    isWholesale: input.isWholesale === true,
   };
 }
 
@@ -109,6 +111,7 @@ export async function upsertProduct(input: ProductSyncInput): Promise<ProductSyn
     priceBucketIds: input.priceBucketIds || [],
     isFlashSale: Boolean(input.isFlashSale),
     isWeekendSpecial: Boolean(input.isWeekendSpecial),
+    isWholesale: input.isWholesale === true,
     updatedAt: now,
   };
 
