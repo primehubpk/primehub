@@ -41,7 +41,7 @@ export default function PriceBuckets({ selectedMaxPrice, wholesaleSelected, onSe
         {(selectedMaxPrice !== null || wholesaleSelected) && <button type="button" onClick={() => { onSelect(null); if (wholesaleSelected) onWholesaleSelect(); }} className="inline-flex items-center gap-1.5 rounded-full bg-[#14140F] px-3 py-1.5 text-[10px] font-black text-white"><SlidersHorizontal size={12} />Clear</button>}
       </div>
 
-      <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-2 lg:grid-cols-4">
         {buckets.map((bucket) => {
           const wholesale = isWholesalePriceBucket(bucket);
           const selected = wholesale ? wholesaleSelected : selectedMaxPrice === bucket.amount && !wholesaleSelected;
