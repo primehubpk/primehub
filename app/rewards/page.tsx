@@ -191,10 +191,11 @@ export default function RewardsPage() {
       return;
     }
 
-    const walletUnsub = onSnapshot(doc(db, 'user_rewards', user.uid), snapshot => {
+    const authenticatedUser = user;
+    const walletUnsub = onSnapshot(doc(db, 'user_rewards', authenticatedUser.uid), snapshot => {
       setWallet({ ...emptyWallet, ...(snapshot.data() || {}) } as Wallet);
     });
-    const winsQuery = query(collection(db, 'reward_wins'), where('userId', '==', user.uid));
+    const winsQuery = query(collection(db, 'reward_wins'), where('userId', '==', authenticatedUser.uid));
     const winsUnsub = onSnapshot(winsQuery, snapshot => {
       const rows = snapshot.docs.map(d => ({ id: d.id, ...d.data() }) as RewardWin);
       rows.sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
@@ -210,7 +211,7 @@ export default function RewardsPage() {
         if (guestWins.length) {
           for (const win of guestWins) {
             await addDoc(collection(db, 'reward_wins'), {
-              userId: user.uid,
+              userId: authenticatedUser.uid,
               prizeId: win.prizeId,
               name: win.name,
               type: win.type,
@@ -231,7 +232,7 @@ export default function RewardsPage() {
           while (remaining > 0) {
             const chunk = Math.min(100, remaining);
             await runTransaction(db, async tx => {
-              const ref = doc(db, 'user_rewards', user.uid);
+              const ref = doc(db, 'user_rewards', authenticatedUser.uid);
               const snap = await tx.get(ref);
               const current = { ...emptyWallet, ...(snap.data() || {}) } as Wallet;
               tx.set(ref, { ...current, points: Number(current.points) + chunk, updatedAt: serverTimestamp() }, { merge: true });
