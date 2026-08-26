@@ -9,7 +9,7 @@ import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 
 const firebaseConfig: FirebaseOptions = {
-  apiKey: 'AIzaSyA0jI5esNvMt3Sb3Wvy7NQShsoWzntJxQU',
+  apiKey: 'AIzaSyA0jI5esNvMt3Sb3WVy7NQShsoWzntJxQU',
   authDomain: 'prime-hub-a02f0.firebaseapp.com',
   projectId: 'prime-hub-a02f0',
   storageBucket: 'prime-hub-a02f0.firebasestorage.app',
