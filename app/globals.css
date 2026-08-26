@@ -11,6 +11,9 @@
   --ph-gold: #ffb020;
   --ph-jade: #0f6a5f;
   --ph-jade-dark: #0b4f47;
+  --font-display: 'Space Grotesk Variable', system-ui, sans-serif;
+  --font-body: 'Inter Variable', system-ui, sans-serif;
+  --font-mono: 'Space Mono', ui-monospace, monospace;
 }
 
 body {

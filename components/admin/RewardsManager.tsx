@@ -494,7 +494,7 @@ function WheelPreview({ prizes }: { prizes: Prize[] }) {
               <div key={`${prize.id}-bg`} className="absolute inset-0" style={{ clipPath: sliceClipPath(index, count), background: index % 2 ? '#FFF1D6' : '#F4F4F1' }} />
             ))}
             {prizes.map((prize, index) => {
-              const size = Math.max(52, Math.min(88, Math.floor(200 / Math.max(3, prizes.length)));
+              const size = Math.max(52, Math.min(88, Math.floor(200 / Math.max(3, prizes.length))));
               return (
                 <div key={prize.id} className="pointer-events-none absolute left-1/2 top-1/2 h-[48%] w-[48%] origin-bottom text-center" style={{ transform: `translate(-50%, -100%) rotate(${index * slice + slice / 2}deg)` }}>
                   <div className="mx-auto mt-1 overflow-hidden rounded-xl border-2 border-white bg-white shadow-sm" style={{ width: size, height: size }}>
