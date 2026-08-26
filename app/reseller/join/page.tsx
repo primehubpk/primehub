@@ -5,6 +5,7 @@ import { FormEvent, useState } from 'react';
 import { ArrowLeft, Check, Crown, Eye, EyeOff, LockKeyhole, Mail, ShieldCheck } from 'lucide-react';
 import Header from '@/components/Header';
 import { createResellerAccount, resetResellerPassword, signInReseller } from '@/lib/resellerAuth';
+import { createResellerProfile } from '@/lib/resellerFirestore';
 
 function authMessage(code: string) {
   switch (code) {
@@ -13,6 +14,7 @@ function authMessage(code: string) {
     case 'auth/weak-password': return 'Password must be at least 6 characters.';
     case 'auth/invalid-credential': return 'Email or password is incorrect.';
     case 'auth/too-many-requests': return 'Too many attempts. Please try again later.';
+    case 'permission-denied': return 'Account created, but reseller profile setup was blocked by Firestore rules.';
     default: return 'Something went wrong. Please try again.';
   }
 }
@@ -30,8 +32,9 @@ export default function ResellerJoinPage() {
     event.preventDefault(); setBusy(true); setMessage(''); setSuccess(false);
     try {
       if (mode === 'signup') {
-        await createResellerAccount(email, password);
-        setSuccess(true); setMessage('Your PrimeHub account is ready. Reseller dashboard will unlock in the next phase.');
+        const credential = await createResellerAccount(email, password);
+        await createResellerProfile(credential.user.uid, credential.user.email || email.trim());
+        setSuccess(true); setMessage('Your PrimeHub Reseller Club account is ready.');
       } else {
         await signInReseller(email, password);
         setSuccess(true); setMessage('Welcome back. Your account is securely signed in.');
@@ -46,10 +49,8 @@ export default function ResellerJoinPage() {
     if (!email.trim()) { setMessage('Enter your email first, then tap Forgot password.'); return; }
     setBusy(true); setMessage('');
     try { await resetResellerPassword(email); setMessage('Password reset email sent. Please check your inbox.'); }
-    catch (error) {
-      const code = error instanceof Error && 'code' in error ? String((error as { code?: string }).code) : '';
-      setMessage(authMessage(code));
-    } finally { setBusy(false); }
+    catch (error) { const code = error instanceof Error && 'code' in error ? String((error as { code?: string }).code) : ''; setMessage(authMessage(code)); }
+    finally { setBusy(false); }
   }
 
   return (
