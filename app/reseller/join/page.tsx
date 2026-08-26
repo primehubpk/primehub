@@ -3,7 +3,6 @@
 import Link from 'next/link';
 import { FormEvent, useEffect, useState } from 'react';
 import { ArrowLeft, Check, ChevronRight, Crown, Eye, EyeOff, LockKeyhole, Mail, ShieldCheck } from 'lucide-react';
-import { useSearchParams } from 'next/navigation';
 import { createResellerAccount, resetResellerPassword, signInReseller } from '@/lib/resellerAuth';
 import { createResellerProfile } from '@/lib/resellerFirestore';
 
@@ -20,12 +19,11 @@ function authMessage(code: string) {
 }
 
 export default function ResellerJoinPage() {
-  const searchParams = useSearchParams();
   const [mode, setMode] = useState<'signup' | 'signin'>('signup');
   const [email, setEmail] = useState(''); const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false); const [busy, setBusy] = useState(false); const [message, setMessage] = useState(''); const [success, setSuccess] = useState(false);
 
-  useEffect(() => { if (searchParams.get('mode') === 'signin') setMode('signin'); }, [searchParams]);
+  useEffect(() => { if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('mode') === 'signin') setMode('signin'); }, []);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setBusy(true); setMessage(''); setSuccess(false);
