@@ -5,10 +5,10 @@ import { ArrowLeft, Check, ChevronRight, Crown, Gift, ShieldCheck, Sparkles, Wal
 import Footer from '@/components/Footer';
 
 const benefits = [
-  { icon: Crown, title: 'Exclusive Reseller Tiers', text: 'Unlock better rewards as your monthly activity grows.', tone: 'bg-[#FFF0C2] text-[#9A6500]', border: 'border-[#F4D98A]' },
-  { icon: WalletCards, title: 'Reward Wallet', text: 'Build a reward balance from eligible reseller activity.', tone: 'bg-[#DDF5F0] text-[#0F6A5F]', border: 'border-[#B8E5DC]' },
-  { icon: Gift, title: 'Monthly Gifts & Bonuses', text: 'Complete monthly challenges to unlock special rewards.', tone: 'bg-[#FFE0DC] text-[#C83B31]', border: 'border-[#F5C1BA]' },
-  { icon: Sparkles, title: 'Special Reseller Deals', text: 'Get access to selected offers made for PrimeHub resellers.', tone: 'bg-[#E9E1FF] text-[#6B45B5]', border: 'border-[#D4C6F7]' },
+  { icon: Crown, title: 'Exclusive Reseller Tiers', text: 'Unlock better rewards as your monthly activity grows.', tone: 'bg-[#FFF0C2] text-[#9A6500]' },
+  { icon: WalletCards, title: 'Reward Wallet', text: 'Build a reward balance from eligible reseller activity.', tone: 'bg-[#DDF5F0] text-[#0F6A5F]' },
+  { icon: Gift, title: 'Monthly Gifts & Bonuses', text: 'Complete monthly challenges to unlock special rewards.', tone: 'bg-[#FFE0DC] text-[#C83B31]' },
+  { icon: Sparkles, title: 'Special Reseller Deals', text: 'Get access to selected offers made for PrimeHub resellers.', tone: 'bg-[#E9E1FF] text-[#6B45B5]' },
 ];
 
 export default function ResellerPage() {
@@ -17,9 +17,7 @@ export default function ResellerPage() {
       <section className="relative overflow-hidden bg-gradient-to-br from-[#151610] via-[#173A34] to-[#0F6A5F] px-4 pb-9 pt-5 text-white sm:px-6">
         <div className="absolute -right-20 -top-20 h-56 w-56 rounded-full bg-[#FFCF68]/15 blur-3xl" />
         <div className="relative mx-auto max-w-3xl">
-          <Link href="/" className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-2 text-[10px] font-bold text-white/85 ring-1 ring-white/15">
-            <ArrowLeft size={13} /> Back to shopping
-          </Link>
+          <Link href="/" className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-2 text-[10px] font-bold text-white/85 ring-1 ring-white/15"><ArrowLeft size={13} /> Back to shopping</Link>
           <div className="mt-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#FFCF68] text-[#14140F] shadow-lg"><Crown size={28} /></div>
           <p className="mt-5 text-[9px] font-black uppercase tracking-[0.24em] text-[#FFCF68]">PrimeHub Exclusive</p>
           <h1 className="mt-2 max-w-xl text-3xl font-black tracking-tight sm:text-5xl">PrimeHub Reseller Club</h1>
@@ -31,13 +29,15 @@ export default function ResellerPage() {
 
       <section className="mx-auto max-w-3xl px-4 py-7 sm:px-6">
         <div className="mb-4"><p className="text-[9px] font-black uppercase tracking-[0.2em] text-[#E1352B]">Why join</p><h2 className="mt-1 text-2xl font-black tracking-tight">Built for PrimeHub resellers</h2></div>
-        <div className="space-y-3">
-          {benefits.map(({ icon: Icon, title, text, tone, border }) => (
-            <div key={title} className={`rounded-[24px] border ${border} bg-white p-4 shadow-[0_10px_28px_rgba(20,20,15,0.05)]`}>
-              <div className="flex items-start gap-3"><div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${tone}`}><Icon size={20} /></div><div className="min-w-0 flex-1"><h3 className="text-sm font-black">{title}</h3><p className="mt-1 text-[10px] leading-5 text-black/50">{text}</p></div></div>
-              <Link href="/reseller/join?mode=signup" className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl bg-[#14140F] py-2.5 text-[10px] font-black text-white">Join Now <ChevronRight size={13} /></Link>
-            </div>
-          ))}
+        <div className="rounded-[28px] border border-black/5 bg-white p-4 shadow-[0_14px_38px_rgba(20,20,15,0.07)] sm:p-5">
+          <div className="grid gap-2 sm:grid-cols-2">
+            {benefits.map(({ icon: Icon, title, text, tone }) => (
+              <div key={title} className="rounded-[20px] border border-black/5 bg-[#FAFAF7] p-4">
+                <div className="flex items-start gap-3"><div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${tone}`}><Icon size={20} /></div><div className="min-w-0"><h3 className="text-sm font-black">{title}</h3><p className="mt-1 text-[10px] leading-5 text-black/50">{text}</p></div></div>
+              </div>
+            ))}
+          </div>
+          <Link href="/reseller/join?mode=signup" className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl bg-[#14140F] py-3.5 text-sm font-black text-white shadow-lg active:scale-[0.99]">Join Now <ChevronRight size={16} /></Link>
         </div>
       </section>
 
