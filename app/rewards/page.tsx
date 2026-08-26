@@ -124,6 +124,19 @@ function prizeLabel(prize: Pick<Prize, 'type' | 'points' | 'voucherAmount'>) {
   return 'FREE PRODUCT';
 }
 
+function sliceClipPath(index: number, count: number) {
+  const n = Math.max(1, count);
+  const start = (index / n) * 2 * Math.PI - Math.PI / 2;
+  const end = ((index + 1) / n) * 2 * Math.PI - Math.PI / 2;
+  const points = ['50% 50%'];
+  const steps = 18;
+  for (let i = 0; i <= steps; i += 1) {
+    const angle = start + ((end - start) * i) / steps;
+    points.push(`${50 + 50 * Math.cos(angle)}% ${50 + 50 * Math.sin(angle)}%`);
+  }
+  return `polygon(${points.join(',')})`;
+}
+
 function rewardText(prize: Prize) {
   if (prize.type === 'points') return `+${Number(prize.points || 0)} points added to your wallet.`;
   if (prize.type === 'free-delivery') return prize.voucherAmount ? `Free delivery voucher up to Rs ${Number(prize.voucherAmount).toLocaleString()}.` : 'Free delivery voucher unlocked.';
@@ -488,8 +501,23 @@ export default function RewardsPage() {
             <div className="relative mx-auto h-[min(82vw,360px)] w-[min(82vw,360px)] max-w-full">
               <div className="absolute -top-3 left-1/2 z-30 -translate-x-1/2 text-2xl text-[#E1352B] drop-shadow">▼</div>
               <div className="absolute inset-0 rounded-full border-[10px] border-[#14140F] bg-white p-3 shadow-2xl" style={{ transform: `rotate(${rotation}deg)`, transition: spinning ? 'transform 1.9s cubic-bezier(.12,.72,.16,1)' : 'none' }}>
-                <div className="relative h-full w-full overflow-hidden rounded-full" style={{ background: `conic-gradient(${activePrizes.map((_, i) => `${i % 2 ? '#FFF1D6' : '#F4F4F1'} ${i * slice}deg ${(i + 1) * slice}deg`).join(',') || '#F4F4F1 0deg 360deg'})` }}>
-                  {activePrizes.map((prize, index) => <div key={prize.id} className="absolute left-1/2 top-1/2 h-1/2 w-[40%] origin-bottom -translate-x-1/2 -translate-y-full text-center" style={{ transform: `translateX(-50%) rotate(${index * slice + slice / 2}deg)` }}><div className="mx-auto h-11 w-11 overflow-hidden rounded-full border-2 border-white bg-white shadow-md sm:h-12 sm:w-12">{prize.imageUrl ? <img src={prize.imageUrl} alt="" className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center text-[9px] font-black">{prize.type === 'points' ? prize.points : '★'}</div>}</div><span className="mt-1 block truncate text-[7px] font-black text-black/80">{prizeLabel(prize)}</span></div>)}
+                <div className="relative h-full w-full overflow-hidden rounded-full bg-[#F4F4F1]">
+                  {activePrizes.map((prize, index) => (
+                    <div key={`${prize.id}-bg`} className="absolute inset-0" style={{ clipPath: sliceClipPath(index, wheelCount), background: index % 2 ? '#FFF1D6' : '#F4F4F1' }} />
+                  ))}
+                  {activePrizes.map((prize, index) => {
+                    const size = Math.max(64, Math.min(120, Math.floor(280 / Math.max(3, activePrizes.length))));
+                    return (
+                      <div key={prize.id} className="pointer-events-none absolute left-1/2 top-1/2 h-[48%] w-[48%] origin-bottom text-center" style={{ transform: `translate(-50%, -100%) rotate(${index * slice + slice / 2}deg)` }}>
+                        <div className="mx-auto mt-2 overflow-hidden rounded-2xl border-2 border-white bg-white shadow-md" style={{ width: size, height: size }}>
+                          {prize.imageUrl
+                            ? <img src={prize.imageUrl} alt={prize.name} className="h-full w-full object-contain" />
+                            : <div className="flex h-full items-center justify-center text-[10px] font-black">{prizeLabel(prize)}</div>}
+                        </div>
+                        <span className="mt-1 inline-block max-w-full truncate rounded-full bg-black/70 px-1.5 py-0.5 text-[7px] font-black text-white sm:text-[8px]">{prizeLabel(prize)}</span>
+                      </div>
+                    );
+                  })}
                   <div className="absolute left-1/2 top-1/2 z-10 flex h-16 w-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-[5px] border-white bg-[#E1352B] text-white shadow-xl"><RotateCw size={22} /></div>
                 </div>
               </div>
@@ -499,7 +527,35 @@ export default function RewardsPage() {
           </div>
         </section>
 
-        {result && result.type !== 'try-again' && <section className="overflow-hidden rounded-[28px] border border-[#FFB020]/30 bg-[#FFF9ED] p-5 shadow-sm sm:p-6"><div className="flex items-center gap-4"><div className="h-20 w-20 shrink-0 overflow-hidden rounded-2xl bg-white shadow-sm">{result.imageUrl ? <img src={result.imageUrl} alt="" className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center text-[#E1352B]"><Gift /></div>}</div><div className="min-w-0"><p className="text-[9px] font-black uppercase tracking-[.2em] text-[#E1352B]">Congratulations</p><h3 className="mt-1 text-xl font-black">{result.name}</h3><p className="mt-1 text-xs leading-5 text-black/55">{rewardText(result)}</p></div></div><a href="#wins" className="mt-4 inline-flex items-center gap-2 rounded-xl bg-[#14140F] px-4 py-2.5 text-[10px] font-black text-white">View my reward <ArrowRight size={13} /></a></section>}
+        {result && (
+          <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/75 p-4" role="dialog" aria-modal="true" aria-labelledby="spin-result-title">
+            <div className="relative w-full max-w-md overflow-hidden rounded-[32px] bg-white p-6 text-center shadow-2xl sm:p-8">
+              <div className="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-[#FFB020]/25 blur-2xl" />
+              {result.type === 'try-again' ? (
+                <>
+                  <p className="text-[10px] font-black uppercase tracking-[.22em] text-black/40">Daily spin</p>
+                  <h3 id="spin-result-title" className="mt-2 text-2xl font-black">Better luck next time</h3>
+                  <p className="mt-2 text-sm text-black/55">{rewardText(result)}</p>
+                </>
+              ) : (
+                <>
+                  <p className="text-[10px] font-black uppercase tracking-[.22em] text-[#E1352B]">Grand congratulations</p>
+                  <h3 id="spin-result-title" className="mt-2 text-3xl font-black tracking-tight">You received</h3>
+                  <div className="mx-auto mt-4 h-36 w-36 overflow-hidden rounded-[28px] border-4 border-[#FFB020] bg-[#FFF9ED] shadow-lg">
+                    {result.imageUrl
+                      ? <img src={result.imageUrl} alt={result.name} className="h-full w-full object-cover" />
+                      : <div className="flex h-full items-center justify-center text-[#E1352B]"><Gift size={40} /></div>}
+                  </div>
+                  <p className="mt-4 text-xl font-black">{result.name}</p>
+                  <p className="mt-1 text-xs font-black uppercase tracking-wider text-[#0F6A5F]">{prizeLabel(result)}</p>
+                  <p className="mt-2 text-sm leading-6 text-black/55">{rewardText(result)}</p>
+                  <a href="#wins" onClick={() => setResult(null)} className="mt-5 inline-flex items-center gap-2 rounded-xl bg-[#14140F] px-5 py-3 text-[11px] font-black text-white">View my reward <ArrowRight size={13} /></a>
+                </>
+              )}
+              <button type="button" onClick={() => setResult(null)} className="mt-4 w-full rounded-xl bg-[#E1352B] py-3 text-xs font-black text-white">{result.type === 'try-again' ? 'Close' : 'Awesome!'}</button>
+            </div>
+          </div>
+        )}
 
         <section id="wins" className="scroll-mt-5 rounded-[30px] border border-black/5 bg-white p-5 shadow-sm sm:p-6"><div className="flex items-end justify-between gap-3"><div><p className="text-[9px] font-black uppercase tracking-[.2em] text-[#E1352B]">Your prizes</p><h2 className="mt-1 text-2xl font-black">My Won Rewards</h2><p className="mt-1 text-xs text-black/45">A reward won from the wheel is yours to claim. Login is required for redemption.</p></div><span className="rounded-full bg-[#FFF1D6] px-3 py-1.5 text-[9px] font-black">{wins.length} total</span></div><div className="mt-5 space-y-3">{wins.length ? wins.map(win => { const product = products[win.productId || '']; const image = win.imageUrl || imageForProduct(product); const canRedeem = win.status !== 'redeemed'; return <article key={win.id} className="overflow-hidden rounded-2xl border border-black/5 bg-[#FAFAF7]"><div className="flex gap-3 p-3 sm:p-4"><div className="h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-white">{image ? <img src={image} alt="" className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center text-black/20"><Gift size={22} /></div>}</div><div className="min-w-0 flex-1"><div className="flex items-start justify-between gap-2"><div><h3 className="text-sm font-black">{win.name}</h3><p className="mt-1 text-[10px] font-black uppercase tracking-wider text-[#0F6A5F]">{prizeLabel(win)}</p></div><span className={`rounded-full px-2 py-1 text-[8px] font-black ${win.status === 'redeemed' ? 'bg-black/5 text-black/35' : 'bg-[#E8F5F2] text-[#0F6A5F]'}`}>{win.status === 'redeemed' ? 'CLAIMED' : 'READY'}</span></div>{win.voucherCode && <p className="mt-2 flex items-center gap-1 text-[10px] font-black text-[#E1352B]"><TicketPercent size={12} /> {win.voucherCode}</p>}{win.voucherAmount ? <p className="mt-1 text-[10px] font-bold text-black/45">Voucher value: Rs {Number(win.voucherAmount).toLocaleString()}</p> : null}</div></div><div className="border-t border-black/5 px-3 py-3 sm:px-4">{!user ? <button type="button" onClick={() => window.location.href = '/login?redirect=/rewards#wins'} className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#14140F] py-2.5 text-[10px] font-black text-white"><Lock size={12} /> Login to Redeem</button> : <button type="button" disabled={!canRedeem || redeeming === win.id} onClick={() => redeemWin(win)} className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#E1352B] py-2.5 text-[10px] font-black text-white disabled:opacity-45">{redeeming === win.id ? 'Claiming...' : canRedeem ? <><CheckCircle2 size={13} /> Claim Reward</> : 'Already Claimed'}</button>}</div></article>; }) : <div className="rounded-2xl bg-[#F7F7F2] p-7 text-center"><div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-black/20"><Gift size={20} /></div><p className="mt-3 text-sm font-black">No wheel rewards yet</p><p className="mt-1 text-xs text-black/40">Your winning rewards will appear here after a successful spin.</p></div>}</div></section>
 

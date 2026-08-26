@@ -111,6 +111,18 @@ function prizeSummary(prize: Prize) {
   return 'No reward — try again next time';
 }
 
+function sliceClipPath(index: number, count: number) {
+  const n = Math.max(1, count);
+  const start = (index / n) * 2 * Math.PI - Math.PI / 2;
+  const end = ((index + 1) / n) * 2 * Math.PI - Math.PI / 2;
+  const points = ['50% 50%'];
+  for (let i = 0; i <= 18; i += 1) {
+    const angle = start + ((end - start) * i) / 18;
+    points.push(`${50 + 50 * Math.cos(angle)}% ${50 + 50 * Math.sin(angle)}%`);
+  }
+  return `polygon(${points.join(',')})`;
+}
+
 export default function RewardsManager({ products = [] }: { products?: any[] }) {
   const [tab, setTab] = useState<'overview' | 'wheel' | 'checkin' | 'store' | 'redemptions'>('overview');
   const [settings, setSettings] = useState<any>(DEFAULT_SETTINGS);
@@ -465,8 +477,54 @@ function GiftEditor({ gift, products, onSave, onRemove, onProduct, onUpload, onC
 function WheelPreview({ prizes }: { prizes: Prize[] }) {
   const count = Math.max(1, prizes.length);
   const slice = 360 / count;
-  const background = prizes.length ? `conic-gradient(${prizes.map((_, index) => `${index % 2 ? '#FFF1D6' : '#F4F4F1'} ${index * slice}deg ${(index + 1) * slice}deg`).join(',')})` : '#F4F4F1';
-  return <div className="rounded-[28px] border border-black/5 bg-white p-5 shadow-sm"><div className="flex items-center justify-between"><div><p className="text-[9px] font-black uppercase tracking-[.2em] text-[#E1352B]">Live preview</p><h3 className="mt-1 text-xl font-black">Customer wheel</h3></div><span className="rounded-full bg-[#FFF1D6] px-2.5 py-1 text-[9px] font-black">{count} slots</span></div><div className="relative mx-auto mt-7 h-64 w-64 max-w-full"><div className="absolute -top-2 left-1/2 z-20 -translate-x-1/2 text-[#E1352B]">▼</div><div className="absolute inset-0 rounded-full border-[9px] border-[#14140F] p-3 shadow-xl" style={{ background }}><div className="relative h-full w-full rounded-full">{prizes.map((prize, index) => <div key={prize.id} className="absolute left-1/2 top-1/2 h-1/2 w-[44%] origin-bottom -translate-x-1/2 -translate-y-full text-center" style={{ transform: `translateX(-50%) rotate(${index * slice + slice / 2}deg)` }}><div className="mx-auto h-10 w-10 overflow-hidden rounded-full border-2 border-white bg-white shadow-sm">{prize.imageUrl ? <img src={prize.imageUrl} alt="" className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center text-[8px] font-black">{prize.type === 'points' ? prize.points : '★'}</div>}</div><span className="mt-1 block truncate text-[7px] font-black">{prizeTypeLabel(prize.type)}</span></div>)}</div><div className="absolute left-1/2 top-1/2 flex h-14 w-14 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-4 border-white bg-[#E1352B] text-white shadow-lg"><Sparkles size={19} /></div></div></div><div className="mt-5 space-y-2">{prizes.slice(0, 6).map(prize => <div key={prize.id} className="flex items-center gap-2 rounded-xl bg-[#F7F7F2] p-2.5"><div className="h-8 w-8 overflow-hidden rounded-lg bg-white">{prize.imageUrl && <img src={prize.imageUrl} alt="" className="h-full w-full object-cover" />}</div><div className="min-w-0 flex-1"><p className="truncate text-[10px] font-black">{prize.name}</p><p className="text-[9px] text-black/40">{prizeSummary(prize)}</p></div><span className="text-[9px] font-black text-[#E1352B]">{prize.probability}%</span></div>)}{!prizes.length && <p className="rounded-xl bg-[#F7F7F2] p-4 text-center text-xs font-bold text-black/45">Add prizes to preview the wheel.</p>}</div></div>;
+  return (
+    <div className="rounded-[28px] border border-black/5 bg-white p-5 shadow-sm">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-[9px] font-black uppercase tracking-[.2em] text-[#E1352B]">Live preview</p>
+          <h3 className="mt-1 text-xl font-black">Customer wheel</h3>
+        </div>
+        <span className="rounded-full bg-[#FFF1D6] px-2.5 py-1 text-[9px] font-black">{prizes.length} slots</span>
+      </div>
+      <div className="relative mx-auto mt-7 h-64 w-64 max-w-full">
+        <div className="absolute -top-2 left-1/2 z-20 -translate-x-1/2 text-[#E1352B]">▼</div>
+        <div className="absolute inset-0 rounded-full border-[9px] border-[#14140F] bg-white p-3 shadow-xl">
+          <div className="relative h-full w-full overflow-hidden rounded-full bg-[#F4F4F1]">
+            {prizes.map((prize, index) => (
+              <div key={`${prize.id}-bg`} className="absolute inset-0" style={{ clipPath: sliceClipPath(index, count), background: index % 2 ? '#FFF1D6' : '#F4F4F1' }} />
+            ))}
+            {prizes.map((prize, index) => {
+              const size = Math.max(52, Math.min(88, Math.floor(200 / Math.max(3, prizes.length)));
+              return (
+                <div key={prize.id} className="pointer-events-none absolute left-1/2 top-1/2 h-[48%] w-[48%] origin-bottom text-center" style={{ transform: `translate(-50%, -100%) rotate(${index * slice + slice / 2}deg)` }}>
+                  <div className="mx-auto mt-1 overflow-hidden rounded-xl border-2 border-white bg-white shadow-sm" style={{ width: size, height: size }}>
+                    {prize.imageUrl
+                      ? <img src={prize.imageUrl} alt={prize.name} className="h-full w-full object-contain" />
+                      : <div className="flex h-full items-center justify-center text-[8px] font-black">{prizeTypeLabel(prize.type)}</div>}
+                  </div>
+                  <span className="mt-1 inline-block max-w-full truncate rounded-full bg-black/65 px-1 py-0.5 text-[7px] font-black text-white">{prizeTypeLabel(prize.type)}</span>
+                </div>
+              );
+            })}
+            <div className="absolute left-1/2 top-1/2 z-10 flex h-14 w-14 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-4 border-white bg-[#E1352B] text-white shadow-lg"><Sparkles size={19} /></div>
+          </div>
+        </div>
+      </div>
+      <div className="mt-5 space-y-2">
+        {prizes.slice(0, 6).map((prize) => (
+          <div key={prize.id} className="flex items-center gap-2 rounded-xl bg-[#F7F7F2] p-2.5">
+            <div className="h-8 w-8 overflow-hidden rounded-lg bg-white">{prize.imageUrl && <img src={prize.imageUrl} alt="" className="h-full w-full object-cover" />}</div>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-[10px] font-black">{prize.name}</p>
+              <p className="text-[9px] text-black/40">{prizeSummary(prize)}</p>
+            </div>
+            <span className="text-[9px] font-black text-[#E1352B]">{prize.probability}%</span>
+          </div>
+        ))}
+        {!prizes.length && <p className="rounded-xl bg-[#F7F7F2] p-4 text-center text-xs font-bold text-black/45">Add prizes to preview the wheel.</p>}
+      </div>
+    </div>
+  );
 }
 
 function EmptyState({ title, text, action, onAction }: { title: string; text: string; action: string; onAction: () => void }) {
