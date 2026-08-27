@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { FormEvent, useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { ArrowLeft, Check, ChevronRight, Crown, Eye, EyeOff, LockKeyhole, Mail, ShieldCheck } from 'lucide-react';
 import { createResellerAccount, resetResellerPassword, signInReseller } from '@/lib/resellerAuth';
 import { createResellerProfile } from '@/lib/resellerFirestore';
@@ -25,6 +26,7 @@ function authMessage(code: string, rawMessage = '') {
 }
 
 export default function ResellerJoinPage() {
+  const router = useRouter();
   const [mode, setMode] = useState<'signup' | 'signin'>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -62,7 +64,11 @@ export default function ResellerJoinPage() {
       } else {
         const credential = await signInReseller(email, password, rememberMe);
         await createResellerProfile(credential.user.uid, credential.user.email || email.trim());
-        setSuccess(true); setMessage('Welcome back. Your Reseller Club account is securely signed in.');
+        // A successful reseller sign-in should take the member straight to the dashboard.
+        // Do not leave a success message or secondary dashboard button on the sign-in page.
+        router.replace('/reseller/dashboard');
+        router.refresh();
+        return;
       }
     } catch (error) {
       const code = error instanceof Error && 'code' in error ? String((error as { code?: string }).code) : '';
