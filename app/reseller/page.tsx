@@ -30,10 +30,12 @@ export default function ResellerPage() {
       <section className="mx-auto max-w-3xl px-4 py-7 sm:px-6">
         <div className="mb-4"><p className="text-[9px] font-black uppercase tracking-[0.2em] text-[#E1352B]">Why join</p><h2 className="mt-1 text-2xl font-black tracking-tight">Built for PrimeHub resellers</h2></div>
         <div className="rounded-[28px] border border-black/5 bg-white p-4 shadow-[0_14px_38px_rgba(20,20,15,0.07)] sm:p-5">
-          <div className="grid grid-cols-2 gap-2 sm:gap-3">
+          <div className="grid grid-cols-2 gap-3">
             {benefits.map(({ icon: Icon, title, text, tone }) => (
-              <div key={title} className="min-w-0 rounded-[20px] border border-black/5 bg-[#FAFAF7] p-3 sm:p-4">
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:gap-3"><div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${tone} sm:h-11 sm:w-11`}><Icon size={19} /></div><div className="min-w-0"><h3 className="text-[11px] font-black leading-4 sm:text-sm">{title}</h3><p className="mt-1 text-[9px] leading-4 text-black/50 sm:text-[10px] sm:leading-5">{text}</p></div></div>
+              <div key={title} className="min-h-[142px] min-w-0 rounded-[20px] border border-black/5 bg-[#FAFAF7] p-3.5 sm:min-h-[160px] sm:p-4">
+                <div className={`flex h-10 w-10 items-center justify-center rounded-2xl ${tone}`}><Icon size={19} /></div>
+                <h3 className="mt-3 text-[11px] font-black leading-4 sm:text-sm">{title}</h3>
+                <p className="mt-1 text-[9px] leading-4 text-black/50 sm:text-[10px] sm:leading-5">{text}</p>
               </div>
             ))}
           </div>
