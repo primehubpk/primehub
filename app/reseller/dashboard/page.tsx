@@ -260,7 +260,7 @@ export default function ResellerDashboardPage() {
           </Link>
           <p className="mt-3 text-[9px] font-extrabold uppercase tracking-[.18em] text-[#FF9A3C]">PrimeHub Reseller</p>
           <h1 className="mt-1 text-[22px] font-extrabold leading-[1.15]">Complete missions.<br />Unlock vouchers.</h1>
-          <p className="mt-1.5 text-xs text-white/75">Tasks, gift vouchers and cash rewards — all controlled from Admin.</p>
+          <p className="mt-1.5 text-xs text-white/75">Complete tasks, collect points and unlock exclusive rewards.</p>
 
           <div className="mt-3.5 grid grid-cols-2 gap-2">
             <Stat label="This month" value={`${monthlyOrders} / ${target}`} />
@@ -293,7 +293,7 @@ export default function ResellerDashboardPage() {
                     <span className="rounded-full bg-[#E7F6F3] px-2 py-1 text-[11px] font-extrabold text-[#0E7C6F]">{monthlyOrders}/{target}</span>
                   </div>
                   <h2 className="mt-1.5 text-lg font-extrabold">{target} orders = gift or cash</h2>
-                  <p className="mt-1 text-xs leading-relaxed text-[#6B6A62]">Admin sets the target, gift title and cash amount. You choose the reward when complete.</p>
+                  <p className="mt-1 text-xs leading-relaxed text-[#6B6A62]">Reach the target and choose your favourite reward when the challenge is complete.</p>
                   <Progress value={challengePercent} />
                   <div className="mt-2 flex gap-2">
                     <button type="button" onClick={() => setSelectedVoucher(vouchers.find(v => v.id === 'challenge-gift') || null)} className="flex-1 rounded-xl bg-[#F1ECE3] px-3 py-2.5 text-xs font-extrabold">🎁 Gift box</button>
@@ -334,7 +334,7 @@ export default function ResellerDashboardPage() {
                 <span className="rounded-full bg-[#E7F6F3] px-2 py-1 text-[11px] font-extrabold text-[#0E7C6F]">{activeTasks.length} live</span>
               </div>
               <h2 className="mt-1.5 text-lg font-extrabold">Earn extra beyond orders</h2>
-              <p className="mt-1 text-xs leading-relaxed text-[#6B6A62]">Social and growth tasks are created in Admin. Rewards credit after review.</p>
+              <p className="mt-1 text-xs leading-relaxed text-[#6B6A62]">Complete social and growth missions to collect points after verification.</p>
               <div className="mt-2">
                 {activeTasks.length ? activeTasks.map(task => <TaskRow key={task.id} task={task} monthlyOrders={monthlyOrders} target={target} />) : <p className="py-6 text-center text-xs text-[#6B6A62]">No active missions right now.</p>}
               </div>
@@ -373,16 +373,12 @@ export default function ResellerDashboardPage() {
               </section>
               <section className="mt-3 rounded-[18px] bg-[#FFFDF8] p-3.5 shadow-[0_8px_24px_rgba(20,20,15,.05)]">
                 <span className="text-[10px] font-extrabold uppercase tracking-[.14em] text-[#E85D04]">My vouchers</span>
-                <p className="mt-2 text-xs leading-relaxed text-[#6B6A62]">Claimed gift vouchers appear here. JazzCash and EasyPaisa payouts are released after Admin review.</p>
+                <p className="mt-2 text-xs leading-relaxed text-[#6B6A62]">Claimed gift vouchers appear here. JazzCash and EasyPaisa payouts are released after verification.</p>
                 <button type="button" onClick={() => setView('vouchers')} className="mt-3 rounded-xl bg-[#0E7C6F] px-3 py-2.5 text-xs font-extrabold text-white">Browse vouchers</button>
               </section>
             </>
           )}
         </section>
-
-        <Link href="/admin/reseller-tasks" className="fixed bottom-[78px] right-[max(14px,calc((100vw-430px)/2+14px))] z-20 rounded-full bg-[#E85D04] px-3 py-2.5 text-[11px] font-extrabold text-white shadow-[0_8px_20px_rgba(232,93,4,.35)]">
-          Admin control
-        </Link>
 
         <footer className="sticky bottom-0 z-10 grid grid-cols-5 bg-white px-1.5 pb-[calc(10px+env(safe-area-inset-bottom))] pt-2 shadow-[0_-8px_24px_rgba(0,0,0,.06)]">
           <Bottom href="/" label="Home" icon={<Home size={17} />} />
@@ -436,7 +432,7 @@ function TaskRow({ task, monthlyOrders, target }: { task: ResellerTask; monthlyO
         <Progress value={percent} />
       </div>
       <div className="text-right">
-        <p className="text-[11px] font-extrabold text-[#0E7C6F]">Rs. {Number(task.reward || 0).toLocaleString()}</p>
+        <p className="text-[11px] font-extrabold text-[#0E7C6F]">+{Number(task.reward || 0).toLocaleString()} pts</p>
         <Link href={href} target={external ? '_blank' : undefined} rel={external ? 'noreferrer' : undefined} className="mt-1.5 inline-flex items-center gap-1 rounded-xl bg-[#F1ECE3] px-2.5 py-2 text-[11px] font-extrabold">
           {task.verification === 'manual' ? 'Submit' : 'Do'} <ChevronRight size={12} />
         </Link>
@@ -470,7 +466,7 @@ function VoucherSheet({ voucher, orders, onClose }: { voucher: Voucher; orders: 
         <button type="button" onClick={onClose} className="absolute right-4 top-4 rounded-full bg-[#F1ECE3] p-2"><X size={16} /></button>
         <p className="text-[10px] font-extrabold uppercase tracking-[.14em] text-[#E85D04]">{voucher.type} voucher</p>
         <h2 className="mt-1.5 pr-10 text-xl font-extrabold">{voucher.title}</h2>
-        <p className="mt-2 text-xs leading-relaxed text-[#6B6A62]">{voucher.description}. Unlock requirement: {voucher.requirement}. Reward release is reviewed by Admin.</p>
+        <p className="mt-2 text-xs leading-relaxed text-[#6B6A62]">{voucher.description}. Unlock requirement: {voucher.requirement}. Reward release is completed after verification.</p>
         {locked ? (
           <button type="button" disabled className="mt-3 w-full rounded-xl bg-[#14140F] px-3 py-3 text-xs font-extrabold text-white opacity-45">Locked — more orders needed</button>
         ) : (
