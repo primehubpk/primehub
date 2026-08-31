@@ -5,7 +5,6 @@ import { Crown, Gem, Sparkles, SlidersHorizontal, Zap, Package } from 'lucide-re
 import { useSettings } from '@/lib/useSettings';
 import { isWholesalePriceBucket, sortPriceBuckets } from '@/lib/priceBucketUtils';
 import type { PriceBucket } from '@/lib/types';
-import ResellerClubCard from '@/components/ResellerClubCard';
 
 interface PriceBucketsProps {
   selectedMaxPrice: number | null;
@@ -88,7 +87,6 @@ export default function PriceBuckets({ selectedMaxPrice, wholesaleSelected, onSe
             </button>
           );
         })}
-        <ResellerClubCard />
       </div>
     </section>
   );

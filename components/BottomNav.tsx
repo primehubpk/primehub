@@ -7,13 +7,13 @@
 
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { Home, ShoppingBag, Gift, ShoppingCart, Package } from 'lucide-react';
+import { Home, ShoppingBag, Users, ShoppingCart, Package } from 'lucide-react';
 import { useCartStore } from '@/lib/cartStore';
 
 const NAV_ITEMS = [
   { key: 'home', label: 'Home', href: '/', icon: Home },
   { key: 'shop', label: 'Shop', href: '/shop', icon: ShoppingBag },
-  { key: 'rewards', label: 'Rewards', href: '/rewards', icon: Gift },
+  { key: 'reseller', label: 'Reseller Club', href: '/reseller/dashboard', icon: Users },
   { key: 'cart', label: 'Cart', href: '/cart', icon: ShoppingCart },
   { key: 'orders', label: 'Orders', href: '/orders', icon: Package },
 ];
@@ -26,7 +26,7 @@ export default function BottomNav() {
     <nav className="fixed bottom-0 inset-x-0 z-40 bg-white border-t border-black/10">
       <div className="max-w-md mx-auto grid grid-cols-5">
         {NAV_ITEMS.map(({ key, label, href, icon: Icon }) => {
-          const isActive = pathname === href;
+          const isActive = pathname === href || (key === 'reseller' && pathname.startsWith('/reseller'));
           return (
             <Link
               key={key}

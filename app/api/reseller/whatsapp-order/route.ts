@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { calculateDeliveryCharge } from '@/lib/deliveryCharges';
 import { getAdminAuth, getAdminDb } from '@/lib/firebaseAdmin';
 import { ResellerTierId } from '@/lib/resellerTypes';
 
@@ -6,7 +7,7 @@ export const runtime = 'nodejs';
 
 type Customer = { name?: string; phone?: string; email?: string; address?: string; city?: string; notes?: string };
 
-type Item = { productId?: string; id?: string | number; title?: string; name?: string; price?: number; quantity?: number; qty?: number; variant?: { color?: string; size?: string } };
+type Item = { productId?: string; id?: string | number; title?: string; name?: string; price?: number; quantity?: number; qty?: number; isWholesale?: unknown; category?: unknown; categoryId?: unknown; variant?: { color?: string; size?: string } };
 
 function resellerCode(uid: string) { return `PH-RS-${uid.slice(-6).toUpperCase()}`; }
 function num(value: unknown) { const n = Number(value); return Number.isFinite(n) ? n : 0; }
@@ -29,7 +30,9 @@ export async function POST(request: Request) {
     if (!items.length) return NextResponse.json({ error: 'Your cart is empty.' }, { status: 400 });
     if (!customer.name?.trim() || !customer.phone?.trim()) return NextResponse.json({ error: 'Customer name and phone are required for a WhatsApp reseller request.' }, { status: 400 });
 
-    const total = items.reduce((sum, item) => sum + num(item.price) * Math.max(1, num(item.quantity ?? item.qty ?? 1)), 0);
+    const subtotal = items.reduce((sum, item) => sum + num(item.price) * Math.max(1, num(item.quantity ?? item.qty ?? 1)), 0);
+    const delivery = calculateDeliveryCharge(items);
+    const total = subtotal + delivery.deliveryCharge;
     const code = resellerCode(uid);
     const ref = await getAdminDb().collection('reseller_whatsapp_orders').add({
       resellerUserId: uid,
@@ -38,7 +41,9 @@ export async function POST(request: Request) {
       resellerTierId: String(profile.tierId || 'starter') as ResellerTierId,
       customer: { name: customer.name.trim(), phone: customer.phone.trim(), email: String(customer.email || '').trim(), address: String(customer.address || '').trim(), city: String(customer.city || '').trim(), notes: String(customer.notes || '').trim() },
       items: items.map(item => ({ productId: String(item.productId || item.id || ''), title: String(item.title || item.name || 'Product'), quantity: Math.max(1, num(item.quantity ?? item.qty ?? 1)), price: num(item.price), variant: item.variant || null })),
-      subtotal: total,
+      subtotal,
+      ...delivery,
+      total,
       status: 'pending',
       source: 'whatsapp',
       createdAt: new Date(),

@@ -12,7 +12,7 @@ export type Category = {
 };
 
 export type FilterState = { search: string; category: string; maxPrice: string; onlyDeals: boolean; filtersOpen: boolean };
-export type CategoryRail = { id: string; title: string; href: string; products: Product[] };
+export type CategoryRail = { id: string; title: string; href: string; imageUrl?: string; products: Product[] };
 export type ShopCatalogActions = {
   setSearch: Dispatch<SetStateAction<string>>; setCategory: Dispatch<SetStateAction<string>>;
   setMaxPrice: Dispatch<SetStateAction<string>>; setOnlyDeals: Dispatch<SetStateAction<boolean>>;

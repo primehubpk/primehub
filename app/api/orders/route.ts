@@ -1,13 +1,112 @@
 import { NextResponse } from 'next/server';
+import { calculateDeliveryCharge } from '@/lib/deliveryCharges';
 import { getAdminAuth, getAdminDb } from '@/lib/firebaseAdmin';
-export const runtime='nodejs';
-const WEEKDAYS=['sunday','monday','tuesday','wednesday','thursday','friday','saturday'] as const; type Weekday=(typeof WEEKDAYS)[number];
-type IncomingItem={id?:string|number;productId?:string;name?:string;title?:string;price?:number;originalPrice?:number;image?:string;imageUrl?:string;qty?:number;quantity?:number;dealDay?:Weekday;variant?:{color?:string;size?:string}};
-type Customer={name:string;phone:string;email?:string;address:string;city:string;notes?:string};
-function pakistanWeekday():Weekday{const day=new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Karachi',weekday:'long'}).format(new Date()).toLowerCase();return(WEEKDAYS.includes(day as Weekday)?day:'sunday') as Weekday;}
-function numberValue(value:unknown){const parsed=Number(value);return Number.isFinite(parsed)?parsed:0;}
-function variantValue(row:any,key:'color'|'size'){const direct=row?.[key]??row?.[`variant${key[0].toUpperCase()}${key.slice(1)}`];if(typeof direct==='string'||typeof direct==='number')return String(direct).trim().toLowerCase();if(row?.options&&typeof row.options==='object'){const value=row.options[key];if(typeof value==='string'||typeof value==='number')return String(value).trim().toLowerCase();}return '';}
-function findVariant(product:any,item:IncomingItem){const rows=[...(Array.isArray(product.variantMatrix)?product.variantMatrix:[]),...(Array.isArray(product.variants)?product.variants:[])];if(!rows.length)return null;const variant=item.variant||{};const wantedColor=variant.color?String(variant.color).trim().toLowerCase():'';const wantedSize=variant.size?String(variant.size).trim().toLowerCase():'';const row:any=rows.find((r:any)=>{const dbColor=variantValue(r,'color');const dbSize=variantValue(r,'size');return(!wantedColor||dbColor===wantedColor)&&(!wantedSize||dbSize===wantedSize);});if(row)return row;return rows[0] as any;}
-async function buildAuthoritativeItems(items:IncomingItem[]){const adminDb=getAdminDb(),currentDay=pakistanWeekday(),settingsSnap=await adminDb.collection('settings').doc('main').get(),settings=settingsSnap.exists?settingsSnap.data()||{}:{},weeklyDeals=Array.isArray(settings.weeklyDeals)?settings.weeklyDeals:[],liveDeal=weeklyDeals.find((deal:any)=>deal?.day===currentDay&&deal?.active!==false&&typeof deal?.productId==='string'&&numberValue(deal?.dealPrice)>0),uniqueIds=[...new Set(items.map(item=>String(item.productId||item.id||'')).filter(Boolean))];if(!uniqueIds.length)throw new Error('Cart does not contain valid product IDs.');const productDocs=await Promise.all(uniqueIds.map(id=>adminDb.collection('products').doc(id).get())),products=new Map(productDocs.map(snap=>[snap.id,snap]));return items.map(item=>{const productId=String(item.productId||item.id||''),snap=products.get(productId);if(!snap?.exists)throw new Error(`Product ${productId} is no longer available.`);const product:any={id:snap.id,...(snap.data()||{})},variant:any=findVariant(product,item),rawStock=variant?.stock??product.stock??product.quantity,stockProvided=rawStock!==undefined&&rawStock!==null&&rawStock!=='',stock=numberValue(rawStock);if(stockProvided&&stock<=0)throw new Error(`${product.title||product.name||'This product'} is currently unavailable.`);const regularPrice=numberValue(product.price),isLiveDealItem=item.dealDay===currentDay&&liveDeal?.productId===productId,authoritativePrice=variant&&numberValue(variant.price)>0?numberValue(variant.price):(isLiveDealItem?numberValue(liveDeal.dealPrice):regularPrice);if(authoritativePrice<=0)throw new Error('Product price is not available.');const quantity=Math.max(1,Math.min(50,Math.floor(numberValue(item.quantity??item.qty??1)))),title=String(product.title||product.name||item.title||item.name||'Product'),image=String(variant?.imageUrl||product.imageUrl||product.image||item.imageUrl||item.image||''),originalPrice=numberValue(product.originalPrice)>regularPrice?numberValue(product.originalPrice):regularPrice;return{productId,title,price:authoritativePrice,originalPrice,quantity,image,variant:item.variant||null,weeklyDealDay:isLiveDealItem?currentDay:null};});}
-async function optionalResellerUserId(request:Request){const header=request.headers.get('authorization')||'';if(!header.startsWith('Bearer '))return '';try{const decoded=await getAdminAuth().verifyIdToken(header.slice(7));const snap=await getAdminDb().collection('reseller_profiles').doc(decoded.uid).get();return snap.exists&&snap.data()?.status==='active'?decoded.uid:'';}catch{return '';}}
-export async function POST(request:Request){try{const body=await request.json(),rawItems=Array.isArray(body?.items)?body.items as IncomingItem[]:[],quoteOnly=body?.mode==='quote';if(!rawItems.length||rawItems.length>50)return NextResponse.json({error:'Your cart is empty or contains too many items.'},{status:400});const items=await buildAuthoritativeItems(rawItems),totalItems=items.reduce((s,i)=>s+i.quantity,0),subtotal=items.reduce((s,i)=>s+i.price*i.quantity,0);if(quoteOnly)return NextResponse.json({items,subtotal,totalItems});const customer=body?.customer as Customer|undefined;if(!customer?.name?.trim()||!customer?.phone?.trim()||!customer?.address?.trim()||!customer?.city?.trim())return NextResponse.json({error:'Name, phone, address and city are required.'},{status:400});const resellerUserId=await optionalResellerUserId(request),orderData:any={customer:{name:customer.name.trim(),phone:customer.phone.trim(),email:String(customer.email||'').trim(),address:customer.address.trim(),city:customer.city.trim(),notes:String(customer.notes||'').trim()},items,totalItems,subtotal,total:subtotal,currency:'PKR',status:'pending',source:'website',createdAt:new Date()};if(resellerUserId)orderData.resellerUserId=resellerUserId;const orderRef=await getAdminDb().collection('orders').add(orderData);return NextResponse.json({orderId:orderRef.id,items,subtotal,totalItems,resellerLinked:Boolean(resellerUserId)});}catch(error){console.error('Secure order creation failed:',error);return NextResponse.json({error:error instanceof Error?error.message:'Unable to place order.'},{status:400});}}
+import { isWholesaleProduct } from '@/lib/wholesale';
+
+export const runtime = 'nodejs';
+const WEEKDAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const;
+type Weekday = (typeof WEEKDAYS)[number];
+type IncomingItem = { id?: string | number; productId?: string; name?: string; title?: string; price?: number; originalPrice?: number; image?: string; imageUrl?: string; qty?: number; quantity?: number; dealDay?: Weekday; variant?: { color?: string; size?: string } };
+type Customer = { name: string; phone: string; email?: string; address: string; city: string; notes?: string };
+
+function pakistanWeekday(): Weekday {
+  const day = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Karachi', weekday: 'long' }).format(new Date()).toLowerCase();
+  return (WEEKDAYS.includes(day as Weekday) ? day : 'sunday') as Weekday;
+}
+function numberValue(value: unknown) { const parsed = Number(value); return Number.isFinite(parsed) ? parsed : 0; }
+function variantValue(row: any, key: 'color' | 'size') {
+  const direct = row?.[key] ?? row?.[`variant${key[0].toUpperCase()}${key.slice(1)}`];
+  if (typeof direct === 'string' || typeof direct === 'number') return String(direct).trim().toLowerCase();
+  if (row?.options && typeof row.options === 'object') {
+    const value = row.options[key];
+    if (typeof value === 'string' || typeof value === 'number') return String(value).trim().toLowerCase();
+  }
+  return '';
+}
+function findVariant(product: any, item: IncomingItem) {
+  const rows = [...(Array.isArray(product.variantMatrix) ? product.variantMatrix : []), ...(Array.isArray(product.variants) ? product.variants : [])];
+  if (!rows.length) return null;
+  const variant = item.variant || {};
+  const wantedColor = variant.color ? String(variant.color).trim().toLowerCase() : '';
+  const wantedSize = variant.size ? String(variant.size).trim().toLowerCase() : '';
+  return rows.find((row: any) => (!wantedColor || variantValue(row, 'color') === wantedColor) && (!wantedSize || variantValue(row, 'size') === wantedSize)) || rows[0];
+}
+async function buildAuthoritativeItems(items: IncomingItem[]) {
+  const adminDb = getAdminDb();
+  const currentDay = pakistanWeekday();
+  const settingsSnap = await adminDb.collection('settings').doc('main').get();
+  const settings = settingsSnap.exists ? settingsSnap.data() || {} : {};
+  const weeklyDeals = Array.isArray(settings.weeklyDeals) ? settings.weeklyDeals : [];
+  const liveDeal = weeklyDeals.find((deal: any) => deal?.day === currentDay && deal?.active !== false && typeof deal?.productId === 'string' && numberValue(deal?.dealPrice) > 0);
+  const uniqueIds = [...new Set(items.map(item => String(item.productId || item.id || '')).filter(Boolean))];
+  if (!uniqueIds.length) throw new Error('Cart does not contain valid product IDs.');
+  const productDocs = await Promise.all(uniqueIds.map(id => adminDb.collection('products').doc(id).get()));
+  const products = new Map(productDocs.map(snapshot => [snapshot.id, snapshot]));
+  return items.map(item => {
+    const productId = String(item.productId || item.id || '');
+    const snapshot = products.get(productId);
+    if (!snapshot?.exists) throw new Error(`Product ${productId} is no longer available.`);
+    const product: any = { id: snapshot.id, ...(snapshot.data() || {}) };
+    const variant: any = findVariant(product, item);
+    const rawStock = variant?.stock ?? product.stock ?? product.quantity;
+    const stockProvided = rawStock !== undefined && rawStock !== null && rawStock !== '';
+    if (stockProvided && numberValue(rawStock) <= 0) throw new Error(`${product.title || product.name || 'This product'} is currently unavailable.`);
+    const regularPrice = numberValue(product.price);
+    const isLiveDealItem = item.dealDay === currentDay && liveDeal?.productId === productId;
+    const price = variant && numberValue(variant.price) > 0 ? numberValue(variant.price) : (isLiveDealItem ? numberValue(liveDeal.dealPrice) : regularPrice);
+    if (price <= 0) throw new Error('Product price is not available.');
+    const quantity = Math.max(1, Math.min(50, Math.floor(numberValue(item.quantity ?? item.qty ?? 1))));
+    return {
+      productId,
+      title: String(product.title || product.name || item.title || item.name || 'Product'),
+      price,
+      originalPrice: numberValue(product.originalPrice) > regularPrice ? numberValue(product.originalPrice) : regularPrice,
+      quantity,
+      image: String(variant?.imageUrl || product.imageUrl || product.image || item.imageUrl || item.image || ''),
+      variant: item.variant || null,
+      weeklyDealDay: isLiveDealItem ? currentDay : null,
+      isWholesale: isWholesaleProduct(product),
+      category: product.category || '',
+      categoryId: product.categoryId || '',
+    };
+  });
+}
+async function optionalResellerUserId(request: Request) {
+  const header = request.headers.get('authorization') || '';
+  if (!header.startsWith('Bearer ')) return '';
+  try {
+    const decoded = await getAdminAuth().verifyIdToken(header.slice(7));
+    const profile = await getAdminDb().collection('reseller_profiles').doc(decoded.uid).get();
+    return profile.exists && profile.data()?.status === 'active' ? decoded.uid : '';
+  } catch { return ''; }
+}
+
+export async function POST(request: Request) {
+  try {
+    const body = await request.json();
+    const rawItems = Array.isArray(body?.items) ? body.items as IncomingItem[] : [];
+    const quoteOnly = body?.mode === 'quote';
+    if (!rawItems.length || rawItems.length > 50) return NextResponse.json({ error: 'Your cart is empty or contains too many items.' }, { status: 400 });
+    const items = await buildAuthoritativeItems(rawItems);
+    const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
+    const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    const delivery = calculateDeliveryCharge(items);
+    const total = subtotal + delivery.deliveryCharge;
+    const quote = { items, subtotal, totalItems, ...delivery, total };
+    if (quoteOnly) return NextResponse.json(quote);
+    const customer = body?.customer as Customer | undefined;
+    if (!customer?.name?.trim() || !customer?.phone?.trim() || !customer?.address?.trim() || !customer?.city?.trim()) return NextResponse.json({ error: 'Name, phone, address and city are required.' }, { status: 400 });
+    const resellerUserId = await optionalResellerUserId(request);
+    const orderData: any = {
+      customer: { name: customer.name.trim(), phone: customer.phone.trim(), email: String(customer.email || '').trim(), address: customer.address.trim(), city: customer.city.trim(), notes: String(customer.notes || '').trim() },
+      ...quote,
+      currency: 'PKR', status: 'pending', source: 'website', createdAt: new Date(),
+    };
+    if (resellerUserId) orderData.resellerUserId = resellerUserId;
+    const orderRef = await getAdminDb().collection('orders').add(orderData);
+    return NextResponse.json({ orderId: orderRef.id, ...quote, resellerLinked: Boolean(resellerUserId) });
+  } catch (error) {
+    console.error('Secure order creation failed:', error);
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Unable to place order.' }, { status: 400 });
+  }
+}

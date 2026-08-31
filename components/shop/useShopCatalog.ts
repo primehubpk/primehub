@@ -85,7 +85,13 @@ export function useShopCatalog(initialCategory?: string, initialQuery = ''): Sho
       const title = item.title || item.name || item.id;
       const items = filtered.filter((product) => productMatchesCategory(slugifyCategory(item.slug || title), product, [item]));
       items.forEach((product) => used.add(product.id));
-      return { id: item.id, title, href: categoryHref(item), products: items };
+      return {
+        id: item.id,
+        title,
+        href: categoryHref(item),
+        imageUrl: item.iconUrl || item.imageUrl || item.image || imageOf(items[0]),
+        products: items,
+      };
     }).filter((rail) => rail.products.length > 0);
 
     const leftovers = new Map<string, Product[]>();
@@ -98,7 +104,7 @@ export function useShopCatalog(initialCategory?: string, initialQuery = ''): Sho
     });
 
     leftovers.forEach((items, title) => {
-      grouped.push({ id: slugifyCategory(title) || title, title, href: categoryHref(title), products: items });
+      grouped.push({ id: slugifyCategory(title) || title, title, href: categoryHref(title), imageUrl: imageOf(items[0]), products: items });
     });
 
     return grouped;

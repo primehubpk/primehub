@@ -19,6 +19,9 @@ service cloud.firestore {
       allow create, update, delete: if isAdmin();
     }
     match /orders/{orderId} {
+      // Customer orders are created only by the protected server route.
+      // This prevents browser/devtools/URL manipulation from writing a fake
+      // discounted price directly into Firestore.
       allow create: if false;
       allow read, update, delete: if isAdmin();
     }
@@ -45,8 +48,15 @@ service cloud.firestore {
         && request.resource.data.userId == request.auth.uid
         && request.resource.data.status == 'pending'
         && request.resource.data.createdAt is timestamp
-        && ((request.resource.data.giftId is string && request.resource.data.pointsCost is int && request.resource.data.pointsCost > 0)
-          || (request.resource.data.wheelWinId is string && request.resource.data.pointsCost is int && request.resource.data.pointsCost == 0));
+        && (
+          (request.resource.data.giftId is string
+            && request.resource.data.pointsCost is int
+            && request.resource.data.pointsCost > 0)
+          ||
+          (request.resource.data.wheelWinId is string
+            && request.resource.data.pointsCost is int
+            && request.resource.data.pointsCost == 0)
+        );
       allow read: if isAdmin() || (signedIn() && resource.data.userId == request.auth.uid);
       allow update, delete: if isAdmin();
     }
@@ -59,52 +69,30 @@ service cloud.firestore {
         && request.resource.data.status == 'pending'
         && request.resource.data.createdAt is timestamp;
       allow read: if isAdmin() || (signedIn() && resource.data.userId == request.auth.uid);
-      allow update: if isAdmin() || (signedIn() && resource.data.userId == request.auth.uid && request.resource.data.userId == request.auth.uid && request.resource.data.status in ['pending', 'redeemed']);
+      allow update: if isAdmin() || (
+        signedIn()
+        && resource.data.userId == request.auth.uid
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.status in ['pending', 'redeemed']
+      );
       allow delete: if isAdmin();
     }
     match /user_rewards/{userId} {
       allow read: if isAdmin() || (signedIn() && request.auth.uid == userId);
-      allow create: if signedIn() && request.auth.uid == userId
-        && request.resource.data.points >= 0 && request.resource.data.points <= 100
-        && request.resource.data.keys().hasOnly(['points','streak','lastCheckIn','lastSpin','coupons','updatedAt']);
-      allow update: if isAdmin() || (signedIn() && request.auth.uid == userId
-        && request.resource.data.points >= 0 && request.resource.data.points <= resource.data.points + 100
-        && request.resource.data.keys().hasOnly(['points','streak','lastCheckIn','lastSpin','coupons','updatedAt']));
-      allow delete: if isAdmin();
-    }
-
-    // Reseller profile: user can create/read only their own profile.
-    // Tier, wallet and status are immutable from the client after creation.
-    match /reseller_profiles/{userId} {
       allow create: if signedIn()
         && request.auth.uid == userId
-        && request.resource.data.userId == userId
-        && request.resource.data.email == request.auth.token.email
-        && request.resource.data.status == 'active'
-        && request.resource.data.tierId == 'starter'
-        && request.resource.data.monthlyOrders == 0
-        && request.resource.data.walletAvailable == 0
-        && request.resource.data.walletPending == 0;
-      allow read: if isAdmin() || (signedIn() && request.auth.uid == userId);
-      allow update, delete: if isAdmin();
+        && request.resource.data.points >= 0
+        && request.resource.data.points <= 100
+        && request.resource.data.keys().hasOnly(['points','streak','lastCheckIn','lastSpin','coupons','updatedAt']);
+      allow update: if isAdmin() || (
+        signedIn()
+        && request.auth.uid == userId
+        && request.resource.data.points >= 0
+        && request.resource.data.points <= resource.data.points + 100
+        && request.resource.data.keys().hasOnly(['points','streak','lastCheckIn','lastSpin','coupons','updatedAt'])
+      );
+      allow delete: if isAdmin();
     }
-
-    // Withdrawal requests can be submitted by the owner, but approval/payment
-    // state is controlled only by the admin/trusted backend.
-    match /reseller_withdrawals/{withdrawalId} {
-      allow create: if signedIn()
-        && request.resource.data.userId == request.auth.uid
-        && request.resource.data.status == 'pending'
-        && request.resource.data.amount is int
-        && request.resource.data.amount >= 500
-        && request.resource.data.method in ['easypaisa', 'jazzcash', 'bank']
-        && request.resource.data.accountTitle is string
-        && request.resource.data.accountNumber is string
-        && request.resource.data.createdAt is timestamp;
-      allow read: if isAdmin() || (signedIn() && resource.data.userId == request.auth.uid);
-      allow update, delete: if isAdmin();
-    }
-
     match /media_assets/{assetId} {
       allow read: if isAdmin();
       allow create, update, delete: if isAdmin();

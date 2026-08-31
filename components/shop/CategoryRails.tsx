@@ -7,6 +7,7 @@ export type CategoryRail = {
   id: string;
   title: string;
   href: string;
+  imageUrl?: string;
   products: Product[];
 };
 
@@ -22,13 +23,10 @@ export default function CategoryRails({ rails, addedId, addProduct, loading }: P
     return (
       <div className="mt-7 space-y-6">
         {Array.from({ length: 2 }).map((_, index) => (
-          <div key={index} className="space-y-3">
-            <div className="h-12 animate-pulse rounded-2xl bg-white" />
-            <div className="flex gap-3 overflow-hidden">
-              {Array.from({ length: 4 }).map((__, card) => (
-                <div key={card} className="h-56 w-[168px] shrink-0 animate-pulse rounded-[22px] bg-white" />
-              ))}
-            </div>
+          <div key={index} className="flex gap-3 overflow-hidden">
+            {Array.from({ length: 4 }).map((__, card) => (
+              <div key={card} className="h-[300px] w-[168px] shrink-0 animate-pulse rounded-[22px] bg-white" />
+            ))}
           </div>
         ))}
       </div>
@@ -40,17 +38,31 @@ export default function CategoryRails({ rails, addedId, addProduct, loading }: P
   return (
     <div className="mt-7 space-y-8">
       {rails.map((rail) => (
-        <section key={rail.id}>
-          <Link
-            href={rail.href}
-            className="group mb-3 flex items-center justify-between gap-3 rounded-2xl bg-white/70 px-3.5 py-3 ring-1 ring-black/5 backdrop-blur transition hover:-translate-y-0.5 hover:bg-white hover:shadow-[0_12px_30px_rgba(20,20,15,0.08)] hover:ring-[#0F6A5F]/20"
-          >
-            <h2 className="text-base font-black tracking-tight text-[#14140F] transition group-hover:text-[#0F6A5F]">✨ {rail.title}</h2>
-            <span className="inline-flex items-center gap-0.5 rounded-full bg-[#0F6A5F]/8 px-2.5 py-1.5 text-[10px] font-black text-[#0F6A5F] transition group-hover:bg-[#0F6A5F] group-hover:text-white">
-              View All <ChevronRight size={14} />
-            </span>
-          </Link>
+        <section key={rail.id} aria-label={rail.title}>
           <div className="flex snap-x snap-mandatory flex-nowrap gap-3 overflow-x-auto overscroll-x-contain scroll-smooth pb-1 scrollbar-hide">
+            <Link
+              href={rail.href}
+              className="group w-[168px] shrink-0 snap-start overflow-hidden rounded-[22px] border border-black/6 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg sm:w-[186px]"
+              aria-label={`Open ${rail.title} category`}
+            >
+              <div className="relative aspect-square overflow-hidden bg-[#F4F4F1]">
+                {rail.imageUrl ? (
+                  <img src={rail.imageUrl} alt={rail.title} className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]" />
+                ) : (
+                  <div className="h-full w-full bg-gradient-to-br from-[#0F6A5F] to-[#14140F]" />
+                )}
+                <span className="absolute left-2 top-2 rounded-full bg-[#0F6A5F] px-2 py-1 text-[8px] font-black uppercase text-white">Category</span>
+              </div>
+              <div className="p-3 pb-1">
+                <h2 className="line-clamp-2 min-h-[30px] text-[11px] font-black leading-4">{rail.title}</h2>
+                <p className="mt-2 text-sm font-black text-[#0F6A5F]">View all items</p>
+              </div>
+              <div className="px-3 pb-3 pt-2">
+                <span className="flex w-full items-center justify-center gap-1 rounded-xl bg-[#0F6A5F] py-2.5 text-[9px] font-black text-white">
+                  Open category <ChevronRight size={13} />
+                </span>
+              </div>
+            </Link>
             {rail.products.map((product) => (
               <CatalogProductCard key={product.id} product={product} addedId={addedId} addProduct={addProduct} compact />
             ))}

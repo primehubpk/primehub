@@ -21,7 +21,15 @@ function isWholesaleBucket(bucket: Bucket) {
 }
 
 export default function BudgetBuckets({ buckets, maxPrice, setMaxPrice, wholesaleOnly, setWholesaleOnly }: Props) {
-  if (!buckets.length) return null;
+  const priceBuckets = [99, 299, 999].map((amount) =>
+    buckets.find((bucket) => !isWholesaleBucket(bucket) && Number(bucket.amount) === amount) || {
+      id: `budget-${amount}`,
+      title: `Under Rs. ${amount}`,
+      amount,
+    },
+  );
+  const wholesaleBucket = buckets.find(isWholesaleBucket) || { id: 'wholesale-deals', title: 'Wholesale Deals', amount: null };
+  const orderedBuckets = [...priceBuckets, wholesaleBucket];
 
   return (
     <section className="mt-5">
@@ -43,8 +51,8 @@ export default function BudgetBuckets({ buckets, maxPrice, setMaxPrice, wholesal
           </button>
         )}
       </div>
-      <div className="flex gap-2.5 overflow-x-auto pb-1 scrollbar-hide">
-        {buckets.map((bucket) => {
+      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+        {orderedBuckets.map((bucket) => {
           const wholesale = isWholesaleBucket(bucket);
           const selected = wholesale ? wholesaleOnly : !wholesaleOnly && maxPrice === String(bucket.amount);
           const accent = bucket.accent || (wholesale ? '#0F6A5F' : '#FFB020');
@@ -61,7 +69,7 @@ export default function BudgetBuckets({ buckets, maxPrice, setMaxPrice, wholesal
                 setWholesaleOnly(false);
                 setMaxPrice(selected ? 'all' : String(bucket.amount));
               }}
-              className={`relative min-w-[168px] shrink-0 overflow-hidden rounded-full border px-4 py-3 text-left transition active:scale-[0.98] ${
+              className={`relative min-w-0 overflow-hidden rounded-[20px] border px-3 py-3 text-left transition active:scale-[0.98] ${
                 selected
                   ? 'border-white/20 text-white shadow-[0_14px_34px_rgba(15,106,95,0.22)]'
                   : 'border-white/50 text-[#14140F] shadow-[0_10px_28px_rgba(20,20,15,0.06)]'
@@ -73,7 +81,7 @@ export default function BudgetBuckets({ buckets, maxPrice, setMaxPrice, wholesal
               }
             >
               <div className="absolute inset-0 backdrop-blur-md" />
-              <div className="relative flex items-center gap-3">
+              <div className="relative flex items-center gap-2.5">
                 <span
                   className={`flex h-10 w-10 items-center justify-center overflow-hidden rounded-full shadow-sm ${selected ? 'bg-white/15 text-white' : 'bg-white/80 text-[#14140F]'}`}
                 >
@@ -87,10 +95,10 @@ export default function BudgetBuckets({ buckets, maxPrice, setMaxPrice, wholesal
                 </span>
                 <span className="min-w-0">
                   <span className={`block text-[8px] font-black uppercase tracking-[0.16em] ${selected ? 'text-white/70' : 'text-black/40'}`}>
-                    {wholesale ? 'Wholesale Deals' : bucket.title}
+                    {wholesale ? 'Bulk savings' : 'Shop under'}
                   </span>
                   <span className="mt-0.5 block truncate text-[12px] font-black leading-4">
-                    {wholesale ? 'Special Wholesale Pricing' : `Under Rs. ${Number(bucket.amount).toLocaleString()}`}
+                    {wholesale ? 'Wholesale Deals' : `Rs. ${Number(bucket.amount).toLocaleString()}`}
                   </span>
                 </span>
               </div>
