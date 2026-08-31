@@ -1,0 +1,8 @@
+'use client';
+import Link from 'next/link';
+import { ArrowLeft,Sparkles } from 'lucide-react';
+import { useMemo } from 'react';
+import { useShopCatalog } from '@/components/shop/useShopCatalog';
+import CatalogProductGrid from '@/components/shop/CatalogProductGrid';
+import { newestFirst } from '@/components/NewArrivalsRail';
+export default function NewArrivalsCatalog(){const shop=useShopCatalog();const ordered=useMemo(()=>newestFirst(shop.products),[shop.products]);const newest=ordered.slice(0,12);const remaining=ordered.slice(12);return <main className="min-h-screen bg-[#F4F4F1] pb-28"><div className="mx-auto max-w-6xl px-4 py-5"><div className="flex items-center gap-3"><Link href="/" className="flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-sm"><ArrowLeft size={18}/></Link><div><p className="flex items-center gap-1 text-[8px] font-black uppercase tracking-[.2em] text-[#B7791F]"><Sparkles size={11}/>Premium Collection</p><h1 className="text-xl font-black">New Arrivals</h1></div></div><section className="mt-6"><div className="mb-3"><span className="rounded-full bg-gradient-to-r from-[#A66A00] to-[#F6C453] px-3 py-1.5 text-[8px] font-black uppercase tracking-wider text-white">Latest products first</span></div><CatalogProductGrid products={newest} addedId={shop.addedId} addProduct={shop.addProduct} loading={shop.loading} dense/></section>{remaining.length>0&&<section className="mt-9"><p className="text-[8px] font-black uppercase tracking-[.2em] text-black/40">More to explore</p><h2 className="mb-3 mt-1 text-xl font-black">All Products</h2><CatalogProductGrid products={remaining} addedId={shop.addedId} addProduct={shop.addProduct} loading={shop.loading} dense/></section>}</div></main>}

@@ -19,6 +19,7 @@ import {
   Play,
   Plus,
   ShoppingBag,
+  Sparkles,
   X,
   Zap,
   Gift,
@@ -27,6 +28,7 @@ import { auth, db } from '@/lib/firebase';
 import { useCartStore } from '@/lib/cartStore';
 import { ProductUrgencyBadges } from '@/components/ProductCard';
 import { isWholesaleProduct } from '@/lib/wholesale';
+import { shuffleProducts } from '@/lib/shuffleProducts';
 
 type Product = {
   id: string;
@@ -151,7 +153,7 @@ export default function ProductGridRewards({
       collection(db, 'products'),
       (snapshot) => {
         setProducts(
-          snapshot.docs.map((d) => ({ id: d.id, ...d.data() }) as Product),
+          shuffleProducts(snapshot.docs.map((d) => ({ id: d.id, ...d.data() }) as Product)),
         );
         setLoading(false);
       },
@@ -388,28 +390,20 @@ export default function ProductGridRewards({
   }
 
   return (
-    <section className="mt-8 px-4 pb-40">
+    <section className="mt-8 px-4 pb-6">
       <div className="mb-4 flex items-end justify-between gap-3">
         <div>
-          <div className="mb-1 flex items-center gap-2 text-[#E1352B]">
-            <ShoppingBag size={14} />
-            <span className="text-[10px] font-black uppercase tracking-[.2em]">
-              PrimeHub picks
+          <div className="mb-1 flex items-center gap-1.5 text-[#B7791F]">
+            <Sparkles size={13} />
+            <span className="text-[9px] font-black uppercase tracking-[.2em]">
+              Premium Picks
             </span>
           </div>
-          <h2 className="text-2xl font-black tracking-tight">Discover deals</h2>
+          <h2 className="text-2xl font-black tracking-tight">Discover Deals</h2>
           <p className="mt-1 text-xs text-black/45">
             {visible.length} product{visible.length === 1 ? '' : 's'} to explore
           </p>
         </div>
-
-        <Link
-          href="/rewards#redeem-rewards"
-          className="flex shrink-0 items-center gap-1.5 rounded-2xl bg-[#14140F] px-3 py-2.5 text-[9px] font-black text-white"
-        >
-          <Gift size={13} className="text-[#FFB020]" />
-          Redeem Rewards
-        </Link>
 
         <label className="flex shrink-0 items-center gap-1.5 rounded-2xl border border-black/8 bg-white px-2.5 py-2.5">
           <ArrowDownUp size={14} />

@@ -86,19 +86,20 @@ export async function POST(request: Request) {
     const body = await request.json();
     const rawItems = Array.isArray(body?.items) ? body.items as IncomingItem[] : [];
     const quoteOnly = body?.mode === 'quote';
+    const selfCollect = body?.selfCollect === true;
     if (!rawItems.length || rawItems.length > 50) return NextResponse.json({ error: 'Your cart is empty or contains too many items.' }, { status: 400 });
     const items = await buildAuthoritativeItems(rawItems);
     const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
     const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
-    const delivery = calculateDeliveryCharge(items);
+    const delivery = selfCollect ? { baseDelivery: 0, wholesaleItems: 0, wholesaleSurcharge: 0, deliveryCharge: 0 } : calculateDeliveryCharge(items);
     const total = subtotal + delivery.deliveryCharge;
-    const quote = { items, subtotal, totalItems, ...delivery, total };
+    const quote = { items, subtotal, totalItems, ...delivery, total, selfCollect, fulfillment: selfCollect ? 'self_collect' : 'delivery' };
     if (quoteOnly) return NextResponse.json(quote);
     const customer = body?.customer as Customer | undefined;
-    if (!customer?.name?.trim() || !customer?.phone?.trim() || !customer?.address?.trim() || !customer?.city?.trim()) return NextResponse.json({ error: 'Name, phone, address and city are required.' }, { status: 400 });
+    if (!customer?.name?.trim() || !customer?.phone?.trim() || (!selfCollect && (!customer?.address?.trim() || !customer?.city?.trim()))) return NextResponse.json({ error: selfCollect ? 'Name and phone are required.' : 'Name, phone, address and city are required.' }, { status: 400 });
     const resellerUserId = await optionalResellerUserId(request);
     const orderData: any = {
-      customer: { name: customer.name.trim(), phone: customer.phone.trim(), email: String(customer.email || '').trim(), address: customer.address.trim(), city: customer.city.trim(), notes: String(customer.notes || '').trim() },
+      customer: { name: customer.name.trim(), phone: customer.phone.trim(), email: String(customer.email || '').trim(), address: selfCollect ? 'PrimeHub Shop Pickup' : customer.address.trim(), city: selfCollect ? 'Lahore' : customer.city.trim(), notes: String(customer.notes || '').trim() },
       ...quote,
       currency: 'PKR', status: 'pending', source: 'website', createdAt: new Date(),
     };

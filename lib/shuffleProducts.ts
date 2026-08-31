@@ -1,0 +1,1 @@
+export function shuffleProducts<T>(items:T[]):T[]{const result=[...items];for(let index=result.length-1;index>0;index--){const swap=Math.floor(Math.random()*(index+1));[result[index],result[swap]]=[result[swap],result[index]]}return result}

@@ -6,6 +6,7 @@ import { useSettings } from '@/lib/useSettings';
 import { isWholesalePriceBucket, sortPriceBuckets } from '@/lib/priceBucketUtils';
 import type { PriceBucket } from '@/lib/types';
 import ResellerClubCard from '@/components/ResellerClubCard';
+import WholesaleVideoHubCard from '@/components/WholesaleVideoHubCard';
 
 interface PriceBucketsProps {
   selectedMaxPrice: number | null;
@@ -88,7 +89,10 @@ export default function PriceBuckets({ selectedMaxPrice, wholesaleSelected, onSe
             </button>
           );
         })}
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-2.5">
         <ResellerClubCard />
+        <WholesaleVideoHubCard />
       </div>
     </section>
   );

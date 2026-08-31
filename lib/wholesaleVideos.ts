@@ -1,0 +1,4 @@
+export type VideoPlatform='youtube'|'tiktok'|'instagram';
+export type WholesaleVideo={id:string;title:string;platform:VideoPlatform;url:string;thumbnailUrl?:string;description?:string;active?:boolean};
+export function youtubeId(url:string){try{const u=new URL(url);if(u.hostname.includes('youtu.be'))return u.pathname.slice(1);if(u.pathname.includes('/shorts/'))return u.pathname.split('/shorts/')[1]?.split('/')[0];return u.searchParams.get('v')||''}catch{return ''}}
+export function thumbnailOf(video:WholesaleVideo){if(video.thumbnailUrl)return video.thumbnailUrl;const id=video.platform==='youtube'?youtubeId(video.url):'';return id?'https://img.youtube.com/vi/'+id+'/hqdefault.jpg':''}

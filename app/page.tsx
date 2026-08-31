@@ -5,6 +5,7 @@ import Header from '@/components/Header';
 import HeroFlashBanner from '@/components/HeroFlashBanner';
 import CategorySwiper from '@/components/CategorySwiper';
 import PriceBuckets from '@/components/PriceBuckets';
+import NewArrivalsRail from '@/components/NewArrivalsRail';
 import ProductGridRewards from '@/components/ProductGridRewards';
 import YouTubeGuide from '@/components/YouTubeGuide';
 import Footer from '@/components/Footer';
@@ -27,6 +28,7 @@ export default function HomePage() {
         <Header />
         <CategorySwiper />
         <HeroFlashBanner />
+        <NewArrivalsRail />
         <PriceBuckets selectedMaxPrice={selectedMaxPrice} wholesaleSelected={wholesaleSelected} onSelect={selectPrice} onWholesaleSelect={selectWholesale} />
         <div id="discover-deals-section">
           <ProductGridRewards selectedMaxPrice={selectedMaxPrice} wholesaleSelected={wholesaleSelected} />

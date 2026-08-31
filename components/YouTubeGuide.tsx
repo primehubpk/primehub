@@ -33,7 +33,7 @@ export default function YouTubeGuide() {
   if (!videoId) return null;
 
   return (
-    <section className="max-w-md mx-auto px-4 mt-7">
+    <section className="max-w-md mx-auto px-4 mt-4">
       <h2 className="font-[family-name:var(--font-display)] font-bold text-base mb-3">
         Watch &amp; Learn
       </h2>

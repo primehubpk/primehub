@@ -2,10 +2,11 @@
 
 import { FormEvent, useMemo, useState } from 'react';
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
-import { Loader2, MessageCircle, X } from 'lucide-react';
+import { Loader2, MapPin, MessageCircle, Store, X } from 'lucide-react';
 import { BASE_DELIVERY_CHARGE } from '@/lib/deliveryCharges';
 import { db } from '@/lib/firebase';
 import { useSettings } from '@/lib/useSettings';
+import { SHOP_ADDRESS, SHOP_MAP_HREF } from '@/lib/shopLocation';
 
 export type WhatsAppOrderItem = { id?: string | number; productId?: string; name?: string; title?: string; price?: number; qty?: number; quantity?: number; image?: string; imageUrl?: string };
 type Props = { items: WhatsAppOrderItem[]; onClose: () => void; onSaved?: () => void };
@@ -17,24 +18,25 @@ export default function WhatsAppOrderModal({ items, onClose, onSaved }: Props) {
   const { settings } = useSettings();
   const [name, setName] = useState(''), [phone, setPhone] = useState(''), [city, setCity] = useState('');
   const [saving, setSaving] = useState(false), [error, setError] = useState('');
+  const [selfCollect, setSelfCollect] = useState(false);
   const subtotal = useMemo(() => items.reduce((sum, item) => sum + priceOf(item) * quantityOf(item), 0), [items]);
-  const estimatedTotal = subtotal + BASE_DELIVERY_CHARGE;
+  const estimatedTotal = subtotal + (selfCollect ? 0 : BASE_DELIVERY_CHARGE);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
     const whatsappNumber = String(settings.whatsappNumber || '').replace(/\D/g, '');
-    if (!whatsappNumber || !name.trim() || !phone.trim() || !city.trim() || !items.length) { setError('Enter your name, phone number, and city before continuing.'); return; }
+    if (!whatsappNumber || !name.trim() || !phone.trim() || (!selfCollect && !city.trim()) || !items.length) { setError('Enter your name, phone number, and city before continuing.'); return; }
     setSaving(true); setError('');
     try {
-      const quoteResponse = await fetch('/api/orders', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode: 'quote', items }) });
+      const quoteResponse = await fetch('/api/orders', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode: 'quote', items, selfCollect }) });
       const quote = await quoteResponse.json();
       if (!quoteResponse.ok) throw new Error(quote.error || 'Unable to verify your cart.');
       const reference = await addDoc(collection(db, 'orders'), {
-        customer: { name: name.trim(), phone: phone.trim(), email: '', address: '', city: city.trim(), notes: 'WhatsApp order request.' },
+        customer: { name: name.trim(), phone: phone.trim(), email: '', address: selfCollect ? 'PrimeHub Shop Pickup' : '', city: selfCollect ? 'Lahore' : city.trim(), notes: selfCollect ? 'WhatsApp self-collect order.' : 'WhatsApp order request.' },
         items: quote.items, totalItems: quote.totalItems, subtotal: quote.subtotal, baseDelivery: quote.baseDelivery,
         wholesaleItems: quote.wholesaleItems, wholesaleSurcharge: quote.wholesaleSurcharge,
         deliveryCharge: quote.deliveryCharge, total: quote.total,
-        currency: 'PKR', status: 'pending', source: 'WhatsApp', createdAt: serverTimestamp(),
+        selfCollect, fulfillment: selfCollect ? 'self_collect' : 'delivery', currency: 'PKR', status: 'pending', source: 'WhatsApp', createdAt: serverTimestamp(),
       });
       const lines = quote.items.map((item: any, index: number) => `${index + 1}. ${item.title} x ${item.quantity} — Rs. ${(Number(item.price) * Number(item.quantity)).toLocaleString()}`);
       const wholesaleLine = Number(quote.wholesaleItems || 0) ? `Wholesale surcharge (${quote.wholesaleItems} × Rs. 30): Rs. ${Number(quote.wholesaleSurcharge).toLocaleString()}` : '';
@@ -45,5 +47,5 @@ export default function WhatsAppOrderModal({ items, onClose, onSaved }: Props) {
     finally { setSaving(false); }
   }
 
-  return <div className="fixed inset-0 z-[200] flex items-end bg-black/55 p-3 sm:items-center sm:justify-center"><button type="button" aria-label="Close" onClick={onClose} className="absolute inset-0" /><form onSubmit={submit} className="relative w-full max-w-md rounded-[30px] bg-white p-5 shadow-2xl"><div className="flex items-start justify-between"><div><p className="text-[9px] font-black uppercase tracking-[0.2em] text-[#0F6A5F]">WhatsApp order</p><h2 className="mt-1 text-xl font-black">A few delivery details</h2></div><button type="button" onClick={onClose} className="rounded-full bg-[#F4F4F1] p-2"><X size={16} /></button></div>{error && <p className="mt-4 rounded-2xl bg-red-50 p-3 text-xs font-bold text-red-700">{error}</p>}<div className="mt-4 rounded-2xl bg-[#F4F4F1] p-3 text-xs"><div className="flex justify-between"><span>Subtotal</span><strong>Rs. {subtotal.toLocaleString()}</strong></div><div className="mt-1 flex justify-between"><span>Delivery starts from</span><strong>Rs. {BASE_DELIVERY_CHARGE}</strong></div><div className="mt-2 flex justify-between border-t border-black/10 pt-2"><span>Estimated total</span><strong>Rs. {estimatedTotal.toLocaleString()}+</strong></div><p className="mt-1 text-[9px] text-black/45">Wholesale items add Rs. 30 each. Exact total is verified before WhatsApp opens.</p></div><div className="mt-4 space-y-3"><input required value={name} onChange={event => setName(event.target.value)} placeholder="Your name" className="w-full rounded-2xl bg-[#F4F4F1] px-4 py-3 text-sm outline-none" /><input required value={phone} onChange={event => setPhone(event.target.value)} placeholder="Phone / WhatsApp number" type="tel" className="w-full rounded-2xl bg-[#F4F4F1] px-4 py-3 text-sm outline-none" /><input required value={city} onChange={event => setCity(event.target.value)} placeholder="City" className="w-full rounded-2xl bg-[#F4F4F1] px-4 py-3 text-sm outline-none" /></div><button disabled={saving} className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl bg-[#0F6A5F] py-4 text-xs font-black text-white disabled:opacity-60">{saving ? <Loader2 size={16} className="animate-spin" /> : <MessageCircle size={16} />}{saving ? 'Verifying order...' : 'Save order & open WhatsApp'}</button></form></div>;
+  return <div className="fixed inset-0 z-[200] flex items-end bg-black/55 p-3 sm:items-center sm:justify-center"><button type="button" aria-label="Close" onClick={onClose} className="absolute inset-0" /><form onSubmit={submit} className="relative w-full max-w-md rounded-[30px] bg-white p-5 shadow-2xl"><div className="flex items-start justify-between"><div><p className="text-[9px] font-black uppercase tracking-[0.2em] text-[#0F6A5F]">WhatsApp order</p><h2 className="mt-1 text-xl font-black">A few delivery details</h2></div><button type="button" onClick={onClose} className="rounded-full bg-[#F4F4F1] p-2"><X size={16} /></button></div>{error && <p className="mt-4 rounded-2xl bg-red-50 p-3 text-xs font-bold text-red-700">{error}</p>}<div className="mt-4 rounded-2xl bg-[#F4F4F1] p-3 text-xs"><div className="flex justify-between"><span>Subtotal</span><strong>Rs. {subtotal.toLocaleString()}</strong></div><div className="mt-1 flex justify-between"><span>{selfCollect ? "Self Collect" : "Delivery starts from"}</span><strong>Rs. {selfCollect ? 0 : BASE_DELIVERY_CHARGE}</strong></div><div className="mt-2 flex justify-between border-t border-black/10 pt-2"><span>Estimated total</span><strong>Rs. {estimatedTotal.toLocaleString()}{selfCollect ? "" : "+"}</strong></div><p className="mt-1 text-[9px] text-black/45">Wholesale items add Rs. 30 each. Exact total is verified before WhatsApp opens.</p></div><label className="mt-4 flex cursor-pointer items-start gap-3 rounded-2xl border border-black/7 bg-[#F8F7F3] p-3"><input type="checkbox" checked={selfCollect} onChange={e=>setSelfCollect(e.target.checked)} className="mt-1 h-4 w-4 accent-[#0F6A5F]"/><Store size={18} className="mt-0.5 text-[#0F6A5F]"/><span className="text-[10px]"><b className="block">Self Collect from Shop</b><span className="mt-1 block text-black/45">Delivery charges become Rs. 0.</span></span></label>{selfCollect&&<div className="mt-2 rounded-2xl bg-[#0F6A5F]/8 p-3 text-[9px]"><p>{SHOP_ADDRESS}</p><a href={SHOP_MAP_HREF} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1 font-black text-[#0F6A5F]">Open Google Maps <MapPin size={11}/></a></div>}<div className="mt-4 space-y-3"><input required value={name} onChange={event => setName(event.target.value)} placeholder="Your name" className="w-full rounded-2xl bg-[#F4F4F1] px-4 py-3 text-sm outline-none" /><input required value={phone} onChange={event => setPhone(event.target.value)} placeholder="Phone / WhatsApp number" type="tel" className="w-full rounded-2xl bg-[#F4F4F1] px-4 py-3 text-sm outline-none" /><input required={!selfCollect} value={city} onChange={event => setCity(event.target.value)} placeholder="City" className="w-full rounded-2xl bg-[#F4F4F1] px-4 py-3 text-sm outline-none" /></div><button disabled={saving} className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl bg-[#0F6A5F] py-4 text-xs font-black text-white disabled:opacity-60">{saving ? <Loader2 size={16} className="animate-spin" /> : <MessageCircle size={16} />}{saving ? 'Verifying order...' : 'Save order & open WhatsApp'}</button></form></div>;
 }

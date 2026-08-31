@@ -1,0 +1,2 @@
+export const SHOP_ADDRESS='Shop No. 217, Street No. 7, Gulistan Colony, Mustafabad, Dharampura, Lahore';
+export const SHOP_MAP_HREF='https://www.google.com/maps/search/?api=1&query=Prime+Hub+Sabir+Bangles+Store+Shop+217+Street+7+Gulistan+Colony+Mustafabad+Dharampura+Lahore';

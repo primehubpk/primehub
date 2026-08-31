@@ -8,6 +8,7 @@ import { useSettings } from '@/lib/useSettings';
 import { useCartStore } from '@/lib/cartStore';
 import { categoryHref, categoryLabel, productMatchesCategory, slugifyCategory } from '@/lib/categoryUtils';
 import { isWholesaleProduct } from '@/lib/wholesale';
+import { shuffleProducts } from '@/lib/shuffleProducts';
 import { Product, Category, ShopCatalogModel, imageOf, priceOf, originalOf, productHasVariants, titleOf } from './ShopTypes';
 
 export function useShopCatalog(initialCategory?: string, initialQuery = ''): ShopCatalogModel {
@@ -39,7 +40,7 @@ export function useShopCatalog(initialCategory?: string, initialQuery = ''): Sho
           getDocs(collection(db, 'categories')),
         ]);
         if (cancelled) return;
-        setProducts(productSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Product)));
+        setProducts(shuffleProducts(productSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Product))));
         setCategories(categorySnap.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Category)));
       } finally {
         if (!cancelled) {

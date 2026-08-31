@@ -31,7 +31,8 @@ export async function POST(request: Request) {
     if (!customer.name?.trim() || !customer.phone?.trim()) return NextResponse.json({ error: 'Customer name and phone are required for a WhatsApp reseller request.' }, { status: 400 });
 
     const subtotal = items.reduce((sum, item) => sum + num(item.price) * Math.max(1, num(item.quantity ?? item.qty ?? 1)), 0);
-    const delivery = calculateDeliveryCharge(items);
+    const selfCollect = body?.selfCollect === true;
+    const delivery = selfCollect ? { baseDelivery: 0, wholesaleItems: 0, wholesaleSurcharge: 0, deliveryCharge: 0 } : calculateDeliveryCharge(items);
     const total = subtotal + delivery.deliveryCharge;
     const code = resellerCode(uid);
     const ref = await getAdminDb().collection('reseller_whatsapp_orders').add({
@@ -44,6 +45,8 @@ export async function POST(request: Request) {
       subtotal,
       ...delivery,
       total,
+      selfCollect,
+      fulfillment: selfCollect ? 'self_collect' : 'delivery',
       status: 'pending',
       source: 'whatsapp',
       createdAt: new Date(),
