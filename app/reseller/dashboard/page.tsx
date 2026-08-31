@@ -8,7 +8,9 @@ import { doc, onSnapshot } from 'firebase/firestore';
 import {
   ArrowLeft,
   Check,
+  CheckCircle2,
   ChevronRight,
+  Clock3,
   Home,
   Instagram,
   Lock,
@@ -16,30 +18,37 @@ import {
   Package,
   PlayCircle,
   Share2,
+  ShieldCheck,
   ShoppingBag,
+  Trophy,
   Users,
   WalletCards,
   X,
+  XCircle,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { auth, db } from '@/lib/firebase';
 import {
   DEFAULT_MONTHLY_CHALLENGE,
   DEFAULT_RESELLER_TASKS,
+  DEFAULT_RESELLER_WHEEL,
   type MonthlyChallengeSettings,
   type ResellerTask,
+  type ResellerWheelSettings,
 } from '@/lib/resellerTasks';
+import { calculateResellerReward, type EligibleResellerOrder } from '@/lib/resellerRewards';
 import { getTierForMonthlyOrders } from '@/lib/resellerTiers';
 import type { ResellerProfile } from '@/lib/resellerTypes';
 
 const outfit = Outfit({ subsets: ['latin'] });
 
-type View = 'home' | 'tasks' | 'vouchers' | 'wallet';
+type View = 'home' | 'tasks' | 'vouchers' | 'rewards' | 'wallet';
 type VoucherType = 'cash' | 'gift' | 'discount' | 'brand';
 type VoucherFilter = 'all' | VoucherType;
 type SettingsSnapshot = {
   resellerTasks?: ResellerTask[];
   resellerMonthlyChallenge?: Partial<MonthlyChallengeSettings>;
+  resellerWheel?: Partial<ResellerWheelSettings>;
 };
 type Voucher = {
   id: string;
@@ -54,6 +63,11 @@ type Voucher = {
 };
 
 const settingsRef = doc(db, 'settings', 'main');
+const rewardSamples: EligibleResellerOrder[] = [
+  { orderId: 'DEMO-1001', status: 'delivered', subtotal: 5000 },
+  { orderId: 'DEMO-1002', status: 'pending', subtotal: 3000 },
+  { orderId: 'DEMO-1003', status: 'cancelled', subtotal: 2500 },
+];
 const taskIcons: Record<string, ElementType> = {
   youtube: PlayCircle,
   instagram: Instagram,
@@ -69,6 +83,7 @@ export default function ResellerDashboardPage() {
   const [profile, setProfile] = useState<ResellerProfile | null>(null);
   const [tasks, setTasks] = useState<ResellerTask[]>(DEFAULT_RESELLER_TASKS);
   const [challenge, setChallenge] = useState<MonthlyChallengeSettings>(DEFAULT_MONTHLY_CHALLENGE);
+  const [wheel, setWheel] = useState<ResellerWheelSettings>(DEFAULT_RESELLER_WHEEL);
   const [view, setView] = useState<View>('home');
   const [filter, setFilter] = useState<VoucherFilter>('all');
   const [selectedVoucher, setSelectedVoucher] = useState<Voucher | null>(null);
@@ -114,6 +129,7 @@ export default function ResellerDashboardPage() {
           if (data?.resellerMonthlyChallenge) {
             setChallenge({ ...DEFAULT_MONTHLY_CHALLENGE, ...data.resellerMonthlyChallenge });
           }
+          if (data?.resellerWheel) setWheel({ ...DEFAULT_RESELLER_WHEEL, ...data.resellerWheel });
         },
         () => undefined,
       ),
@@ -253,7 +269,7 @@ export default function ResellerDashboardPage() {
 
   return (
     <main className={`${outfit.className} min-h-screen bg-[#111] text-[#14140F]`}>
-      <div className="relative mx-auto min-h-screen max-w-[430px] overflow-hidden bg-[#F6F1E8] shadow-2xl">
+      <div className="relative mx-auto min-h-screen max-w-[1100px] overflow-hidden bg-[#F6F1E8] shadow-2xl">
         <header className="relative bg-[linear-gradient(165deg,#16332E_0%,#0C1C19_70%)] px-4 pb-[22px] pt-3 text-white">
           <Link href="/reseller" className="inline-flex items-center gap-1.5 text-xs font-semibold text-white/80">
             <ArrowLeft size={14} /> Reseller Club
@@ -262,7 +278,7 @@ export default function ResellerDashboardPage() {
           <h1 className="mt-1 text-[22px] font-extrabold leading-[1.15]">Complete missions.<br />Unlock vouchers.</h1>
           <p className="mt-1.5 text-xs text-white/75">Complete tasks, collect points and unlock exclusive rewards.</p>
 
-          <div className="mt-3.5 grid grid-cols-2 gap-2">
+          <div className="mt-3.5 grid grid-cols-2 gap-2 sm:grid-cols-4">
             <Stat label="This month" value={`${monthlyOrders} / ${target}`} />
             <Stat label="Wallet" value={`Rs. ${walletAvailable.toLocaleString()}`} />
             <Stat label="Tier" value={`${tier.name} · ${tier.rewardPercent}%`} />
@@ -271,7 +287,7 @@ export default function ResellerDashboardPage() {
         </header>
 
         <nav className="flex gap-1.5 overflow-x-auto px-4 pt-3">
-          {(['home', 'tasks', 'vouchers', 'wallet'] as View[]).map(item => (
+          {(['home', 'tasks', 'vouchers', 'rewards', 'wallet'] as View[]).map(item => (
             <button
               key={item}
               type="button"
@@ -318,7 +334,7 @@ export default function ResellerDashboardPage() {
                   <h2 className="text-lg font-extrabold">Gift vouchers</h2>
                   <button type="button" onClick={() => setView('vouchers')} className="rounded-xl bg-[#F1ECE3] px-3 py-2 text-xs font-extrabold">See all</button>
                 </div>
-                <div className="grid grid-cols-2 gap-2.5">
+                <div className="grid grid-cols-2 gap-2.5 md:grid-cols-4">
                   {vouchers.slice(0, 4).map(voucher => (
                     <VoucherCard key={voucher.id} voucher={voucher} orders={monthlyOrders} onOpen={setSelectedVoucher} />
                   ))}
@@ -355,12 +371,33 @@ export default function ResellerDashboardPage() {
                   </button>
                 ))}
               </div>
-              <div className="grid grid-cols-2 gap-2.5">
+              <div className="grid grid-cols-2 gap-2.5 md:grid-cols-4">
                 {filteredVouchers.map(voucher => (
                   <VoucherCard key={voucher.id} voucher={voucher} orders={monthlyOrders} onOpen={setSelectedVoucher} />
                 ))}
               </div>
             </>
+          )}
+
+
+          {view === 'rewards' && (
+            <div className="grid gap-3 lg:grid-cols-[1.05fr_.95fr]">
+              <section className="rounded-[18px] bg-[#FFFDF8] p-3.5 shadow-[0_8px_24px_rgba(20,20,15,.05)]">
+                <div className="flex items-center justify-between gap-2">
+                  <div><span className="text-[10px] font-extrabold uppercase tracking-[.14em] text-[#E85D04]">Reward engine</span><h2 className="mt-1.5 text-lg font-extrabold">Order rewards</h2></div>
+                  <Trophy className="text-[#0E7C6F]" size={24} />
+                </div>
+                <p className="mt-1 text-xs text-[#6B6A62]">Only eligible delivered orders create a cash reseller reward.</p>
+                <div className="mt-3 space-y-2">
+                  {rewardSamples.map((order, index) => {
+                    const result = calculateResellerReward(order, index + 4);
+                    return <article key={order.orderId} className="rounded-2xl border border-black/[.06] bg-white p-3"><div className="flex items-center justify-between gap-3"><div><p className="text-[9px] font-extrabold uppercase tracking-wider text-black/35">{order.orderId}</p><h3 className="mt-1 text-sm font-extrabold">Rs. {order.subtotal.toLocaleString()}</h3></div>{result.eligible ? <CheckCircle2 className="text-[#0E7C6F]" size={20}/> : <XCircle className="text-[#D94B3D]" size={20}/>}</div><div className="mt-2 flex flex-wrap gap-1.5 text-[9px] font-extrabold"><span className="rounded-full bg-black/5 px-2.5 py-1 capitalize">{order.status}</span><span className="rounded-full bg-[#E7F6F3] px-2.5 py-1 text-[#0E7C6F]">{result.rewardPercent}% tier rate</span>{result.eligible && <span className="rounded-full bg-[#FFF3E0] px-2.5 py-1">Cash Rs. {result.rewardAmount.toLocaleString()}</span>}</div><p className="mt-2 text-[10px] text-[#6B6A62]">{result.reason}</p></article>;
+                  })}
+                </div>
+                <div className="mt-3 rounded-2xl bg-[#E7F6F3] p-3"><div className="flex items-center gap-2 text-sm font-extrabold"><ShieldCheck size={17} className="text-[#0E7C6F]"/> Protected reward flow</div><div className="mt-2 grid gap-2 sm:grid-cols-2"><Mini icon={<Clock3 size={14}/>} text="Pending rewards are not withdrawable."/><Mini icon={<CheckCircle2 size={14}/>} text="Delivered eligible orders can qualify."/></div></div>
+              </section>
+              {wheel.active && <RewardWheel settings={wheel} />}
+            </div>
           )}
 
           {view === 'wallet' && (
@@ -432,13 +469,54 @@ function TaskRow({ task, monthlyOrders, target }: { task: ResellerTask; monthlyO
         <Progress value={percent} />
       </div>
       <div className="text-right">
-        <p className="text-[11px] font-extrabold text-[#0E7C6F]">+{Number(task.reward || 0).toLocaleString()} pts</p>
+        <p className="text-[11px] font-extrabold text-[#0E7C6F]">{task.id === 'weekly-orders' || task.id === 'monthly-orders' ? <>Rs. {Number(task.reward || 0).toLocaleString()}</> : <>+{Number(task.reward || 0).toLocaleString()} pts</>}</p>
         <Link href={href} target={external ? '_blank' : undefined} rel={external ? 'noreferrer' : undefined} className="mt-1.5 inline-flex items-center gap-1 rounded-xl bg-[#F1ECE3] px-2.5 py-2 text-[11px] font-extrabold">
           {task.verification === 'manual' ? 'Submit' : 'Do'} <ChevronRight size={12} />
         </Link>
       </div>
     </div>
   );
+}
+
+
+function RewardWheel({ settings }: { settings: ResellerWheelSettings }) {
+  const prizes = [
+    { title: 'Try Again', icon: '↻' },
+    { title: 'Free Delivery', icon: '📦' },
+    { title: 'Rs. 300 Voucher', icon: '₨' },
+    { title: '20 Points', icon: '⭐' },
+    { title: settings.customPrizeTitle || 'Mystery Gift', icon: settings.customPrizeImage ? '🖼️' : '🎁' },
+  ];
+  const [rotation, setRotation] = useState(0);
+  const [spinning, setSpinning] = useState(false);
+  const [result, setResult] = useState('');
+  function spin() {
+    if (spinning) return;
+    const winner = Math.floor(Math.random() * prizes.length);
+    setSpinning(true); setResult('');
+    setRotation(current => current + 1440 + (360 - winner * 72));
+    window.setTimeout(() => { setResult(prizes[winner].title); setSpinning(false); }, 3200);
+  }
+  return (
+    <section className="overflow-hidden rounded-[18px] bg-[linear-gradient(160deg,#16332E,#0C1C19)] p-4 text-white shadow-[0_8px_24px_rgba(20,20,15,.12)]">
+      <span className="text-[10px] font-extrabold uppercase tracking-[.14em] text-[#FF9A3C]">Spin & win</span>
+      <h2 className="mt-1.5 text-xl font-extrabold">Your reward wheel</h2>
+      <p className="mt-1 text-xs text-white/65">Spin to reveal today’s prize.</p>
+      <div className="relative mx-auto mt-5 aspect-square w-full max-w-[300px] sm:max-w-[360px]">
+        <div className="absolute left-1/2 top-[-10px] z-20 h-0 w-0 -translate-x-1/2 border-x-[12px] border-t-[24px] border-x-transparent border-t-[#FF9A3C]" />
+        <div className="relative h-full w-full rounded-full border-[8px] border-[#FFFDF8] shadow-2xl transition-transform duration-[3000ms] ease-out" style={{ transform: `rotate(${rotation}deg)`, background: 'conic-gradient(#E85D04 0deg 72deg,#0E7C6F 72deg 144deg,#D94B3D 144deg 216deg,#C9A227 216deg 288deg,#7B4B94 288deg 360deg)' }}>
+          {prizes.map((prize, index) => { const angle=index*72+36; return <div key={prize.title} className="absolute left-1/2 top-1/2 w-[86px] text-center text-[10px] font-extrabold leading-tight" style={{ transform: `translate(-50%,-50%) rotate(${angle}deg) translateY(-105px) rotate(-${angle}deg)` }}><span className="block text-xl">{index===4 && settings.customPrizeImage ? <img src={settings.customPrizeImage} alt="" className="mx-auto h-8 w-8 rounded-full object-cover"/> : prize.icon}</span>{prize.title}</div>; })}
+          <div className="absolute left-1/2 top-1/2 grid h-14 w-14 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border-4 border-white bg-[#14140F] text-[10px] font-extrabold">WIN</div>
+        </div>
+      </div>
+      <button type="button" onClick={spin} disabled={spinning} className="mt-5 w-full rounded-xl bg-[#FF9A3C] px-4 py-3 text-sm font-extrabold text-[#14140F] disabled:opacity-60">{spinning ? 'Spinning…' : 'Spin the wheel'}</button>
+      {result && <p className="mt-3 rounded-xl bg-white/10 p-3 text-center text-sm font-extrabold">You got: {result}</p>}
+    </section>
+  );
+}
+
+function Mini({ icon, text }: { icon: React.ReactNode; text: string }) {
+  return <div className="flex items-center gap-2 rounded-xl bg-white p-3 text-[10px] font-semibold text-[#6B6A62]">{icon}{text}</div>;
 }
 
 function VoucherCard({ voucher, orders, onOpen }: { voucher: Voucher; orders: number; onOpen: (voucher: Voucher) => void }) {
