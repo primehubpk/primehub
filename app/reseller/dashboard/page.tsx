@@ -1,22 +1,68 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState, type ElementType, type ReactNode } from 'react';
+import { Outfit } from 'next/font/google';
+import { useEffect, useMemo, useState, type ElementType } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, onSnapshot } from 'firebase/firestore';
-import { ArrowLeft, Check, ChevronRight, Crown, Gift, Home, Instagram, Music2, Package, PlayCircle, Share2, ShoppingBag, Trophy, Users, WalletCards } from 'lucide-react';
+import {
+  ArrowLeft,
+  Check,
+  ChevronRight,
+  Home,
+  Instagram,
+  Lock,
+  Music2,
+  Package,
+  PlayCircle,
+  Share2,
+  ShoppingBag,
+  Users,
+  WalletCards,
+  X,
+} from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { auth, db } from '@/lib/firebase';
-import { DEFAULT_MONTHLY_CHALLENGE, DEFAULT_RESELLER_TASKS, type MonthlyChallengeSettings, type ResellerTask } from '@/lib/resellerTasks';
-import { getTierForMonthlyOrders, getTierProgress, getResellerTiers } from '@/lib/resellerTiers';
+import {
+  DEFAULT_MONTHLY_CHALLENGE,
+  DEFAULT_RESELLER_TASKS,
+  type MonthlyChallengeSettings,
+  type ResellerTask,
+} from '@/lib/resellerTasks';
+import { getTierForMonthlyOrders } from '@/lib/resellerTiers';
 import type { ResellerProfile } from '@/lib/resellerTypes';
 
+const outfit = Outfit({ subsets: ['latin'] });
+
 type View = 'home' | 'tasks' | 'vouchers' | 'wallet';
-type SettingsSnapshot = { resellerTasks?: ResellerTask[]; resellerMonthlyChallenge?: Partial<MonthlyChallengeSettings> };
-type Voucher = { id: string; title: string; description: string; value: string; icon: ReactNode; tone: string };
+type VoucherType = 'cash' | 'gift' | 'discount' | 'brand';
+type VoucherFilter = 'all' | VoucherType;
+type SettingsSnapshot = {
+  resellerTasks?: ResellerTask[];
+  resellerMonthlyChallenge?: Partial<MonthlyChallengeSettings>;
+};
+type Voucher = {
+  id: string;
+  type: VoucherType;
+  title: string;
+  description: string;
+  requirement: string;
+  icon: string;
+  art: string;
+  minOrders: number;
+  value?: number;
+};
 
 const settingsRef = doc(db, 'settings', 'main');
-const icons: Record<string, ElementType> = { youtube: PlayCircle, instagram: Instagram, tiktok: Music2, whatsapp: Share2, refer: Users, order: ShoppingBag, wholesale: Package };
+const taskIcons: Record<string, ElementType> = {
+  youtube: PlayCircle,
+  instagram: Instagram,
+  tiktok: Music2,
+  whatsapp: Share2,
+  refer: Users,
+  order: ShoppingBag,
+  wholesale: Package,
+};
 
 export default function ResellerDashboardPage() {
   const router = useRouter();
@@ -24,77 +70,423 @@ export default function ResellerDashboardPage() {
   const [tasks, setTasks] = useState<ResellerTask[]>(DEFAULT_RESELLER_TASKS);
   const [challenge, setChallenge] = useState<MonthlyChallengeSettings>(DEFAULT_MONTHLY_CHALLENGE);
   const [view, setView] = useState<View>('home');
+  const [filter, setFilter] = useState<VoucherFilter>('all');
+  const [selectedVoucher, setSelectedVoucher] = useState<Voucher | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let stopProfile: (() => void) | undefined;
     const stopAuth = onAuthStateChanged(auth, user => {
       stopProfile?.();
-      if (!user) { router.replace('/reseller/join'); return; }
+      if (!user) {
+        router.replace('/reseller/join');
+        return;
+      }
+
       setLoading(true);
-      stopProfile = onSnapshot(doc(db, 'reseller_profiles', user.uid), snap => {
-        if (!snap.exists()) { router.replace('/reseller/join'); return; }
-        setProfile(snap.data() as ResellerProfile);
-        setLoading(false);
-      }, () => setLoading(false));
+      stopProfile = onSnapshot(
+        doc(db, 'reseller_profiles', user.uid),
+        snapshot => {
+          if (!snapshot.exists()) {
+            router.replace('/reseller/join');
+            return;
+          }
+          setProfile(snapshot.data() as ResellerProfile);
+          setLoading(false);
+        },
+        () => setLoading(false),
+      );
     });
-    return () => { stopAuth(); stopProfile?.(); };
+
+    return () => {
+      stopAuth();
+      stopProfile?.();
+    };
   }, [router]);
 
-  useEffect(() => onSnapshot(settingsRef, snap => {
-    const data = snap.data() as SettingsSnapshot | undefined;
-    if (Array.isArray(data?.resellerTasks)) setTasks(data.resellerTasks);
-    if (data?.resellerMonthlyChallenge) setChallenge({ ...DEFAULT_MONTHLY_CHALLENGE, ...data.resellerMonthlyChallenge });
-  }, () => undefined), []);
+  useEffect(
+    () =>
+      onSnapshot(
+        settingsRef,
+        snapshot => {
+          const data = snapshot.data() as SettingsSnapshot | undefined;
+          if (Array.isArray(data?.resellerTasks)) setTasks(data.resellerTasks);
+          if (data?.resellerMonthlyChallenge) {
+            setChallenge({ ...DEFAULT_MONTHLY_CHALLENGE, ...data.resellerMonthlyChallenge });
+          }
+        },
+        () => undefined,
+      ),
+    [],
+  );
 
   const activeTasks = useMemo(() => tasks.filter(task => task.active !== false), [tasks]);
   const monthlyOrders = Number(profile?.monthlyOrders ?? 0);
   const walletAvailable = Number(profile?.walletAvailable ?? 0);
   const walletPending = Number(profile?.walletPending ?? 0);
   const tier = getTierForMonthlyOrders(monthlyOrders);
-  const progress = getTierProgress(monthlyOrders);
   const target = Math.max(1, Number(challenge.targetOrders || DEFAULT_MONTHLY_CHALLENGE.targetOrders));
   const challengePercent = Math.min(100, Math.round((monthlyOrders / target) * 100));
   const remaining = Math.max(0, target - monthlyOrders);
-  const vouchers: Voucher[] = [
-    ...(challenge.active ? [
-      { id: 'challenge-gift', title: challenge.giftTitle || 'PrimeHub Gift Box', description: 'Unlock after completing the monthly challenge.', value: 'Mystery gift', icon: <Gift size={20}/>, tone: 'from-[#FFF0B8] to-[#FFF9E6]' },
-      { id: 'challenge-cash', title: 'Cash reward', description: 'Choose cash when your challenge is complete.', value: `Rs. ${Number(challenge.cashReward || 0).toLocaleString()}`, icon: <WalletCards size={20}/>, tone: 'from-[#DDF5F0] to-[#F2FFFC]' }
-    ] : []),
-    { id: 'tier-voucher', title: `${tier.name} bonus`, description: `Your current ${tier.rewardPercent}% reseller rate.`, value: `${tier.rewardPercent}% off`, icon: <Crown size={20}/>, tone: 'from-[#E7E2FF] to-[#F8F6FF]' },
-    { id: 'welcome-voucher', title: 'Member-only deals', description: 'New product drops reserved for club members.', value: 'View deals', icon: <ShoppingBag size={20}/>, tone: 'from-[#FFE0DC] to-[#FFF7F4]' }
-  ];
 
-  if (loading || !profile) return <main className="min-h-screen bg-[#F5F4EF] flex items-center justify-center text-sm font-bold text-black/45">Loading your Reseller Club…</main>;
+  const vouchers = useMemo<Voucher[]>(
+    () => [
+      {
+        id: 'cash-500',
+        type: 'cash',
+        title: 'Rs. 500 Cash',
+        description: 'Credit to wallet',
+        requirement: '5 orders',
+        icon: '₨',
+        art: '#0E7C6F',
+        minOrders: 5,
+        value: 500,
+      },
+      {
+        id: 'challenge-cash',
+        type: 'cash',
+        title: `Rs. ${Number(challenge.cashReward || 0).toLocaleString()} Cash`,
+        description: 'Monthly challenge',
+        requirement: `${target} orders`,
+        icon: '₨',
+        art: '#127C6A',
+        minOrders: target,
+        value: Number(challenge.cashReward || 0),
+      },
+      {
+        id: 'challenge-gift',
+        type: 'gift',
+        title: challenge.giftTitle || 'PrimeHub Gift Box',
+        description: 'Surprise bangles gift',
+        requirement: `${target} orders`,
+        icon: '🎁',
+        art: '#D94B3D',
+        minOrders: target,
+      },
+      {
+        id: 'bridal-gift',
+        type: 'gift',
+        title: 'Bridal Gift Voucher',
+        description: 'Free bridal pouch',
+        requirement: 'Gold tier',
+        icon: '💍',
+        art: '#9B2C4A',
+        minOrders: 25,
+      },
+      {
+        id: 'wholesale-off',
+        type: 'discount',
+        title: '10% Wholesale Off',
+        description: 'Next wholesale order',
+        requirement: '3 orders',
+        icon: '%',
+        art: '#E85D04',
+        minOrders: 3,
+      },
+      {
+        id: 'free-delivery',
+        type: 'discount',
+        title: 'Free Delivery',
+        description: 'On any one order',
+        requirement: '2 orders',
+        icon: '📦',
+        art: '#1D4E89',
+        minOrders: 2,
+      },
+      {
+        id: 'jazzcash-300',
+        type: 'brand',
+        title: 'JazzCash Rs. 300',
+        description: 'Payout voucher',
+        requirement: '8 orders',
+        icon: '📱',
+        art: '#C1121F',
+        minOrders: 8,
+        value: 300,
+      },
+      {
+        id: 'easypaisa-300',
+        type: 'brand',
+        title: 'EasyPaisa Rs. 300',
+        description: 'Payout voucher',
+        requirement: '8 orders',
+        icon: '📱',
+        art: '#2A9D8F',
+        minOrders: 8,
+        value: 300,
+      },
+      {
+        id: 'kids-gift',
+        type: 'gift',
+        title: 'Kids Deal Box Gift',
+        description: 'Kids gift voucher',
+        requirement: '6 orders',
+        icon: '🎀',
+        art: '#7B4B94',
+        minOrders: 6,
+      },
+      {
+        id: 'elite-cash',
+        type: 'cash',
+        title: 'Rs. 2,000 Elite',
+        description: 'Elite members only',
+        requirement: 'Elite 40+',
+        icon: '👑',
+        art: '#C9A227',
+        minOrders: 40,
+        value: 2000,
+      },
+    ],
+    [challenge.cashReward, challenge.giftTitle, target],
+  );
 
-  return <main className="min-h-screen bg-[#F5F4EF] text-[#14140F]">
-    <div className="mx-auto min-h-screen max-w-[440px] bg-[#F5F4EF] shadow-2xl">
-      <header className="bg-gradient-to-br from-[#11130E] via-[#171A12] to-[#0F665B] px-5 pb-6 pt-4 text-white">
-        <Link href="/reseller" className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-2 text-[10px] font-black text-white/75"><ArrowLeft size={13}/> Reseller Club</Link>
-        <div className="mt-5 flex items-center gap-3"><div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#FFCF68] text-[#15150F]"><Crown size={25}/></div><div><p className="text-[9px] font-black uppercase tracking-[.22em] text-[#FFCF68]">PrimeHub Reseller</p><h1 className="text-2xl font-black">Mission Board</h1></div></div>
-        <p className="mt-3 text-[11px] leading-5 text-white/60">Complete missions, unlock vouchers and grow your reseller wallet.</p>
-        <div className="mt-5 grid grid-cols-2 gap-2"><Stat label="This month" value={`${monthlyOrders}/${target}`} icon={<Trophy size={14}/>} /><Stat label="Wallet" value={`Rs. ${walletAvailable.toLocaleString()}`} icon={<WalletCards size={14}/>} /><Stat label="Tier" value={`${tier.name} · ${tier.rewardPercent}%`} icon={<Crown size={14}/>} /><Stat label="Live tasks" value={`${activeTasks.length}`} icon={<Check size={14}/>} /></div>
-      </header>
+  const filteredVouchers = vouchers.filter(voucher => filter === 'all' || voucher.type === filter);
+  const nextTask = activeTasks[0];
 
-      <nav className="flex gap-2 overflow-x-auto bg-[#F5F0E7] px-4 py-3">{(['home','tasks','vouchers','wallet'] as View[]).map(item => <button key={item} onClick={() => setView(item)} className={`rounded-full px-4 py-2 text-[10px] font-black capitalize ${view === item ? 'bg-[#14140F] text-white' : 'bg-white text-black/55'}`}>{item}</button>)}</nav>
+  if (loading || !profile) {
+    return (
+      <main className={`${outfit.className} flex min-h-screen items-center justify-center bg-[#F6F1E8] text-sm font-bold text-black/45`}>
+        Loading your Reseller Club…
+      </main>
+    );
+  }
 
-      <section className="space-y-4 px-4 pb-8 pt-4">
-        {view === 'home' && <><div className="rounded-[26px] bg-gradient-to-br from-[#FFF0B8] via-[#FFF8DE] to-[#E1F5EF] p-5 shadow-sm"><div className="flex items-start justify-between"><div><p className="text-[9px] font-black uppercase tracking-[.2em] text-[#C23B32]">Monthly challenge</p><h2 className="mt-1 text-xl font-black">{target} orders = your choice</h2></div><span className="rounded-full bg-white/80 px-3 py-1.5 text-[10px] font-black text-[#0F6A5F]">{monthlyOrders}/{target}</span></div><p className="mt-2 text-[11px] text-black/55">Admin-managed goal and rewards update here instantly.</p><div className="mt-4 h-2.5 overflow-hidden rounded-full bg-black/10"><div className="h-full rounded-full bg-[#0F6A5F] transition-all" style={{ width: `${challengePercent}%` }}/></div><div className="mt-4 grid grid-cols-2 gap-2"><div className="rounded-2xl bg-white/75 p-3"><Gift size={18} className="text-[#C23B32]"/><p className="mt-2 text-[11px] font-black">{challenge.giftTitle || 'PrimeHub Gift Box'}</p></div><div className="rounded-2xl bg-white/75 p-3"><WalletCards size={18} className="text-[#0F6A5F]"/><p className="mt-2 text-[11px] font-black">Rs. {Number(challenge.cashReward || 0).toLocaleString()} cash</p></div></div><p className="mt-4 rounded-2xl bg-[#14140F] px-4 py-3 text-[10px] font-bold text-white/75">{remaining ? `${remaining} more eligible order${remaining === 1 ? '' : 's'} to unlock.` : '🎉 Challenge complete — reward selection unlocked.'}</p></div><TierCard orders={monthlyOrders} tier={tier} progress={progress}/><div className="rounded-[26px] bg-white p-5 shadow-sm"><div className="flex items-center justify-between"><div><p className="text-[9px] font-black uppercase tracking-[.2em] text-[#E1352B]">Quick missions</p><h2 className="mt-1 text-xl font-black">Earn more today</h2></div><button onClick={() => setView('tasks')} className="text-[10px] font-black text-[#0F6A5F]">See all</button></div><div className="mt-3 space-y-2">{activeTasks.slice(0,3).map(task => <TaskRow key={task.id} task={task}/>)}</div></div></>}
+  return (
+    <main className={`${outfit.className} min-h-screen bg-[#111] text-[#14140F]`}>
+      <div className="relative mx-auto min-h-screen max-w-[430px] overflow-hidden bg-[#F6F1E8] shadow-2xl">
+        <header className="relative bg-[linear-gradient(165deg,#16332E_0%,#0C1C19_70%)] px-4 pb-[22px] pt-3 text-white">
+          <Link href="/reseller" className="inline-flex items-center gap-1.5 text-xs font-semibold text-white/80">
+            <ArrowLeft size={14} /> Reseller Club
+          </Link>
+          <p className="mt-3 text-[9px] font-extrabold uppercase tracking-[.18em] text-[#FF9A3C]">PrimeHub Reseller</p>
+          <h1 className="mt-1 text-[22px] font-extrabold leading-[1.15]">Complete missions.<br />Unlock vouchers.</h1>
+          <p className="mt-1.5 text-xs text-white/75">Tasks, gift vouchers and cash rewards — all controlled from Admin.</p>
 
-        {view === 'tasks' && <div className="rounded-[26px] bg-white p-5 shadow-sm"><p className="text-[9px] font-black uppercase tracking-[.2em] text-[#E1352B]">Live missions</p><h2 className="mt-1 text-2xl font-black">Complete & earn</h2><p className="mt-2 text-[11px] text-black/50">Tasks are controlled from Admin and appear here automatically.</p><div className="mt-5 space-y-2">{activeTasks.length ? activeTasks.map(task => <TaskRow key={task.id} task={task}/>) : <p className="rounded-2xl bg-[#F7F6F2] p-4 text-sm text-black/50">No active missions right now.</p>}</div></div>}
+          <div className="mt-3.5 grid grid-cols-2 gap-2">
+            <Stat label="This month" value={`${monthlyOrders} / ${target}`} />
+            <Stat label="Wallet" value={`Rs. ${walletAvailable.toLocaleString()}`} />
+            <Stat label="Tier" value={`${tier.name} · ${tier.rewardPercent}%`} />
+            <Stat label="Live missions" value={`${activeTasks.length} tasks`} />
+          </div>
+        </header>
 
-        {view === 'vouchers' && <div className="space-y-3"><div className="px-1"><p className="text-[9px] font-black uppercase tracking-[.2em] text-[#E1352B]">Rewards vault</p><h2 className="mt-1 text-2xl font-black">Your vouchers</h2></div>{vouchers.map(v => <div key={v.id} className={`rounded-[24px] bg-gradient-to-br ${v.tone} p-4 shadow-sm`}><div className="flex items-center gap-3"><div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/80 text-[#0F6A5F]">{v.icon}</div><div className="min-w-0 flex-1"><p className="text-[9px] font-black uppercase tracking-wider text-black/45">Reseller voucher</p><h3 className="text-sm font-black">{v.title}</h3><p className="mt-1 text-[10px] text-black/55">{v.description}</p></div><span className="rounded-full bg-white/80 px-2.5 py-1 text-[10px] font-black">{v.value}</span></div></div>)}</div>}
+        <nav className="flex gap-1.5 overflow-x-auto px-4 pt-3">
+          {(['home', 'tasks', 'vouchers', 'wallet'] as View[]).map(item => (
+            <button
+              key={item}
+              type="button"
+              onClick={() => setView(item)}
+              className={`whitespace-nowrap rounded-full px-3.5 py-2 text-xs font-bold capitalize transition ${view === item ? 'bg-[#14140F] text-white' : 'bg-white text-[#6B6A62]'}`}
+            >
+              {item}
+            </button>
+          ))}
+        </nav>
 
-        {view === 'wallet' && <div className="space-y-4"><div className="rounded-[26px] bg-gradient-to-br from-[#0F6A5F] to-[#11130E] p-5 text-white shadow-lg"><p className="text-[9px] font-black uppercase tracking-[.2em] text-[#FFCF68]">Reward wallet</p><p className="mt-2 text-3xl font-black">Rs. {walletAvailable.toLocaleString()}</p><p className="mt-1 text-[10px] text-white/55">Available balance</p><div className="mt-5 rounded-2xl bg-white/10 p-3"><p className="text-[9px] uppercase tracking-wider text-white/45">Pending approval</p><p className="mt-1 text-lg font-black">Rs. {walletPending.toLocaleString()}</p></div></div><div className="rounded-[26px] bg-white p-5 shadow-sm"><p className="text-[9px] font-black uppercase tracking-[.2em] text-[#E1352B]">How it works</p><div className="mt-4 space-y-3"><Info n="01" title="Complete an eligible mission" text="Open a task and follow its instructions."/><Info n="02" title="Admin approves your activity" text="Approved rewards are added to your wallet."/><Info n="03" title="Withdraw your earnings" text="Request a payout when your balance is ready."/></div></div></div>}
-      </section>
+        <section className="px-4 pb-28 pt-3.5">
+          {view === 'home' && (
+            <>
+              {challenge.active && (
+                <section className="mb-3 rounded-[18px] bg-[#FFFDF8] p-3.5 shadow-[0_8px_24px_rgba(20,20,15,.05)]">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[10px] font-extrabold uppercase tracking-[.14em] text-[#E85D04]">Monthly challenge</span>
+                    <span className="rounded-full bg-[#E7F6F3] px-2 py-1 text-[11px] font-extrabold text-[#0E7C6F]">{monthlyOrders}/{target}</span>
+                  </div>
+                  <h2 className="mt-1.5 text-lg font-extrabold">{target} orders = gift or cash</h2>
+                  <p className="mt-1 text-xs leading-relaxed text-[#6B6A62]">Admin sets the target, gift title and cash amount. You choose the reward when complete.</p>
+                  <Progress value={challengePercent} />
+                  <div className="mt-2 flex gap-2">
+                    <button type="button" onClick={() => setSelectedVoucher(vouchers.find(v => v.id === 'challenge-gift') || null)} className="flex-1 rounded-xl bg-[#F1ECE3] px-3 py-2.5 text-xs font-extrabold">🎁 Gift box</button>
+                    <button type="button" onClick={() => setSelectedVoucher(vouchers.find(v => v.id === 'challenge-cash') || null)} className="flex-1 rounded-xl bg-[#F1ECE3] px-3 py-2.5 text-xs font-extrabold">₨ {Number(challenge.cashReward || 0).toLocaleString()} cash</button>
+                  </div>
+                  <p className="mt-2.5 text-xs text-[#6B6A62]">
+                    {remaining ? `${remaining} more eligible order${remaining === 1 ? '' : 's'} to unlock.` : 'Challenge complete — pick your reward.'}
+                  </p>
+                </section>
+              )}
 
-      <footer className="sticky bottom-0 grid grid-cols-5 border-t border-black/5 bg-white/95 px-2 py-2 backdrop-blur"><Bottom href="/" label="Home" icon={<Home size={17}/>} /><Bottom href="/shop" label="Shop" icon={<ShoppingBag size={17}/>} /><Bottom href="/reseller/dashboard" label="Club" active icon={<Crown size={17}/>} /><Bottom href="/wallet" label="Wallet" icon={<WalletCards size={17}/>} /><Bottom href="/orders" label="Orders" icon={<Package size={17}/>} /></footer>
-    </div>
-  </main>;
+              <section className="mb-3 rounded-[18px] bg-[#FFFDF8] p-3.5 shadow-[0_8px_24px_rgba(20,20,15,.05)]">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[10px] font-extrabold uppercase tracking-[.14em] text-[#E85D04]">Next mission</span>
+                  <button type="button" onClick={() => setView('tasks')} className="rounded-xl bg-[#0E7C6F] px-3 py-2 text-xs font-extrabold text-white">All tasks</button>
+                </div>
+                {nextTask ? <TaskRow task={nextTask} monthlyOrders={monthlyOrders} target={target} /> : <p className="mt-3 text-xs text-[#6B6A62]">No live missions right now.</p>}
+              </section>
+
+              <section>
+                <div className="mb-2.5 flex items-center justify-between px-0.5">
+                  <h2 className="text-lg font-extrabold">Gift vouchers</h2>
+                  <button type="button" onClick={() => setView('vouchers')} className="rounded-xl bg-[#F1ECE3] px-3 py-2 text-xs font-extrabold">See all</button>
+                </div>
+                <div className="grid grid-cols-2 gap-2.5">
+                  {vouchers.slice(0, 4).map(voucher => (
+                    <VoucherCard key={voucher.id} voucher={voucher} orders={monthlyOrders} onOpen={setSelectedVoucher} />
+                  ))}
+                </div>
+              </section>
+            </>
+          )}
+
+          {view === 'tasks' && (
+            <section className="rounded-[18px] bg-[#FFFDF8] p-3.5 shadow-[0_8px_24px_rgba(20,20,15,.05)]">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-extrabold uppercase tracking-[.14em] text-[#E85D04]">Reseller tasks</span>
+                <span className="rounded-full bg-[#E7F6F3] px-2 py-1 text-[11px] font-extrabold text-[#0E7C6F]">{activeTasks.length} live</span>
+              </div>
+              <h2 className="mt-1.5 text-lg font-extrabold">Earn extra beyond orders</h2>
+              <p className="mt-1 text-xs leading-relaxed text-[#6B6A62]">Social and growth tasks are created in Admin. Rewards credit after review.</p>
+              <div className="mt-2">
+                {activeTasks.length ? activeTasks.map(task => <TaskRow key={task.id} task={task} monthlyOrders={monthlyOrders} target={target} />) : <p className="py-6 text-center text-xs text-[#6B6A62]">No active missions right now.</p>}
+              </div>
+            </section>
+          )}
+
+          {view === 'vouchers' && (
+            <>
+              <div className="mb-2.5 flex gap-1.5 overflow-x-auto pb-1">
+                {(['all', 'cash', 'gift', 'discount', 'brand'] as VoucherFilter[]).map(item => (
+                  <button
+                    key={item}
+                    type="button"
+                    onClick={() => setFilter(item)}
+                    className={`whitespace-nowrap rounded-full px-3 py-2 text-[11px] font-bold capitalize ${filter === item ? 'bg-[#14140F] text-white' : 'bg-white text-[#6B6A62]'}`}
+                  >
+                    {item}
+                  </button>
+                ))}
+              </div>
+              <div className="grid grid-cols-2 gap-2.5">
+                {filteredVouchers.map(voucher => (
+                  <VoucherCard key={voucher.id} voucher={voucher} orders={monthlyOrders} onOpen={setSelectedVoucher} />
+                ))}
+              </div>
+            </>
+          )}
+
+          {view === 'wallet' && (
+            <>
+              <section className="rounded-[18px] bg-[#FFFDF8] p-3.5 shadow-[0_8px_24px_rgba(20,20,15,.05)]">
+                <span className="text-[10px] font-extrabold uppercase tracking-[.14em] text-[#E85D04]">Reward wallet</span>
+                <h2 className="mt-1.5 text-[32px] font-extrabold">Rs. {walletAvailable.toLocaleString()}</h2>
+                <p className="text-xs text-[#6B6A62]">Available now · Pending Rs. {walletPending.toLocaleString()}</p>
+                <Link href="/reseller/wallet" className="mt-3 block w-full rounded-xl bg-[#14140F] px-3 py-3 text-center text-xs font-extrabold text-white">Request withdrawal</Link>
+              </section>
+              <section className="mt-3 rounded-[18px] bg-[#FFFDF8] p-3.5 shadow-[0_8px_24px_rgba(20,20,15,.05)]">
+                <span className="text-[10px] font-extrabold uppercase tracking-[.14em] text-[#E85D04]">My vouchers</span>
+                <p className="mt-2 text-xs leading-relaxed text-[#6B6A62]">Claimed gift vouchers appear here. JazzCash and EasyPaisa payouts are released after Admin review.</p>
+                <button type="button" onClick={() => setView('vouchers')} className="mt-3 rounded-xl bg-[#0E7C6F] px-3 py-2.5 text-xs font-extrabold text-white">Browse vouchers</button>
+              </section>
+            </>
+          )}
+        </section>
+
+        <Link href="/admin/reseller-tasks" className="fixed bottom-[78px] right-[max(14px,calc((100vw-430px)/2+14px))] z-20 rounded-full bg-[#E85D04] px-3 py-2.5 text-[11px] font-extrabold text-white shadow-[0_8px_20px_rgba(232,93,4,.35)]">
+          Admin control
+        </Link>
+
+        <footer className="sticky bottom-0 z-10 grid grid-cols-5 bg-white px-1.5 pb-[calc(10px+env(safe-area-inset-bottom))] pt-2 shadow-[0_-8px_24px_rgba(0,0,0,.06)]">
+          <Bottom href="/" label="Home" icon={<Home size={17} />} />
+          <Bottom href="/shop" label="Shop" icon={<ShoppingBag size={17} />} />
+          <Bottom href="/reseller/dashboard" label="Club" active icon={<WalletCards size={17} />} />
+          <Bottom href="/cart" label="Cart" icon={<ShoppingBag size={17} />} />
+          <Bottom href="/orders" label="Orders" icon={<Package size={17} />} />
+        </footer>
+
+        {selectedVoucher && (
+          <VoucherSheet voucher={selectedVoucher} orders={monthlyOrders} onClose={() => setSelectedVoucher(null)} />
+        )}
+      </div>
+    </main>
+  );
 }
 
-function Stat({ label, value, icon }: { label: string; value: string; icon: ReactNode }) { return <div className="rounded-2xl bg-white/[.08] p-3 ring-1 ring-white/10"><div className="flex items-center gap-1.5 text-[#FFCF68]">{icon}<span className="text-[8px] font-black uppercase tracking-wider text-white/45">{label}</span></div><p className="mt-1 text-sm font-black">{value}</p></div>; }
-function TaskRow({ task }: { task: ResellerTask }) { const Icon = icons[task.icon || 'order'] || Check; return <a href={task.url || '/reseller/tasks'} target={task.url?.startsWith('http') ? '_blank' : undefined} rel="noreferrer" className="flex items-center gap-3 rounded-2xl bg-[#F7F6F2] p-3 transition hover:bg-[#E9F6F2]"><span className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-[#0F6A5F]"><Icon size={18}/></span><span className="min-w-0 flex-1"><span className="block text-[11px] font-black">{task.title}</span><span className="mt-1 block text-[9px] text-black/45">{task.description || 'Complete this mission to earn rewards.'}</span></span><span className="text-right"><span className="block text-[10px] font-black text-[#C23B32]">Rs. {Number(task.reward || 0).toLocaleString()}</span><ChevronRight size={15} className="ml-auto mt-1 text-black/25"/></span></a>; }
-function TierCard({ orders, tier, progress }: { orders: number; tier: ReturnType<typeof getTierForMonthlyOrders>; progress: ReturnType<typeof getTierProgress> }) { return <div className="rounded-[26px] bg-white p-5 shadow-sm"><div className="flex items-center justify-between"><div><p className="text-[9px] font-black uppercase tracking-[.2em] text-[#0F6A5F]">Your tier</p><h2 className="mt-1 text-xl font-black">{tier.name} · {tier.rewardPercent}%</h2></div><Crown className="text-[#0F6A5F]"/></div><div className="mt-4 grid grid-cols-4 gap-2">{getResellerTiers().map(t => <div key={t.id} className={`rounded-xl p-2 text-center ${orders >= t.minMonthlyOrders ? 'bg-[#E5F6F1]' : 'bg-[#F7F6F2]'}`}><p className="text-[10px] font-black">{t.rewardPercent}%</p><p className="mt-1 text-[8px] text-black/40">{t.minMonthlyOrders}+</p></div>)}</div>{progress.next && <p className="mt-3 rounded-xl bg-[#FFF4D1] px-3 py-2 text-[10px] font-bold text-[#795B00]">{progress.remaining} more order{progress.remaining === 1 ? '' : 's'} to reach {progress.next.name}.</p>}</div>; }
-function Info({ n, title, text }: { n: string; title: string; text: string }) { return <div className="flex gap-3"><span className="text-[10px] font-black text-[#0F6A5F]">{n}</span><div><p className="text-[11px] font-black">{title}</p><p className="mt-1 text-[10px] text-black/45">{text}</p></div></div>; }
-function Bottom({ href, label, icon, active }: { href: string; label: string; icon: ReactNode; active?: boolean }) { return <Link href={href} className={`flex flex-col items-center gap-1 py-1 text-[8px] font-black ${active ? 'text-[#E1352B]' : 'text-black/35'}`}>{icon}<span>{label}</span></Link>; }
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-[14px] border border-white/[.08] bg-white/[.07] px-3 py-2.5">
+      <small className="block text-[9px] font-bold uppercase tracking-[.12em] text-white/55">{label}</small>
+      <strong className="mt-0.5 block text-base font-extrabold">{value}</strong>
+    </div>
+  );
+}
+
+function Progress({ value }: { value: number }) {
+  return (
+    <div className="my-2.5 h-2 overflow-hidden rounded-full bg-[#EDE8DE]">
+      <div className="h-full rounded-full bg-[linear-gradient(90deg,#0E7C6F,#12A394)] transition-all" style={{ width: `${Math.max(0, Math.min(100, value))}%` }} />
+    </div>
+  );
+}
+
+function TaskRow({ task, monthlyOrders, target }: { task: ResellerTask; monthlyOrders: number; target: number }) {
+  const Icon = taskIcons[task.icon || 'order'] || Check;
+  const isMonthly = task.id.includes('monthly');
+  const isOrderTask = isMonthly || task.id.includes('weekly') || task.id.includes('order');
+  const taskTarget = isMonthly ? target : task.id.includes('weekly') ? 3 : 1;
+  const progress = isOrderTask ? Math.min(monthlyOrders, taskTarget) : 0;
+  const percent = Math.round((progress / Math.max(1, taskTarget)) * 100);
+  const href = task.url || '/reseller/tasks';
+  const external = href.startsWith('http');
+
+  return (
+    <div className="grid grid-cols-[42px_1fr_auto] items-center gap-2.5 border-b border-black/[.08] py-3 last:border-0 last:pb-0">
+      <div className="grid h-[42px] w-[42px] place-items-center rounded-[14px] bg-[#FFF3E0] text-[#0E7C6F]"><Icon size={18} /></div>
+      <div className="min-w-0">
+        <h3 className="text-[13px] font-bold">{task.title}</h3>
+        <p className="truncate text-xs text-[#6B6A62]">{task.description}</p>
+        <Progress value={percent} />
+      </div>
+      <div className="text-right">
+        <p className="text-[11px] font-extrabold text-[#0E7C6F]">Rs. {Number(task.reward || 0).toLocaleString()}</p>
+        <Link href={href} target={external ? '_blank' : undefined} rel={external ? 'noreferrer' : undefined} className="mt-1.5 inline-flex items-center gap-1 rounded-xl bg-[#F1ECE3] px-2.5 py-2 text-[11px] font-extrabold">
+          {task.verification === 'manual' ? 'Submit' : 'Do'} <ChevronRight size={12} />
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+function VoucherCard({ voucher, orders, onOpen }: { voucher: Voucher; orders: number; onOpen: (voucher: Voucher) => void }) {
+  const locked = orders < voucher.minOrders;
+  return (
+    <button type="button" onClick={() => onOpen(voucher)} className="w-full overflow-hidden rounded-2xl bg-white text-left shadow-[0_8px_20px_rgba(20,20,15,.05)]">
+      <div className="relative grid h-[78px] place-items-center text-[28px] text-white" style={{ background: voucher.art }}>
+        {voucher.icon}
+        {locked && <span className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-full bg-black/45 px-2 py-1 text-[9px] font-extrabold"><Lock size={9} /> Locked</span>}
+      </div>
+      <div className="p-2.5">
+        <h3 className="text-[13px] font-bold">{voucher.title}</h3>
+        <p className="text-xs leading-snug text-[#6B6A62]">{voucher.description}<br />{voucher.requirement}</p>
+      </div>
+    </button>
+  );
+}
+
+function VoucherSheet({ voucher, orders, onClose }: { voucher: Voucher; orders: number; onClose: () => void }) {
+  const locked = orders < voucher.minOrders;
+  return (
+    <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/45" role="dialog" aria-modal="true" aria-label={voucher.title}>
+      <button type="button" aria-label="Close voucher" onClick={onClose} className="absolute inset-0" />
+      <div className="relative w-full max-w-[430px] rounded-t-[22px] bg-white p-4 pb-[calc(24px+env(safe-area-inset-bottom))]">
+        <button type="button" onClick={onClose} className="absolute right-4 top-4 rounded-full bg-[#F1ECE3] p-2"><X size={16} /></button>
+        <p className="text-[10px] font-extrabold uppercase tracking-[.14em] text-[#E85D04]">{voucher.type} voucher</p>
+        <h2 className="mt-1.5 pr-10 text-xl font-extrabold">{voucher.title}</h2>
+        <p className="mt-2 text-xs leading-relaxed text-[#6B6A62]">{voucher.description}. Unlock requirement: {voucher.requirement}. Reward release is reviewed by Admin.</p>
+        {locked ? (
+          <button type="button" disabled className="mt-3 w-full rounded-xl bg-[#14140F] px-3 py-3 text-xs font-extrabold text-white opacity-45">Locked — more orders needed</button>
+        ) : (
+          <Link href="/reseller/rewards-preview" className="mt-3 block w-full rounded-xl bg-[#14140F] px-3 py-3 text-center text-xs font-extrabold text-white">Redeem / choose this</Link>
+        )}
+        <button type="button" onClick={onClose} className="mt-2 w-full rounded-xl bg-[#F1ECE3] px-3 py-3 text-xs font-extrabold">Close</button>
+      </div>
+    </div>
+  );
+}
+
+function Bottom({ href, label, icon, active }: { href: string; label: string; icon: React.ReactNode; active?: boolean }) {
+  return (
+    <Link href={href} className={`flex flex-col items-center gap-1 py-1 text-[10px] font-bold ${active ? 'text-[#0E7C6F]' : 'text-[#9A9890]'}`}>
+      {icon}
+      <span>{label}</span>
+    </Link>
+  );
+}
