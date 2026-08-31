@@ -4,13 +4,11 @@ import Link from 'next/link';
 import { Outfit } from 'next/font/google';
 import { useEffect, useMemo, useState, type ElementType } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { addDoc, collection, doc, onSnapshot, runTransaction, serverTimestamp } from 'firebase/firestore';
 import {
   ArrowLeft,
   Check,
-  CheckCircle2,
   ChevronRight,
-  Clock3,
   Home,
   Instagram,
   Lock,
@@ -18,13 +16,10 @@ import {
   Package,
   PlayCircle,
   Share2,
-  ShieldCheck,
   ShoppingBag,
-  Trophy,
   Users,
   WalletCards,
   X,
-  XCircle,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { auth, db } from '@/lib/firebase';
@@ -36,7 +31,6 @@ import {
   type ResellerTask,
   type ResellerWheelSettings,
 } from '@/lib/resellerTasks';
-import { calculateResellerReward, type EligibleResellerOrder } from '@/lib/resellerRewards';
 import { getTierForMonthlyOrders } from '@/lib/resellerTiers';
 import type { ResellerProfile } from '@/lib/resellerTypes';
 
@@ -50,6 +44,11 @@ type SettingsSnapshot = {
   resellerMonthlyChallenge?: Partial<MonthlyChallengeSettings>;
   resellerWheel?: Partial<ResellerWheelSettings>;
 };
+type RewardWallet = { points: number; streak: number; lastCheckIn?: string; lastSpin?: string; };
+type RewardSettings = { checkInRewards?: number[]; };
+type RewardGift = { id: string; productId: string; pointsCost: number; active?: boolean; stock?: number; imageUrl?: string; title?: string; };
+type RewardProduct = { id: string; title?: string; name?: string; imageUrl?: string; image?: string; images?: string[] | { url?: string }[]; };
+
 type Voucher = {
   id: string;
   type: VoucherType;
@@ -63,11 +62,6 @@ type Voucher = {
 };
 
 const settingsRef = doc(db, 'settings', 'main');
-const rewardSamples: EligibleResellerOrder[] = [
-  { orderId: 'DEMO-1001', status: 'delivered', subtotal: 5000 },
-  { orderId: 'DEMO-1002', status: 'pending', subtotal: 3000 },
-  { orderId: 'DEMO-1003', status: 'cancelled', subtotal: 2500 },
-];
 const taskIcons: Record<string, ElementType> = {
   youtube: PlayCircle,
   instagram: Instagram,
@@ -88,6 +82,12 @@ export default function ResellerDashboardPage() {
   const [filter, setFilter] = useState<VoucherFilter>('all');
   const [selectedVoucher, setSelectedVoucher] = useState<Voucher | null>(null);
   const [loading, setLoading] = useState(true);
+  const [rewardWallet, setRewardWallet] = useState<RewardWallet>({ points: 0, streak: 0 });
+  const [rewardSettings, setRewardSettings] = useState<RewardSettings>({ checkInRewards: [10, 15, 20, 25, 30, 50, 100] });
+  const [rewardGifts, setRewardGifts] = useState<RewardGift[]>([]);
+  const [rewardProducts, setRewardProducts] = useState<Record<string, RewardProduct>>({});
+  const [rewardBusy, setRewardBusy] = useState(false);
+  const [rewardMessage, setRewardMessage] = useState('');
 
   useEffect(() => {
     let stopProfile: (() => void) | undefined;
@@ -135,6 +135,43 @@ export default function ResellerDashboardPage() {
       ),
     [],
   );
+
+
+  useEffect(() => {
+    let stopWallet: (() => void) | undefined;
+    const stopAuth = onAuthStateChanged(auth, user => {
+      stopWallet?.();
+      if (user) stopWallet = onSnapshot(doc(db, 'user_rewards', user.uid), snap => setRewardWallet({ points: 0, streak: 0, ...(snap.data() || {}) } as RewardWallet));
+    });
+    const stopSettings = onSnapshot(doc(db, 'settings', 'rewards'), snap => setRewardSettings({ checkInRewards: [10, 15, 20, 25, 30, 50, 100], ...(snap.data() || {}) }));
+    const stopGifts = onSnapshot(collection(db, 'reward_gifts'), snap => setRewardGifts(snap.docs.map(row => ({ id: row.id, ...row.data() }) as RewardGift).filter(gift => gift.active !== false)));
+    const stopProducts = onSnapshot(collection(db, 'products'), snap => {
+      const next: Record<string, RewardProduct> = {};
+      snap.docs.forEach(row => { next[row.id] = { id: row.id, ...row.data() } as RewardProduct; });
+      setRewardProducts(next);
+    });
+    return () => { stopAuth(); stopWallet?.(); stopSettings(); stopGifts(); stopProducts(); };
+  }, []);
+
+  async function checkInReward() {
+    const user = auth.currentUser;
+    if (!user || rewardBusy || rewardWallet.lastCheckIn === rewardDayKey()) return;
+    setRewardBusy(true); setRewardMessage('');
+    try {
+      const yesterday = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Karachi' }).format(new Date(Date.now() - 86400000));
+      const streak = rewardWallet.lastCheckIn === yesterday ? Math.min(7, Math.max(1, Number(rewardWallet.streak || 0)) + 1) : 1;
+      const points = Math.max(0, Number(rewardSettings.checkInRewards?.[streak - 1] ?? 10));
+      await runTransaction(db, async tx => {
+        const ref = doc(db, 'user_rewards', user.uid);
+        const snap = await tx.get(ref);
+        const current = { points: 0, streak: 0, ...(snap.data() || {}) } as RewardWallet;
+        if (current.lastCheckIn === rewardDayKey()) throw new Error('Already checked in today.');
+        tx.set(ref, { ...current, points: Number(current.points || 0) + points, streak, lastCheckIn: rewardDayKey(), updatedAt: serverTimestamp() }, { merge: true });
+      });
+      setRewardMessage(`Day ${streak} complete — +${points} points added.`);
+    } catch (error) { setRewardMessage(error instanceof Error ? error.message : 'Check-in failed.'); }
+    finally { setRewardBusy(false); }
+  }
 
   const activeTasks = useMemo(() => tasks.filter(task => task.active !== false), [tasks]);
   const monthlyOrders = Number(profile?.monthlyOrders ?? 0);
@@ -381,22 +418,18 @@ export default function ResellerDashboardPage() {
 
 
           {view === 'rewards' && (
-            <div className="grid gap-3 lg:grid-cols-[1.05fr_.95fr]">
-              <section className="rounded-[18px] bg-[#FFFDF8] p-3.5 shadow-[0_8px_24px_rgba(20,20,15,.05)]">
-                <div className="flex items-center justify-between gap-2">
-                  <div><span className="text-[10px] font-extrabold uppercase tracking-[.14em] text-[#E85D04]">Reward engine</span><h2 className="mt-1.5 text-lg font-extrabold">Order rewards</h2></div>
-                  <Trophy className="text-[#0E7C6F]" size={24} />
-                </div>
-                <p className="mt-1 text-xs text-[#6B6A62]">Only eligible delivered orders create a cash reseller reward.</p>
-                <div className="mt-3 space-y-2">
-                  {rewardSamples.map((order, index) => {
-                    const result = calculateResellerReward(order, index + 4);
-                    return <article key={order.orderId} className="rounded-2xl border border-black/[.06] bg-white p-3"><div className="flex items-center justify-between gap-3"><div><p className="text-[9px] font-extrabold uppercase tracking-wider text-black/35">{order.orderId}</p><h3 className="mt-1 text-sm font-extrabold">Rs. {order.subtotal.toLocaleString()}</h3></div>{result.eligible ? <CheckCircle2 className="text-[#0E7C6F]" size={20}/> : <XCircle className="text-[#D94B3D]" size={20}/>}</div><div className="mt-2 flex flex-wrap gap-1.5 text-[9px] font-extrabold"><span className="rounded-full bg-black/5 px-2.5 py-1 capitalize">{order.status}</span><span className="rounded-full bg-[#E7F6F3] px-2.5 py-1 text-[#0E7C6F]">{result.rewardPercent}% tier rate</span>{result.eligible && <span className="rounded-full bg-[#FFF3E0] px-2.5 py-1">Cash Rs. {result.rewardAmount.toLocaleString()}</span>}</div><p className="mt-2 text-[10px] text-[#6B6A62]">{result.reason}</p></article>;
-                  })}
-                </div>
-                <div className="mt-3 rounded-2xl bg-[#E7F6F3] p-3"><div className="flex items-center gap-2 text-sm font-extrabold"><ShieldCheck size={17} className="text-[#0E7C6F]"/> Protected reward flow</div><div className="mt-2 grid gap-2 sm:grid-cols-2"><Mini icon={<Clock3 size={14}/>} text="Pending rewards are not withdrawable."/><Mini icon={<CheckCircle2 size={14}/>} text="Delivered eligible orders can qualify."/></div></div>
+            <div className="space-y-3">
+              <section className="rounded-[18px] bg-[#FFFDF8] p-4 shadow-[0_8px_24px_rgba(20,20,15,.05)]">
+                <div className="flex items-end justify-between gap-3"><div><p className="text-[10px] font-extrabold uppercase tracking-[.14em] text-[#E85D04]">Daily streak</p><h2 className="mt-1 text-xl font-extrabold">7-Day Check-in</h2><p className="mt-1 text-xs text-[#6B6A62]">Complete every day to unlock higher point rewards.</p></div><span className="rounded-full bg-[#FFF3E0] px-3 py-1.5 text-[10px] font-extrabold">{Math.min(7, Number(rewardWallet.streak || 0))}/7</span></div>
+                <div className="mt-4 grid grid-cols-7 gap-1.5">{Array.from({ length: 7 }, (_, index) => { const complete=index<Number(rewardWallet.streak||0); return <div key={index} className={`rounded-xl p-2 text-center ${complete?'bg-[#0E7C6F] text-white':'bg-[#F1ECE3] text-[#6B6A62]'}`}><p className="text-[8px] font-extrabold">D{index+1}</p><p className="mt-1 text-[9px] font-extrabold">+{Number(rewardSettings.checkInRewards?.[index]??0)}</p><p className="text-[7px] font-bold">PTS</p></div>; })}</div>
+                <button type="button" onClick={checkInReward} disabled={rewardBusy || rewardWallet.lastCheckIn===rewardDayKey()} className="mt-4 w-full rounded-xl bg-[#14140F] py-3.5 text-xs font-extrabold text-white disabled:opacity-45">{rewardWallet.lastCheckIn===rewardDayKey()?'✓ Checked in today':`Check in +${Number(rewardSettings.checkInRewards?.[Math.min(6,Number(rewardWallet.streak||0))]??10)} points`}</button>
               </section>
               {wheel.active && <RewardWheel settings={wheel} />}
+              <section className="rounded-[18px] bg-[#FFFDF8] p-4 shadow-[0_8px_24px_rgba(20,20,15,.05)]">
+                <div className="flex items-end justify-between gap-3"><div><p className="text-[10px] font-extrabold uppercase tracking-[.14em] text-[#0E7C6F]">Point store</p><h2 className="mt-1 text-xl font-extrabold">Gifts & Products</h2><p className="mt-1 text-xs text-[#6B6A62]">Rewards added from Admin appear here automatically.</p></div><span className="rounded-full bg-[#FFF3E0] px-3 py-1.5 text-[10px] font-extrabold">{Number(rewardWallet.points||0).toLocaleString()} PTS</span></div>
+                <div className="mt-4 grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">{rewardGifts.length ? rewardGifts.map(gift => { const product=rewardProducts[gift.productId]; const image=gift.imageUrl || rewardProductImage(product); const need=Math.max(0,Number(gift.pointsCost)-Number(rewardWallet.points||0)); return <article key={gift.id} className="overflow-hidden rounded-2xl border border-black/[.06] bg-white"><div className="aspect-[4/3] bg-[#F1ECE3]">{image?<img src={image} alt={gift.title||'Reward gift'} className="h-full w-full object-cover"/>:<div className="grid h-full place-items-center text-3xl">🎁</div>}</div><div className="p-3"><h3 className="text-sm font-extrabold">{gift.title||product?.title||product?.name||'Reward Gift'}</h3><p className="mt-1 text-xs font-extrabold text-[#E85D04]">{Number(gift.pointsCost).toLocaleString()} points</p><p className="mt-1 text-[10px] text-[#0E7C6F]">Free delivery included</p><Link href="/rewards#redeem-rewards" className="mt-3 block rounded-xl bg-[#14140F] px-3 py-2.5 text-center text-[10px] font-extrabold text-white">{need?`Need ${need} more points`:'Redeem gift'}</Link></div></article>; }) : <div className="rounded-2xl bg-[#F1ECE3] p-6 text-center text-xs text-[#6B6A62] sm:col-span-2 lg:col-span-3">Admin se add kiye gaye active gifts yahan show honge.</div>}</div>
+              </section>
+              {rewardMessage && <div className="rounded-xl bg-[#0E7C6F] p-3 text-center text-xs font-extrabold text-white">{rewardMessage}</div>}
             </div>
           )}
 
@@ -404,8 +437,7 @@ export default function ResellerDashboardPage() {
             <>
               <section className="rounded-[18px] bg-[#FFFDF8] p-3.5 shadow-[0_8px_24px_rgba(20,20,15,.05)]">
                 <span className="text-[10px] font-extrabold uppercase tracking-[.14em] text-[#E85D04]">Reward wallet</span>
-                <h2 className="mt-1.5 text-[32px] font-extrabold">Rs. {walletAvailable.toLocaleString()}</h2>
-                <p className="text-xs text-[#6B6A62]">Available now · Pending Rs. {walletPending.toLocaleString()}</p>
+                <div className="mt-3 grid grid-cols-2 gap-2"><div className="rounded-2xl bg-[#F1ECE3] p-3"><p className="text-[9px] font-extrabold uppercase tracking-wider text-[#6B6A62]">Cash wallet</p><h2 className="mt-1 text-2xl font-extrabold">Rs. {walletAvailable.toLocaleString()}</h2><p className="text-[10px] text-[#6B6A62]">Pending Rs. {walletPending.toLocaleString()}</p></div><div className="rounded-2xl bg-[#E7F6F3] p-3"><p className="text-[9px] font-extrabold uppercase tracking-wider text-[#0E7C6F]">Points wallet</p><h2 className="mt-1 text-2xl font-extrabold">{Number(rewardWallet.points||0).toLocaleString()}</h2><p className="text-[10px] text-[#0E7C6F]">Reward points</p></div></div>
                 <Link href="/reseller/wallet" className="mt-3 block w-full rounded-xl bg-[#14140F] px-3 py-3 text-center text-xs font-extrabold text-white">Request withdrawal</Link>
               </section>
               <section className="mt-3 rounded-[18px] bg-[#FFFDF8] p-3.5 shadow-[0_8px_24px_rgba(20,20,15,.05)]">
@@ -431,6 +463,19 @@ export default function ResellerDashboardPage() {
       </div>
     </main>
   );
+}
+
+
+function rewardDayKey() {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Karachi' }).format(new Date());
+}
+
+function rewardProductImage(product?: RewardProduct) {
+  if (!product) return '';
+  if (product.imageUrl) return product.imageUrl;
+  if (product.image) return product.image;
+  const first=product.images?.[0];
+  return typeof first==='string'?first:first?.url||'';
 }
 
 function Stat({ label, value }: { label: string; value: string }) {
