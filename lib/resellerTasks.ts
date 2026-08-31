@@ -33,3 +33,17 @@ export const DEFAULT_MONTHLY_CHALLENGE: MonthlyChallengeSettings = {
   cashReward: 1000,
   active: true,
 };
+
+export type ResellerWheelSettings = {
+  active: boolean;
+  customPrizeTitle: string;
+  customPrizeImage: string;
+  customPrizeValue: number;
+};
+
+export const DEFAULT_RESELLER_WHEEL: ResellerWheelSettings = {
+  active: true,
+  customPrizeTitle: 'Mystery Gift',
+  customPrizeImage: '',
+  customPrizeValue: 0,
+};
