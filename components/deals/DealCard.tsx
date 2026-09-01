@@ -13,6 +13,7 @@ export default function DealCard({ deal, label, status, product, adding }: DealC
 
   const regularPrice = regularPriceOf(product, deal);
   const dealPrice = Number(deal.dealPrice || 0);
+  const livePrice = status === 'live' && deal.active !== false && dealPrice > 0 && dealPrice < regularPrice ? dealPrice : regularPrice;
   const discount = regularPrice > dealPrice && dealPrice > 0
     ? Math.round(((regularPrice - dealPrice) / regularPrice) * 100)
     : 0;
@@ -42,7 +43,9 @@ export default function DealCard({ deal, label, status, product, adding }: DealC
     if (hasVariants && typeof openVariantModal === 'function') {
       const modalProduct = {
         ...product,
-        price: dealPrice > 0 ? dealPrice : regularPrice,
+        price: livePrice,
+        dealPrice: livePrice,
+        dealDay: status === 'live' ? deal.day : undefined,
         originalPrice: regularPrice,
         image,
         imageUrl: image,
@@ -53,7 +56,7 @@ export default function DealCard({ deal, label, status, product, adding }: DealC
     addItem({
       id: product.id,
       name: title,
-      price: dealPrice > 0 ? dealPrice : regularPrice,
+      price: livePrice,
       originalPrice: regularPrice,
       image,
       imageUrl: image,

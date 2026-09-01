@@ -8,6 +8,7 @@ import { ArrowRight, Clock3, ShoppingBag } from 'lucide-react';
 import type { WeeklyDeal } from '@/lib/types';
 import { weeklyDealSavings } from '@/lib/weeklyDealUtils';
 import { useCartStore, type VariantModalProduct } from '@/lib/cartStore';
+import { getPakistanDay } from '@/lib/dealPricing';
 
 type DealProduct = VariantModalProduct & {
   stock?: number;
@@ -22,7 +23,7 @@ const DAY_LABELS: Record<WeeklyDeal['day'], string> = {
   thursday: 'Thursday', friday: 'Friday', saturday: 'Saturday',
 };
 
-function getToday(): WeeklyDeal['day'] { return DAYS[new Date().getDay()]; }
+function getToday(): WeeklyDeal['day'] { return getPakistanDay().toLowerCase() as WeeklyDeal['day']; }
 
 function hasVariants(product: DealProduct): boolean {
   return Boolean(
@@ -84,6 +85,8 @@ export default function WeeklyDealStrip() {
       const image = getProductImage(product);
       const productPrice = numericPrice((product as any).price);
       const dealPrice = numericPrice(deal.dealPrice || (product as any).dealPrice || productPrice);
+      const isLiveToday = deal.active !== false && deal.day === getToday();
+      const effectivePrice = isLiveToday && dealPrice > 0 && dealPrice < productPrice ? dealPrice : productPrice;
       const originalPrice = numericPrice(
         deal.originalPrice ||
         (product as any).normalPrice ||
@@ -94,8 +97,10 @@ export default function WeeklyDealStrip() {
       );
       const productWithDealPrice: DealProduct = {
         ...product,
-        price: dealPrice,
-        originalPrice: originalPrice || dealPrice,
+        price: effectivePrice,
+        dealPrice: effectivePrice,
+        dealDay: isLiveToday ? deal.day : undefined,
+        originalPrice: originalPrice || productPrice,
         image,
         imageUrl: image,
       };
@@ -108,11 +113,11 @@ export default function WeeklyDealStrip() {
       addItem({
         id: productWithDealPrice.id,
         name: productWithDealPrice.title || productWithDealPrice.name || deal.title || 'PrimeHub Deal',
-        price: dealPrice,
-        originalPrice: originalPrice || dealPrice,
+        price: effectivePrice,
+        originalPrice: originalPrice || productPrice,
         image,
         imageUrl: image,
-        dealDay: deal.day,
+        dealDay: isLiveToday ? deal.day : undefined,
       });
     } catch (error) {
       console.error('Error fetching deal product variants:', error);

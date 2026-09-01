@@ -29,6 +29,7 @@ import { useCartStore } from '@/lib/cartStore';
 import { ProductUrgencyBadges } from '@/components/ProductCard';
 import { isWholesaleProduct } from '@/lib/wholesale';
 import { shuffleProducts } from '@/lib/shuffleProducts';
+import { getEffectivePrice } from '@/lib/dealPricing';
 
 type Product = {
   id: string;
@@ -85,8 +86,11 @@ const safeNumber = (value: unknown) => {
   return Number.isFinite(parsed) ? parsed : 0;
 };
 
-const effectivePrice = (p: Product) =>
-  safeNumber(p.dealPrice || p.normalPrice || p.price || 0);
+const effectivePrice = (p: Product) => getEffectivePrice({
+  price: safeNumber(p.normalPrice || p.price || 0),
+  dealPrice: safeNumber(p.dealPrice || 0),
+  dealDay: String(p.dealDay || ''),
+});
 
 const original = (p: Product) =>
   safeNumber(p.compareAtPrice ?? p.originalPrice ?? 0);
@@ -377,7 +381,7 @@ export default function ProductGridRewards({
     return (
       <section className="mt-8 px-4">
         <div className="mb-4 h-7 w-44 animate-pulse rounded-lg bg-black/8" />
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
           {Array.from({ length: 6 }).map((_, i) => (
             <div
               key={i}
@@ -436,7 +440,7 @@ export default function ProductGridRewards({
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
           {visible.map((p) => {
             const r = rewards[p.id];
             const pts = points;
@@ -459,7 +463,7 @@ export default function ProductGridRewards({
                         alt={title(p)}
                         fill
                         unoptimized
-                        sizes="(max-width: 640px) 50vw, 320px"
+                        sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
                         className="object-cover"
                         onError={(event) => {
                           event.currentTarget.src = '/placeholder.png';

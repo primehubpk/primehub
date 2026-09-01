@@ -332,17 +332,17 @@ export default function ResellerDashboardPage() {
 
   return (
     <main className={`${outfit.className} min-h-screen bg-[#111] text-[#14140F]`}>
-      <div className="relative mx-auto min-h-screen max-w-[1100px] overflow-hidden bg-[#F6F1E8] shadow-2xl">
-        <header className="relative bg-[linear-gradient(165deg,#16332E_0%,#0C1C19_70%)] px-4 pb-[22px] pt-3 text-white">
+      <div className="relative mx-auto min-h-screen max-w-[1180px] overflow-hidden bg-[#F6F1E8] shadow-2xl lg:my-6 lg:min-h-[calc(100vh-3rem)] lg:rounded-[32px]">
+        <header className="relative bg-[linear-gradient(165deg,#16332E_0%,#0C1C19_70%)] px-4 pb-[22px] pt-3 text-white sm:px-6 lg:px-8 lg:pb-7 lg:pt-5">
           <div id="club-home" className="flex items-center justify-between gap-3"><Link href="/reseller" className="inline-flex items-center gap-1.5 text-xs font-semibold text-white/80"><ArrowLeft size={14} /> Reseller Club</Link><div className="flex items-center gap-2"><Link href="/reseller/wallet" aria-label="Reward history" className="grid h-9 w-9 place-items-center rounded-full bg-white/10 text-white"><History size={16}/></Link><a href="#club-tasks" aria-label="Notifications" className="relative grid h-9 w-9 place-items-center rounded-full bg-white/10 text-white"><Bell size={16}/><span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-[#FF9A3C] ring-2 ring-[#16332E]"/></a></div></div>
           <div className="mt-4 grid gap-3 sm:grid-cols-[1.3fr_.7fr]"><div className="flex min-w-0 items-center gap-3 rounded-2xl border border-white/10 bg-white/[.07] p-3"><div className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-[#FFCF68] text-lg font-extrabold text-[#14140F]">{(profile?.displayName||profile?.email||'P').charAt(0).toUpperCase()}</div><div className="min-w-0"><p className="text-[9px] font-extrabold uppercase tracking-[.2em] text-[#FFCF68]">Profile</p><h1 className="truncate text-lg font-extrabold">{profile?.displayName||'PrimeHub Reseller'}</h1><p className="truncate text-[10px] text-white/55">{profile?.email}</p></div></div><div className="grid grid-cols-2 gap-2"><div className="rounded-2xl border border-white/10 bg-white/[.07] p-3"><p className="text-[8px] font-extrabold uppercase tracking-wider text-white/45">Cash Wallet</p><p className="mt-1 text-base font-extrabold">Rs. {walletAvailable.toLocaleString()}</p></div><div className="rounded-2xl border border-white/10 bg-white/[.07] p-3"><p className="text-[8px] font-extrabold uppercase tracking-wider text-white/45">Points Wallet</p><p className="mt-1 text-base font-extrabold">{Number(rewardWallet.points||0).toLocaleString()}</p></div></div></div>
         </header>
 
-        <nav className="sticky top-0 z-30 flex gap-1.5 overflow-x-auto border-b border-black/5 bg-[#F6F1E8]/95 px-4 py-3 backdrop-blur [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <nav className="sticky top-0 z-30 flex gap-1.5 overflow-x-auto border-b border-black/5 bg-[#F6F1E8]/95 px-4 py-3 backdrop-blur sm:px-6 lg:justify-center lg:px-8 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {(['home', 'rewards', 'tiers', 'tasks', 'vouchers', 'wallet', 'gifts'] as View[]).map(item => <button key={item} type="button" onClick={() => setView(item)} className={`shrink-0 rounded-full px-2.5 py-2 text-[10px] font-bold capitalize shadow-sm ${view === item ? 'bg-[#14140F] text-white' : 'bg-white text-[#6B6A62]'}`}>{item}</button>)}
         </nav>
 
-        <section className="space-y-4 px-4 pb-28 pt-3.5">
+        <section className={`space-y-4 px-4 pb-28 pt-3.5 sm:px-6 lg:px-8 ${view === 'home' ? 'lg:grid lg:grid-cols-2 lg:items-start lg:gap-5 lg:space-y-0' : 'lg:mx-auto lg:max-w-5xl'}`}>
           {(view === 'home' || view === 'rewards') && <>
           <section className="rounded-[18px] bg-[#FFFDF8] p-4 shadow-[0_8px_24px_rgba(20,20,15,.05)]">
             <div className="flex items-end justify-between gap-3"><div><p className="text-[10px] font-extrabold uppercase tracking-[.14em] text-[#E85D04]">Weekly streak</p><h2 className="mt-1 text-xl font-extrabold">7-Day Check-in</h2><p className="mt-1 text-xs text-[#6B6A62]">Check in every day and unlock higher point rewards.</p></div><span className="rounded-full bg-[#FFF3E0] px-3 py-1.5 text-[10px] font-extrabold">{Math.min(7, Number(rewardWallet.streak || 0))}/7</span></div>

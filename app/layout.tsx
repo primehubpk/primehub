@@ -5,6 +5,7 @@ import '@fontsource-variable/inter/wght.css';
 import '@fontsource/space-mono/latin-400.css';
 import '@fontsource/space-mono/latin-700.css';
 import BottomNav from '@/components/BottomNav';
+import GlobalFooter from '@/components/GlobalFooter';
 import CartMiniBar from '@/components/CartMiniBar';
 import PWARegister from '@/components/PWARegister';
 import PWAInstallBanner from '@/components/PWAInstallBanner';
@@ -31,6 +32,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="font-sans antialiased pb-24">
         <script dangerouslySetInnerHTML={{ __html: JSON.stringify({ '@context': 'https://schema.org', '@type': 'WebSite', name: 'PrimeHub Deals', alternateName: 'phdeals', url: SITE_URL || undefined, description: 'Daily flash sales, weekend glow deals, and gamified rewards.', potentialAction: { '@type': 'SearchAction', target: `${SITE_URL || ''}/shop?q={search_term_string}`, 'query-input': 'required name=search_term_string' } }) }} />
         {children}
+        <GlobalFooter />
         <GlobalVariantSelector />
         <BottomNav />
         <CartMiniBar />
