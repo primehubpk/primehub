@@ -87,7 +87,7 @@ export async function reviewResellerWithdrawal(withdrawalId: string, action: 'ap
 export async function createResellerTaskClaim(userId: string, taskId: string, proof: string) {
   const cleanTask = taskId.trim().toLowerCase();
   const cleanProof = proof.trim();
-  if (!cleanTask || cleanTask.length > 80) throw new Error('Invalid task.');
+  if (!cleanTask || cleanTask.length > 80 || !['youtube', 'instagram', 'tiktok'].includes(cleanTask)) throw new Error('Proof is only needed for YouTube, Instagram, or TikTok.');
   if (cleanProof.length < 3 || cleanProof.length > 1000) throw new Error('Please provide your account name or proof link.');
   const db = getAdminDb();
   const profile = await db.collection('reseller_profiles').doc(userId).get();
