@@ -124,3 +124,17 @@ export async function reviewResellerTaskClaim(claimId: string, action: 'approve'
     tx.update(claimRef, { status: 'approved', points, adminNote: adminNote.trim(), reviewedAt: FieldValue.serverTimestamp() });
   });
 }
+
+const SOCIAL_TASK_IDS = new Set(['youtube', 'instagram', 'tiktok']);
+
+export async function recordResellerTaskOpen(userId: string, taskId: string) {
+  if (!SOCIAL_TASK_IDS.has(taskId)) throw new Error('Only social tasks can be opened here.');
+  const db = getAdminDb();
+  const profile = await db.collection('reseller_profiles').doc(userId).get();
+  if (!profile.exists || profile.data()?.status !== 'active') throw new Error('Join the Reseller Club first.');
+  await db.collection('reseller_task_events').add({ userId, taskId, event: 'opened', createdAt: FieldValue.serverTimestamp() });
+}
+
+export function isSocialResellerTask(taskId: string) {
+  return SOCIAL_TASK_IDS.has(taskId);
+}
