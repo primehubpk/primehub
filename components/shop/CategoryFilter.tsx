@@ -24,8 +24,8 @@ export default function CategoryFilter({ categories, category, setCategory }: Pr
       <div className="flex gap-3 overflow-x-auto pb-1 [scrollbar-width:none]">
         {visible.map((cat) => {
           // Names are unique; old Firestore slugs can be only one duplicate letter.
-          const value = slugifyCategory(cat.title || cat.name || cat.id || cat.slug);
-          const label = cat.name || cat.title || cat.id;
+          const value = slugifyCategory(cat.title || cat.name || cat.id || cat.slug || '');
+          const label = cat.name || cat.title || cat.id || 'Category';
           const icon = cat.iconUrl || cat.imageUrl || cat.image;
           const selected = category !== 'all' && productMatchesCategory(category, { category: cat.title || cat.name, categoryId: cat.id }, [cat]);
           const nextValue = selected ? 'all' : value;
