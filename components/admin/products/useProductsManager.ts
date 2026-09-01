@@ -162,12 +162,11 @@ export function useProductsManager() {
 
   async function upload(event: React.ChangeEvent<HTMLInputElement>) {
     const files = Array.from(event.target.files || []);
-    const remaining = Math.max(0, 6 - form.images.length);
-    if (!files.length || !remaining) {
+    if (!files.length) {
       event.target.value = '';
       return;
     }
-    const selected = files.slice(0, remaining);
+    const selected = files;
     setBusy(true);
     setMessage('');
     try {
@@ -175,7 +174,7 @@ export function useProductsManager() {
         setUploadingSlot(form.images.length + index);
         const file = await compressImage(selected[index]);
         const url = await uploadImageToImgBB(file);
-        setForm(current => current.images.length >= 6 ? current : { ...current, images: [...current.images, url] });
+        setForm(current => ({ ...current, images: [...current.images, url] }));
         try {
           await createAdminDocument('media_assets', {
             name: selected[index].name,
@@ -261,7 +260,7 @@ export function useProductsManager() {
       Array.isArray(product.images) && product.images.length > 0
         ? product.images.map((img: any) => typeof img === 'string' ? img : (img?.url || '')).filter(Boolean)
         : [typeof product.imageUrl === 'string' ? product.imageUrl : ''].filter(Boolean)
-    ).slice(0, 6);
+    );
 
     setEditing(product);
     setForm({
@@ -370,7 +369,7 @@ export function useProductsManager() {
       const variantOptions = [{ id: 'color', name: 'Color', values: cleanColors.map(color => color.name) }, { id: 'size', name: 'Size', values: cleanSizes }];
       const colorImages = Object.fromEntries(cleanColors.map(color => [color.name, color.imageUrl]));
       const variantMatrix = variantRows.map(row => ({ id: row.id, label: `${row.color} / ${row.size}`, color: row.color, size: row.size, stock: Math.max(0, Number(row.stock || 0)), imageUrl: row.imageUrl || colorImages[row.color] || form.images[0] || '', sku: '', price: String(salePrice), salePrice: '', active: true }));
-      const payload = { title: form.title.trim(), slug: slugify(form.title), price: salePrice, originalPrice, description: form.description, category: form.category, stock: Math.max(0, Number(form.stock || 0)), videoUrl: form.videoUrl.trim(), imageUrl: form.images[0] || '', images: form.images.slice(0, 6), colorImages, variantColors: cleanColors, variantOptions, variantMatrix, featured: form.featured, published: form.published, isWholesale: form.isWholesale === true, priceBucketIds: bucketIds, updatedAt: new Date().toISOString() };
+      const payload = { title: form.title.trim(), slug: slugify(form.title), price: salePrice, originalPrice, description: form.description, category: form.category, stock: Math.max(0, Number(form.stock || 0)), videoUrl: form.videoUrl.trim(), imageUrl: form.images[0] || '', images: form.images, colorImages, variantColors: cleanColors, variantOptions, variantMatrix, featured: form.featured, published: form.published, isWholesale: form.isWholesale === true, priceBucketIds: bucketIds, updatedAt: new Date().toISOString() };
       let productId = editing?.id || '';
       if (editing) await updateAdminDocument('products', editing.id, payload);
       else productId = (await createAdminDocument('products', { ...payload, isFlashSale: false, isWeekendSpecial: false, createdAt: new Date().toISOString() })).id;
