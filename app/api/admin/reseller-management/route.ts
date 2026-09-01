@@ -16,20 +16,22 @@ export async function GET(request: Request) {
   try {
     await requireAdmin(request);
     const db = getAdminDb();
-    const [profilesSnap, withdrawalsSnap, ledgerSnap, claimsSnap, pointsSnap] = await Promise.all([
+    const [profilesSnap, withdrawalsSnap, ledgerSnap, claimsSnap, pointsSnap, eventsSnap] = await Promise.all([
       db.collection('reseller_profiles').orderBy('createdAt', 'desc').limit(200).get(),
       db.collection('reseller_withdrawals').orderBy('createdAt', 'desc').limit(200).get(),
       db.collection('reseller_reward_ledger').orderBy('createdAt', 'desc').limit(500).get(),
       db.collection('reseller_task_claims').orderBy('createdAt', 'desc').limit(300).get(),
       db.collection('reseller_point_ledger').orderBy('createdAt', 'desc').limit(500).get(),
+      db.collection('reseller_task_events').orderBy('createdAt', 'desc').limit(500).get(),
     ]);
     const profiles = profilesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
     const withdrawals = withdrawalsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
     const ledger = ledgerSnap.docs.map(d => ({ id: d.id, ...d.data() }));
     const claims = claimsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
     const pointHistory = pointsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-    const stats = { resellers: profiles.filter((p: any) => p.status === 'active').length, pendingWithdrawals: withdrawals.filter((w: any) => w.status === 'pending').length, pendingTaskClaims: claims.filter((c: any) => c.status === 'pending').length, walletLiability: profiles.reduce((sum: number, p: any) => sum + Number(p.walletAvailable || 0) + Number(p.walletPending || 0), 0), totalRewards: ledger.reduce((sum: number, r: any) => sum + Number(r.rewardAmount || 0), 0) };
-    return NextResponse.json({ stats, profiles, withdrawals, ledger, claims, pointHistory });
+    const taskEvents = eventsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const stats = { resellers: profiles.filter((p: any) => p.status === 'active').length, pendingWithdrawals: withdrawals.filter((w: any) => w.status === 'pending').length, pendingTaskClaims: claims.filter((c: any) => c.status === 'pending').length, socialTaskOpens: taskEvents.length, walletLiability: profiles.reduce((sum: number, p: any) => sum + Number(p.walletAvailable || 0) + Number(p.walletPending || 0), 0), totalRewards: ledger.reduce((sum: number, r: any) => sum + Number(r.rewardAmount || 0), 0) };
+    return NextResponse.json({ stats, profiles, withdrawals, ledger, claims, pointHistory, taskEvents });
   } catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : 'Unable to load reseller management.' }, { status: 403 }); }
 }
 
