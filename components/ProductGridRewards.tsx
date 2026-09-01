@@ -377,7 +377,7 @@ export default function ProductGridRewards({
     return (
       <section className="mt-8 px-4">
         <div className="mb-4 h-7 w-44 animate-pulse rounded-lg bg-black/8" />
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
           {Array.from({ length: 6 }).map((_, i) => (
             <div
               key={i}
@@ -436,7 +436,7 @@ export default function ProductGridRewards({
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
           {visible.map((p) => {
             const r = rewards[p.id];
             const pts = points;
@@ -459,7 +459,7 @@ export default function ProductGridRewards({
                         alt={title(p)}
                         fill
                         unoptimized
-                        sizes="(max-width: 640px) 50vw, 320px"
+                        sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
                         className="object-cover"
                         onError={(event) => {
                           event.currentTarget.src = '/placeholder.png';
