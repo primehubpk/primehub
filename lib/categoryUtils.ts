@@ -33,7 +33,7 @@ export function slugifyCategory(value: string): string {
 export function categoryHref(category: CategoryRef | string): string {
   const slug = typeof category === 'string'
     ? slugifyCategory(category)
-    : slugifyCategory(category.title || category.name || category.slug || category.id || '');
+    : slugifyCategory(category.slug || category.id || category.title || category.name || '');
   return slug ? `/category/${slug}` : '/shop';
 }
 
