@@ -105,6 +105,14 @@ export function productMatchesCategory(
     ...categoryTokens(String(product.category || '')),
     ...categoryTokens(String(product.categoryId || '')),
   ];
+  // When the admin has a real category document, match its exact id/slug/title first.
+  // This prevents categories such as Plastic Bangles from borrowing items from another bangle category.
+  const selectedSlug = slugifyCategory(selected);
+  const selectedCategory = categories.find((category) => [category.id, category.slug, category.title, category.name].some((value) => slugifyCategory(String(value || '')) === selectedSlug));
+  if (selectedCategory) {
+    const exactTokens = new Set(categoryDocTokens(selectedCategory).map(slugifyCategory).filter(Boolean));
+    return productTokens.some((token) => exactTokens.has(slugifyCategory(token)));
+  }
   const selectedFamily = exclusiveFamilyIndex(categoryTokens(selected));
   const productFamily = exclusiveFamilyIndex(productTokens);
   if (selectedFamily != null && productFamily != null && selectedFamily !== productFamily) {
