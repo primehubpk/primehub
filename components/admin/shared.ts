@@ -19,6 +19,7 @@ function requireAdminSession() {
   if (typeof window === 'undefined' || window.localStorage.getItem(ADMIN_SESSION_KEY) !== 'true') {
     throw new Error('Admin session required.');
   }
+  document.cookie = 'primehub_admin_auth=true; Path=/; Max-Age=604800; SameSite=Lax';
 }
 
 async function adminWrite(action: 'create' | 'update' | 'set' | 'delete', name: string, id?: string, value?: Record<string, any>) {
