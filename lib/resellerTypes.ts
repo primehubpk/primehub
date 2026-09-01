@@ -5,6 +5,8 @@ export interface ResellerTier {
   name: string;
   minMonthlyOrders: number;
   rewardPercent: number;
+  discountPercent?: number;
+  benefits?: string[];
 }
 
 export interface ResellerProfile {
@@ -21,8 +23,9 @@ export interface ResellerProfile {
 }
 
 export const DEFAULT_RESELLER_TIERS: ResellerTier[] = [
-  { id: 'starter', name: 'Starter', minMonthlyOrders: 5, rewardPercent: 5 },
-  { id: 'prime', name: 'Prime', minMonthlyOrders: 10, rewardPercent: 10 },
-  { id: 'pro', name: 'Pro', minMonthlyOrders: 20, rewardPercent: 15 },
-  { id: 'elite', name: 'Elite', minMonthlyOrders: 30, rewardPercent: 20 },
+  { id: 'starter', name: 'Starter', minMonthlyOrders: 0, rewardPercent: 5, discountPercent: 0, benefits: ['Member-only prices', 'Earn points on tasks', 'Access club rewards'] },
+  { id: 'prime', name: 'Silver', minMonthlyOrders: 10, rewardPercent: 10, discountPercent: 2, benefits: ['2% shopping discount', 'Priority reward access', 'Silver member badge'] },
+  { id: 'pro', name: 'Gold', minMonthlyOrders: 20, rewardPercent: 15, discountPercent: 5, benefits: ['5% shopping discount', 'Bonus reward points', 'Gold member offers'] },
+  { id: 'elite', name: 'Premium', minMonthlyOrders: 30, rewardPercent: 20, discountPercent: 8, benefits: ['8% shopping discount', 'Premium gift access', 'Top priority benefits'] },
 ];
+
