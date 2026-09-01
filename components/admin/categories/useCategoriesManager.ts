@@ -22,6 +22,7 @@ export function useCategoriesManager() {
   const [gallerySearch, setGallerySearch] = useState('');
   const [galleryTarget, setGalleryTarget] = useState<GalleryTarget>('category');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const slugEditedRef = useRef(false);
 
   useEffect(() => onSnapshot(adminCollection('categories'), (snapshot) => setCategories(snapshot.docs.map((item) => ({ id: item.id, ...item.data() }) as CategoryWithMeta).sort((a, b) => Number(a.sortOrder ?? 999) - Number(b.sortOrder ?? 999)))), []);
   useEffect(() => onSnapshot(adminCollection('media_assets'), (snapshot) => setMedia(snapshot.docs.map((item) => ({ id: item.id, ...item.data() }) as MediaAsset))), []);
@@ -30,10 +31,12 @@ export function useCategoriesManager() {
   const gallery = useMemo(() => media.filter((asset) => `${asset.name || ''} ${asset.url}`.toLowerCase().includes(gallerySearch.toLowerCase())), [media, gallerySearch]);
   const selectedUrl = galleryTarget === 'category' ? form.iconUrl : bucketForm.iconUrl;
 
-  function handleTitleChange(title: string) { setForm((current) => ({ ...current, title, slug: current.slug || slugify(title) })); }
-  function startEdit(category: CategoryWithMeta) { setEditingId(category.id); setForm({ title: category.title, slug: category.slug || slugify(category.title), iconUrl: category.iconUrl || '', active: category.active !== false }); window.scrollTo({ top: 0, behavior: 'smooth' }); }
-  function cancelEdit() { setEditingId(null); setForm(EMPTY_FORM); }
+  function handleTitleChange(title: string) { setForm((current) => ({ ...current, title, slug: slugEditedRef.current ? current.slug : slugify(title) })); }
+  function handleSlugChange(slug: string) { slugEditedRef.current = true; setForm((current) => ({ ...current, slug })); }
+  function startEdit(category: CategoryWithMeta) { slugEditedRef.current = true; setEditingId(category.id); setForm({ title: category.title, slug: category.slug || slugify(category.title), iconUrl: category.iconUrl || '', active: category.active !== false }); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+  function cancelEdit() { slugEditedRef.current = false; setEditingId(null); setForm(EMPTY_FORM); }
   async function handleSave(event: FormEvent<HTMLFormElement>) { event.preventDefault(); if (!form.title.trim()) return; setIsSaving(true); setToast(''); try { const payload = { title: form.title.trim(), slug: slugify(form.slug || form.title), iconUrl: form.iconUrl.trim(), active: form.active, sortOrder: editingId ? Number(categories.find((item) => item.id === editingId)?.sortOrder ?? categories.length + 1) : categories.length + 1 }; if (editingId) await updateAdminDocument('categories', editingId, payload); else await createAdminDocument('categories', payload); const wasEditing = Boolean(editingId); cancelEdit(); setToast(wasEditing ? 'Category updated.' : 'Category added.'); } catch { setToast('Unable to save category.'); } finally { setIsSaving(false); } }
+  async function repairCategorySlugs() { if (!confirm('Repair all category links from their category names? Products will stay unchanged.')) return; setIsSaving(true); try { await Promise.all(categories.map((category) => updateAdminDocument('categories', category.id, { slug: slugify(category.title) }))); setToast('Category links repaired.'); } catch { setToast('Unable to repair category links.'); } finally { setIsSaving(false); } }
   async function remove(category: CategoryWithMeta) { if (!confirm(`Delete ${category.title}?`)) return; await deleteAdminDocument('categories', category.id); setToast('Category deleted.'); }
   async function toggleActive(category: CategoryWithMeta) { await updateAdminDocument('categories', category.id, { active: category.active === false }); }
   async function move(category: CategoryWithMeta, direction: -1 | 1) { const index = categories.findIndex((item) => item.id === category.id); const nextIndex = index + direction; if (nextIndex < 0 || nextIndex >= categories.length) return; const other = categories[nextIndex]; await Promise.all([updateAdminDocument('categories', category.id, { sortOrder: nextIndex + 1 }), updateAdminDocument('categories', other.id, { sortOrder: index + 1 })]); }
@@ -51,5 +54,5 @@ export function useCategoriesManager() {
   async function toggleBucket(bucket: PriceBucket) { const normalized = buckets.map((item) => item.id === bucket.id ? { ...item, active: !item.active } : item); await setAdminDocument('settings', 'main', { priceBuckets: normalized }); setBuckets(normalized); }
   async function moveBucket(index: number, direction: -1 | 1) { const target = index + direction; if (target < 0 || target >= buckets.length) return; const next = [...buckets]; [next[index], next[target]] = [next[target], next[index]]; const normalized = next.map((item, i) => ({ ...item, sortOrder: i + 1 })); await setAdminDocument('settings', 'main', { priceBuckets: normalized }); setBuckets(normalized); }
 
-  return { tab, setTab, categories, media, form, setForm, editingId, buckets, bucketForm, editingBucketId, isSaving, uploading, toast, showGallery, setShowGallery, gallerySearch, setGallerySearch, galleryTarget, fileInputRef, gallery, selectedUrl, handleTitleChange, startEdit, cancelEdit, handleSave, remove, toggleActive, move, openGallery, chooseGalleryImage, uploadDevice, uploadFromDevice, startBucketEdit, cancelBucketEdit, changeBucket, saveBucket, removeBucket, toggleBucket, moveBucket };
+  return { tab, setTab, categories, media, form, setForm, editingId, buckets, bucketForm, editingBucketId, isSaving, uploading, toast, showGallery, setShowGallery, gallerySearch, setGallerySearch, galleryTarget, fileInputRef, gallery, selectedUrl, handleTitleChange, handleSlugChange, repairCategorySlugs, startEdit, cancelEdit, handleSave, remove, toggleActive, move, openGallery, chooseGalleryImage, uploadDevice, uploadFromDevice, startBucketEdit, cancelBucketEdit, changeBucket, saveBucket, removeBucket, toggleBucket, moveBucket };
 }

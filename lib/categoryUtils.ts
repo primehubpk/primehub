@@ -14,6 +14,9 @@ export const CATEGORY_ALIASES: Record<string, string[]> = {
   'kids-bangles': ['kids-metal-bangles', 'kids-metal-bangle', 'kids-bangle', 'kids metal bangles', 'kids bangles'],
   'kids-metal-deals': ['kids-deal-box', 'kids-deals', 'kids-deal', 'kidsdealbox', 'kids metal deals', 'kids deal box'],
   'kids-deal-box': ['kids-metal-deals', 'kids-deals', 'kids-deal', 'kidsdealbox', 'kids metal deals', 'kids deal box'],
+  'plastic-bangles': ['plastic-deal-box', 'plastic-deals', 'plastic-deal', 'plasticedeal', 'plastic deal box', 'plastic deals'],
+  'plastic-deal-box': ['plastic-bangles', 'plastic-bangle', 'plasticedeal', 'plastic bangles'],
+  plasticedeal: ['plastic-bangles', 'plastic-deal-box', 'plastic deal box', 'plastic deals'],
 };
 
 /** Families that must never share products, even if aliases or titles overlap. */
@@ -30,10 +33,14 @@ export function slugifyCategory(value: string): string {
     .replace(/^-+|-+$/g, '');
 }
 
+/**
+ * Storefront links use the category title first. Older admin records contain
+ * duplicate one-letter slugs, so title-based links keep every category unique.
+ */
 export function categoryHref(category: CategoryRef | string): string {
   const slug = typeof category === 'string'
     ? slugifyCategory(category)
-    : slugifyCategory(category.title || category.name || category.slug || category.id || '');
+    : slugifyCategory(category.title || category.name || category.id || category.slug || '');
   return slug ? `/category/${slug}` : '/shop';
 }
 
@@ -105,20 +112,34 @@ export function productMatchesCategory(
     ...categoryTokens(String(product.category || '')),
     ...categoryTokens(String(product.categoryId || '')),
   ];
+  // Match an actual category document by its id/title first. This avoids old,
+  // duplicated admin slugs (such as "p") mixing unrelated categories.
+  const selectedSlug = slugifyCategory(selected);
+  const selectedCategory = categories.find((category) => [category.id, category.title, category.name, category.slug].some((value) => slugifyCategory(String(value || '')) === selectedSlug));
+  if (selectedCategory) {
+    const exactTokens = new Set(categoryDocTokens(selectedCategory).map(slugifyCategory).filter(Boolean));
+    return productTokens.some((token) => exactTokens.has(slugifyCategory(token)));
+  }
   const selectedFamily = exclusiveFamilyIndex(categoryTokens(selected));
   const productFamily = exclusiveFamilyIndex(productTokens);
-  if (selectedFamily != null && productFamily != null && selectedFamily !== productFamily) {
-    return false;
-  }
-  if (selectedFamily != null && productFamily === selectedFamily) {
-    return true;
-  }
+  if (selectedFamily != null && productFamily != null && selectedFamily !== productFamily) return false;
+  if (selectedFamily != null && productFamily === selectedFamily) return true;
   const selectedTokens = expandCategoryTokens(selected, categories);
   return productTokens.some((token) => selectedTokens.has(token));
 }
 
 export function categoryLabel(selected: string, categories: CategoryRef[] = []): string {
   if (!selected || selected === 'all') return '';
+  const selectedSlug = slugifyCategory(selected);
+
+  // The current route is created from the visible category title. Resolve that
+  // exact title/id before considering an old slug, because old slugs such as
+  // "g" and "p" are duplicated between multiple categories.
+  const direct = categories.find((category) =>
+    [category.title, category.name, category.id].some((value) => slugifyCategory(String(value || '')) === selectedSlug),
+  );
+  if (direct) return direct.title || direct.name || selected.replace(/-/g, ' ');
+
   const selectedTokens = expandCategoryTokens(selected, categories);
   const match = categories.find((category) => {
     const tokens = [
@@ -129,9 +150,7 @@ export function categoryLabel(selected: string, categories: CategoryRef[] = []):
     ];
     const categoryFamily = exclusiveFamilyIndex(tokens);
     const selectedFamily = exclusiveFamilyIndex(selectedTokens);
-    if (selectedFamily != null && categoryFamily != null && selectedFamily !== categoryFamily) {
-      return false;
-    }
+    if (selectedFamily != null && categoryFamily != null && selectedFamily !== categoryFamily) return false;
     return tokens.some((token) => selectedTokens.has(token));
   });
   return match?.title || match?.name || selected.replace(/-/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
