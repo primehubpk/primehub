@@ -41,10 +41,10 @@ export default function CategorySwiper() {
           View all <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
         </Link>
       </div>
-      <div className="flex gap-3 overflow-x-auto overflow-y-visible touch-pan-x touch-pan-y cursor-grab active:cursor-grabbing snap-x snap-mandatory overscroll-x-contain scroll-smooth pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="flex gap-3 overflow-x-auto overflow-y-visible touch-pan-x touch-pan-y cursor-grab active:cursor-grabbing snap-x snap-mandatory overscroll-x-contain scroll-smooth pb-3 [scrollbar-width:none] lg:[scrollbar-width:thin] lg:[scrollbar-color:#9ca3af_transparent] [&::-webkit-scrollbar]:hidden lg:[&::-webkit-scrollbar]:block lg:[&::-webkit-scrollbar]:h-1.5 lg:[&::-webkit-scrollbar-thumb]:rounded-full lg:[&::-webkit-scrollbar-thumb]:bg-black/25">
         {visible.map((category) => (
-          <Link key={category.id} href={categoryHref(category)} className="group w-[92px] shrink-0 snap-start text-center">
-            <span className="mx-auto flex h-20 w-20 items-center justify-center overflow-hidden rounded-full bg-[#F4F4F1] ring-1 ring-black/5">
+          <Link key={category.id} href={categoryHref(category)} className="group w-[92px] shrink-0 snap-start text-center lg:w-[78px]">
+            <span className="mx-auto flex h-20 w-20 items-center justify-center lg:h-[68px] lg:w-[68px] overflow-hidden rounded-full bg-[#F4F4F1] ring-1 ring-black/5">
               {category.iconUrl ? (
                 <img src={category.iconUrl} alt={category.title} draggable={false} className="h-full w-full object-cover" />
               ) : (
