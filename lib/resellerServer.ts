@@ -2,6 +2,7 @@ import 'server-only';
 import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { getAdminDb } from '@/lib/firebaseAdmin';
 import { getTierForMonthlyOrders } from '@/lib/resellerTiers';
+import { DEFAULT_RESELLER_TASKS } from '@/lib/resellerTasks';
 
 const HOLD_DAYS = 7;
 const n = (v: unknown) => { const x = Number(v); return Number.isFinite(x) ? x : 0; };
@@ -110,7 +111,7 @@ export async function reviewResellerTaskClaim(claimId: string, action: 'approve'
       return;
     }
     const taskSettings = await tx.get(db.collection('settings').doc('reseller'));
-    const tasks = Array.isArray(taskSettings.data()?.resellerTasks) ? taskSettings.data()?.resellerTasks : [];
+    const tasks = Array.isArray(taskSettings.data()?.resellerTasks) ? taskSettings.data()?.resellerTasks : DEFAULT_RESELLER_TASKS;
     const task = tasks.find((item: any) => item?.id === claim.taskId);
     const points = Math.max(0, Math.floor(n(task?.reward)));
     if (!points) throw new Error('This task is not active or has no point reward.');
