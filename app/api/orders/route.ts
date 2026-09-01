@@ -71,14 +71,24 @@ async function buildAuthoritativeItems(items: IncomingItem[]) {
     };
   });
 }
-async function optionalResellerUserId(request: Request) {
+async function optionalReseller(request: Request) {
   const header = request.headers.get('authorization') || '';
-  if (!header.startsWith('Bearer ')) return '';
+  if (!header.startsWith('Bearer ')) return null;
   try {
     const decoded = await getAdminAuth().verifyIdToken(header.slice(7));
     const profile = await getAdminDb().collection('reseller_profiles').doc(decoded.uid).get();
-    return profile.exists && profile.data()?.status === 'active' ? decoded.uid : '';
-  } catch { return ''; }
+    if (!profile.exists || profile.data()?.status !== 'active') return null;
+    const data = profile.data() || {};
+    const settingsSnap = await getAdminDb().collection('settings').doc('main').get();
+    const configured = Array.isArray(settingsSnap.data()?.resellerTiers) ? settingsSnap.data()?.resellerTiers : [];
+    const tiers = configured.length === 4 ? configured : [
+      { id: 'starter', minMonthlyOrders: 0, discountPercent: 0 }, { id: 'prime', minMonthlyOrders: 10, discountPercent: 2 },
+      { id: 'pro', minMonthlyOrders: 20, discountPercent: 5 }, { id: 'elite', minMonthlyOrders: 30, discountPercent: 8 },
+    ];
+    const monthlyOrders = Math.max(0, Number(data.monthlyOrders || 0));
+    const tier = [...tiers].sort((a:any,b:any)=>Number(b.minMonthlyOrders)-Number(a.minMonthlyOrders)).find((item:any)=>monthlyOrders>=Number(item.minMonthlyOrders)) || tiers[0];
+    return { userId: decoded.uid, tierId: String(tier.id || 'starter'), tierName: String(tier.name || 'Starter'), discountPercent: Math.min(100, Math.max(0, Number(tier.discountPercent || 0))) };
+  } catch { return null; }
 }
 
 export async function POST(request: Request) {
@@ -90,14 +100,18 @@ export async function POST(request: Request) {
     if (!rawItems.length || rawItems.length > 50) return NextResponse.json({ error: 'Your cart is empty or contains too many items.' }, { status: 400 });
     const items = await buildAuthoritativeItems(rawItems);
     const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
-    const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    const rawSubtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    const reseller = await optionalReseller(request);
+    const tierDiscountPercent = reseller?.discountPercent || 0;
+    const tierDiscount = Math.round(rawSubtotal * tierDiscountPercent / 100);
+    const subtotal = Math.max(0, rawSubtotal - tierDiscount);
     const delivery = selfCollect ? { baseDelivery: 0, wholesaleItems: 0, wholesaleSurcharge: 0, deliveryCharge: 0 } : calculateDeliveryCharge(items);
     const total = subtotal + delivery.deliveryCharge;
-    const quote = { items, subtotal, totalItems, ...delivery, total, selfCollect, fulfillment: selfCollect ? 'self_collect' : 'delivery' };
+    const quote = { items, rawSubtotal, tierDiscount, tierDiscountPercent, resellerTier: reseller?.tierName || '', subtotal, totalItems, ...delivery, total, selfCollect, fulfillment: selfCollect ? 'self_collect' : 'delivery' };
     if (quoteOnly) return NextResponse.json(quote);
     const customer = body?.customer as Customer | undefined;
     if (!customer?.name?.trim() || !customer?.phone?.trim() || (!selfCollect && (!customer?.address?.trim() || !customer?.city?.trim()))) return NextResponse.json({ error: selfCollect ? 'Name and phone are required.' : 'Name, phone, address and city are required.' }, { status: 400 });
-    const resellerUserId = await optionalResellerUserId(request);
+    const resellerUserId = reseller?.userId || '';
     const orderData: any = {
       customer: { name: customer.name.trim(), phone: customer.phone.trim(), email: String(customer.email || '').trim(), address: selfCollect ? 'PrimeHub Shop Pickup' : customer.address.trim(), city: selfCollect ? 'Lahore' : customer.city.trim(), notes: String(customer.notes || '').trim() },
       ...quote,
@@ -111,3 +125,4 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: error instanceof Error ? error.message : 'Unable to place order.' }, { status: 400 });
   }
 }
+
