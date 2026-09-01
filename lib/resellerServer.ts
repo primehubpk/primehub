@@ -48,10 +48,11 @@ export async function releaseMaturedResellerRewards(userId?: string) {
   return { released };
 }
 
-export async function createResellerWithdrawal(userId: string, amount: number, method: string, accountTitle: string, accountNumber: string) {
+export async function createResellerWithdrawal(userId: string, amount: number, method: string, accountTitle: string, accountNumber: string, bankName = '') {
   if (!['easypaisa', 'jazzcash', 'bank'].includes(method)) throw new Error('Unsupported withdrawal method.');
   if (!Number.isInteger(amount) || amount < 500) throw new Error('Minimum withdrawal is Rs. 500.');
   if (!accountTitle.trim() || !accountNumber.trim()) throw new Error('Payout account details are required.');
+  if (method === 'bank' && !bankName.trim()) throw new Error('Bank name is required.');
   const db = getAdminDb(), profileRef = db.collection('reseller_profiles').doc(userId), withdrawalRef = db.collection('reseller_withdrawals').doc();
   await db.runTransaction(async tx => {
     const profile = await tx.get(profileRef);
@@ -59,7 +60,7 @@ export async function createResellerWithdrawal(userId: string, amount: number, m
     const available = Math.max(0, Math.floor(n(profile.data()?.walletAvailable)));
     if (amount > available) throw new Error('Withdrawal amount exceeds available balance.');
     tx.update(profileRef, { walletAvailable: available - amount, updatedAt: FieldValue.serverTimestamp() });
-    tx.create(withdrawalRef, { id: withdrawalRef.id, userId, amount, method, accountTitle: accountTitle.trim(), accountNumber: accountNumber.trim(), status: 'pending', createdAt: FieldValue.serverTimestamp() });
+    tx.create(withdrawalRef, { id: withdrawalRef.id, userId, amount, method, bankName: method === 'bank' ? bankName.trim() : '', accountTitle: accountTitle.trim(), accountNumber: accountNumber.trim(), status: 'pending', createdAt: FieldValue.serverTimestamp() });
   });
   return { withdrawalId: withdrawalRef.id, status: 'pending' as const };
 }
@@ -79,3 +80,4 @@ export async function reviewResellerWithdrawal(withdrawalId: string, action: 'ap
     tx.update(ref, { status: 'rejected', reviewedAt: FieldValue.serverTimestamp(), adminNote: adminNote.trim() });
   });
 }
+

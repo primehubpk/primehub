@@ -13,6 +13,8 @@ export async function POST(request: Request) {
     const method = String(body?.method || '');
     const accountTitle = String(body?.accountTitle || '');
     const accountNumber = String(body?.accountNumber || '');
-    return NextResponse.json(await createResellerWithdrawal(user.uid, amount, method, accountTitle, accountNumber));
+    const bankName = String(body?.bankName || '');
+    return NextResponse.json(await createResellerWithdrawal(user.uid, amount, method, accountTitle, accountNumber, bankName));
   } catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : 'Withdrawal failed.' }, { status: 400 }); }
 }
+

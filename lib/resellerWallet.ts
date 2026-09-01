@@ -8,6 +8,7 @@ export interface WithdrawalRequest {
   method: WithdrawalMethod;
   accountTitle: string;
   accountNumber: string;
+  bankName?: string;
   status: WithdrawalStatus;
   createdAt: unknown;
   reviewedAt?: unknown;
@@ -30,3 +31,4 @@ export function validateWithdrawalAmount(amount: number, availableBalance: numbe
   if (amount > availableBalance) return 'Withdrawal amount cannot exceed your available balance.';
   return null;
 }
+

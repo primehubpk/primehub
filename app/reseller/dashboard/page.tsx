@@ -7,8 +7,10 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { addDoc, collection, doc, onSnapshot, runTransaction, serverTimestamp } from 'firebase/firestore';
 import {
   ArrowLeft,
+  Bell,
   Check,
   ChevronRight,
+  History,
   Instagram,
   Lock,
   Music2,
@@ -29,12 +31,12 @@ import {
   type ResellerTask,
   type ResellerWheelSettings,
 } from '@/lib/resellerTasks';
-import { getTierForMonthlyOrders } from '@/lib/resellerTiers';
-import type { ResellerProfile } from '@/lib/resellerTypes';
+import { getResellerTiers } from '@/lib/resellerTiers';
+import type { ResellerProfile, ResellerTier } from '@/lib/resellerTypes';
 
 const outfit = Outfit({ subsets: ['latin'] });
 
-type View = 'home' | 'tasks' | 'vouchers' | 'rewards' | 'wallet';
+type View = 'home' | 'tiers' | 'tasks' | 'vouchers' | 'rewards' | 'wallet' | 'gifts';
 type VoucherType = 'cash' | 'gift' | 'discount' | 'brand';
 type VoucherFilter = 'all' | VoucherType;
 type SettingsSnapshot = {
@@ -42,6 +44,7 @@ type SettingsSnapshot = {
   resellerMonthlyChallenge?: Partial<MonthlyChallengeSettings>;
   resellerWheel?: Partial<ResellerWheelSettings>;
   resellerVoucherImages?: Record<string, string>;
+  resellerTiers?: ResellerTier[];
 };
 type RewardWallet = { points: number; streak: number; lastCheckIn?: string; lastSpin?: string; };
 type RewardSettings = { checkInRewards?: number[]; };
@@ -94,6 +97,7 @@ export default function ResellerDashboardPage() {
   const [rewardBusy, setRewardBusy] = useState(false);
   const [rewardMessage, setRewardMessage] = useState('');
   const [voucherImages, setVoucherImages] = useState<Record<string, string>>({});
+  const [resellerTiers, setResellerTiers] = useState<ResellerTier[]>(getResellerTiers());
 
   useEffect(() => {
     let stopProfile: (() => void) | undefined;
@@ -137,6 +141,7 @@ export default function ResellerDashboardPage() {
           }
           if (data?.resellerWheel) setWheel({ ...DEFAULT_RESELLER_WHEEL, ...data.resellerWheel });
           setVoucherImages(data?.resellerVoucherImages || {});
+          if (Array.isArray(data?.resellerTiers) && data.resellerTiers.length === 4) setResellerTiers(data.resellerTiers);
         },
         () => undefined,
       ),
@@ -184,7 +189,11 @@ export default function ResellerDashboardPage() {
   const monthlyOrders = Number(profile?.monthlyOrders ?? 0);
   const walletAvailable = Number(profile?.walletAvailable ?? 0);
   const walletPending = Number(profile?.walletPending ?? 0);
-  const tier = getTierForMonthlyOrders(monthlyOrders);
+  const sortedTiers = [...resellerTiers].sort((a,b) => a.minMonthlyOrders - b.minMonthlyOrders);
+  const tier = [...sortedTiers].reverse().find(item => monthlyOrders >= item.minMonthlyOrders) || sortedTiers[0];
+  const tierIndex = Math.max(0, sortedTiers.findIndex(item => item.id === tier.id));
+  const nextTier = sortedTiers[tierIndex + 1] || null;
+  const tierProgress = nextTier ? Math.min(100, Math.round(((monthlyOrders-tier.minMonthlyOrders)/Math.max(1,nextTier.minMonthlyOrders-tier.minMonthlyOrders))*100)) : 100;
   const target = Math.max(1, Number(challenge.targetOrders || DEFAULT_MONTHLY_CHALLENGE.targetOrders));
   const challengePercent = Math.min(100, Math.round((monthlyOrders / target) * 100));
   const remaining = Math.max(0, target - monthlyOrders);
@@ -325,35 +334,53 @@ export default function ResellerDashboardPage() {
     <main className={`${outfit.className} min-h-screen bg-[#111] text-[#14140F]`}>
       <div className="relative mx-auto min-h-screen max-w-[1100px] overflow-hidden bg-[#F6F1E8] shadow-2xl">
         <header className="relative bg-[linear-gradient(165deg,#16332E_0%,#0C1C19_70%)] px-4 pb-[22px] pt-3 text-white">
-          <Link href="/reseller" className="inline-flex items-center gap-1.5 text-xs font-semibold text-white/80">
-            <ArrowLeft size={14} /> Reseller Club
-          </Link>
-          <p className="mt-3 text-[9px] font-extrabold uppercase tracking-[.18em] text-[#FF9A3C]">PrimeHub Reseller</p>
-          <h1 className="mt-1 text-[22px] font-extrabold leading-[1.15]">Complete missions.<br />Unlock vouchers.</h1>
-          <p className="mt-1.5 text-xs text-white/75">Complete tasks, collect points and unlock exclusive rewards.</p>
-
-          <div className="mt-3.5 grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <Stat label="This month" value={`${monthlyOrders} / ${target}`} />
-            <Stat label="Wallet" value={`Rs. ${walletAvailable.toLocaleString()}`} />
-            <Stat label="Tier" value={`${tier.name} · ${tier.rewardPercent}%`} />
-            <Stat label="Live missions" value={`${activeTasks.length} tasks`} />
-          </div>
+          <div id="club-home" className="flex items-center justify-between gap-3"><Link href="/reseller" className="inline-flex items-center gap-1.5 text-xs font-semibold text-white/80"><ArrowLeft size={14} /> Reseller Club</Link><div className="flex items-center gap-2"><Link href="/reseller/wallet" aria-label="Reward history" className="grid h-9 w-9 place-items-center rounded-full bg-white/10 text-white"><History size={16}/></Link><a href="#club-tasks" aria-label="Notifications" className="relative grid h-9 w-9 place-items-center rounded-full bg-white/10 text-white"><Bell size={16}/><span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-[#FF9A3C] ring-2 ring-[#16332E]"/></a></div></div>
+          <div className="mt-4 grid gap-3 sm:grid-cols-[1.3fr_.7fr]"><div className="flex min-w-0 items-center gap-3 rounded-2xl border border-white/10 bg-white/[.07] p-3"><div className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-[#FFCF68] text-lg font-extrabold text-[#14140F]">{(profile?.displayName||profile?.email||'P').charAt(0).toUpperCase()}</div><div className="min-w-0"><p className="text-[9px] font-extrabold uppercase tracking-[.2em] text-[#FFCF68]">Profile</p><h1 className="truncate text-lg font-extrabold">{profile?.displayName||'PrimeHub Reseller'}</h1><p className="truncate text-[10px] text-white/55">{profile?.email}</p></div></div><div className="grid grid-cols-2 gap-2"><div className="rounded-2xl border border-white/10 bg-white/[.07] p-3"><p className="text-[8px] font-extrabold uppercase tracking-wider text-white/45">Cash Wallet</p><p className="mt-1 text-base font-extrabold">Rs. {walletAvailable.toLocaleString()}</p></div><div className="rounded-2xl border border-white/10 bg-white/[.07] p-3"><p className="text-[8px] font-extrabold uppercase tracking-wider text-white/45">Points Wallet</p><p className="mt-1 text-base font-extrabold">{Number(rewardWallet.points||0).toLocaleString()}</p></div></div></div>
         </header>
 
-        <nav className="flex gap-1.5 overflow-x-auto px-4 pt-3">
-          {(['home', 'tasks', 'vouchers', 'rewards', 'wallet'] as View[]).map(item => (
-            <button
-              key={item}
-              type="button"
-              onClick={() => setView(item)}
-              className={`whitespace-nowrap rounded-full px-3.5 py-2 text-xs font-bold capitalize transition ${view === item ? 'bg-[#14140F] text-white' : 'bg-white text-[#6B6A62]'}`}
-            >
-              {item}
-            </button>
-          ))}
+        <nav className="sticky top-0 z-30 flex gap-1.5 overflow-x-auto border-b border-black/5 bg-[#F6F1E8]/95 px-4 py-3 backdrop-blur [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {(['home', 'rewards', 'tiers', 'tasks', 'vouchers', 'wallet', 'gifts'] as View[]).map(item => <button key={item} type="button" onClick={() => setView(item)} className={`shrink-0 rounded-full px-2.5 py-2 text-[10px] font-bold capitalize shadow-sm ${view === item ? 'bg-[#14140F] text-white' : 'bg-white text-[#6B6A62]'}`}>{item}</button>)}
         </nav>
 
-        <section className="px-4 pb-28 pt-3.5">
+        <section className="space-y-4 px-4 pb-28 pt-3.5">
+          {(view === 'home' || view === 'rewards') && <>
+          <section className="rounded-[18px] bg-[#FFFDF8] p-4 shadow-[0_8px_24px_rgba(20,20,15,.05)]">
+            <div className="flex items-end justify-between gap-3"><div><p className="text-[10px] font-extrabold uppercase tracking-[.14em] text-[#E85D04]">Weekly streak</p><h2 className="mt-1 text-xl font-extrabold">7-Day Check-in</h2><p className="mt-1 text-xs text-[#6B6A62]">Check in every day and unlock higher point rewards.</p></div><span className="rounded-full bg-[#FFF3E0] px-3 py-1.5 text-[10px] font-extrabold">{Math.min(7, Number(rewardWallet.streak || 0))}/7</span></div>
+            <div className="mt-4 grid grid-cols-7 gap-1.5">{Array.from({ length: 7 }, (_, index) => { const complete=index<Number(rewardWallet.streak||0); return <div key={index} className={`rounded-xl p-2 text-center ${complete?'bg-[#0E7C6F] text-white':'bg-[#F1ECE3] text-[#6B6A62]'}`}><p className="text-[8px] font-extrabold">D{index+1}</p><p className="mt-1 text-[9px] font-extrabold">+{Number(rewardSettings.checkInRewards?.[index]??0)}</p><p className="text-[7px] font-bold">PTS</p></div>; })}</div>
+            <button type="button" onClick={checkInReward} disabled={rewardBusy || rewardWallet.lastCheckIn===rewardDayKey()} className="mt-4 w-full rounded-xl bg-[#14140F] py-3.5 text-xs font-extrabold text-white disabled:opacity-45">{rewardWallet.lastCheckIn===rewardDayKey()?'✓ Checked in today':`Check in +${Number(rewardSettings.checkInRewards?.[Math.min(6,Number(rewardWallet.streak||0))]??10)} points`}</button>
+          </section>
+
+          {wheel.active && <RewardWheel settings={wheel} />}
+          </>}
+
+          {(view === 'home' || view === 'tiers') && <section className="rounded-[28px] border border-black/[.06] bg-[#FFFDF8] p-4 shadow-[0_16px_40px_rgba(20,20,15,.08)]"><div className="flex items-end justify-between gap-3"><div><p className="text-[9px] font-extrabold uppercase tracking-[.2em] text-[#B4871D]">Prime Loyalty Program</p><h2 className="mt-1 text-xl font-extrabold">Your reseller tiers</h2><p className="mt-1 text-[10px] text-black/45">Current tier: <b className="text-[#0E7C6F]">{tier.name}</b></p></div><span className="rounded-full bg-[#14140F] px-3 py-2 text-[9px] font-extrabold text-white">4 TIERS</span></div><div className="mt-4 grid grid-cols-2 gap-2.5 lg:grid-cols-4">{sortedTiers.map((item,index)=>{const active=item.id===tier.id;const colors=[['#7B3F1D','#F6D6B5'],['#59636E','#F1F5F8'],['#8A5A00','#FFE7A3'],['#171B2D','#B8C5FF']][index];const benefits=item.benefits?.length?item.benefits:['Exclusive member pricing','Earn bonus rewards','Special tier offers'];return <article key={item.id} className={`relative overflow-hidden rounded-[20px] border p-3 transition ${active?'border-[#14140F] shadow-[0_12px_26px_rgba(20,20,15,.16)]':'border-black/[.07]'}`} style={{background:'linear-gradient(145deg,#FFFDF8,'+colors[1]+')'}}><div className="absolute -right-7 -top-8 h-24 w-24 rounded-full opacity-20" style={{backgroundColor:colors[1]}}/><div className="relative flex items-center justify-between"><div className="grid h-9 w-9 place-items-center rounded-xl text-xs font-extrabold text-white shadow-md" style={{background:'linear-gradient(145deg,'+colors[0]+','+colors[1]+')'}}>{index+1}</div>{active&&<span className="rounded-full bg-[#14140F] px-2.5 py-1 text-[8px] font-extrabold text-white">CURRENT</span>}</div><h3 className="relative mt-3 text-base font-extrabold">{item.name}</h3><p className="mt-1 text-[10px] font-bold text-black/40">{item.minMonthlyOrders}+ monthly orders</p><p className="mt-2 text-xl font-extrabold" style={{color:colors[0]}}>{Number(item.discountPercent||0)}% <span className="text-[10px] text-black/35">OFF</span></p><div className="mt-3 space-y-1.5">{benefits.slice(0,4).map((benefit,n)=><p key={n} className="flex items-start gap-2 text-[9px] font-bold text-black/55"><span className="mt-0.5 grid h-3.5 w-3.5 shrink-0 place-items-center rounded-full bg-[#0E7C6F] text-[8px] text-white">✓</span>{benefit}</p>)}</div><div className={`mt-3 rounded-xl py-2 text-center text-[9px] font-extrabold ${active?'bg-[#14140F] text-white':'bg-white text-black/45'}`}>{active?'Your current tier':index<=tierIndex?'Unlocked':`Need ${Math.max(0,item.minMonthlyOrders-monthlyOrders)} orders`}</div></article>})}</div></section>}
+
+          {(view === 'home' || view === 'tasks') && <section className="rounded-[18px] bg-[#FFFDF8] p-3.5 shadow-[0_8px_24px_rgba(20,20,15,.05)]">
+            <div className="flex items-center justify-between"><div><span className="text-[10px] font-extrabold uppercase tracking-[.14em] text-[#E85D04]">Tasks</span><h2 className="mt-1 text-lg font-extrabold">Earn points & cash</h2></div><span className="rounded-full bg-[#E7F6F3] px-2 py-1 text-[11px] font-extrabold text-[#0E7C6F]">{activeTasks.length} live</span></div>
+            {challenge.active && <div className="mt-3 rounded-2xl bg-[#F6F1E8] p-3"><div className="flex items-center justify-between"><p className="text-xs font-extrabold">{target} orders = gift or cash</p><span className="text-[10px] font-extrabold text-[#0E7C6F]">{monthlyOrders}/{target}</span></div><Progress value={challengePercent}/><p className="text-[10px] text-[#6B6A62]">{remaining ? `${remaining} eligible orders remaining` : 'Challenge complete — choose your reward.'}</p></div>}
+            <div className="mt-2">{activeTasks.length ? activeTasks.map(task => <TaskRow key={task.id} task={task} monthlyOrders={monthlyOrders} target={target} />) : <p className="py-6 text-center text-xs text-[#6B6A62]">No active missions right now.</p>}</div>
+          </section>}
+
+          {(view === 'home' || view === 'vouchers') && <section>
+            <div className="mb-2.5 flex items-center justify-between"><div><p className="text-[10px] font-extrabold uppercase tracking-[.14em] text-[#E85D04]">Vouchers</p><h2 className="mt-1 text-lg font-extrabold">Unlock your rewards</h2></div><span className="rounded-full bg-white px-3 py-2 text-[10px] font-extrabold shadow-sm">{vouchers.length} rewards</span></div>
+            <div className="mb-2.5 flex gap-1.5 overflow-x-auto pb-1">{(['all','cash','gift','discount','brand'] as VoucherFilter[]).map(item=><button key={item} type="button" onClick={()=>setFilter(item)} className={`whitespace-nowrap rounded-full px-3 py-2 text-[11px] font-bold capitalize ${filter===item?'bg-[#14140F] text-white':'bg-white text-[#6B6A62]'}`}>{item}</button>)}</div>
+            <div className="grid grid-cols-2 gap-2.5 md:grid-cols-4">{filteredVouchers.map(voucher=><VoucherCard key={voucher.id} voucher={voucher} orders={monthlyOrders} onOpen={setSelectedVoucher}/>)}</div>
+          </section>}
+
+          {(view === 'home' || view === 'wallet') && <section className="rounded-[18px] bg-[#FFFDF8] p-3.5 shadow-[0_8px_24px_rgba(20,20,15,.05)]">
+            <span className="text-[10px] font-extrabold uppercase tracking-[.14em] text-[#E85D04]">Wallet</span>
+            <div className="mt-3 grid grid-cols-2 gap-2"><div className="rounded-2xl bg-[#F1ECE3] p-3"><p className="text-[9px] font-extrabold uppercase tracking-wider text-[#6B6A62]">Cash wallet</p><h2 className="mt-1 text-2xl font-extrabold">Rs. {walletAvailable.toLocaleString()}</h2><p className="text-[10px] text-[#6B6A62]">Pending Rs. {walletPending.toLocaleString()}</p></div><div className="rounded-2xl bg-[#E7F6F3] p-3"><p className="text-[9px] font-extrabold uppercase tracking-wider text-[#0E7C6F]">Points wallet</p><h2 className="mt-1 text-2xl font-extrabold">{Number(rewardWallet.points||0).toLocaleString()}</h2><p className="text-[10px] text-[#0E7C6F]">Reward points</p></div></div>
+            <Link href="/reseller/wallet" className="mt-3 block w-full rounded-xl bg-[#14140F] px-3 py-3 text-center text-xs font-extrabold text-white">History & withdrawal</Link>
+          </section>}
+
+          {(view === 'home' || view === 'gifts') && <section className="rounded-[18px] bg-[#FFFDF8] p-4 shadow-[0_8px_24px_rgba(20,20,15,.05)]">
+            <div className="flex items-end justify-between gap-3"><div><p className="text-[10px] font-extrabold uppercase tracking-[.14em] text-[#0E7C6F]">Point store</p><h2 className="mt-1 text-xl font-extrabold">Gifts & Products</h2><p className="mt-1 text-xs text-[#6B6A62]">Admin se add ki gayi reward images yahan automatically show hongi.</p></div><span className="rounded-full bg-[#FFF3E0] px-3 py-1.5 text-[10px] font-extrabold">{Number(rewardWallet.points||0).toLocaleString()} PTS</span></div>
+            <div className="mt-4 grid grid-cols-2 gap-2.5 lg:grid-cols-3">{rewardGifts.length ? rewardGifts.map(gift=>{const product=rewardProducts[gift.productId];const image=gift.imageUrl||rewardProductImage(product);const need=Math.max(0,Number(gift.pointsCost)-Number(rewardWallet.points||0));return <article key={gift.id} className="overflow-hidden rounded-2xl border border-black/[.06] bg-white"><div className="aspect-square bg-[#F1ECE3]">{image?<img src={image} alt={gift.title||'Reward gift'} className="h-full w-full object-cover"/>:<div className="grid h-full place-items-center text-3xl">🎁</div>}</div><div className="p-3"><h3 className="text-sm font-extrabold">{gift.title||product?.title||product?.name||'Reward Gift'}</h3><p className="mt-1 text-xs font-extrabold text-[#E85D04]">{Number(gift.pointsCost).toLocaleString()} points</p><Link href="/rewards#redeem-rewards" className="mt-3 block rounded-xl bg-[#14140F] px-3 py-2.5 text-center text-[10px] font-extrabold text-white">{need?`Need ${need} more points`:'Redeem gift'}</Link></div></article>}) : <div className="col-span-2 rounded-2xl bg-[#F1ECE3] p-6 text-center text-xs text-[#6B6A62] lg:col-span-3">Admin se add kiye gaye active gifts yahan show honge.</div>}</div>
+          </section>}
+          {rewardMessage && <div className="rounded-xl bg-[#0E7C6F] p-3 text-center text-xs font-extrabold text-white">{rewardMessage}</div>}
+        </section>
+
+        <section className="hidden">
           {view === 'home' && (
             <>
               {challenge.active && (
@@ -611,3 +638,4 @@ function VoucherSheet({ voucher, orders, onClose }: { voucher: Voucher; orders: 
     </div>
   );
 }
+

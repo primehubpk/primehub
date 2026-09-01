@@ -10,7 +10,7 @@ export const titleOf = (item: any) => item.title || item.name || 'Product';
 export const priceOf = (item: any) => Number(item.price || 0);
 export const imageOf = (item: any) => item.imageUrl || item.image || item.images?.[0] || '';
 export async function getAuthoritativeQuote(items: any[], selfCollect = false) {
-  const response = await fetch('/api/orders', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode: 'quote', items, selfCollect }) });
+  const response = await fetch('/api/orders', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(await authHeader()) }, body: JSON.stringify({ mode: 'quote', items, selfCollect }) });
   const data = await response.json();
   if (!response.ok) throw new Error(data.error || 'Unable to verify current prices.');
   return data;
@@ -27,13 +27,15 @@ export function useCheckout() {
   const [deliveryCharge, setDeliveryCharge] = useState(BASE_DELIVERY_CHARGE);
   const [selfCollect, setSelfCollect] = useState(false);
   const [wholesaleItems, setWholesaleItems] = useState(0);
+  const [tierDiscount, setTierDiscount] = useState(0), [tierDiscountPercent, setTierDiscountPercent] = useState(0), [resellerTier, setResellerTier] = useState('');
   const totalItems = useMemo(() => items.reduce((sum: number, item: any) => sum + Number(item.quantity || item.qty || 1), 0), [items]);
   const subtotal = useMemo(() => items.reduce((sum: number, item: any) => sum + priceOf(item) * Number(item.quantity || item.qty || 1), 0), [items]);
-  const total = subtotal + deliveryCharge;
+  const discountedSubtotal = Math.max(0, subtotal - tierDiscount);
+  const total = discountedSubtotal + deliveryCharge;
   useEffect(() => {
     if (!items.length) { setDeliveryCharge(BASE_DELIVERY_CHARGE); setWholesaleItems(0); return; }
     let cancelled = false;
-    getAuthoritativeQuote(items, selfCollect).then(quote => { if (!cancelled) { setDeliveryCharge(Number(quote.deliveryCharge ?? BASE_DELIVERY_CHARGE)); setWholesaleItems(Number(quote.wholesaleItems || 0)); } }).catch(() => undefined);
+    getAuthoritativeQuote(items, selfCollect).then(quote => { if (!cancelled) { setDeliveryCharge(Number(quote.deliveryCharge ?? BASE_DELIVERY_CHARGE)); setWholesaleItems(Number(quote.wholesaleItems || 0)); setTierDiscount(Number(quote.tierDiscount||0)); setTierDiscountPercent(Number(quote.tierDiscountPercent||0)); setResellerTier(String(quote.resellerTier||'')); } }).catch(() => undefined);
     return () => { cancelled = true; };
   }, [items, selfCollect]);
   const update = (key: keyof Customer, value: string) => setCustomer(previous => ({ ...previous, [key]: value }));
@@ -45,5 +47,6 @@ export function useCheckout() {
     const text = ['*Order from PrimeHub*', '', ...lines, '', '*Customer Details:*', `Name: ${customer.name || '-'}`, `Phone: ${customer.phone || '-'}`, `Address: ${customer.address || '-'}`, `City: ${customer.city || '-'}`, '', `Subtotal: Rs. ${Number(quote.subtotal).toLocaleString()}`, `Base delivery: Rs. ${Number(quote.baseDelivery || 350).toLocaleString()}`, wholesaleLine, `*Grand Total: Rs. ${Number(quote.total).toLocaleString()}*`, ...tracking].filter(Boolean).join('\n');
     window.open(`https://wa.me/${adminNumber}?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
   } catch (caught) { console.error(caught); setError(caught instanceof Error ? caught.message : 'Unable to prepare WhatsApp order.'); } };
-  return { items, customer, placing, orderId, error, totalItems, subtotal, deliveryCharge, wholesaleItems, total, selfCollect, setSelfCollect, update, placeOrder, whatsappOrder };
+  return { items, customer, placing, orderId, error, totalItems, subtotal: discountedSubtotal, rawSubtotal: subtotal, tierDiscount, tierDiscountPercent, resellerTier, deliveryCharge, wholesaleItems, total, selfCollect, setSelfCollect, update, placeOrder, whatsappOrder };
 }
+
