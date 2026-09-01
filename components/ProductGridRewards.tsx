@@ -29,6 +29,7 @@ import { useCartStore } from '@/lib/cartStore';
 import { ProductUrgencyBadges } from '@/components/ProductCard';
 import { isWholesaleProduct } from '@/lib/wholesale';
 import { shuffleProducts } from '@/lib/shuffleProducts';
+import { getEffectivePrice } from '@/lib/dealPricing';
 
 type Product = {
   id: string;
@@ -85,8 +86,11 @@ const safeNumber = (value: unknown) => {
   return Number.isFinite(parsed) ? parsed : 0;
 };
 
-const effectivePrice = (p: Product) =>
-  safeNumber(p.dealPrice || p.normalPrice || p.price || 0);
+const effectivePrice = (p: Product) => getEffectivePrice({
+  price: safeNumber(p.normalPrice || p.price || 0),
+  dealPrice: safeNumber(p.dealPrice || 0),
+  dealDay: String(p.dealDay || ''),
+});
 
 const original = (p: Product) =>
   safeNumber(p.compareAtPrice ?? p.originalPrice ?? 0);
