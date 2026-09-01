@@ -130,6 +130,16 @@ export function productMatchesCategory(
 
 export function categoryLabel(selected: string, categories: CategoryRef[] = []): string {
   if (!selected || selected === 'all') return '';
+  const selectedSlug = slugifyCategory(selected);
+
+  // The current route is created from the visible category title. Resolve that
+  // exact title/id before considering an old slug, because old slugs such as
+  // "g" and "p" are duplicated between multiple categories.
+  const direct = categories.find((category) =>
+    [category.title, category.name, category.id].some((value) => slugifyCategory(String(value || '')) === selectedSlug),
+  );
+  if (direct) return direct.title || direct.name || selected.replace(/-/g, ' ');
+
   const selectedTokens = expandCategoryTokens(selected, categories);
   const match = categories.find((category) => {
     const tokens = [
