@@ -81,3 +81,45 @@ export async function reviewResellerWithdrawal(withdrawalId: string, action: 'ap
   });
 }
 
+
+
+export async function createResellerTaskClaim(userId: string, taskId: string, proof: string) {
+  const cleanTask = taskId.trim().toLowerCase();
+  const cleanProof = proof.trim();
+  if (!cleanTask || cleanTask.length > 80) throw new Error('Invalid task.');
+  if (cleanProof.length < 3 || cleanProof.length > 1000) throw new Error('Please provide your account name or proof link.');
+  const db = getAdminDb();
+  const profile = await db.collection('reseller_profiles').doc(userId).get();
+  if (!profile.exists || profile.data()?.status !== 'active') throw new Error('Join the Reseller Club before submitting a task.');
+  const duplicate = await db.collection('reseller_task_claims').where('userId', '==', userId).where('taskId', '==', cleanTask).where('status', 'in', ['pending', 'approved']).limit(1).get();
+  if (!duplicate.empty) throw new Error('This task is already submitted or approved.');
+  const ref = db.collection('reseller_task_claims').doc();
+  await ref.create({ id: ref.id, userId, taskId: cleanTask, proof: cleanProof, status: 'pending', createdAt: FieldValue.serverTimestamp() });
+  return { claimId: ref.id, status: 'pending' as const };
+}
+
+export async function reviewResellerTaskClaim(claimId: string, action: 'approve' | 'reject', adminNote = '') {
+  const db = getAdminDb(), claimRef = db.collection('reseller_task_claims').doc(claimId);
+  await db.runTransaction(async tx => {
+    const claimSnap = await tx.get(claimRef);
+    if (!claimSnap.exists) throw new Error('Task claim not found.');
+    const claim = claimSnap.data() || {};
+    if (claim.status !== 'pending') throw new Error('This task claim has already been reviewed.');
+    if (action === 'reject') {
+      tx.update(claimRef, { status: 'rejected', adminNote: adminNote.trim(), reviewedAt: FieldValue.serverTimestamp() });
+      return;
+    }
+    const taskSettings = await tx.get(db.collection('settings').doc('reseller'));
+    const tasks = Array.isArray(taskSettings.data()?.resellerTasks) ? taskSettings.data()?.resellerTasks : [];
+    const task = tasks.find((item: any) => item?.id === claim.taskId);
+    const points = Math.max(0, Math.floor(n(task?.reward)));
+    if (!points) throw new Error('This task is not active or has no point reward.');
+    const profileRef = db.collection('reseller_profiles').doc(String(claim.userId));
+    const profile = await tx.get(profileRef);
+    if (!profile.exists || profile.data()?.status !== 'active') throw new Error('Reseller profile is not active.');
+    const ledgerRef = db.collection('reseller_point_ledger').doc(claimId);
+    tx.create(ledgerRef, { id: claimId, userId: claim.userId, claimId, taskId: claim.taskId, points, reason: task.title || claim.taskId, status: 'approved', createdAt: FieldValue.serverTimestamp() });
+    tx.update(profileRef, { pointsBalance: FieldValue.increment(points), updatedAt: FieldValue.serverTimestamp() });
+    tx.update(claimRef, { status: 'approved', points, adminNote: adminNote.trim(), reviewedAt: FieldValue.serverTimestamp() });
+  });
+}
