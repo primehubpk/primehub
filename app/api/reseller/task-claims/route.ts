@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getAdminAuth } from '@/lib/firebaseAdmin';
-import { createResellerTaskClaim } from '@/lib/resellerServer';
+import { createResellerTaskClaim, recordResellerTaskOpen } from '@/lib/resellerServer';
 
 export const runtime = 'nodejs';
 
@@ -10,9 +10,11 @@ export async function POST(request: Request) {
   try {
     const user = await getAdminAuth().verifyIdToken(header.slice(7));
     const body = await request.json();
-    const result = await createResellerTaskClaim(user.uid, String(body?.taskId || ''), String(body?.proof || ''));
-    return NextResponse.json(result);
-  } catch (error) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : 'Task submission failed.' }, { status: 400 });
-  }
+    const taskId = String(body?.taskId || '');
+    if (body?.action === 'open') {
+      await recordResellerTaskOpen(user.uid, taskId);
+      return NextResponse.json({ ok: true });
+    }
+    return NextResponse.json(await createResellerTaskClaim(user.uid, taskId, String(body?.proof || '')));
+  } catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : 'Task action failed.' }, { status: 400 }); }
 }
