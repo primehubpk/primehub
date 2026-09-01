@@ -381,7 +381,7 @@ export default function ProductGridRewards({
     return (
       <section className="mt-8 px-4">
         <div className="mb-4 h-7 w-44 animate-pulse rounded-lg bg-black/8" />
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+        <div className="grid grid-cols-2 gap-2 md:grid-cols-3 md:gap-3 lg:grid-cols-4 xl:grid-cols-5">
           {Array.from({ length: 6 }).map((_, i) => (
             <div
               key={i}
@@ -440,7 +440,7 @@ export default function ProductGridRewards({
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+        <div className="grid grid-cols-2 gap-2 md:grid-cols-3 md:gap-3 lg:grid-cols-4 xl:grid-cols-5">
           {visible.map((p) => {
             const r = rewards[p.id];
             const pts = points;
@@ -453,7 +453,7 @@ export default function ProductGridRewards({
             return (
               <article
                 key={p.id}
-                className="overflow-hidden rounded-[24px] border border-black/7 bg-white shadow-sm"
+                className="overflow-hidden rounded-[18px] border border-black/7 bg-white shadow-sm sm:rounded-[24px]"
               >
                 <div className="relative aspect-square overflow-hidden bg-[#F4F4F1]">
                   {img ? (
