@@ -17,7 +17,8 @@ export function getPakistanDay(now = new Date()): DealDay {
 
 /** A scheduled deal is active only when its assigned weekday is today's PKT weekday. */
 export function isDealActive(dealDay?: string, now = new Date()): boolean {
-  return !!dealDay && DEAL_DAYS.includes(dealDay as DealDay) && dealDay === getPakistanDay(now);
+  const normalizedDay = String(dealDay || '').trim().toLowerCase();
+  return DEAL_DAYS.some((day) => day.toLowerCase() === normalizedDay) && normalizedDay === getPakistanDay(now).toLowerCase();
 }
 
 /** Single pricing rule: scheduled/future deals use regular price; only today's PKT deal price is active. */
@@ -30,7 +31,7 @@ export function getEffectivePrice(product: DealPriceInput, now = new Date()): nu
 }
 
 export function getDealStatus(dealDay?: string, now = new Date()) {
-  if (!dealDay || !DEAL_DAYS.includes(dealDay as DealDay)) return 'regular' as const;
+  if (!dealDay || !DEAL_DAYS.some((day) => day.toLowerCase() === String(dealDay).trim().toLowerCase())) return 'regular' as const;
   if (isDealActive(dealDay, now)) return 'active' as const;
   return 'scheduled' as const;
 }
