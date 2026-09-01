@@ -24,10 +24,10 @@ export default function BottomNav() {
           const isActive = pathname === href || (key === 'reseller' && pathname.startsWith('/reseller'));
           return (
             <Link key={key} href={href} className="group relative flex flex-col items-center gap-1 px-0.5 py-2">
-              <span className={`relative flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-[#171711] via-[#2B281C] to-[#7C5608] text-[#FFD979] ring-1 ring-[#E7B84B]/35 transition-all ${isActive ? '-translate-y-0.5 shadow-[0_7px_16px_rgba(141,97,0,0.34)]' : 'opacity-75 shadow-[0_3px_9px_rgba(20,20,15,0.16)] group-hover:opacity-100'}`}>
+              <span className={`relative flex h-8 w-8 items-center justify-center rounded-full bg-[#14140F] text-white transition-all ${isActive ? '-translate-y-0.5 shadow-[0_7px_16px_rgba(20,20,15,0.3)] ring-2 ring-[#E1352B]/25' : 'opacity-80 shadow-md group-hover:opacity-100'}`}>
                 <Icon className="h-[18px] w-[18px]" aria-hidden="true" />
               </span>
-              <span className={`max-w-full truncate text-[8px] font-black sm:text-[9px] ${isActive ? 'text-[#8D6100]' : 'text-black/55'}`}>{label}</span>
+              <span className={`max-w-full truncate text-[8px] font-black sm:text-[9px] ${isActive ? 'text-[#E1352B]' : 'text-black/55'}`}>{label}</span>
               {key === 'cart' && cartCount > 0 && <span className="absolute right-[calc(50%-20px)] top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#E1352B] px-1 text-[8px] font-bold text-white ring-2 ring-white">{cartCount}</span>}
             </Link>
           );
