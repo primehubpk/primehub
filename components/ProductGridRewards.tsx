@@ -27,6 +27,7 @@ import {
 import { auth, db } from '@/lib/firebase';
 import { useCartStore } from '@/lib/cartStore';
 import { ProductUrgencyBadges } from '@/components/ProductCard';
+import ProductShareButton from '@/components/ProductShareButton';
 import { isWholesaleProduct } from '@/lib/wholesale';
 import { shuffleProducts } from '@/lib/shuffleProducts';
 import { getEffectivePrice } from '@/lib/dealPricing';
@@ -497,6 +498,7 @@ export default function ProductGridRewards({
                   )}
 
                   <div className="absolute right-2.5 top-2.5 flex gap-1.5">
+                    <ProductShareButton productId={p.id} title={title(p)} className="flex h-8 w-8 items-center justify-center rounded-full bg-white/90 shadow-sm"/>
                     {(p.videoUrl || p.reelUrl) && (
                       <button
                         type="button"
