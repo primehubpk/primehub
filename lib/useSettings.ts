@@ -11,7 +11,7 @@ const DEFAULT_SETTINGS: SiteSettings = {
   announcementText: 'PrimeHub Deals', whatsappNumber: '', freeShippingCount: 5,
   heroTitle: 'Flash Sale', heroDiscountText: 'Up to 70% Off', heroCountdownEndTime: new Date(Date.now() + 2 * 3600 * 1000).toISOString(),
   heroImageUrl: '', heroButtonText: "Shop Today's Deal", heroButtonLink: '#',
-  dailyDeal: { productId: '', imageUrl: '', title: '', originalPrice: 0, dealPrice: 0, startAt: '', endAt: '', buttonText: 'View Big Deal', buttonLink: '/deals/big', active: false },
+  dailyDeal: { productId: '', imageUrl: '', imageUrls: [], title: '', originalPrice: 0, dealPrice: 0, startAt: '', endAt: '', buttonText: 'View Big Deal', buttonLink: '/deals/big', active: false },
   youtubeGuide: { enabled: true, title: 'How To Order & List Products on PrimeHub Deals', videoId: 'dQw4w9WgXcQ', description: 'Watch this quick guide to learn how to order and list products on PrimeHub Deals.' },
   policies: { privacyPolicy: { title: 'Privacy Policy', content: '' }, terms: { title: 'Terms of Service', content: '' }, returnPolicy: { title: 'Return Policy', content: '' } },
   contact: { whatsappNumber: '', email: '', physicalAddress: '' },
@@ -36,6 +36,17 @@ function resolveAnnouncement(mainData: RawSettings, legacyData?: RawSettings): s
   return typeof match === 'string' ? match.trim() : DEFAULT_SETTINGS.announcementText;
 }
 
+function resolveRotatingBigDeal(settings: RawSettings): RawSettings {
+  const dailyDeal = settings.dailyDeal;
+  if (!dailyDeal) return settings;
+  const images = Array.isArray(dailyDeal.imageUrls) ? dailyDeal.imageUrls.filter((value: unknown): value is string => typeof value === 'string' && Boolean(value.trim())) : [];
+  if (!images.length) return settings;
+  const weekday = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Karachi', weekday: 'long' }).format(new Date()).toLowerCase();
+  const index = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'].indexOf(weekday);
+  const imageUrl = images[index >= 0 ? index % images.length : 0] || dailyDeal.imageUrl || images[0];
+  return { ...settings, dailyDeal: { ...dailyDeal, imageUrl } };
+}
+
 export function useSettings() {
   const [settings, setSettings] = useState<SiteSettings>(DEFAULT_SETTINGS);
   const [loading, setLoading] = useState(true);
@@ -49,7 +60,7 @@ export function useSettings() {
     let contactReady = false;
 
     const publish = () => {
-      const merged: RawSettings = { ...DEFAULT_SETTINGS, ...legacyData, ...mainData };
+      const merged: RawSettings = resolveRotatingBigDeal({ ...DEFAULT_SETTINGS, ...legacyData, ...mainData });
       const mainWhatsApp = typeof mainData.whatsappNumber === 'string' ? mainData.whatsappNumber : '';
       const contactWhatsApp = typeof contactData.whatsappNumber === 'string' ? contactData.whatsappNumber : '';
       const privacyPolicy = typeof policyData.privacyPolicy === 'string' ? policyData.privacyPolicy : DEFAULT_SETTINGS.policies?.privacyPolicy?.content || '';
