@@ -7,6 +7,7 @@ import { db } from '@/lib/firebase';
 import { useSettings } from '@/lib/useSettings';
 import { useCartStore } from '@/lib/cartStore';
 import { categoryHref, categoryLabel, productMatchesCategory, slugifyCategory } from '@/lib/categoryUtils';
+import { smartSearchProducts } from '@/lib/smartSearch';
 import { isWholesaleProduct } from '@/lib/wholesale';
 import { shuffleProducts } from '@/lib/shuffleProducts';
 import { Product, Category, ShopCatalogModel, imageOf, priceOf, originalOf, productHasVariants, titleOf } from './ShopTypes';
@@ -15,21 +16,26 @@ export function useShopCatalog(initialCategory?: string, initialQuery = ''): Sho
   const { settings } = useSettings();
   const addItem = useCartStore((state) => state.addItem);
   const openVariantModal = useCartStore((state) => state.openVariantModal);
+  const searchParams = useSearchParams();
+  const urlQuery = searchParams.get('q') || '';
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [search, setSearch] = useState(initialQuery);
+  const [search, setSearch] = useState(initialQuery || urlQuery);
   const [category, setCategory] = useState(initialCategory || 'all');
   const [maxPrice, setMaxPrice] = useState('all');
   const [onlyDeals, setOnlyDeals] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [addedId, setAddedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const searchParams = useSearchParams();
   const [wholesaleOnly, setWholesaleOnly] = useState(searchParams.get('wholesale') === 'true');
 
   useEffect(() => {
     setCategory(initialCategory ? slugifyCategory(decodeURIComponent(initialCategory)) || initialCategory : 'all');
   }, [initialCategory]);
+
+  useEffect(() => {
+    if (!initialQuery) setSearch(urlQuery);
+  }, [initialQuery, urlQuery]);
 
   useEffect(() => {
     let cancelled = false;
@@ -61,18 +67,13 @@ export function useShopCatalog(initialCategory?: string, initialQuery = ''): Sho
   );
 
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return products.filter((p) => {
-      if (p.published === false) return false;
-      const title = titleOf(p).toLowerCase();
-      const cat = String(p.category || '').toLowerCase();
-      const catId = String(p.categoryId || '').toLowerCase();
-      const matchesSearch = !q || title.includes(q) || cat.includes(q) || catId.includes(q);
+    const searchable = smartSearchProducts(products.filter((p) => p.published !== false), search);
+    return searchable.filter((p) => {
       const selectedCat = wholesaleOnly || productMatchesCategory(category, p, categories);
       const matchesPrice = wholesaleOnly || maxPrice === 'all' || !Number(maxPrice) || priceOf(p) <= Number(maxPrice);
       const matchesDeal = !onlyDeals || Boolean(p.isFlashSale);
       const matchesWholesale = !wholesaleOnly || isWholesaleProduct(p);
-      return matchesSearch && selectedCat && matchesPrice && matchesDeal && matchesWholesale;
+      return selectedCat && matchesPrice && matchesDeal && matchesWholesale;
     });
   }, [products, categories, search, category, maxPrice, onlyDeals, wholesaleOnly]);
 
