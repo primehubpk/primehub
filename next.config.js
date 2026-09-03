@@ -9,6 +9,11 @@ const nextConfig = {
           { protocol: 'https', hostname: 'ibb.co', pathname: '/**' },
           {
             protocol: 'https',
+            hostname: 'images.primehubmall.com',
+            pathname: '/**',
+          },
+          {
+            protocol: 'https',
             hostname: 'pub-157b90419bf04016bdea666e4cbce181.r2.dev',
             pathname: '/**',
           },
