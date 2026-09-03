@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { ArrowRight, Image as ImageIcon, Sparkles } from 'lucide-react';
+import { ArrowRight, Image as ImageIcon, MessageCircle, Sparkles } from 'lucide-react';
 import { collection, doc, getDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { PRIME_SKILLS_SEED } from '@/lib/primeSkillsSeed';
@@ -15,6 +15,7 @@ type SkillItem = {
   price?: number;
   thumbnailUrl?: string;
   whatsapp?: string;
+  buttonText?: string;
   active?: boolean;
   sortOrder?: number;
   packages?: SkillPackage[];
@@ -29,12 +30,33 @@ const DEFAULT_PAGE: PageSettings = {
   ctaWhatsapp: '03238878009',
 };
 
-function sellerWhatsappUrl(number?: string) {
+function normalizeWhatsapp(number?: string) {
   const digits = String(number || '').replace(/\D/g, '');
   if (!digits) return '';
-  const international = digits.startsWith('92') ? digits : digits.startsWith('0') ? `92${digits.slice(1)}` : digits;
+  return digits.startsWith('92') ? digits : digits.startsWith('0') ? `92${digits.slice(1)}` : digits;
+}
+
+function sellerWhatsappUrl(number?: string) {
+  const international = normalizeWhatsapp(number);
+  if (!international) return '';
   const text = 'Assalam o Alaikum, mujhe PrimeHub par apni skill ya service add karwani hai. Please details share kar dein.';
   return `https://wa.me/${international}?text=${encodeURIComponent(text)}`;
+}
+
+function orderWhatsappUrl(number: string | undefined, item: SkillItem) {
+  const international = normalizeWhatsapp(number);
+  if (!international) return '';
+  const price = Number(item.price || 0) > 0 ? `Rs. ${Number(item.price).toLocaleString()}` : 'Please confirm';
+  const lines = [
+    'Assalam o Alaikum, mujhe PrimeHub ki ye online skill/service order karni hai.',
+    '',
+    `*Service:* ${item.title || 'Prime Skill'}`,
+    `*Price:* ${price}`,
+    item.subtitle ? `*Service Details:* ${item.subtitle}` : '',
+    '',
+    'Please order details aur next step share kar dein.',
+  ].filter(Boolean);
+  return `https://wa.me/${international}?text=${encodeURIComponent(lines.join('\n'))}`;
 }
 
 function displayPrice(item: SkillItem) {
@@ -97,17 +119,33 @@ export default function SkillsShowcase() {
     <section className="mx-auto mt-4 max-w-5xl sm:mt-7">{loading ? <div className="rounded-[20px] border border-black/5 bg-white px-4 py-10 text-center text-sm font-bold text-black/40">Loading skills...</div> : <div className="grid grid-cols-2 gap-2 sm:gap-5">{visibleItems.map((item) => {
       const detailHref = `/skills/${encodeURIComponent(item.id)}`;
       const priceInfo = displayPrice(item);
-      const packageCount = (item.packages || []).filter((pkg) => pkg.active !== false).length;
+      const packages = (item.packages || []).filter((pkg) => pkg.active !== false);
+      const packageCount = packages.length;
+      const waHref = packageCount === 0 ? orderWhatsappUrl(item.whatsapp, item) : '';
+
       return <article key={item.id} className="group min-w-0 overflow-hidden rounded-[14px] border border-black/5 bg-white shadow-[0_7px_18px_rgba(20,20,15,0.06)] sm:rounded-[22px] sm:shadow-[0_12px_34px_rgba(20,20,15,0.07)]">
         <Link href={detailHref} className="block">
           <div className="relative aspect-video overflow-hidden bg-white">{item.thumbnailUrl ? <img src={item.thumbnailUrl} alt={item.title || 'Prime Skill'} className="h-full w-full object-contain transition duration-300 sm:object-cover sm:group-hover:scale-[1.02]" loading="lazy"/> : <div className="flex h-full items-center justify-center text-black/25"><ImageIcon size={22}/></div>}</div>
-          <div className="p-2 sm:p-5">
+          <div className="p-2 pb-0 sm:p-5 sm:pb-0">
             <h2 className="line-clamp-2 text-[11px] font-black leading-[15px] text-[#181914] sm:text-lg sm:leading-tight">{item.title}</h2>
             {priceInfo.price > 0 && <p className="mt-1 text-[10px] font-black text-[#E1352B] sm:mt-2 sm:text-sm">{priceInfo.from ? 'From ' : ''}Rs {priceInfo.price.toLocaleString()}</p>}
             {packageCount > 0 && <span className="mt-1.5 inline-flex rounded-full bg-[#0F6A5F]/10 px-2 py-1 text-[8px] font-black text-[#0F6A5F] sm:text-[9px]">{packageCount} package{packageCount === 1 ? '' : 's'} available</span>}
-            <div className="mt-2 flex min-h-9 w-full items-center justify-center gap-1.5 rounded-lg bg-[#181914] px-2 py-2 text-[9px] font-black text-white sm:mt-3 sm:min-h-11 sm:rounded-xl sm:px-4 sm:py-3 sm:text-xs">View & Choose Package <ArrowRight size={12}/></div>
           </div>
         </Link>
+
+        <div className="p-2 pt-2 sm:p-5 sm:pt-3">
+          {packageCount > 0 ? (
+            <Link href={detailHref} className="flex min-h-9 w-full items-center justify-center gap-1.5 rounded-lg bg-[#181914] px-2 py-2 text-[9px] font-black text-white sm:min-h-11 sm:rounded-xl sm:px-4 sm:py-3 sm:text-xs">
+              View Packages <ArrowRight size={12}/>
+            </Link>
+          ) : waHref ? (
+            <Link href={waHref} target="_blank" rel="noreferrer" className="flex min-h-9 w-full items-center justify-center gap-1.5 rounded-lg bg-[#0F6A5F] px-2 py-2 text-[9px] font-black text-white sm:min-h-11 sm:rounded-xl sm:px-4 sm:py-3 sm:text-xs">
+              <MessageCircle size={12}/>{item.buttonText || 'Order on WhatsApp'}
+            </Link>
+          ) : (
+            <Link href={detailHref} className="flex min-h-9 w-full items-center justify-center gap-1.5 rounded-lg bg-[#181914] px-2 py-2 text-[9px] font-black text-white sm:min-h-11 sm:rounded-xl sm:px-4 sm:py-3 sm:text-xs">View Details <ArrowRight size={12}/></Link>
+          )}
+        </div>
       </article>;
     })}</div>}</section>
   </main>;
