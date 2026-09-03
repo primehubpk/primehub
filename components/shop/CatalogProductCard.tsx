@@ -3,7 +3,6 @@
 import Link from 'next/link';
 import { Check, ShoppingBag } from 'lucide-react';
 import WholesaleBadge from '@/components/WholesaleBadge';
-import ProductShareButton from '@/components/ProductShareButton';
 import { useCartStore } from '@/lib/cartStore';
 import { isWholesaleProduct } from '@/lib/wholesale';
 import { Product, availableStockOf, discountOf, imageOf, originalOf, priceOf, productHasVariants, titleOf } from './ShopTypes';
@@ -55,14 +54,14 @@ export default function CatalogProductCard({ product, addedId, addProduct, compa
         </div>
       </Link>
       <div className={dense ? "px-2 pb-2 pt-1.5 sm:px-3 sm:pb-3" : "px-3 pb-3 pt-2"}>
-        <div className="flex gap-2"><button
+        <button
           type="button"
           disabled={unavailable}
           onClick={handleAdd}
-          className={`flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-xl py-2 text-[8px] sm:py-2.5 sm:text-[9px] font-black transition active:scale-[0.98] ${unavailable ? 'cursor-not-allowed bg-black/5 text-black/25' : added ? 'bg-[#0F6A5F] text-white' : 'bg-[#14140F] text-white hover:bg-[#E1352B]'}`}
+          className={`flex w-full min-w-0 items-center justify-center gap-1.5 rounded-xl py-2 text-[8px] sm:py-2.5 sm:text-[9px] font-black transition active:scale-[0.98] ${unavailable ? 'cursor-not-allowed bg-black/5 text-black/25' : added ? 'bg-[#0F6A5F] text-white' : 'bg-[#14140F] text-white hover:bg-[#E1352B]'}`}
         >
           {unavailable ? 'Unavailable' : added ? <><Check size={13} />Added to Cart</> : <><ShoppingBag size={13} />Add to Cart</>}
-        </button><ProductShareButton productId={product.id} title={titleOf(product)} className="flex w-10 shrink-0 items-center justify-center rounded-xl border border-black/8 bg-white text-[#14140F] transition hover:bg-black/5"/></div>
+        </button>
       </div>
     </article>
   );
