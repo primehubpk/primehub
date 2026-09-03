@@ -1,4 +1,32 @@
 'use client';
-import { Crown, ArrowRight } from 'lucide-react';
+
 import Link from 'next/link';
-export default function ResellerClubCard(){return <Link href="/reseller" className="group relative block min-h-[190px] overflow-hidden rounded-[24px] border border-white/60 bg-gradient-to-br from-[#14140F] via-[#173C36] to-[#0B4F47] p-3.5 text-white shadow-[0_14px_34px_rgba(15,106,95,0.18)] transition active:scale-[0.985] sm:min-h-[210px] sm:p-5"><div className="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-[#FFB020]/20 blur-2xl"/><div className="relative"><div className="flex items-start justify-between gap-2"><div className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 sm:h-11 sm:w-11"><Crown size={18} className="text-[#FFCF68]"/></div><span className="rounded-full bg-[#FFB020]/15 px-2 py-1 text-[7px] font-black uppercase text-[#FFD979]">Special Club</span></div><p className="mt-3 text-[7px] font-black uppercase tracking-[0.18em] text-white/55">PrimeHub Exclusive</p><h3 className="mt-1 text-[14px] font-black leading-tight sm:text-[17px]">Prime Reseller Club</h3><p className="mt-1 line-clamp-2 text-[9px] font-semibold leading-4 text-white/65">Rewards, gifts, points and reseller cash.</p><div className="mt-4 flex items-center justify-between rounded-full bg-white px-3 py-2.5 text-[#14140F]"><span className="text-[9px] font-black">Join Now</span><ArrowRight size={14}/></div></div></Link>}
+import { ArrowRight, Crown } from 'lucide-react';
+
+export default function ResellerClubCard() {
+  return (
+    <Link
+      href="/reseller"
+      className="group relative block overflow-hidden rounded-[28px] border border-white/50 bg-gradient-to-br from-[#14140F] via-[#173C36] to-[#0B4F47] px-4 py-3.5 text-white shadow-[0_10px_28px_rgba(15,106,95,0.14)] transition active:scale-[0.98]"
+    >
+      <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-[#FFB020]/20 blur-2xl" />
+      <div className="relative">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-[#FFCF68]">
+            <Crown size={18} />
+          </div>
+          <span className="rounded-full bg-[#FFB020]/15 px-2 py-1 text-[7px] font-black uppercase text-[#FFD979]">
+            Club
+          </span>
+        </div>
+        <p className="mt-3 text-[8px] font-black uppercase tracking-[0.16em] text-white/55">
+          PrimeHub Exclusive
+        </p>
+        <div className="mt-0.5 flex items-center justify-between gap-2">
+          <p className="text-sm font-black leading-tight">Prime Reseller Club</p>
+          <ArrowRight size={14} className="shrink-0 text-white/70 transition group-hover:translate-x-0.5" />
+        </div>
+      </div>
+    </Link>
+  );
+}
