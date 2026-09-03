@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { ArrowRight, ExternalLink, Image as ImageIcon, MessageCircle, Play, Sparkles } from 'lucide-react';
 import { collection, doc, getDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { PRIME_SKILLS_SEED } from '@/lib/primeSkillsSeed';
 
 type MediaType = 'image' | 'video-link' | 'external-link';
 
@@ -43,7 +44,7 @@ function whatsappUrl(number?: string, title?: string) {
   if (!digits) return '';
   const international = digits.startsWith('92') ? digits : digits.startsWith('0') ? `92${digits.slice(1)}` : digits;
   const text = title
-    ? `Assalam o Alaikum, mujhe PrimeHub par \"${title}\" ke bare mein maloomat chahiye.`
+    ? `Assalam o Alaikum, mujhe PrimeHub par \"${title}\" order karna hai. Please details share kar dein.`
     : 'Assalam o Alaikum, mujhe PrimeHub par apni skill ya service add karwani hai.';
   return `https://wa.me/${international}?text=${encodeURIComponent(text)}`;
 }
@@ -80,10 +81,12 @@ export default function SkillsShowcase() {
     return unsubscribe;
   }, []);
 
-  const visibleItems = useMemo(
-    () => items.filter((item) => item.active !== false).sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0)),
-    [items],
-  );
+  const visibleItems = useMemo(() => {
+    const source: SkillItem[] = items.length ? items : PRIME_SKILLS_SEED;
+    return source
+      .filter((item) => item.active !== false)
+      .sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0));
+  }, [items]);
 
   const ctaHref = whatsappUrl(page.ctaWhatsapp);
 
@@ -108,11 +111,6 @@ export default function SkillsShowcase() {
       <section className="mx-auto mt-8 max-w-5xl">
         {loading ? (
           <div className="rounded-[24px] border border-black/5 bg-white px-5 py-12 text-center text-sm font-bold text-black/40">Loading skills...</div>
-        ) : visibleItems.length === 0 ? (
-          <div className="rounded-[24px] border border-dashed border-black/10 bg-white/60 px-5 py-10 text-center sm:px-8">
-            <p className="text-sm font-bold text-black/70">Skills aur services jald yahan show hongi.</p>
-            <p className="mt-2 text-xs font-medium text-black/45">Apni skill add karwane ke liye upar WhatsApp button use karein.</p>
-          </div>
         ) : (
           <div className="grid gap-5 sm:grid-cols-2">
             {visibleItems.map((item) => {
@@ -146,7 +144,7 @@ export default function SkillsShowcase() {
                     <div className="mt-4 flex flex-wrap gap-2">
                       {waHref && (
                         <Link href={waHref} target="_blank" rel="noreferrer" className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-[#0F6A5F] px-4 py-3 text-xs font-black text-white sm:flex-none">
-                          <MessageCircle size={14}/>{item.buttonText || 'Contact on WhatsApp'}
+                          <MessageCircle size={14}/>{item.buttonText || 'Order Place'}
                         </Link>
                       )}
                       {externalHref && (
