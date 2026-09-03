@@ -29,19 +29,43 @@ type PageSettings = {
 const DEFAULT_PAGE: PageSettings = {
   eyebrow: 'Prime Skills',
   title: 'Aap kya karte hain?',
-  description: 'Apni skill ya service PrimeHub par add karwa sakte hain. Humein WhatsApp par batayein — hum aapki service, image, video ya link yahan professionally add kar denge.',
+  description: 'Apni skill ya service PrimeHub par add karwa sakte hain. WhatsApp par details bhejein — hum aapki service ko professionally showcase kar denge.',
   ctaText: 'Apni Skill Add Karwayein',
   ctaWhatsapp: '03238878009',
 };
 
-function whatsappUrl(number?: string, title?: string) {
+function normalizeWhatsapp(number?: string) {
   const digits = String(number || '').replace(/\D/g, '');
   if (!digits) return '';
-  const international = digits.startsWith('92') ? digits : digits.startsWith('0') ? `92${digits.slice(1)}` : digits;
-  const text = title
-    ? `Assalam o Alaikum, mujhe PrimeHub par \"${title}\" order karna hai. Please details share kar dein.`
-    : 'Assalam o Alaikum, mujhe PrimeHub par apni skill ya service add karwani hai.';
+  return digits.startsWith('92') ? digits : digits.startsWith('0') ? `92${digits.slice(1)}` : digits;
+}
+
+function sellerWhatsappUrl(number?: string) {
+  const international = normalizeWhatsapp(number);
+  if (!international) return '';
+  const text = 'Assalam o Alaikum, mujhe PrimeHub par apni skill ya service add karwani hai. Please details share kar dein.';
   return `https://wa.me/${international}?text=${encodeURIComponent(text)}`;
+}
+
+function orderWhatsappUrl(number: string | undefined, item: SkillItem) {
+  const international = normalizeWhatsapp(number);
+  if (!international) return '';
+
+  const price = Number(item.price || 0) > 0 ? `Rs. ${Number(item.price).toLocaleString()}` : 'Please confirm';
+  const details = String(item.subtitle || '').trim();
+  const imageUrl = String(item.thumbnailUrl || '').trim();
+  const lines = [
+    'Assalam o Alaikum, mujhe PrimeHub ki ye online skill/service order karni hai.',
+    '',
+    `*Service:* ${item.title || 'Prime Skill'}`,
+    `*Price:* ${price}`,
+    details ? `*Details:* ${details}` : '',
+    imageUrl ? `*Service Image:* ${imageUrl}` : '',
+    '',
+    'Please order details aur next step share kar dein.',
+  ].filter(Boolean);
+
+  return `https://wa.me/${international}?text=${encodeURIComponent(lines.join('\n'))}`;
 }
 
 export default function SkillsShowcase() {
@@ -76,34 +100,41 @@ export default function SkillsShowcase() {
       .sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0));
   }, [items]);
 
-  const ctaHref = whatsappUrl(page.ctaWhatsapp);
+  const ctaHref = sellerWhatsappUrl(page.ctaWhatsapp);
 
   return (
-    <main className="min-h-screen overflow-x-hidden bg-[#F4F4F1] px-2 pb-28 pt-3 sm:px-6 sm:pt-10">
-      <section className="mx-auto max-w-5xl overflow-hidden rounded-[20px] border border-black/5 bg-[#FFFCF7] shadow-[0_10px_28px_rgba(20,20,15,0.07)] sm:rounded-[28px] sm:shadow-[0_18px_50px_rgba(20,20,15,0.08)]">
-        <div className="px-4 py-5 text-center sm:px-10 sm:py-12">
-          <div className="mx-auto mb-2.5 flex h-9 w-9 items-center justify-center rounded-xl bg-[#0F6A5F] text-white sm:mb-4 sm:h-12 sm:w-12 sm:rounded-2xl">
-            <Sparkles className="h-4 w-4 sm:h-5 sm:w-5" aria-hidden="true" />
+    <main className="min-h-screen overflow-x-hidden bg-[#F4F4F1] px-2.5 pb-28 pt-3 sm:px-6 sm:pt-8">
+      <section className="mx-auto max-w-5xl overflow-hidden rounded-[22px] border border-black/[0.06] bg-[#FFFCF7] shadow-[0_12px_32px_rgba(20,20,15,0.07)] sm:rounded-[30px]">
+        <div className="relative overflow-hidden px-4 py-4 sm:px-9 sm:py-8">
+          <div className="pointer-events-none absolute -right-16 -top-20 h-48 w-48 rounded-full bg-[#0F6A5F]/[0.07] blur-2xl" />
+          <div className="relative flex items-start gap-3.5 sm:items-center sm:gap-5">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#0F6A5F] text-white shadow-[0_8px_20px_rgba(15,106,95,0.22)] sm:h-14 sm:w-14">
+              <Sparkles className="h-[18px] w-[18px] sm:h-6 sm:w-6" aria-hidden="true" />
+            </div>
+
+            <div className="min-w-0 flex-1">
+              <p className="text-[7px] font-black uppercase tracking-[0.2em] text-[#0F6A5F] sm:text-[10px]">{page.eyebrow}</p>
+              <h1 className="mt-0.5 text-[19px] font-black leading-tight tracking-[-0.025em] text-[#181914] sm:text-3xl">{page.title}</h1>
+              <p className="mt-1.5 max-w-2xl text-[10px] font-semibold leading-[15px] text-black/50 sm:text-sm sm:leading-5">{page.description}</p>
+
+              {ctaHref && (
+                <Link href={ctaHref} target="_blank" rel="noreferrer" className="mt-3 inline-flex min-h-9 items-center justify-center gap-1.5 rounded-full bg-[#181914] px-3.5 py-2 text-[9px] font-black text-white shadow-sm sm:mt-4 sm:min-h-10 sm:px-4 sm:text-[11px]">
+                  {page.ctaText}<ArrowRight className="h-3 w-3 shrink-0 sm:h-3.5 sm:w-3.5" aria-hidden="true" />
+                </Link>
+              )}
+            </div>
           </div>
-          <p className="mb-1 text-[8px] font-black uppercase tracking-[0.17em] text-[#0F6A5F] sm:mb-2 sm:text-[11px] sm:tracking-[0.22em]">{page.eyebrow}</p>
-          <h1 className="mx-auto max-w-3xl text-[22px] font-black leading-[1.08] tracking-[-0.03em] text-[#181914] sm:text-5xl">{page.title}</h1>
-          <p className="mx-auto mt-2.5 max-w-2xl text-[11px] font-semibold leading-[17px] text-black/55 sm:mt-4 sm:text-base sm:leading-6">{page.description}</p>
-          {ctaHref && (
-            <Link href={ctaHref} target="_blank" rel="noreferrer" className="mt-4 inline-flex min-h-9 items-center justify-center gap-1.5 rounded-full bg-[#181914] px-4 py-2 text-[10px] font-black text-white sm:mt-7 sm:min-h-11 sm:px-5 sm:py-3 sm:text-sm">
-              {page.ctaText}<ArrowRight className="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" aria-hidden="true" />
-            </Link>
-          )}
         </div>
       </section>
 
-      <section className="mx-auto mt-4 max-w-5xl sm:mt-8">
+      <section className="mx-auto mt-4 max-w-5xl sm:mt-7">
         {loading ? (
           <div className="rounded-[20px] border border-black/5 bg-white px-4 py-10 text-center text-sm font-bold text-black/40">Loading skills...</div>
         ) : (
           <div className="grid grid-cols-2 gap-2 sm:gap-5">
             {visibleItems.map((item) => {
               const detailHref = `/skills/${encodeURIComponent(item.id)}`;
-              const waHref = whatsappUrl(item.whatsapp, item.title);
+              const waHref = orderWhatsappUrl(item.whatsapp, item);
 
               return (
                 <article key={item.id} className="group min-w-0 overflow-hidden rounded-[14px] border border-black/5 bg-white shadow-[0_7px_18px_rgba(20,20,15,0.06)] sm:rounded-[22px] sm:shadow-[0_12px_34px_rgba(20,20,15,0.07)]">
