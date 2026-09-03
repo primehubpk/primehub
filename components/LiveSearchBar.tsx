@@ -6,6 +6,7 @@ import { Search } from 'lucide-react';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { smartSearchProducts } from '@/lib/smartSearch';
+import VoiceSearchButton from '@/components/VoiceSearchButton';
 
 type Product = {
   id: string;
@@ -44,17 +45,25 @@ export default function LiveSearchBar({ value, onChange, className = '' }: Props
 
   return (
     <div className={`relative min-w-0 flex-1 ${className}`}>
-      <input
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        onFocus={() => setFocused(true)}
-        onBlur={() => window.setTimeout(() => setFocused(false), 120)}
-        autoComplete="off"
-        spellCheck="false"
-        aria-label="Search products"
-        placeholder="Search products, categories..."
-        className="block w-full min-w-0 bg-transparent text-sm outline-none"
-      />
+      <div className="flex min-w-0 items-center gap-1">
+        <input
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          onFocus={() => setFocused(true)}
+          onBlur={() => window.setTimeout(() => setFocused(false), 120)}
+          autoComplete="off"
+          spellCheck="false"
+          aria-label="Search products"
+          placeholder="Search products, categories..."
+          className="block w-full min-w-0 bg-transparent text-sm outline-none"
+        />
+        <VoiceSearchButton
+          onTranscript={(text) => {
+            onChange(text);
+            setFocused(true);
+          }}
+        />
+      </div>
       {showPanel && (
         <div className="absolute left-[-36px] right-[-42px] top-full z-[70] mt-3 overflow-hidden rounded-2xl border border-black/10 bg-white shadow-[0_18px_55px_rgba(20,20,15,0.18)] sm:left-0 sm:right-0">
           {results.length > 0 ? (
