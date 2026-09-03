@@ -1,4 +1,5 @@
 import { Search, SlidersHorizontal, X } from 'lucide-react';
+import VoiceSearchButton from '@/components/VoiceSearchButton';
 
 type Props = {
   search: string;
@@ -41,6 +42,7 @@ export default function CatalogHeader({
               <X size={15} className="text-black/30" />
             </button>
           ) : null}
+          <VoiceSearchButton onTranscript={setSearch} />
         </label>
         {!title ? (
           <span className="hidden rounded-full bg-white/80 px-2.5 py-2 text-[9px] font-black text-black/45 ring-1 ring-black/5 sm:inline">
