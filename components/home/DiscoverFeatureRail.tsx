@@ -1,54 +1,131 @@
+'use client';
+
 import Link from 'next/link';
-import { ArrowRight, Crown, Gift, PackageSearch, ShieldCheck, Sparkles, Store, Tags, WalletCards } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { doc, onSnapshot } from 'firebase/firestore';
+import {
+  ArrowRight,
+  Crown,
+  Gift,
+  PackageSearch,
+  ShieldCheck,
+  Sparkles,
+  Store,
+  Tags,
+  WalletCards,
+} from 'lucide-react';
+import { db } from '@/lib/firebase';
+import { DEFAULT_RESELLER_TASKS, type ResellerTask } from '@/lib/resellerTasks';
+
+const shopItems = [
+  { label: 'All Products', icon: <PackageSearch size={16} />, href: '/shop' },
+  { label: 'Categories', icon: <Tags size={16} />, href: '/shop' },
+  { label: 'New Arrivals', icon: <Sparkles size={16} />, href: '/shop' },
+  { label: 'Best Deals', icon: <Gift size={16} />, href: '/shop' },
+];
 
 export function ShopFeatureBanner() {
-  return <section className="col-span-full my-3 overflow-hidden rounded-[26px] bg-gradient-to-r from-[#14140F] via-[#24352F] to-[#0F6A5F] text-white shadow-[0_16px_40px_rgba(20,20,15,0.14)]">
-    <Link href="/shop" className="group grid gap-4 p-4 sm:p-5 md:grid-cols-[1fr_auto] md:items-center">
-      <div className="flex items-start gap-3 sm:items-center"><div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/10 text-[#FFCF68]"><Store size={23}/></div><div><p className="text-[8px] font-black uppercase tracking-[.2em] text-[#FFCF68]">PrimeHub Shop</p><h3 className="mt-1 text-lg font-black sm:text-xl">Explore the complete collection</h3><p className="mt-1 text-[10px] leading-4 text-white/60">All products, categories and latest deals in one place.</p></div></div>
-      <div className="flex items-center gap-2 overflow-x-auto pb-1 md:justify-end md:overflow-visible md:pb-0"><FeaturePill icon={<PackageSearch size={12}/>} label="All Products"/><FeaturePill icon={<Tags size={12}/>} label="Categories"/><FeaturePill icon={<Sparkles size={12}/>} label="New Arrivals"/><span className="ml-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white text-[#14140F] transition group-hover:translate-x-1"><ArrowRight size={17}/></span></div>
-    </Link>
-  </section>;
+  return (
+    <section className="col-span-full my-3 min-w-0 overflow-hidden rounded-[24px] border border-black/5 bg-[#FFFCF7] py-4 shadow-[0_12px_30px_rgba(20,20,15,0.07)] sm:rounded-[28px] sm:py-5">
+      <div className="mb-3 flex items-center justify-between gap-3 px-4 sm:px-5">
+        <Link href="/shop" className="group flex min-w-0 items-center gap-2.5">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#14140F] text-white shadow-[0_8px_18px_rgba(20,20,15,0.16)]">
+            <Store size={19} />
+          </span>
+          <span className="min-w-0">
+            <span className="block text-[8px] font-black uppercase tracking-[.2em] text-[#B7791F]">Explore PrimeHub</span>
+            <span className="mt-0.5 block truncate text-base font-black text-[#14140F] sm:text-lg">Shop</span>
+          </span>
+        </Link>
+        <Link href="/shop" className="flex shrink-0 items-center gap-1 rounded-full bg-[#14140F] px-3 py-2 text-[9px] font-black text-white">
+          View all <ArrowRight size={12} />
+        </Link>
+      </div>
+
+      <div className="flex snap-x snap-mandatory gap-2.5 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:gap-3 sm:px-5">
+        {shopItems.map((item) => (
+          <Link
+            key={item.label}
+            href={item.href}
+            className="group flex w-[52vw] max-w-[190px] shrink-0 snap-start items-center gap-3 rounded-[18px] border border-black/5 bg-white p-3 shadow-sm sm:w-[180px] sm:rounded-[20px]"
+          >
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#F4F4F1] text-[#0F6A5F]">
+              {item.icon}
+            </span>
+            <span className="min-w-0 flex-1 truncate text-[11px] font-black text-[#14140F]">{item.label}</span>
+            <ArrowRight size={13} className="shrink-0 text-[#0F6A5F] transition group-hover:translate-x-0.5" />
+          </Link>
+        ))}
+      </div>
+    </section>
+  );
 }
-
-function FeaturePill({ icon, label }: { icon: React.ReactNode; label: string }) {
-  return <span className="flex shrink-0 items-center gap-1.5 rounded-full bg-white/10 px-3 py-2 text-[9px] font-black text-white/80">{icon}{label}</span>;
-}
-
-type FeatureConfig = {
-  href: string;
-  eyebrow: string;
-  title: string;
-  description: string;
-  benefits: Array<{ icon: React.ReactNode; label: string }>;
-  action: string;
-  icon: React.ReactNode;
-  theme: string;
-};
-
-const RESELLER_FEATURE: FeatureConfig = {
-  href: '/reseller',
-  eyebrow: 'PrimeHub Exclusive',
-  title: 'Prime Reseller Club',
-  description: 'Buy more, save more and build your reseller income with PrimeHub.',
-  benefits: [
-    { icon: <WalletCards size={12}/>, label: 'Earn reseller cash' },
-    { icon: <Gift size={12}/>, label: 'Monthly gifts & rewards' },
-    { icon: <ShieldCheck size={12}/>, label: 'Special member benefits' },
-  ],
-  action: 'Join Reseller Club',
-  icon: <Crown size={23}/>,
-  theme: 'bg-gradient-to-br from-[#14140F] via-[#173C36] to-[#0B4F47] text-white',
-};
-
-// Keep this list ready for future PrimeHub home features that should appear beside Reseller Club.
-const COMPANION_FEATURES: FeatureConfig[] = [];
 
 export function MemberFeatureRail() {
-  const features = [RESELLER_FEATURE, ...COMPANION_FEATURES];
+  const [tasks, setTasks] = useState<ResellerTask[]>(DEFAULT_RESELLER_TASKS);
 
-  return <section className="col-span-full my-3"><div className="mb-2 flex items-center justify-between px-1"><div><p className="text-[8px] font-black uppercase tracking-[.2em] text-[#0F6A5F]">More from PrimeHub</p><h3 className="mt-0.5 text-base font-black">Unlock more ways to shop</h3></div>{features.length > 1 ? <span className="text-[8px] font-bold text-black/35 sm:hidden">Swipe →</span> : null}</div><div className={features.length > 1 ? "flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:grid md:grid-cols-[1.35fr_.65fr] md:overflow-visible" : "grid gap-3"}>{features.map(feature => <FeatureCard key={feature.href} feature={feature}/>)}</div></section>;
-}
+  useEffect(
+    () =>
+      onSnapshot(doc(db, 'settings', 'main'), (snapshot) => {
+        const data = snapshot.data() as { resellerTasks?: ResellerTask[] } | undefined;
+        if (Array.isArray(data?.resellerTasks)) setTasks(data.resellerTasks);
+      }),
+    [],
+  );
 
-function FeatureCard({ feature }: { feature: FeatureConfig }) {
-  return <Link href={feature.href} className={`group relative min-h-[188px] w-full shrink-0 snap-start overflow-hidden rounded-[24px] p-4 shadow-[0_14px_34px_rgba(20,20,15,0.10)] sm:min-h-[198px] sm:p-5 md:w-auto ${feature.theme}`}><div className="absolute -right-10 -top-10 h-32 w-32 rounded-full bg-white/10 blur-2xl"/><div className="relative flex h-full flex-col"><div className="flex items-start justify-between gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-white/15 sm:h-11 sm:w-11">{feature.icon}</div><span className="rounded-full bg-white/15 px-2.5 py-1 text-[7px] font-black uppercase tracking-wider">Featured</span></div><p className="mt-3 text-[8px] font-black uppercase tracking-[.2em] opacity-60 sm:mt-4">{feature.eyebrow}</p><h4 className="mt-1 text-lg font-black sm:text-xl">{feature.title}</h4><p className="mt-1 max-w-xl text-[10px] leading-4 opacity-65">{feature.description}</p><div className="mt-3 flex flex-wrap gap-1.5">{feature.benefits.map(benefit => <span key={benefit.label} className="flex items-center gap-1 rounded-full bg-white/15 px-2.5 py-1.5 text-[8px] font-black">{benefit.icon}{benefit.label}</span>)}</div><div className="mt-auto flex items-center justify-between pt-4 text-[10px] font-black"><span>{feature.action}</span><span className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-[#14140F] transition group-hover:translate-x-1"><ArrowRight size={15}/></span></div></div></Link>;
+  const visibleTasks = useMemo(
+    () => tasks.filter((task) => task.active !== false).slice(0, 8),
+    [tasks],
+  );
+
+  return (
+    <section className="col-span-full my-3 min-w-0 overflow-hidden rounded-[24px] border border-black/5 bg-[#F7FBFA] py-4 shadow-[0_12px_30px_rgba(20,20,15,0.07)] sm:rounded-[28px] sm:py-5">
+      <div className="mb-3 flex items-center justify-between gap-3 px-4 sm:px-5">
+        <Link href="/reseller" className="group flex min-w-0 items-center gap-2.5">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#0F6A5F] text-[#FFCF68] shadow-[0_8px_18px_rgba(15,106,95,0.22)]">
+            <Crown size={19} />
+          </span>
+          <span className="min-w-0">
+            <span className="block text-[8px] font-black uppercase tracking-[.2em] text-[#0F6A5F]">PrimeHub Exclusive</span>
+            <span className="mt-0.5 block truncate text-base font-black text-[#14140F] sm:text-lg">Reseller Club</span>
+          </span>
+        </Link>
+        <Link href="/reseller" className="flex shrink-0 items-center gap-1 rounded-full bg-[#14140F] px-3 py-2 text-[9px] font-black text-white">
+          Open club <ArrowRight size={12} />
+        </Link>
+      </div>
+
+      <div className="flex snap-x snap-mandatory gap-2.5 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:gap-3 sm:px-5">
+        {visibleTasks.length > 0 ? (
+          visibleTasks.map((task, index) => (
+            <Link
+              key={task.id}
+              href="/reseller"
+              className="group w-[68vw] max-w-[250px] shrink-0 snap-start rounded-[18px] border border-black/5 bg-white p-3 shadow-sm sm:w-[230px] sm:rounded-[20px]"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#DDF5F0] text-[#0F6A5F]">
+                  {index % 3 === 0 ? <WalletCards size={16} /> : index % 3 === 1 ? <Gift size={16} /> : <ShieldCheck size={16} />}
+                </span>
+                <span className="rounded-full bg-[#F4F4F1] px-2 py-1 text-[8px] font-black text-black/45">
+                  {Number(task.reward || 0) > 0 ? `${Number(task.reward).toLocaleString()} reward` : 'Member task'}
+                </span>
+              </div>
+              <p className="mt-3 line-clamp-1 text-[11px] font-black text-[#14140F] sm:text-xs">{task.title}</p>
+              <p className="mt-1 line-clamp-2 min-h-[30px] text-[9px] leading-[15px] text-black/45">{task.description}</p>
+              <div className="mt-2 flex items-center justify-between text-[9px] font-black text-[#0F6A5F]">
+                <span>View task</span>
+                <ArrowRight size={12} className="transition group-hover:translate-x-0.5" />
+              </div>
+            </Link>
+          ))
+        ) : (
+          <Link href="/reseller" className="flex w-[68vw] max-w-[250px] shrink-0 items-center gap-3 rounded-[18px] border border-black/5 bg-white p-3 shadow-sm">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#DDF5F0] text-[#0F6A5F]"><Crown size={16} /></span>
+            <span className="text-[11px] font-black">Login or join to view reseller benefits</span>
+          </Link>
+        )}
+      </div>
+    </section>
+  );
 }
