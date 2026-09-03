@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import {
   collection,
@@ -27,6 +27,8 @@ import {
 import { auth, db } from '@/lib/firebase';
 import { useCartStore } from '@/lib/cartStore';
 import { ProductUrgencyBadges } from '@/components/ProductCard';
+import ProductShareButton from '@/components/ProductShareButton';
+import { MemberFeatureRail, ShopFeatureBanner } from '@/components/home/DiscoverFeatureRail';
 import { isWholesaleProduct } from '@/lib/wholesale';
 import { shuffleProducts } from '@/lib/shuffleProducts';
 import { getEffectivePrice } from '@/lib/dealPricing';
@@ -441,7 +443,7 @@ export default function ProductGridRewards({
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-2 md:grid-cols-3 md:gap-3 lg:grid-cols-4 xl:grid-cols-5">
-          {visible.map((p) => {
+          {visible.map((p, index) => {
             const r = rewards[p.id];
             const pts = points;
             const need = r ? Math.max(0, r.points - pts) : 0;
@@ -450,9 +452,8 @@ export default function ProductGridRewards({
             const img = image(p);
             const stock = Number(p.stock ?? p.quantity ?? 0);
 
-            return (
+            return <Fragment key={p.id}>
               <article
-                key={p.id}
                 className="overflow-hidden rounded-[18px] border border-black/7 bg-white shadow-sm sm:rounded-[24px]"
               >
                 <div className="relative aspect-square overflow-hidden bg-[#F4F4F1]">
@@ -497,6 +498,7 @@ export default function ProductGridRewards({
                   )}
 
                   <div className="absolute right-2.5 top-2.5 flex gap-1.5">
+                    <ProductShareButton productId={p.id} title={title(p)} className="flex h-8 w-8 items-center justify-center rounded-full bg-white/90 shadow-sm"/>
                     {(p.videoUrl || p.reelUrl) && (
                       <button
                         type="button"
@@ -620,7 +622,9 @@ export default function ProductGridRewards({
                   )}
                 </div>
               </article>
-            );
+              {index === 5 && visible.length >= 6 ? <ShopFeatureBanner/> : null}
+              {index === 11 && visible.length >= 12 ? <MemberFeatureRail/> : null}
+            </Fragment>;
           })}
         </div>
       )}
