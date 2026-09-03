@@ -1,109 +1,127 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Mic, MicOff } from 'lucide-react';
+import { Loader2, Mic, MicOff } from 'lucide-react';
 import { interpretSearchQuery } from '@/lib/aiSearchClient';
-
-type SpeechRecognitionEventLike = Event & {
-  results: ArrayLike<{ 0: { transcript: string }; isFinal?: boolean }>;
-};
-
-type SpeechRecognitionErrorEventLike = Event & { error?: string };
-
-type SpeechRecognitionLike = {
-  lang: string;
-  interimResults: boolean;
-  continuous: boolean;
-  maxAlternatives: number;
-  start: () => void;
-  stop: () => void;
-  abort: () => void;
-  onstart: (() => void) | null;
-  onend: (() => void) | null;
-  onresult: ((event: SpeechRecognitionEventLike) => void) | null;
-  onerror: ((event: SpeechRecognitionErrorEventLike) => void) | null;
-};
-
-type SpeechRecognitionConstructor = new () => SpeechRecognitionLike;
-
-type VoiceWindow = Window & typeof globalThis & {
-  SpeechRecognition?: SpeechRecognitionConstructor;
-  webkitSpeechRecognition?: SpeechRecognitionConstructor;
-};
 
 type Props = {
   onTranscript: (text: string) => void;
   className?: string;
-  language?: string;
 };
 
-export default function VoiceSearchButton({ onTranscript, className = '', language = 'en-PK' }: Props) {
-  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+function extensionForMime(mime: string) {
+  if (mime.includes('mp4')) return 'm4a';
+  if (mime.includes('ogg')) return 'ogg';
+  return 'webm';
+}
+
+export default function VoiceSearchButton({ onTranscript, className = '' }: Props) {
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const stopTimerRef = useRef<number | null>(null);
   const [supported, setSupported] = useState(false);
   const [listening, setListening] = useState(false);
+  const [processing, setProcessing] = useState(false);
 
   useEffect(() => {
-    const voiceWindow = window as VoiceWindow;
-    setSupported(Boolean(voiceWindow.SpeechRecognition || voiceWindow.webkitSpeechRecognition));
-    return () => recognitionRef.current?.abort();
+    setSupported(Boolean(navigator.mediaDevices?.getUserMedia && window.MediaRecorder));
+    return () => {
+      if (stopTimerRef.current) window.clearTimeout(stopTimerRef.current);
+      recorderRef.current?.stop();
+      streamRef.current?.getTracks().forEach((track) => track.stop());
+    };
   }, []);
 
-  function toggleListening() {
-    if (!supported) return;
-    if (listening) {
-      recognitionRef.current?.stop();
-      return;
-    }
-
-    const voiceWindow = window as VoiceWindow;
-    const Recognition = voiceWindow.SpeechRecognition || voiceWindow.webkitSpeechRecognition;
-    if (!Recognition) return;
-
-    const recognition = new Recognition();
-    recognition.lang = language;
-    recognition.interimResults = true;
-    recognition.continuous = false;
-    recognition.maxAlternatives = 1;
-    recognition.onstart = () => setListening(true);
-    recognition.onend = () => setListening(false);
-    recognition.onerror = () => setListening(false);
-    recognition.onresult = (event) => {
-      let transcript = '';
-      let final = false;
-      for (let i = 0; i < event.results.length; i += 1) {
-        transcript += event.results[i]?.[0]?.transcript || '';
-        if (event.results[i]?.isFinal) final = true;
-      }
-      const clean = transcript.trim();
-      if (!clean) return;
-      onTranscript(clean);
-      if (final) {
-        void interpretSearchQuery(clean).then((intent) => {
-          if (intent.query) onTranscript(intent.query);
-        });
-      }
-    };
-    recognitionRef.current = recognition;
-
+  async function transcribe(blob: Blob) {
+    setProcessing(true);
     try {
-      recognition.start();
+      const form = new FormData();
+      form.append('audio', blob, `voice.${extensionForMime(blob.type)}`);
+      const response = await fetch('/api/search/transcribe', { method: 'POST', body: form });
+      const data = await response.json().catch(() => ({}));
+      const transcript = typeof data?.text === 'string' ? data.text.trim() : '';
+      if (!response.ok || !transcript) return;
+
+      onTranscript(transcript);
+      const intent = await interpretSearchQuery(transcript);
+      if (intent.query) onTranscript(intent.query);
+    } catch {
+      // Keep voice search non-blocking; normal text search remains available.
+    } finally {
+      setProcessing(false);
+    }
+  }
+
+  function stopRecording() {
+    if (stopTimerRef.current) {
+      window.clearTimeout(stopTimerRef.current);
+      stopTimerRef.current = null;
+    }
+    if (recorderRef.current?.state === 'recording') recorderRef.current.stop();
+  }
+
+  async function startRecording() {
+    if (!supported || processing) return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+      });
+      streamRef.current = stream;
+      chunksRef.current = [];
+
+      const preferred = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'];
+      const mimeType = preferred.find((type) => MediaRecorder.isTypeSupported(type));
+      const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+      recorderRef.current = recorder;
+
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) chunksRef.current.push(event.data);
+      };
+      recorder.onstart = () => {
+        setListening(true);
+        stopTimerRef.current = window.setTimeout(stopRecording, 15000);
+      };
+      recorder.onerror = () => {
+        setListening(false);
+        stream.getTracks().forEach((track) => track.stop());
+      };
+      recorder.onstop = () => {
+        setListening(false);
+        stream.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
+        const blob = new Blob(chunksRef.current, { type: recorder.mimeType || 'audio/webm' });
+        chunksRef.current = [];
+        if (blob.size > 0) void transcribe(blob);
+      };
+
+      recorder.start(250);
     } catch {
       setListening(false);
     }
   }
 
+  function toggleListening() {
+    if (listening) stopRecording();
+    else void startRecording();
+  }
+
   if (!supported) return null;
+
+  const active = listening || processing;
+  const label = listening ? 'Stop voice search' : processing ? 'Understanding voice search' : 'Search by voice';
 
   return (
     <button
       type="button"
       onClick={toggleListening}
-      aria-label={listening ? 'Stop voice search' : 'Search by voice'}
-      title={listening ? 'Listening… tap to stop' : 'Search by voice'}
-      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition ${listening ? 'bg-[#E1352B] text-white shadow-sm' : 'text-black/40 hover:bg-black/5 hover:text-[#14140F]'} ${className}`}
+      disabled={processing}
+      aria-label={label}
+      title={listening ? 'Listening… tap to search' : processing ? 'Understanding your search…' : 'Search by voice'}
+      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition ${active ? 'bg-[#E1352B] text-white shadow-sm' : 'text-black/40 hover:bg-black/5 hover:text-[#14140F]'} disabled:cursor-wait ${className}`}
     >
-      {listening ? <MicOff size={15} /> : <Mic size={15} />}
-      <span className="sr-only">{listening ? 'Listening' : 'Voice search'}</span>
+      {processing ? <Loader2 size={15} className="animate-spin" /> : listening ? <MicOff size={15} /> : <Mic size={15} />}
+      <span className="sr-only">{label}</span>
     </button>
   );
 }
