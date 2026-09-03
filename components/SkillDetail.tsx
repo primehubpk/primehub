@@ -22,12 +22,31 @@ type SkillItem = {
   sortOrder?: number;
 };
 
-function whatsappUrl(number?: string, title?: string) {
+function normalizeWhatsapp(number?: string) {
   const digits = String(number || '').replace(/\D/g, '');
   if (!digits) return '';
-  const international = digits.startsWith('92') ? digits : digits.startsWith('0') ? `92${digits.slice(1)}` : digits;
-  const text = `Assalam o Alaikum, mujhe PrimeHub par \"${title || 'is service'}\" order karna hai. Please details share kar dein.`;
-  return `https://wa.me/${international}?text=${encodeURIComponent(text)}`;
+  return digits.startsWith('92') ? digits : digits.startsWith('0') ? `92${digits.slice(1)}` : digits;
+}
+
+function whatsappUrl(number: string | undefined, item: SkillItem) {
+  const international = normalizeWhatsapp(number);
+  if (!international) return '';
+
+  const price = Number(item.price || 0) > 0 ? `Rs. ${Number(item.price).toLocaleString()}` : 'Please confirm';
+  const details = String(item.subtitle || '').trim();
+  const imageUrl = String(item.thumbnailUrl || '').trim();
+  const lines = [
+    'Assalam o Alaikum, mujhe PrimeHub ki ye online skill/service order karni hai.',
+    '',
+    `*Service:* ${item.title || 'Prime Skill'}`,
+    `*Price:* ${price}`,
+    details ? `*Details:* ${details}` : '',
+    imageUrl ? `*Service Image:* ${imageUrl}` : '',
+    '',
+    'Please order details aur next step share kar dein.',
+  ].filter(Boolean);
+
+  return `https://wa.me/${international}?text=${encodeURIComponent(lines.join('\n'))}`;
 }
 
 function safeExternalUrl(value?: string) {
@@ -57,7 +76,7 @@ export default function SkillDetail({ skillId }: { skillId: string }) {
   if (loading) return <main className="min-h-screen bg-[#F4F4F1] px-3 py-6"><div className="mx-auto max-w-5xl rounded-2xl bg-white p-8 text-center text-sm font-bold text-black/40">Loading skill...</div></main>;
   if (!item) return <main className="min-h-screen bg-[#F4F4F1] px-3 py-6"><div className="mx-auto max-w-5xl rounded-2xl bg-white p-8 text-center"><p className="text-sm font-black">Skill not found.</p><Link href="/skills" className="mt-3 inline-flex text-xs font-black text-[#0F6A5F]">Back to Prime Skills</Link></div></main>;
 
-  const waHref = whatsappUrl(item.whatsapp, item.title);
+  const waHref = whatsappUrl(item.whatsapp, item);
   const externalHref = safeExternalUrl(item.externalUrl);
 
   return <main className="min-h-screen overflow-x-hidden bg-[#F4F4F1] px-3 pb-28 pt-3 sm:px-6 sm:pt-8">
