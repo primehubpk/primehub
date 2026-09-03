@@ -29,6 +29,7 @@ import { useCartStore } from '@/lib/cartStore';
 import { ProductUrgencyBadges } from '@/components/ProductCard';
 import ProductShareButton from '@/components/ProductShareButton';
 import { MemberFeatureRail, ShopFeatureBanner } from '@/components/home/DiscoverFeatureRail';
+import PrimeSkillsHomeRail from '@/components/home/PrimeSkillsHomeRail';
 import { isWholesaleProduct } from '@/lib/wholesale';
 import { shuffleProducts } from '@/lib/shuffleProducts';
 import { getEffectivePrice } from '@/lib/dealPricing';
@@ -624,6 +625,7 @@ export default function ProductGridRewards({
               </article>
               {index === 5 && visible.length >= 6 ? <ShopFeatureBanner/> : null}
               {index === 11 && visible.length >= 12 ? <MemberFeatureRail/> : null}
+              {index === 17 && visible.length >= 18 ? <PrimeSkillsHomeRail/> : null}
             </Fragment>;
           })}
         </div>
