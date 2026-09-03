@@ -13,6 +13,7 @@ import {
 
 import RecentlyViewed from '@/components/RecentlyViewed';
 import ReviewsSection from '@/components/ReviewsSection';
+import ProductShareButton from '@/components/ProductShareButton';
 import WeeklyDealCalendar from '@/components/WeeklyDealCalendar';
 import DealConfetti from '@/components/product-detail/DealConfetti';
 import ProductHero from '@/components/product-detail/ProductHero';
@@ -120,18 +121,18 @@ export default function ProductDetailPage() {
           <span className="text-[10px] font-black uppercase tracking-[0.24em] text-black/40">
             PrimeHub Product
           </span>
-          <button
-            type="button"
-            onClick={() => setWished((value) => !value)}
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-sm"
-            aria-label={wished ? 'Remove from wishlist' : 'Add to wishlist'}
-          >
-            <Heart
-              size={17}
-              className={wished ? 'text-[#E1352B]' : 'text-[#14140F]'}
-              fill={wished ? 'currentColor' : 'none'}
-            />
-          </button>
+          <div className="flex items-center gap-2"><ProductShareButton productId={product.id} title={product.title} className="flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-sm"/><button
+              type="button"
+              onClick={() => setWished((value) => !value)}
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-sm"
+              aria-label={wished ? 'Remove from wishlist' : 'Add to wishlist'}
+            >
+              <Heart
+                size={17}
+                className={wished ? 'text-[#E1352B]' : 'text-[#14140F]'}
+                fill={wished ? 'currentColor' : 'none'}
+              />
+            </button></div>
         </header>
 
         <div className="grid gap-5 px-3 md:grid-cols-[1.04fr_.96fr] md:px-5 md:pt-3">
@@ -141,7 +142,7 @@ export default function ProductDetailPage() {
             activeImage={activeImage}
             savingsAmount={savingsAmount}
             liveDeal={liveDeal}
-            onImageChange={(url) => setActiveImage(url)}
+            onImageChange={setActiveImage}
             onVideoOpen={() => setVideoOpen(true)}
           />
 
