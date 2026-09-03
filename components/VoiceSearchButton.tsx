@@ -25,7 +25,7 @@ export default function VoiceSearchButton({ onTranscript, className = '' }: Prop
   const [processing, setProcessing] = useState(false);
 
   useEffect(() => {
-    setSupported(Boolean(navigator.mediaDevices?.getUserMedia && window.MediaRecorder));
+    setSupported('mediaDevices' in navigator && typeof navigator.mediaDevices.getUserMedia === 'function' && 'MediaRecorder' in window);
     return () => {
       if (stopTimerRef.current) window.clearTimeout(stopTimerRef.current);
       recorderRef.current?.stop();
