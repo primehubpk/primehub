@@ -3,6 +3,7 @@
 import { ChangeEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { onSnapshot } from 'firebase/firestore';
 import { ImagePlus, Loader2, Pencil, Plus, Save, Sparkles, Trash2 } from 'lucide-react';
+import { PRIME_SKILLS_SEED } from '@/lib/primeSkillsSeed';
 import {
   adminCollection,
   createAdminDocument,
@@ -104,6 +105,25 @@ export default function SkillsManager() {
     }
   }
 
+  async function seedStarterListings() {
+    if (items.length > 0) {
+      setToast('Starter listings are only available when the Prime Skills collection is empty.');
+      return;
+    }
+    setSaving(true);
+    try {
+      for (const starter of PRIME_SKILLS_SEED) {
+        const { id: _seedId, ...payload } = starter;
+        await createAdminDocument('prime_skills', { ...payload, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
+      }
+      setToast('5 starter Prime Skills listings added. You can edit every field now.');
+    } catch (error) {
+      setToast(error instanceof Error ? error.message : 'Unable to add starter listings.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function saveItem() {
     if (!form.title.trim()) return setToast('Title is required.');
     if (!form.thumbnailUrl.trim()) return setToast('Thumbnail is required.');
@@ -145,8 +165,17 @@ export default function SkillsManager() {
   return (
     <section className="mx-auto max-w-6xl px-4 py-6">
       <div className="flex items-center gap-2 text-[#0F6A5F]"><Sparkles size={16}/><span className="text-[10px] font-black uppercase tracking-[.16em]">Prime Skills</span></div>
-      <h2 className="mt-1 text-2xl font-black">Skills & Services Manager</h2>
-      <p className="mt-1 text-sm text-black/50">Manage page text, thumbnails, prices, WhatsApp contacts and external links. Storefront card connection comes in Phase 3.</p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h2 className="mt-1 text-2xl font-black">Skills & Services Manager</h2>
+          <p className="mt-1 text-sm text-black/50">Manage page text, thumbnails, prices, WhatsApp contacts and external links.</p>
+        </div>
+        {items.length === 0 && (
+          <button onClick={seedStarterListings} disabled={saving} className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#0F6A5F] px-4 py-3 text-xs font-black text-white disabled:opacity-50">
+            {saving ? <Loader2 size={15} className="animate-spin"/> : <Sparkles size={15}/>} Add 5 Starter Listings
+          </button>
+        )}
+      </div>
 
       <div className="mt-6 grid gap-5 lg:grid-cols-[0.9fr_1.1fr]">
         <div className="space-y-5">
@@ -186,7 +215,7 @@ export default function SkillsManager() {
         <div className="rounded-2xl border border-black/10 bg-white p-4 shadow-sm">
           <h3 className="text-sm font-black">Current Listings ({items.length})</h3>
           <div className="mt-4 space-y-3">
-            {sorted.length === 0 && <div className="rounded-xl bg-[#F4F4F1] p-6 text-center text-xs font-bold text-black/40">No skills added yet.</div>}
+            {sorted.length === 0 && <div className="rounded-xl bg-[#F4F4F1] p-6 text-center text-xs font-bold text-black/40">No saved skills yet. Storefront is showing the 5 starter listings; click “Add 5 Starter Listings” to save them here for editing.</div>}
             {sorted.map((item) => <div key={item.id} className="grid grid-cols-[120px_1fr] gap-3 rounded-xl border border-black/8 p-3 sm:grid-cols-[160px_1fr]">
               <div className="aspect-video overflow-hidden rounded-lg bg-[#F4F4F1]"><img src={item.thumbnailUrl} alt={item.title} className="h-full w-full object-cover"/></div>
               <div className="min-w-0"><div className="flex items-start justify-between gap-2"><div><p className="truncate text-sm font-black">{item.title}</p><p className="mt-1 line-clamp-2 text-xs text-black/50">{item.subtitle}</p></div><span className={`rounded-full px-2 py-1 text-[9px] font-black ${item.active?'bg-[#0F6A5F]/10 text-[#0F6A5F]':'bg-black/5 text-black/40'}`}>{item.active?'ACTIVE':'HIDDEN'}</span></div><p className="mt-2 text-xs font-black">Rs {Number(item.price||0).toLocaleString()}</p><div className="mt-3 flex gap-2"><button onClick={()=>editItem(item)} className="inline-flex items-center gap-1 rounded-lg bg-black/5 px-2.5 py-1.5 text-[10px] font-black"><Pencil size={12}/>Edit</button><button onClick={()=>removeItem(item.id)} className="inline-flex items-center gap-1 rounded-lg bg-[#E1352B]/10 px-2.5 py-1.5 text-[10px] font-black text-[#E1352B]"><Trash2 size={12}/>Delete</button></div></div>
