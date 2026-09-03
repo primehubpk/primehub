@@ -26,7 +26,6 @@ const DEFAULT_SETTINGS: SiteSettings = {
 };
 
 type RawSettings = Partial<SiteSettings> & Record<string, any>;
-
 type RawPolicy = { privacyPolicy?: string; returnPolicy?: string; terms?: string } & Record<string, any>;
 type RawContact = { whatsappNumber?: string; email?: string; physicalAddress?: string } & Record<string, any>;
 
@@ -88,8 +87,9 @@ export function useSettings() {
     const unsubscribeLegacy = onSnapshot(doc(db, 'settings', 'general'), (snap) => { legacyData = snap.exists() ? (snap.data() as RawSettings) : {}; publish(); }, () => publish());
     const unsubscribePolicy = onSnapshot(doc(db, 'settings', 'policy'), (snap) => { policyReady = true; policyData = snap.exists() ? (snap.data() as RawPolicy) : {}; publish(); }, () => { policyReady = true; publish(); });
     const unsubscribeContact = onSnapshot(doc(db, 'settings', 'contact'), (snap) => { contactReady = true; contactData = snap.exists() ? (snap.data() as RawContact) : {}; publish(); }, () => { contactReady = true; publish(); });
+    const rotationTimer = window.setInterval(publish, 60_000);
 
-    return () => { unsubscribeMain(); unsubscribeLegacy(); unsubscribePolicy(); unsubscribeContact(); };
+    return () => { unsubscribeMain(); unsubscribeLegacy(); unsubscribePolicy(); unsubscribeContact(); window.clearInterval(rotationTimer); };
   }, []);
   return { settings, loading, policy: settings.policies, contact: settings.contact };
 }
