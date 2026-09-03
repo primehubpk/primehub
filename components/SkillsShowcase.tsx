@@ -108,9 +108,9 @@ export default function SkillsShowcase() {
               return (
                 <article key={item.id} className="group min-w-0 overflow-hidden rounded-[14px] border border-black/5 bg-white shadow-[0_7px_18px_rgba(20,20,15,0.06)] sm:rounded-[22px] sm:shadow-[0_12px_34px_rgba(20,20,15,0.07)]">
                   <Link href={detailHref} className="block">
-                    <div className="relative aspect-video overflow-hidden bg-[#ECECE7]">
+                    <div className="relative aspect-video overflow-hidden bg-white">
                       {item.thumbnailUrl ? (
-                        <img src={item.thumbnailUrl} alt={item.title || 'Prime Skill'} className="h-full w-full object-cover transition duration-300 sm:group-hover:scale-[1.02]" loading="lazy" />
+                        <img src={item.thumbnailUrl} alt={item.title || 'Prime Skill'} className="h-full w-full object-contain transition duration-300 sm:object-cover sm:group-hover:scale-[1.02]" loading="lazy" />
                       ) : (
                         <div className="flex h-full items-center justify-center text-black/25"><ImageIcon size={22}/></div>
                       )}
