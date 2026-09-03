@@ -36,7 +36,7 @@ async function adminWrite(action: 'create' | 'update' | 'set' | 'delete', name: 
   return result;
 }
 
-/** New uploads go to Cloudflare R2. Existing ImgBB URLs on products stay as-is. */
+/** New uploads go to Cloudflare R2. Existing ImgBB and legacy R2 URLs stay compatible. */
 export async function uploadImageToImgBB(file: File): Promise<string> {
   if (!file.type.startsWith('image/')) throw new Error('Only image files are allowed.');
   if (file.size > 10 * 1024 * 1024) throw new Error('Image must be 10MB or smaller.');
@@ -46,7 +46,7 @@ export async function uploadImageToImgBB(file: File): Promise<string> {
   const response = await fetch('/api/upload/r2', { method: 'POST', body: form, credentials: 'same-origin', cache: 'no-store' });
   const result = await response.json().catch(() => null);
   if (!response.ok || !result?.success || typeof result.url !== 'string') throw new Error(result?.error || 'Image upload failed. Please try again.');
-  if (!/^https:\/\/pub-[a-z0-9]+\.r2\.dev\//i.test(result.url) && !/^https:\/\/i\.ibb\.co\//i.test(result.url)) {
+  if (!/^https:\/\/images\.primehubmall\.com\//i.test(result.url) && !/^https:\/\/pub-[a-z0-9]+\.r2\.dev\//i.test(result.url) && !/^https:\/\/i\.ibb\.co\//i.test(result.url)) {
     throw new Error('Upload returned a non-CDN image URL.');
   }
   return result.url;
