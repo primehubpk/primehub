@@ -7,7 +7,6 @@ import CategorySwiper from '@/components/CategorySwiper';
 import PriceBuckets from '@/components/PriceBuckets';
 import NewArrivalsRail from '@/components/NewArrivalsRail';
 import ProductGridRewards from '@/components/ProductGridRewards';
-import PrimeSkillsHomeRail from '@/components/home/PrimeSkillsHomeRail';
 import YouTubeGuide from '@/components/YouTubeGuide';
 import Footer from '@/components/Footer';
 
@@ -34,7 +33,6 @@ export default function HomePage() {
         <div id="discover-deals-section">
           <ProductGridRewards selectedMaxPrice={selectedMaxPrice} wholesaleSelected={wholesaleSelected} />
         </div>
-        <PrimeSkillsHomeRail />
         <YouTubeGuide />
         <Footer onWholesaleSelect={selectWholesale} />
       </div>
