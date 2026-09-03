@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Mic, MicOff } from 'lucide-react';
+import { interpretSearchQuery } from '@/lib/aiSearchClient';
 
 type SpeechRecognitionEventLike = Event & {
   results: ArrayLike<{ 0: { transcript: string }; isFinal?: boolean }>;
@@ -68,9 +69,19 @@ export default function VoiceSearchButton({ onTranscript, className = '', langua
     recognition.onerror = () => setListening(false);
     recognition.onresult = (event) => {
       let transcript = '';
-      for (let i = 0; i < event.results.length; i += 1) transcript += event.results[i]?.[0]?.transcript || '';
+      let final = false;
+      for (let i = 0; i < event.results.length; i += 1) {
+        transcript += event.results[i]?.[0]?.transcript || '';
+        if (event.results[i]?.isFinal) final = true;
+      }
       const clean = transcript.trim();
-      if (clean) onTranscript(clean);
+      if (!clean) return;
+      onTranscript(clean);
+      if (final) {
+        void interpretSearchQuery(clean).then((intent) => {
+          if (intent.query) onTranscript(intent.query);
+        });
+      }
     };
     recognitionRef.current = recognition;
 
