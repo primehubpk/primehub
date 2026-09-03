@@ -76,7 +76,7 @@ export default function SkillsShowcase() {
   const ctaHref = whatsappUrl(page.ctaWhatsapp);
 
   return (
-    <main className="min-h-screen overflow-x-hidden bg-[#F4F4F1] px-3 pb-28 pt-3 sm:px-6 sm:pt-10">
+    <main className="min-h-screen overflow-x-hidden bg-[#F4F4F1] px-1.5 pb-28 pt-3 sm:px-6 sm:pt-10">
       <section className="mx-auto max-w-5xl overflow-hidden rounded-[20px] border border-black/5 bg-[#FFFCF7] shadow-[0_10px_28px_rgba(20,20,15,0.07)] sm:rounded-[28px] sm:shadow-[0_18px_50px_rgba(20,20,15,0.08)]">
         <div className="px-4 py-5 text-center sm:px-10 sm:py-12">
           <div className="mx-auto mb-2.5 flex h-9 w-9 items-center justify-center rounded-xl bg-[#0F6A5F] text-white sm:mb-4 sm:h-12 sm:w-12 sm:rounded-2xl">
@@ -97,19 +97,19 @@ export default function SkillsShowcase() {
         {loading ? (
           <div className="rounded-[20px] border border-black/5 bg-white px-4 py-10 text-center text-sm font-bold text-black/40">Loading skills...</div>
         ) : (
-          <div className="grid grid-cols-2 gap-2.5 sm:gap-5">
+          <div className="grid grid-cols-2 gap-1.5 sm:gap-5">
             {visibleItems.map((item) => (
-              <Link key={item.id} href={`/skills/${encodeURIComponent(item.id)}`} className="group min-w-0 overflow-hidden rounded-[16px] border border-black/5 bg-white shadow-[0_8px_22px_rgba(20,20,15,0.06)] sm:rounded-[22px] sm:shadow-[0_12px_34px_rgba(20,20,15,0.07)]">
-                <div className="relative aspect-video overflow-hidden bg-[#ECECE7]">
+              <Link key={item.id} href={`/skills/${encodeURIComponent(item.id)}`} className="group min-w-0 overflow-hidden rounded-[14px] border border-black/5 bg-white shadow-[0_7px_18px_rgba(20,20,15,0.06)] sm:rounded-[22px] sm:shadow-[0_12px_34px_rgba(20,20,15,0.07)]">
+                <div className="relative aspect-[16/10] overflow-hidden bg-[#ECECE7] sm:aspect-video">
                   {item.thumbnailUrl ? (
                     <img src={item.thumbnailUrl} alt={item.title || 'Prime Skill'} className="h-full w-full object-cover transition duration-300 sm:group-hover:scale-[1.02]" loading="lazy" />
                   ) : (
                     <div className="flex h-full items-center justify-center text-black/25"><ImageIcon size={22}/></div>
                   )}
                 </div>
-                <div className="p-2.5 sm:p-5">
+                <div className="p-2 sm:p-5">
                   <h2 className="line-clamp-2 text-[11px] font-black leading-[15px] text-[#181914] sm:text-lg sm:leading-tight">{item.title}</h2>
-                  {Number(item.price || 0) > 0 && <p className="mt-1.5 text-[10px] font-black text-[#E1352B] sm:mt-2 sm:text-sm">Rs {Number(item.price).toLocaleString()}</p>}
+                  {Number(item.price || 0) > 0 && <p className="mt-1 text-[10px] font-black text-[#E1352B] sm:mt-2 sm:text-sm">Rs {Number(item.price).toLocaleString()}</p>}
                 </div>
               </Link>
             ))}
