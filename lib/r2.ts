@@ -3,7 +3,7 @@ import sharp from 'sharp';
 
 const PUBLIC_BASE = (
   process.env.R2_PUBLIC_BASE_URL ||
-  'https://pub-157b90419bf04016bdea666e4cbce181.r2.dev'
+  'https://images.primehubmall.com'
 ).replace(/\/+$/, '');
 
 function requiredEnv(name: string) {
@@ -60,5 +60,7 @@ export async function uploadWebpToR2(body: Buffer, key: string) {
 }
 
 export function isR2PublicUrl(url: string) {
-  return /^https:\/\/pub-[a-z0-9]+\.r2\.dev\//i.test((url || '').trim());
+  const value = (url || '').trim();
+  return /^https:\/\/images\.primehubmall\.com\//i.test(value) ||
+    /^https:\/\/pub-[a-z0-9]+\.r2\.dev\//i.test(value);
 }
