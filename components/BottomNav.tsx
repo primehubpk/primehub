@@ -2,20 +2,18 @@
 
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { Home, ShoppingBag, Users, ShoppingCart, Package } from 'lucide-react';
-import { useCartStore } from '@/lib/cartStore';
+import { Home, ShoppingBag, Users, Sparkles, Package } from 'lucide-react';
 
 const NAV_ITEMS = [
   { key: 'home', label: 'Home', href: '/', icon: Home },
   { key: 'shop', label: 'Shop', href: '/shop', icon: ShoppingBag },
   { key: 'reseller', label: 'Reseller Club', href: '/reseller/dashboard', icon: Users },
-  { key: 'cart', label: 'Cart', href: '/cart', icon: ShoppingCart },
+  { key: 'skills', label: 'Prime Skills', href: '/skills', icon: Sparkles },
   { key: 'orders', label: 'Orders', href: '/orders', icon: Package },
 ];
 
 export default function BottomNav() {
   const pathname = usePathname();
-  const cartCount = useCartStore((s) => s.getCartCount());
 
   return (
     <nav className="fixed inset-x-0 bottom-0 z-40 px-2 pb-[max(6px,env(safe-area-inset-bottom))] sm:px-4">
@@ -28,7 +26,6 @@ export default function BottomNav() {
                 <Icon className="h-[17px] w-[17px]" aria-hidden="true" />
               </span>
               <span className={`max-w-full truncate text-[8px] font-black sm:text-[9px] ${isActive ? 'text-[#0F6A5F]' : 'text-black/60'}`}>{label}</span>
-              {key === 'cart' && cartCount > 0 && <span className="absolute right-[calc(50%-20px)] top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#E1352B] px-1 text-[8px] font-bold text-white ring-2 ring-white">{cartCount}</span>}
             </Link>
           );
         })}
