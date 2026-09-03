@@ -18,11 +18,12 @@ export function useShopCatalog(initialCategory?: string, initialQuery = ''): Sho
   const openVariantModal = useCartStore((state) => state.openVariantModal);
   const searchParams = useSearchParams();
   const urlQuery = searchParams.get('q') || '';
+  const urlMax = searchParams.get('max') || 'all';
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [search, setSearch] = useState(initialQuery || urlQuery);
   const [category, setCategory] = useState(initialCategory || 'all');
-  const [maxPrice, setMaxPrice] = useState('all');
+  const [maxPrice, setMaxPrice] = useState(urlMax);
   const [onlyDeals, setOnlyDeals] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [addedId, setAddedId] = useState<string | null>(null);
@@ -35,7 +36,8 @@ export function useShopCatalog(initialCategory?: string, initialQuery = ''): Sho
 
   useEffect(() => {
     if (!initialQuery) setSearch(urlQuery);
-  }, [initialQuery, urlQuery]);
+    setMaxPrice(urlMax);
+  }, [initialQuery, urlQuery, urlMax]);
 
   useEffect(() => {
     let cancelled = false;
