@@ -3,41 +3,129 @@ import ProductRewardInfo from '@/components/ProductRewardInfo';
 import WeeklyDealProductExtras from '@/components/WeeklyDealProductExtras';
 import { getAdminDb } from '@/lib/firebaseAdmin';
 
-type ProductMetadata = { title?: string; name?: string; description?: string; price?: number; imageUrl?: string; image?: string; images?: Array<string | { url?: string }> };
+type ProductMetadata = {
+  title?: string;
+  name?: string;
+  description?: string;
+  price?: number;
+  imageUrl?: string;
+  image?: string;
+  images?: Array<string | { url?: string }>;
+  stock?: number;
+  quantity?: number;
+  active?: boolean;
+  category?: string;
+};
 
 function siteUrl() {
- const configured = process.env.NEXT_PUBLIC_SITE_URL || process.env.VERCEL_PROJECT_PRODUCTION_URL || 'https://primehub-one.vercel.app';
- return configured.startsWith('http') ? configured.replace(/\/$/, '') : `https://${configured.replace(/\/$/, '')}`;
+  const configured = process.env.NEXT_PUBLIC_SITE_URL || 'https://primehubmall.com';
+  return configured.startsWith('http') ? configured.replace(/\/$/, '') : `https://${configured.replace(/\/$/, '')}`;
 }
 
 function productImage(product: ProductMetadata) {
- const first = product.images?.[0];
- const image = (typeof first === 'string' ? first : first?.url) || product.imageUrl || product.image || '';
- if (!image || image.startsWith('http://') || image.startsWith('https://')) return image;
- return `${siteUrl()}${image.startsWith('/') ? '' : '/'}${image}`;
+  const first = product.images?.[0];
+  const image = (typeof first === 'string' ? first : first?.url) || product.imageUrl || product.image || '';
+  if (!image || image.startsWith('http://') || image.startsWith('https://')) return image;
+  return `${siteUrl()}${image.startsWith('/') ? '' : '/'}${image}`;
 }
 
-export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
- const url = `${siteUrl()}/product/${encodeURIComponent(params.id)}`;
- try {
-  const snapshot = await getAdminDb().collection('products').doc(params.id).get();
-  if (!snapshot.exists) return { title: 'Product not found | PrimeHub Deals', alternates: { canonical: url } };
-  const product = snapshot.data() as ProductMetadata;
-  const title = product.title || product.name || 'PrimeHub Deal';
-  const description = String(product.description || `${title}${product.price ? ` — Rs. ${Number(product.price).toLocaleString()}` : ''}. Shop now on PrimeHub Deals.`).slice(0, 180);
+async function loadProduct(id: string) {
+  try {
+    const snapshot = await getAdminDb().collection('products').doc(id).get();
+    if (!snapshot.exists) return null;
+    return snapshot.data() as ProductMetadata;
+  } catch {
+    return null;
+  }
+}
+
+export async function generateMetadata({
+  params,
+}: {
+  params: { id: string } | Promise<{ id: string }>;
+}): Promise<Metadata> {
+  const resolved = await Promise.resolve(params);
+  const id = decodeURIComponent(resolved.id || '');
+  const url = `${siteUrl()}/product/${encodeURIComponent(id)}`;
+  const product = await loadProduct(id);
+
+  if (!product || product.active === false) {
+    return {
+      title: 'Product not found',
+      alternates: { canonical: url },
+      robots: { index: false, follow: true },
+    };
+  }
+
+  const title = String(product.title || product.name || 'PrimeHubMall Product').trim();
+  const description = String(
+    product.description || `${title}${product.price ? ` — Rs. ${Number(product.price).toLocaleString()}` : ''}. Shop retail and wholesale deals at PrimeHubMall Pakistan.`,
+  )
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 160);
   const image = productImage(product);
+
   return {
-   title: `${title} | PrimeHub Deals`,
-   description,
-   alternates: { canonical: url },
-   openGraph: { title, description, url, siteName: 'PrimeHub Deals', type: 'website', ...(image ? { images: [{ url: image, alt: title }] } : {}) },
-   twitter: { card: 'summary_large_image', title, description, ...(image ? { images: [image] } : {}) },
+    title,
+    description,
+    alternates: { canonical: url },
+    openGraph: {
+      title: `${title} | PrimeHubMall`,
+      description,
+      url,
+      siteName: 'PrimeHubMall',
+      type: 'website',
+      ...(image ? { images: [{ url: image, alt: title }] } : {}),
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: `${title} | PrimeHubMall`,
+      description,
+      ...(image ? { images: [image] } : {}),
+    },
   };
- } catch {
-  return { title: 'PrimeHub Product', description: 'View this product on PrimeHub Deals.', alternates: { canonical: url }, openGraph: { title: 'PrimeHub Product', description: 'View this product on PrimeHub Deals.', url, siteName: 'PrimeHub Deals', type: 'website' } };
- }
 }
 
-export default function ProductLayout({children,params}:{children:React.ReactNode;params:{id:string}}){
- return <><ProductRewardInfo productId={params.id}/>{children}<WeeklyDealProductExtras productId={params.id}/></>;
+export default async function ProductLayout({
+  children,
+  params,
+}: {
+  children: React.ReactNode;
+  params: { id: string } | Promise<{ id: string }>;
+}) {
+  const resolved = await Promise.resolve(params);
+  const id = decodeURIComponent(resolved.id || '');
+  const product = await loadProduct(id);
+  const title = String(product?.title || product?.name || '').trim();
+  const image = product ? productImage(product) : '';
+  const price = Number(product?.price || 0);
+  const stock = Number(product?.stock ?? product?.quantity ?? 0);
+
+  const productSchema = product && product.active !== false && title ? {
+    '@context': 'https://schema.org',
+    '@type': 'Product',
+    name: title,
+    description: String(product.description || '').trim() || undefined,
+    image: image || undefined,
+    category: product.category || undefined,
+    sku: id,
+    brand: { '@type': 'Brand', name: 'PrimeHubMall' },
+    ...(price > 0 ? {
+      offers: {
+        '@type': 'Offer',
+        priceCurrency: 'PKR',
+        price,
+        availability: stock > 0 ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
+        url: `${siteUrl()}/product/${encodeURIComponent(id)}`,
+      },
+    } : {}),
+  } : null;
+
+  return <>
+    {productSchema && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(productSchema) }} />}
+    <ProductRewardInfo productId={id}/>
+    {children}
+    <WeeklyDealProductExtras productId={id}/>
+  </>;
 }
