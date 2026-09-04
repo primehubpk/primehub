@@ -7,7 +7,10 @@ const staticRoutes = [
   '/shop',
   '/new-arrivals',
   '/deals',
+  '/weekly-deals',
+  '/skills',
   '/rewards',
+  '/reseller',
   '/contact',
   '/privacy-policy',
   '/terms',
@@ -17,12 +20,11 @@ const staticRoutes = [
 export const dynamic = 'force-dynamic';
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, '');
-  if (!siteUrl) return [];
+  const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || 'https://primehubmall.com').replace(/\/$/, '');
 
   const entries: MetadataRoute.Sitemap = staticRoutes.map((path) => ({
     url: `${siteUrl}${path}`,
-    changeFrequency: path === '/' || path === '/shop' || path === '/new-arrivals' || path === '/deals' ? 'daily' : 'monthly',
+    changeFrequency: path === '/' || path === '/shop' || path === '/new-arrivals' || path === '/deals' || path === '/weekly-deals' ? 'daily' : 'monthly',
     priority: path === '/' ? 1 : path === '/shop' ? 0.9 : 0.6,
   }));
 
