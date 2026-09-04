@@ -13,25 +13,102 @@ import GlobalVariantSelector from '@/components/GlobalVariantSelector';
 import './globals.css';
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL;
+const BRAND_NAME = 'PrimeHubMall';
+const BRAND_ALT = 'Prime Hub Mall';
+const SITE_DESCRIPTION =
+  'Shop bangles, jewellery, watches, retail and wholesale deals at PrimeHubMall Pakistan. Discover new arrivals, special offers and nationwide delivery.';
 
 export const metadata: Metadata = {
-  title: 'PrimeHub Deals | Daily Dollar Deals & Flash Sales',
-  description: 'PrimeHub Deals (phdeals) — daily flash sales, weekend glow deals, and gamified rewards. Worldwide delivery, WhatsApp ordering.',
-  ...(SITE_URL ? { metadataBase: new URL(SITE_URL) } : {}), applicationName: 'PrimeHub Deals', generator: 'Next.js',
-  keywords: ['PrimeHub Deals', 'phdeals', 'daily deals', 'flash sales', 'online shopping'], alternates: { canonical: '/' },
-  verification: { other: { 'facebook-domain-verification': 'fvnxoqhor4zrphzqp0gfvnrfmb4n50' } },
-  openGraph: { title: 'PrimeHub Deals', description: 'Daily flash sales, weekend glow deals, and gamified rewards.', type: 'website', ...(SITE_URL ? { url: SITE_URL } : {}), siteName: 'PrimeHub Deals' },
-  twitter: { card: 'summary_large_image', title: 'PrimeHub Deals', description: 'Daily flash sales, weekend glow deals, and gamified rewards.' },
-  robots: { index: true, follow: true, googleBot: { index: true, follow: true, 'max-image-preview': 'large', 'max-snippet': -1, 'max-video-preview': -1 } },
+  title: 'PrimeHubMall | Retail & Wholesale Shopping in Pakistan',
+  description: SITE_DESCRIPTION,
+  ...(SITE_URL ? { metadataBase: new URL(SITE_URL) } : {}),
+  applicationName: BRAND_NAME,
+  generator: 'Next.js',
+  keywords: [
+    'PrimeHubMall',
+    'Prime Hub Mall',
+    'PrimeHub Mall Pakistan',
+    'online shopping Pakistan',
+    'retail shopping Pakistan',
+    'wholesale shopping Pakistan',
+    'bangles Pakistan',
+    'jewellery Pakistan',
+    'watches Pakistan',
+    'wholesale deals',
+  ],
+  alternates: { canonical: '/' },
+  verification: {
+    other: {
+      'facebook-domain-verification': 'fvnxoqhor4zrphzqp0gfvnrfmb4n50',
+    },
+  },
+  openGraph: {
+    title: 'PrimeHubMall | Retail & Wholesale Shopping in Pakistan',
+    description: SITE_DESCRIPTION,
+    type: 'website',
+    ...(SITE_URL ? { url: SITE_URL } : {}),
+    siteName: BRAND_NAME,
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'PrimeHubMall | Retail & Wholesale Shopping in Pakistan',
+    description: SITE_DESCRIPTION,
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+      'max-video-preview': -1,
+    },
+  },
 };
 
-export const viewport: Viewport = { themeColor: '#14140F', colorScheme: 'light', width: 'device-width', initialScale: 1 };
+export const viewport: Viewport = {
+  themeColor: '#14140F',
+  colorScheme: 'light',
+  width: 'device-width',
+  initialScale: 1,
+};
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  const websiteSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'WebSite',
+    name: BRAND_NAME,
+    alternateName: [BRAND_ALT, 'PrimeHub Mall'],
+    url: SITE_URL || undefined,
+    description: SITE_DESCRIPTION,
+    potentialAction: {
+      '@type': 'SearchAction',
+      target: `${SITE_URL || ''}/shop?q={search_term_string}`,
+      'query-input': 'required name=search_term_string',
+    },
+  };
+
+  const organizationSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'Organization',
+    name: BRAND_NAME,
+    alternateName: BRAND_ALT,
+    url: SITE_URL || undefined,
+    description: SITE_DESCRIPTION,
+  };
+
   return (
     <html lang="en">
       <body className="font-sans antialiased pb-24">
-        <script dangerouslySetInnerHTML={{ __html: JSON.stringify({ '@context': 'https://schema.org', '@type': 'WebSite', name: 'PrimeHub Deals', alternateName: 'phdeals', url: SITE_URL || undefined, description: 'Daily flash sales, weekend glow deals, and gamified rewards.', potentialAction: { '@type': 'SearchAction', target: `${SITE_URL || ''}/shop?q={search_term_string}`, 'query-input': 'required name=search_term_string' } }) }} />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteSchema) }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema) }}
+        />
         {children}
         <GlobalFooter />
         <GlobalVariantSelector />
