@@ -77,7 +77,7 @@ export default function Footer({ onWholesaleSelect }: { onWholesaleSelect?: () =
       <section className="mx-auto max-w-7xl px-4 py-7 sm:px-6 lg:px-8">
         <div className="mb-4">
           <p className="text-[9px] font-black uppercase tracking-[0.2em] text-[#E1352B]">Shop with confidence</p>
-          <h2 className="mt-1 text-base font-black tracking-tight text-[#14140F]">Why PrimeHub?</h2>
+          <h2 className="mt-1 text-base font-black tracking-tight text-[#14140F]">Why PrimeHubMall?</h2>
         </div>
         <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-4">
           {TRUST_BADGES.map(({ icon: Icon, label, text }) => (
@@ -94,9 +94,9 @@ export default function Footer({ onWholesaleSelect }: { onWholesaleSelect?: () =
         <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
           <div className="grid gap-7 sm:grid-cols-2 lg:grid-cols-[1.35fr_0.8fr_0.9fr_1.35fr]">
             <div>
-              <div className="text-3xl font-black tracking-[-0.07em]">ph<span className="text-[#E1352B]">deals</span></div>
-              <div className="mt-1 text-[7px] font-black tracking-[0.35em] text-[#FFB020]">PRIME HUB</div>
-              <p className="mt-3 max-w-xs text-[11px] leading-5 text-white/55">Premium everyday deals from Prime Hub, with worldwide delivery and wholesale deals available.</p>
+              <div className="text-3xl font-black tracking-[-0.06em]">PrimeHub<span className="text-[#E1352B]">Mall</span></div>
+              <div className="mt-1 text-[7px] font-black tracking-[0.3em] text-[#FFB020]">PRIME HUB DEALS</div>
+              <p className="mt-3 max-w-xs text-[11px] leading-5 text-white/55">PrimeHubMall (Prime Hub) brings retail and wholesale deals on bangles, jewellery, watches and more, with nationwide delivery.</p>
             </div>
 
             <div>
@@ -125,7 +125,7 @@ export default function Footer({ onWholesaleSelect }: { onWholesaleSelect?: () =
               </a>
 
               <div className="grid grid-cols-2 gap-2">
-                <Link href="/contact" className="flex min-h-[72px] items-start gap-2 rounded-2xl border border-white/10 bg-white/5 p-3 text-[9px] font-black text-white/70 transition hover:bg-white/10"><Globe2 className="mt-0.5 h-4 w-4 shrink-0 text-[#FFB020]" /><span>Global Shipping Available.<span className="mt-1 block font-normal leading-4 text-white/45">We deliver our premium bangles worldwide with secure packaging.</span></span></Link>
+                <Link href="/contact" className="flex min-h-[72px] items-start gap-2 rounded-2xl border border-white/10 bg-white/5 p-3 text-[9px] font-black text-white/70 transition hover:bg-white/10"><Globe2 className="mt-0.5 h-4 w-4 shrink-0 text-[#FFB020]" /><span>Nationwide Delivery<span className="mt-1 block font-normal leading-4 text-white/45">Secure delivery across Pakistan with customer support.</span></span></Link>
                 <button type="button" onClick={handleWholesaleClick} className="flex min-h-[72px] items-start gap-2 rounded-2xl border border-yellow-600/30 bg-white/5 p-3 text-left backdrop-blur-md transition hover:bg-white/[0.08] hover:border-yellow-600/40">
                   <ShoppingBag size={14} className="mt-0.5 shrink-0 text-yellow-600/80" />
                   <span className="min-w-0 flex-1">
@@ -139,7 +139,7 @@ export default function Footer({ onWholesaleSelect }: { onWholesaleSelect?: () =
           </div>
 
           <div className="mt-7 flex flex-col gap-2 border-t border-white/10 pt-4 text-[9px] text-white/35 sm:flex-row sm:items-center sm:justify-between">
-            <span>© {new Date().getFullYear()} PrimeHub Deals. All rights reserved.</span>
+            <span>© {new Date().getFullYear()} PrimeHubMall. All rights reserved.</span>
             <span>Prime Hub · Sabir Bangles Store · Lahore</span>
           </div>
         </div>
