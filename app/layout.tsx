@@ -14,12 +14,15 @@ import './globals.css';
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL;
 const BRAND_NAME = 'PrimeHubMall';
-const BRAND_ALT = 'Prime Hub Mall';
+const BRAND_ALIASES = ['Prime Hub Mall', 'PrimeHub Mall', 'Prime Hub', 'PrimeHub Deals', 'Prime Hub Deals'];
 const SITE_DESCRIPTION =
   'Shop bangles, jewellery, watches, retail and wholesale deals at PrimeHubMall Pakistan. Discover new arrivals, special offers and nationwide delivery.';
 
 export const metadata: Metadata = {
-  title: 'PrimeHubMall | Retail & Wholesale Shopping in Pakistan',
+  title: {
+    default: 'PrimeHubMall | Retail & Wholesale Shopping in Pakistan',
+    template: '%s | PrimeHubMall',
+  },
   description: SITE_DESCRIPTION,
   ...(SITE_URL ? { metadataBase: new URL(SITE_URL) } : {}),
   applicationName: BRAND_NAME,
@@ -27,6 +30,10 @@ export const metadata: Metadata = {
   keywords: [
     'PrimeHubMall',
     'Prime Hub Mall',
+    'PrimeHub Mall',
+    'Prime Hub',
+    'PrimeHub Deals',
+    'Prime Hub Deals',
     'PrimeHub Mall Pakistan',
     'online shopping Pakistan',
     'retail shopping Pakistan',
@@ -79,7 +86,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     '@context': 'https://schema.org',
     '@type': 'WebSite',
     name: BRAND_NAME,
-    alternateName: [BRAND_ALT, 'PrimeHub Mall'],
+    alternateName: BRAND_ALIASES,
     url: SITE_URL || undefined,
     description: SITE_DESCRIPTION,
     potentialAction: {
@@ -93,7 +100,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     '@context': 'https://schema.org',
     '@type': 'Organization',
     name: BRAND_NAME,
-    alternateName: BRAND_ALT,
+    alternateName: BRAND_ALIASES,
     url: SITE_URL || undefined,
     description: SITE_DESCRIPTION,
   };
