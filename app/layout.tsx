@@ -19,6 +19,7 @@ export const metadata: Metadata = {
   description: 'PrimeHub Deals (phdeals) — daily flash sales, weekend glow deals, and gamified rewards. Worldwide delivery, WhatsApp ordering.',
   ...(SITE_URL ? { metadataBase: new URL(SITE_URL) } : {}), applicationName: 'PrimeHub Deals', generator: 'Next.js',
   keywords: ['PrimeHub Deals', 'phdeals', 'daily deals', 'flash sales', 'online shopping'], alternates: { canonical: '/' },
+  verification: { other: { 'facebook-domain-verification': 'fvnxoqhor4zrphzqp0gfvnrfmb4n50' } },
   openGraph: { title: 'PrimeHub Deals', description: 'Daily flash sales, weekend glow deals, and gamified rewards.', type: 'website', ...(SITE_URL ? { url: SITE_URL } : {}), siteName: 'PrimeHub Deals' },
   twitter: { card: 'summary_large_image', title: 'PrimeHub Deals', description: 'Daily flash sales, weekend glow deals, and gamified rewards.' },
   robots: { index: true, follow: true, googleBot: { index: true, follow: true, 'max-image-preview': 'large', 'max-snippet': -1, 'max-video-preview': -1 } },
