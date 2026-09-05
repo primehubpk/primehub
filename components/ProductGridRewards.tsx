@@ -33,6 +33,7 @@ import PrimeSkillsHomeRail from '@/components/home/PrimeSkillsHomeRail';
 import { isWholesaleProduct } from '@/lib/wholesale';
 import { shuffleProducts } from '@/lib/shuffleProducts';
 import { getEffectivePrice } from '@/lib/dealPricing';
+import { normalizeImageUrl } from '@/lib/imageUrl';
 
 type Product = {
   id: string;
@@ -76,14 +77,12 @@ const title = (p: Product) => p.title || p.name || 'Untitled Product';
 
 const image = (p: Product) => {
   const first = p.images?.[0];
-  return (typeof first === 'object' ? first?.url : first) || p.imageUrl || p.image || '';
+  const raw = (typeof first === 'object' ? first?.url : first) || p.imageUrl || p.image || '';
+  return normalizeImageUrl(raw);
 };
 
 const safeNumber = (value: unknown) => {
-  if (typeof value === 'number') {
-    return Number.isFinite(value) ? value : 0;
-  }
-
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
   const cleaned = String(value ?? '').replace(/[^0-9.]/g, '');
   const parsed = Number(cleaned);
   return Number.isFinite(parsed) ? parsed : 0;
@@ -95,8 +94,7 @@ const effectivePrice = (p: Product) => getEffectivePrice({
   dealDay: String(p.dealDay || ''),
 });
 
-const original = (p: Product) =>
-  safeNumber(p.compareAtPrice ?? p.originalPrice ?? 0);
+const original = (p: Product) => safeNumber(p.compareAtPrice ?? p.originalPrice ?? 0);
 
 const discount = (p: Product) => {
   const o = original(p);
@@ -104,12 +102,11 @@ const discount = (p: Product) => {
   return o > v ? Math.round(((o - v) / o) * 100) : 0;
 };
 
-const sameImage = (a: string, b: string) => Boolean(a && b && a.trim() === b.trim());
+const sameImage = (a: string, b: string) => Boolean(a && b && normalizeImageUrl(a).trim() === normalizeImageUrl(b).trim());
 
 function getModalProduct(p: Product): Product {
   const rawOptions = Array.isArray(p.options) ? p.options : [];
   const existingVariantOptions = Array.isArray(p.variantOptions) ? p.variantOptions : [];
-
   const normalizedOptions = rawOptions
     .map((option: any, index: number) => {
       if (!option || typeof option !== 'object') return null;
@@ -123,28 +120,24 @@ function getModalProduct(p: Product): Product {
     })
     .filter((option): option is { id: string; values: string[] } => Boolean(option));
 
-  if (!normalizedOptions.length || existingVariantOptions.length > 0) {
-    return p;
-  }
-
-  return {
-    ...p,
-    variantOptions: normalizedOptions,
-  };
+  if (!normalizedOptions.length || existingVariantOptions.length > 0) return p;
+  return { ...p, variantOptions: normalizedOptions };
 }
 
 export default function ProductGridRewards({
+  initialProducts = [],
   selectedMaxPrice = null,
   wholesaleSelected = false,
 }: {
+  initialProducts?: Product[];
   selectedMaxPrice?: number | null;
   wholesaleSelected?: boolean;
 }) {
-  const [products, setProducts] = useState<Product[]>([]);
+  const [products, setProducts] = useState<Product[]>(() => shuffleProducts(initialProducts));
   const [gifts, setGifts] = useState<Reward[]>([]);
   const [points, setPoints] = useState(0);
   const [uid, setUid] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(initialProducts.length === 0);
   const [sort, setSort] = useState<Sort>('featured');
   const [wish, setWish] = useState<string[]>([]);
   const [video, setVideo] = useState<Product | null>(null);
@@ -159,9 +152,7 @@ export default function ProductGridRewards({
     const unsubscribeProducts = onSnapshot(
       collection(db, 'products'),
       (snapshot) => {
-        setProducts(
-          shuffleProducts(snapshot.docs.map((d) => ({ id: d.id, ...d.data() }) as Product)),
-        );
+        setProducts(shuffleProducts(snapshot.docs.map((d) => ({ id: d.id, ...d.data() }) as Product)));
         setLoading(false);
       },
       () => setLoading(false),
@@ -183,29 +174,17 @@ export default function ProductGridRewards({
 
   const rewards = useMemo(() => {
     const map: Record<string, { id: string; points: number; stock: number }> = {};
-
     for (const gift of gifts) {
       let productId = gift.productId;
       const rewardImage = gift.imageUrl;
-
       if (!productId && rewardImage) {
         const match = products.find(
           (product) =>
             sameImage(image(product), rewardImage) ||
-            (Array.isArray(product.images) &&
-              product.images.some((item) =>
-                sameImage(
-                  typeof item === 'object' ? item.url || '' : item,
-                  rewardImage,
-                ),
-              )),
+            (Array.isArray(product.images) && product.images.some((item) => sameImage(typeof item === 'object' ? item.url || '' : item, rewardImage))),
         );
-
-        if (match) {
-          productId = match.id;
-        }
+        if (match) productId = match.id;
       }
-
       if (productId) {
         map[productId] = {
           id: gift.id,
@@ -214,33 +193,24 @@ export default function ProductGridRewards({
         };
       }
     }
-
     return map;
   }, [gifts, products]);
 
   useEffect(() => {
     let unsubscribeUserRewards = () => {};
-
     const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
       unsubscribeUserRewards();
       setUid(user?.uid || null);
-
       if (user) {
-        unsubscribeUserRewards = onSnapshot(
-          doc(db, 'user_rewards', user.uid),
-          (snapshot) => setPoints(Number(snapshot.data()?.points || 0)),
-        );
+        unsubscribeUserRewards = onSnapshot(doc(db, 'user_rewards', user.uid), (snapshot) => setPoints(Number(snapshot.data()?.points || 0)));
       } else {
         try {
-          setPoints(
-            Number(JSON.parse(localStorage.getItem(GUEST_KEY) || '{}')?.points || 0),
-          );
+          setPoints(Number(JSON.parse(localStorage.getItem(GUEST_KEY) || '{}')?.points || 0));
         } catch {
           setPoints(0);
         }
       }
     });
-
     return () => {
       unsubscribeAuth();
       unsubscribeUserRewards();
@@ -250,25 +220,14 @@ export default function ProductGridRewards({
   const visible = useMemo(() => {
     const hasNumericBudget = selectedMaxPrice !== null;
     const hasSelectedFilter = wholesaleSelected || hasNumericBudget;
-
     const filtered = products.filter((product) => {
-      if (wholesaleSelected) {
-        return isWholesaleProduct(product);
-      }
-
-      if (hasNumericBudget) {
-        return effectivePrice(product) <= Number(selectedMaxPrice);
-      }
-
+      if (wholesaleSelected) return isWholesaleProduct(product);
+      if (hasNumericBudget) return effectivePrice(product) <= Number(selectedMaxPrice);
       return true;
     });
 
     if (process.env.NODE_ENV === 'development' && hasSelectedFilter) {
-      console.log('Filtered Price Bucket Products:', {
-        wholesaleSelected,
-        selectedMaxPrice,
-        filtered,
-      });
+      console.log('Filtered Price Bucket Products:', { wholesaleSelected, selectedMaxPrice, filtered });
     }
 
     if (hasNumericBudget && !wholesaleSelected) {
@@ -281,14 +240,8 @@ export default function ProductGridRewards({
         return Number(Boolean(b.isFlashSale)) - Number(Boolean(a.isFlashSale));
       });
     }
-
     return filtered;
-  }, [
-    products,
-    selectedMaxPrice,
-    wholesaleSelected,
-    sort,
-  ]);
+  }, [products, selectedMaxPrice, wholesaleSelected, sort]);
 
   function add(p: Product) {
     const img = image(p);
@@ -300,7 +253,7 @@ export default function ProductGridRewards({
       (Array.isArray(modalProduct.variantSizes) && modalProduct.variantSizes.length > 0) ||
       (Array.isArray(modalProduct.variantOptions) && modalProduct.variantOptions.length > 0) ||
       (Array.isArray(modalProduct.options) && modalProduct.options.length > 0) ||
-      modalProduct.hasVariants === true,
+      modalProduct.hasVariants === true
     );
 
     if (hasVariants && typeof openVariantModal === 'function') {
@@ -321,10 +274,7 @@ export default function ProductGridRewards({
     setTimeout(() => setAdded(null), 1100);
   }
 
-  async function redeem(
-    p: Product,
-    r: { id: string; points: number; stock: number },
-  ) {
+  async function redeem(p: Product, r: { id: string; points: number; stock: number }) {
     if (!uid) {
       window.location.href = '/login?redirect=/rewards#redeem-rewards';
       return;
@@ -332,28 +282,15 @@ export default function ProductGridRewards({
 
     setNotice('');
     setRedeeming(p.id);
-
     try {
       await runTransaction(db, async (tx) => {
         const wallet = doc(db, 'user_rewards', uid);
         const redemption = doc(collection(db, 'reward_redemptions'));
         const snapshot = await tx.get(wallet);
         const current = Number(snapshot.data()?.points || 0);
-
-        if (current < r.points) {
-          throw new Error(`You need ${r.points - current} more points.`);
-        }
-
-        if (r.stock < 1) {
-          throw new Error('This reward is out of stock.');
-        }
-
-        tx.set(
-          wallet,
-          { points: current - r.points, updatedAt: serverTimestamp() },
-          { merge: true },
-        );
-
+        if (current < r.points) throw new Error(`You need ${r.points - current} more points.`);
+        if (r.stock < 1) throw new Error('This reward is out of stock.');
+        tx.set(wallet, { points: current - r.points, updatedAt: serverTimestamp() }, { merge: true });
         tx.set(redemption, {
           userId: uid,
           giftId: r.id,
@@ -366,15 +303,10 @@ export default function ProductGridRewards({
           createdAt: serverTimestamp(),
         });
       });
-
       setPoints((current) => Math.max(0, current - r.points));
-      setNotice(
-        `${title(p)} reward claimed. ${r.points} points deducted and FREE DELIVERY included.`,
-      );
+      setNotice(`${title(p)} reward claimed. ${r.points} points deducted and FREE DELIVERY included.`);
     } catch (error) {
-      setNotice(
-        error instanceof Error ? error.message : 'Redemption failed. Please try again.',
-      );
+      setNotice(error instanceof Error ? error.message : 'Redemption failed. Please try again.');
     } finally {
       setRedeeming(null);
     }
@@ -385,12 +317,7 @@ export default function ProductGridRewards({
       <section className="mt-8 px-4">
         <div className="mb-4 h-7 w-44 animate-pulse rounded-lg bg-black/8" />
         <div className="grid grid-cols-2 gap-2 md:grid-cols-3 md:gap-3 lg:grid-cols-4 xl:grid-cols-5">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div
-              key={i}
-              className="aspect-[.8] animate-pulse rounded-[22px] bg-white"
-            />
-          ))}
+          {Array.from({ length: 6 }).map((_, i) => <div key={i} className="aspect-[.8] animate-pulse rounded-[22px] bg-white" />)}
         </div>
       </section>
     );
@@ -402,23 +329,15 @@ export default function ProductGridRewards({
         <div>
           <div className="mb-1 flex items-center gap-1.5 text-[#B7791F]">
             <Sparkles size={13} />
-            <span className="text-[9px] font-black uppercase tracking-[.2em]">
-              Premium Picks
-            </span>
+            <span className="text-[9px] font-black uppercase tracking-[.2em]">Premium Picks</span>
           </div>
           <h2 className="text-2xl font-black tracking-tight">Discover Deals</h2>
-          <p className="mt-1 text-xs text-black/45">
-            {visible.length} product{visible.length === 1 ? '' : 's'} to explore
-          </p>
+          <p className="mt-1 text-xs text-black/45">{visible.length} product{visible.length === 1 ? '' : 's'} to explore</p>
         </div>
 
         <label className="flex shrink-0 items-center gap-1.5 rounded-2xl border border-black/8 bg-white px-2.5 py-2.5">
           <ArrowDownUp size={14} />
-          <select
-            value={sort}
-            onChange={(e) => setSort(e.target.value as Sort)}
-            className="max-w-[90px] bg-transparent text-[10px] font-black outline-none"
-          >
+          <select value={sort} onChange={(e) => setSort(e.target.value as Sort)} className="max-w-[90px] bg-transparent text-[10px] font-black outline-none">
             <option value="featured">Featured</option>
             <option value="discount">Best deal</option>
             <option value="low">Low price</option>
@@ -427,19 +346,13 @@ export default function ProductGridRewards({
         </label>
       </div>
 
-      {notice && (
-        <p className="mb-3 rounded-xl bg-[#0F6A5F] p-3 text-center text-[10px] font-black text-white">
-          {notice}
-        </p>
-      )}
+      {notice && <p className="mb-3 rounded-xl bg-[#0F6A5F] p-3 text-center text-[10px] font-black text-white">{notice}</p>}
 
       {visible.length === 0 ? (
         <div className="rounded-[24px] border border-dashed border-black/10 bg-white px-5 py-12 text-center">
           <p className="text-sm font-black">No products found</p>
           <p className="mt-1 text-xs text-black/45">
-            {wholesaleSelected
-              ? 'There are no wholesale products available right now.'
-              : 'There are no products matching this filter right now.'}
+            {wholesaleSelected ? 'There are no wholesale products available right now.' : 'There are no products matching this filter right now.'}
           </p>
         </div>
       ) : (
@@ -454,9 +367,7 @@ export default function ProductGridRewards({
             const stock = Number(p.stock ?? p.quantity ?? 0);
 
             return <Fragment key={p.id}>
-              <article
-                className="overflow-hidden rounded-[18px] border border-black/7 bg-white shadow-sm sm:rounded-[24px]"
-              >
+              <article className="overflow-hidden rounded-[18px] border border-black/7 bg-white shadow-sm sm:rounded-[24px]">
                 <div className="relative aspect-square overflow-hidden bg-[#F4F4F1]">
                   {img ? (
                     <Link href={`/product/${p.id}`} className="block h-full w-full">
@@ -464,119 +375,59 @@ export default function ProductGridRewards({
                         src={img}
                         alt={title(p)}
                         fill
-                        unoptimized
+                        priority={index < 4}
+                        loading={index < 4 ? 'eager' : 'lazy'}
+                        fetchPriority={index < 4 ? 'high' : 'auto'}
                         sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
+                        quality={72}
                         className="object-cover"
-                        onError={(event) => {
-                          event.currentTarget.src = '/placeholder.png';
-                        }}
                       />
                     </Link>
                   ) : (
-                    <div className="flex h-full items-center justify-center text-xs text-black/30">
-                      No image
-                    </div>
+                    <div className="flex h-full items-center justify-center text-xs text-black/30">No image</div>
                   )}
 
-                  {discount(p) > 0 && (
-                    <span className="absolute left-2.5 top-2.5 rounded-full bg-[#E1352B] px-2 py-1 text-[9px] font-black text-white">
-                      -{discount(p)}%
-                    </span>
-                  )}
+                  {discount(p) > 0 && <span className="absolute left-2.5 top-2.5 rounded-full bg-[#E1352B] px-2 py-1 text-[9px] font-black text-white">-{discount(p)}%</span>}
 
-                  {r && (
-                    <span className="absolute left-2.5 top-10 inline-flex items-center gap-1 rounded-full bg-[#0F6A5F] px-2.5 py-1.5 text-[9px] font-black text-white">
-                      <Gift size={10} />
-                      FREE GIFT · {r.points} PTS
-                    </span>
-                  )}
+                  {r && <span className="absolute left-2.5 top-10 inline-flex items-center gap-1 rounded-full bg-[#0F6A5F] px-2.5 py-1.5 text-[9px] font-black text-white"><Gift size={10} />FREE GIFT · {r.points} PTS</span>}
 
-                  {p.isFlashSale && (
-                    <span className="absolute left-2.5 top-[4.25rem] inline-flex items-center gap-1 rounded-full bg-[#14140F] px-2 py-1 text-[9px] font-black text-white">
-                      <Zap size={9} />
-                      FLASH
-                    </span>
-                  )}
+                  {p.isFlashSale && <span className="absolute left-2.5 top-[4.25rem] inline-flex items-center gap-1 rounded-full bg-[#14140F] px-2 py-1 text-[9px] font-black text-white"><Zap size={9} />FLASH</span>}
 
                   <div className="absolute right-2.5 top-2.5 flex gap-1.5">
                     <ProductShareButton productId={p.id} title={title(p)} className="flex h-8 w-8 items-center justify-center rounded-full bg-white/90 shadow-sm"/>
-                    {(p.videoUrl || p.reelUrl) && (
-                      <button
-                        type="button"
-                        onClick={() => setVideo(p)}
-                        className="flex h-8 w-8 items-center justify-center rounded-full bg-white/90"
-                      >
-                        <Play size={13} />
-                      </button>
-                    )}
+                    {(p.videoUrl || p.reelUrl) && <button type="button" onClick={() => setVideo(p)} className="flex h-8 w-8 items-center justify-center rounded-full bg-white/90"><Play size={13} /></button>}
                     <button
                       type="button"
-                      onClick={() =>
-                        setWish((current) =>
-                          current.includes(p.id)
-                            ? current.filter((id) => id !== p.id)
-                            : [...current, p.id],
-                        )
-                      }
+                      onClick={() => setWish((current) => current.includes(p.id) ? current.filter((id) => id !== p.id) : [...current, p.id])}
                       className="flex h-8 w-8 items-center justify-center rounded-full bg-white/90"
                     >
-                      <Heart
-                        size={14}
-                        className={wished ? 'text-[#E1352B]' : 'text-[#14140F]'}
-                        fill={wished ? 'currentColor' : 'none'}
-                      />
+                      <Heart size={14} className={wished ? 'text-[#E1352B]' : 'text-[#14140F]'} fill={wished ? 'currentColor' : 'none'} />
                     </button>
                   </div>
 
-                  {stock > 0 && stock <= 5 && (
-                    <span className="absolute bottom-2.5 left-2.5 rounded-full bg-[#FFB020] px-2 py-1 text-[9px] font-black">
-                      Only {stock} left
-                    </span>
-                  )}
-
+                  {stock > 0 && stock <= 5 && <span className="absolute bottom-2.5 left-2.5 rounded-full bg-[#FFB020] px-2 py-1 text-[9px] font-black">Only {stock} left</span>}
                   <ProductUrgencyBadges stock={stock} productId={p.id} />
                 </div>
 
                 <div className="p-3">
                   <Link href={`/product/${p.id}`} className="block">
-                    <p className="line-clamp-2 min-h-[32px] text-[12px] font-extrabold leading-4">
-                      {title(p)}
-                    </p>
+                    <p className="line-clamp-2 min-h-[32px] text-[12px] font-extrabold leading-4">{title(p)}</p>
                     <div className="mt-2 flex items-end gap-1.5">
-                      <span className="text-[16px] font-black text-[#E1352B]">
-                        Rs. {effectivePrice(p).toLocaleString()}
-                      </span>
-                      {original(p) > effectivePrice(p) && (
-                        <span className="text-[9px] text-black/35 line-through">
-                          Rs. {original(p).toLocaleString()}
-                        </span>
-                      )}
+                      <span className="text-[16px] font-black text-[#E1352B]">Rs. {effectivePrice(p).toLocaleString()}</span>
+                      {original(p) > effectivePrice(p) && <span className="text-[9px] text-black/35 line-through">Rs. {original(p).toLocaleString()}</span>}
                     </div>
 
                     {r && (
                       <div className="mt-2 rounded-xl bg-[#F7F7F2] p-2">
-                        <p className="text-[10px] font-black text-[#0F6A5F]">
-                          FREE with {r.points} points
-                        </p>
-                        <p className="mt-0.5 text-[9px] font-bold text-black/45">
-                          You have {pts} points
-                        </p>
+                        <p className="text-[10px] font-black text-[#0F6A5F]">FREE with {r.points} points</p>
+                        <p className="mt-0.5 text-[9px] font-bold text-black/45">You have {pts} points</p>
                         {need > 0 ? (
                           <>
-                            <p className="text-[9px] font-bold text-black/45">
-                              Need {need} more points
-                            </p>
-                            <Link
-                              href="/rewards"
-                              className="mt-1 inline-flex text-[9px] font-black text-[#E1352B]"
-                            >
-                              Earn More Points →
-                            </Link>
+                            <p className="text-[9px] font-bold text-black/45">Need {need} more points</p>
+                            <Link href="/rewards" className="mt-1 inline-flex text-[9px] font-black text-[#E1352B]">Earn More Points →</Link>
                           </>
                         ) : (
-                          <p className="mt-0.5 text-[9px] font-black text-[#0F6A5F]">
-                            ✓ You have enough points to redeem
-                          </p>
+                          <p className="mt-0.5 text-[9px] font-black text-[#0F6A5F]">✓ You have enough points to redeem</p>
                         )}
                       </div>
                     )}
@@ -589,36 +440,11 @@ export default function ProductGridRewards({
                       disabled={redeeming === p.id || Boolean(uid && !can)}
                       className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl bg-[#E1352B] py-2.5 text-[10px] font-black text-white disabled:opacity-50"
                     >
-                      {!uid ? (
-                        <>
-                          <LogIn size={12} />
-                          Login to redeem
-                        </>
-                      ) : redeeming === p.id ? (
-                        'Submitting...'
-                      ) : can ? (
-                        'Redeem for FREE'
-                      ) : (
-                        'Need ' + need + ' more points'
-                      )}
+                      {!uid ? <><LogIn size={12} />Login to redeem</> : redeeming === p.id ? 'Submitting...' : can ? 'Redeem for FREE' : 'Need ' + need + ' more points'}
                     </button>
                   ) : (
-                    <button
-                      type="button"
-                      onClick={() => add(p)}
-                      className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl bg-[#14140F] py-2.5 text-[10px] font-black text-white"
-                    >
-                      {added === p.id ? (
-                        <>
-                          <Check size={13} />
-                          Added
-                        </>
-                      ) : (
-                        <>
-                          <Plus size={13} />
-                          Add to cart
-                        </>
-                      )}
+                    <button type="button" onClick={() => add(p)} className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl bg-[#14140F] py-2.5 text-[10px] font-black text-white">
+                      {added === p.id ? <><Check size={13} />Added</> : <><Plus size={13} />Add to cart</>}
                     </button>
                   )}
                 </div>
@@ -636,28 +462,12 @@ export default function ProductGridRewards({
       </div>
 
       {video && (
-        <div
-          className="fixed inset-0 z-[90] flex items-center justify-center bg-black/80 p-4"
-          onClick={() => setVideo(null)}
-        >
-          <div
-            className="relative w-full max-w-lg"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <button
-              type="button"
-              onClick={() => setVideo(null)}
-              className="absolute -right-1 -top-12 h-9 w-9 rounded-full bg-white"
-            >
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/80 p-4" onClick={() => setVideo(null)}>
+          <div className="relative w-full max-w-lg" onClick={(event) => event.stopPropagation()}>
+            <button type="button" onClick={() => setVideo(null)} className="absolute -right-1 -top-12 h-9 w-9 rounded-full bg-white">
               <X size={16} className="mx-auto" />
             </button>
-            <video
-              src={video.videoUrl || video.reelUrl || ''}
-              controls
-              playsInline
-              autoPlay
-              className="max-h-[78vh] w-full rounded-3xl bg-black"
-            />
+            <video src={video.videoUrl || video.reelUrl || ''} controls playsInline autoPlay className="max-h-[78vh] w-full rounded-3xl bg-black" />
           </div>
         </div>
       )}
