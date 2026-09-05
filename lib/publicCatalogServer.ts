@@ -43,6 +43,29 @@ export const getPublicCatalogSnapshot = unstable_cache(
   { revalidate: 60, tags: ['public-catalog'] },
 );
 
+async function loadStorefrontSettings() {
+  try {
+    const db = getAdminDb();
+    const [mainSnap, legacySnap] = await Promise.all([
+      db.collection('settings').doc('main').get(),
+      db.collection('settings').doc('general').get(),
+    ]);
+    return {
+      ...(legacySnap.exists ? toSerializable(legacySnap.data()) : {}),
+      ...(mainSnap.exists ? toSerializable(mainSnap.data()) : {}),
+    };
+  } catch (error) {
+    console.error('storefront settings preload failed', error);
+    return {};
+  }
+}
+
+export const getStorefrontSettingsSnapshot = unstable_cache(
+  loadStorefrontSettings,
+  ['primehub-storefront-settings-v1'],
+  { revalidate: 30, tags: ['storefront-settings'] },
+);
+
 async function loadPrimeSkills() {
   try {
     const db = getAdminDb();
