@@ -9,7 +9,7 @@ import NewArrivalsRail from '@/components/NewArrivalsRail';
 import ProductGridRewards from '@/components/ProductGridRewards';
 import YouTubeGuide from '@/components/YouTubeGuide';
 import Footer from '@/components/Footer';
-import type { Category } from '@/lib/types';
+import type { Category, Product as SharedProduct } from '@/lib/types';
 import type { Product } from '@/components/shop/ShopTypes';
 
 type Props = {
@@ -35,7 +35,7 @@ export default function HomePageClient({ initialProducts, initialCategories }: P
     <div className="min-h-screen bg-[#F4F4F1] text-[#14140F]">
       <Header />
       <CategorySwiper initialCategories={initialCategories} />
-      <HeroFlashBanner initialProducts={initialProducts} />
+      <HeroFlashBanner initialProducts={initialProducts as SharedProduct[]} />
       <NewArrivalsRail initialProducts={initialProducts} />
       <PriceBuckets
         selectedMaxPrice={selectedMaxPrice}
