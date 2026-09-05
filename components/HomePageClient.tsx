@@ -35,7 +35,7 @@ export default function HomePageClient({ initialProducts, initialCategories }: P
     <div className="min-h-screen bg-[#F4F4F1] text-[#14140F]">
       <Header />
       <CategorySwiper initialCategories={initialCategories} />
-      <HeroFlashBanner />
+      <HeroFlashBanner initialProducts={initialProducts} />
       <NewArrivalsRail initialProducts={initialProducts} />
       <PriceBuckets
         selectedMaxPrice={selectedMaxPrice}
