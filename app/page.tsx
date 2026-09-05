@@ -3,7 +3,7 @@ import { getPublicCatalogSnapshot } from '@/lib/publicCatalogServer';
 import type { Category } from '@/lib/types';
 import type { Product } from '@/components/shop/ShopTypes';
 
-export const revalidate = 60;
+export const dynamic = 'force-dynamic';
 
 export default async function HomePage() {
   const snapshot = await getPublicCatalogSnapshot();
