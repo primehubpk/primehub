@@ -126,10 +126,12 @@ function getModalProduct(p: Product): Product {
 
 export default function ProductGridRewards({
   initialProducts = [],
+  liveUpdates = true,
   selectedMaxPrice = null,
   wholesaleSelected = false,
 }: {
   initialProducts?: Product[];
+  liveUpdates?: boolean;
   selectedMaxPrice?: number | null;
   wholesaleSelected?: boolean;
 }) {
@@ -149,14 +151,24 @@ export default function ProductGridRewards({
   const openVariantModal = useCartStore((s) => s.openVariantModal);
 
   useEffect(() => {
-    const unsubscribeProducts = onSnapshot(
-      collection(db, 'products'),
-      (snapshot) => {
-        setProducts(shuffleProducts(snapshot.docs.map((d) => ({ id: d.id, ...d.data() }) as Product)));
-        setLoading(false);
-      },
-      () => setLoading(false),
-    );
+    if (!liveUpdates) {
+      setProducts(shuffleProducts(initialProducts));
+      setLoading(initialProducts.length === 0);
+    }
+  }, [initialProducts, liveUpdates]);
+
+  useEffect(() => {
+    let unsubscribeProducts = () => {};
+    if (liveUpdates) {
+      unsubscribeProducts = onSnapshot(
+        collection(db, 'products'),
+        (snapshot) => {
+          setProducts(shuffleProducts(snapshot.docs.map((d) => ({ id: d.id, ...d.data() }) as Product)));
+          setLoading(false);
+        },
+        () => setLoading(false),
+      );
+    }
 
     const unsubscribeGifts = onSnapshot(collection(db, 'reward_gifts'), (snapshot) => {
       setGifts(
@@ -170,7 +182,7 @@ export default function ProductGridRewards({
       unsubscribeProducts();
       unsubscribeGifts();
     };
-  }, []);
+  }, [liveUpdates]);
 
   const rewards = useMemo(() => {
     const map: Record<string, { id: string; points: number; stock: number }> = {};
