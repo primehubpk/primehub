@@ -70,7 +70,13 @@ function productMap(list: Product[]) {
   return Object.fromEntries(list.map((product) => [product.id, product]));
 }
 
-export default function HeroFlashBanner({ initialProducts = [] }: { initialProducts?: Product[] }) {
+export default function HeroFlashBanner({
+  initialProducts = [],
+  liveUpdates = true,
+}: {
+  initialProducts?: Product[];
+  liveUpdates?: boolean;
+}) {
   const { settings } = useSettings();
   const [nowTick, setNowTick] = useState<number | null>(null);
   const [products, setProducts] = useState<Record<string, Product>>(() => productMap(initialProducts));
@@ -85,21 +91,24 @@ export default function HeroFlashBanner({ initialProducts = [] }: { initialProdu
     return () => window.clearInterval(timer);
   }, []);
 
-  useEffect(
-    () =>
-      onSnapshot(
-        collection(db, 'products'),
-        (snapshot) => {
-          const next: Record<string, Product> = {};
-          snapshot.forEach((doc) => {
-            next[doc.id] = { id: doc.id, ...doc.data() } as Product;
-          });
-          setProducts(next);
-        },
-        () => undefined,
-      ),
-    [],
-  );
+  useEffect(() => {
+    if (!liveUpdates) setProducts(productMap(initialProducts));
+  }, [initialProducts, liveUpdates]);
+
+  useEffect(() => {
+    if (!liveUpdates) return;
+    return onSnapshot(
+      collection(db, 'products'),
+      (snapshot) => {
+        const next: Record<string, Product> = {};
+        snapshot.forEach((doc) => {
+          next[doc.id] = { id: doc.id, ...doc.data() } as Product;
+        });
+        setProducts(next);
+      },
+      () => undefined,
+    );
+  }, [liveUpdates]);
 
   useEffect(() => {
     const urls = [bigDeal?.imageUrl, ...weeklyDeals.map((deal) => deal.imageUrl)]
