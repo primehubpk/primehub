@@ -1,41 +1,17 @@
-'use client';
+import HomePageClient from '@/components/HomePageClient';
+import { getPublicCatalogSnapshot } from '@/lib/publicCatalogServer';
+import type { Category } from '@/lib/types';
+import type { Product } from '@/components/shop/ShopTypes';
 
-import { useState } from 'react';
-import Header from '@/components/Header';
-import HeroFlashBanner from '@/components/HeroFlashBanner';
-import CategorySwiper from '@/components/CategorySwiper';
-import PriceBuckets from '@/components/PriceBuckets';
-import NewArrivalsRail from '@/components/NewArrivalsRail';
-import ProductGridRewards from '@/components/ProductGridRewards';
-import YouTubeGuide from '@/components/YouTubeGuide';
-import Footer from '@/components/Footer';
+export const dynamic = 'force-dynamic';
 
-export default function HomePage() {
-  const [selectedMaxPrice, setSelectedMaxPrice] = useState<number | null>(null);
-  const [wholesaleSelected, setWholesaleSelected] = useState(false);
-  const selectPrice = (amount: number | null) => {
-    setSelectedMaxPrice(amount);
-    setWholesaleSelected(false);
-  };
-  const selectWholesale = () => {
-    setSelectedMaxPrice(null);
-    setWholesaleSelected((selected) => !selected);
-  };
+export default async function HomePage() {
+  const snapshot = await getPublicCatalogSnapshot();
 
   return (
-    <>
-      <div className="min-h-screen bg-[#F4F4F1] text-[#14140F]">
-        <Header />
-        <CategorySwiper />
-        <HeroFlashBanner />
-        <NewArrivalsRail />
-        <PriceBuckets selectedMaxPrice={selectedMaxPrice} wholesaleSelected={wholesaleSelected} onSelect={selectPrice} onWholesaleSelect={selectWholesale} />
-        <div id="discover-deals-section">
-          <ProductGridRewards selectedMaxPrice={selectedMaxPrice} wholesaleSelected={wholesaleSelected} />
-        </div>
-        <YouTubeGuide />
-        <Footer onWholesaleSelect={selectWholesale} />
-      </div>
-    </>
+    <HomePageClient
+      initialProducts={snapshot.products as Product[]}
+      initialCategories={snapshot.categories as Category[]}
+    />
   );
 }

@@ -8,11 +8,14 @@ import { FilterDrawer } from './shop/CatalogFilters';
 import CatalogProductGrid from './shop/CatalogProductGrid';
 import CompactCategoryStrip from './shop/CompactCategoryStrip';
 import { productMatchesCategory } from '@/lib/categoryUtils';
+import type { Product, Category } from './shop/ShopTypes';
 
 function score(id:string){return Array.from(id).reduce((n,c)=>((n*31+c.charCodeAt(0))>>>0),7)}
 
-export default function ShopCatalog({initialCategory,initialQuery=''}:{initialCategory?:string;initialQuery?:string}){
-  const shop=useShopCatalog(initialCategory,initialQuery);
+type Props={initialCategory?:string;initialQuery?:string;initialProducts?:Product[];initialCategories?:Category[]};
+
+export default function ShopCatalog({initialCategory,initialQuery='',initialProducts=[],initialCategories=[]}:Props){
+  const shop=useShopCatalog(initialCategory,initialQuery,initialProducts,initialCategories);
   const categoryView=Boolean(initialCategory);
   const searchView=Boolean(shop.search.trim());
   const picks=useMemo(()=>[...shop.filtered].sort((a,b)=>score(a.id)-score(b.id)),[shop.filtered]);

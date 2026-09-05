@@ -1,5 +1,6 @@
 import type { Dispatch, SetStateAction } from 'react';
 import { slugifyCategory } from '@/lib/categoryUtils';
+import { normalizeImageUrl } from '@/lib/imageUrl';
 
 export type Product = {
   id: string; title?: string; name?: string; price?: number; compareAtPrice?: number; originalPrice?: number;
@@ -25,7 +26,7 @@ export type ShopCatalogModel = FilterState & ShopCatalogActions & {
 };
 
 export function titleOf(p: Product) { return p.title || p.name || ''; }
-export function imageOf(p: Product) { return p.imageUrl || p.image || p.images?.[0] || ''; }
+export function imageOf(p: Product) { return normalizeImageUrl(p.imageUrl || p.image || p.images?.[0] || ''); }
 export function priceOf(p: Product) { return Number(p.price || 0); }
 export function originalOf(p: Product) { return Number(p.compareAtPrice ?? p.originalPrice ?? 0); }
 export function slugify(value: string) { return slugifyCategory(value); }

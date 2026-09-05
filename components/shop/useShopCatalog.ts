@@ -12,22 +12,23 @@ import { isWholesaleProduct } from '@/lib/wholesale';
 import { shuffleProducts } from '@/lib/shuffleProducts';
 import { Product, Category, ShopCatalogModel, imageOf, priceOf, originalOf, productHasVariants, titleOf } from './ShopTypes';
 
-export function useShopCatalog(initialCategory?: string, initialQuery = ''): ShopCatalogModel {
+export function useShopCatalog(initialCategory?: string, initialQuery = '', initialProducts: Product[] = [], initialCategories: Category[] = []): ShopCatalogModel {
   const { settings } = useSettings();
   const addItem = useCartStore((state) => state.addItem);
   const openVariantModal = useCartStore((state) => state.openVariantModal);
   const searchParams = useSearchParams();
   const urlQuery = searchParams.get('q') || '';
   const urlMax = searchParams.get('max') || 'all';
-  const [products, setProducts] = useState<Product[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
+  const hasServerData = initialProducts.length > 0 || initialCategories.length > 0;
+  const [products, setProducts] = useState<Product[]>(() => hasServerData ? shuffleProducts(initialProducts) : []);
+  const [categories, setCategories] = useState<Category[]>(initialCategories);
   const [search, setSearch] = useState(initialQuery || urlQuery);
   const [category, setCategory] = useState(initialCategory || 'all');
   const [maxPrice, setMaxPrice] = useState(urlMax);
   const [onlyDeals, setOnlyDeals] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [addedId, setAddedId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!hasServerData);
   const [wholesaleOnly, setWholesaleOnly] = useState(searchParams.get('wholesale') === 'true');
 
   useEffect(() => {

@@ -1,15 +1,17 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { ArrowLeft, Check, ExternalLink, MessageCircle } from 'lucide-react';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { PRIME_SKILLS_SEED } from '@/lib/primeSkillsSeed';
+import { normalizeImageUrl } from '@/lib/imageUrl';
 
 type MediaType = 'image' | 'video-link' | 'external-link';
 type SkillPackage = { id: string; name: string; price: number; description?: string; active?: boolean };
-type SkillItem = {
+export type SkillDetailItem = {
   id: string;
   title?: string;
   subtitle?: string;
@@ -30,7 +32,7 @@ function normalizeWhatsapp(number?: string) {
   return digits.startsWith('92') ? digits : digits.startsWith('0') ? `92${digits.slice(1)}` : digits;
 }
 
-function whatsappUrl(number: string | undefined, item: SkillItem, selected?: SkillPackage | null) {
+function whatsappUrl(number: string | undefined, item: SkillDetailItem, selected?: SkillPackage | null) {
   const international = normalizeWhatsapp(number);
   if (!international) return '';
   const chosenPrice = selected ? selected.price : Number(item.price || 0);
@@ -55,29 +57,29 @@ function safeExternalUrl(value?: string) {
   return /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
 }
 
-function displayPrice(item: SkillItem) {
+function displayPrice(item: SkillDetailItem) {
   const packages = (item.packages || []).filter((pkg) => pkg.active !== false && Number(pkg.price) > 0);
   if (packages.length) return Math.min(...packages.map((pkg) => Number(pkg.price)));
   return Number(item.price || 0);
 }
 
-export default function SkillDetail({ skillId }: { skillId: string }) {
-  const [items, setItems] = useState<SkillItem[]>([]);
-  const [loading, setLoading] = useState(true);
+export default function SkillDetail({ skillId, initialItems = [] }: { skillId: string; initialItems?: SkillDetailItem[] }) {
+  const [items, setItems] = useState<SkillDetailItem[]>(initialItems);
+  const [loading, setLoading] = useState(initialItems.length === 0);
   const [selectedPackageId, setSelectedPackageId] = useState('');
 
   useEffect(() => onSnapshot(
     collection(db, 'prime_skills'),
     (snapshot) => {
-      setItems(snapshot.docs.map((entry) => ({ id: entry.id, ...entry.data() } as SkillItem)));
+      setItems(snapshot.docs.map((entry) => ({ id: entry.id, ...entry.data() } as SkillDetailItem)));
       setLoading(false);
     },
     () => setLoading(false),
   ), []);
 
-  const source: SkillItem[] = items.length ? items : PRIME_SKILLS_SEED;
+  const source: SkillDetailItem[] = items.length ? items : PRIME_SKILLS_SEED;
   const active = useMemo(() => source.filter((entry) => entry.active !== false).sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0)), [source]);
-  const item = active.find((entry) => entry.id === skillId) || (PRIME_SKILLS_SEED as SkillItem[]).find((entry) => entry.id === skillId);
+  const item = active.find((entry) => entry.id === skillId) || (PRIME_SKILLS_SEED as SkillDetailItem[]).find((entry) => entry.id === skillId);
   const related = active.filter((entry) => entry.id !== skillId).slice(0, 4);
 
   if (loading) return <main className="min-h-screen bg-[#F4F4F1] px-3 py-6"><div className="mx-auto max-w-5xl rounded-2xl bg-white p-8 text-center text-sm font-bold text-black/40">Loading skill...</div></main>;
@@ -88,12 +90,13 @@ export default function SkillDetail({ skillId }: { skillId: string }) {
   const waHref = whatsappUrl(item.whatsapp, item, selectedPackage);
   const externalHref = safeExternalUrl(item.externalUrl);
   const basePrice = displayPrice(item);
+  const heroImage = normalizeImageUrl(item.thumbnailUrl);
 
   return <main className="min-h-screen overflow-x-hidden bg-[#F4F4F1] px-3 pb-28 pt-3 sm:px-6 sm:pt-8">
     <div className="mx-auto max-w-5xl">
       <Link href="/skills" className="mb-3 inline-flex items-center gap-1.5 text-[10px] font-black text-black/55 sm:text-xs"><ArrowLeft size={14}/>Prime Skills</Link>
       <article className="overflow-hidden rounded-[20px] border border-black/5 bg-white shadow-[0_12px_34px_rgba(20,20,15,0.07)] sm:rounded-[28px]">
-        <div className="aspect-video bg-[#ECECE7]">{item.thumbnailUrl ? <img src={item.thumbnailUrl} alt={item.title || 'Prime Skill'} className="h-full w-full object-cover"/> : null}</div>
+        <div className="relative aspect-video bg-[#ECECE7]">{heroImage ? <Image src={heroImage} alt={item.title || 'Prime Skill'} fill sizes="(max-width: 1024px) 100vw, 1024px" priority quality={78} className="object-cover"/> : null}</div>
         <div className="p-4 sm:p-7">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0"><h1 className="text-xl font-black leading-tight text-[#181914] sm:text-3xl">{item.title}</h1>{item.subtitle && <p className="mt-2 text-[13px] font-medium leading-5 text-black/55 sm:text-base sm:leading-6">{item.subtitle}</p>}</div>
@@ -109,7 +112,7 @@ export default function SkillDetail({ skillId }: { skillId: string }) {
         </div>
       </article>
 
-      {related.length > 0 && <section className="mt-6 sm:mt-8"><div className="mb-3"><p className="text-[8px] font-black uppercase tracking-[.18em] text-[#0F6A5F]">Prime Skills</p><h2 className="mt-1 text-base font-black sm:text-xl">Related Skills</h2></div><div className="grid grid-cols-2 gap-1.5 sm:gap-5">{related.map((entry) => { const price = displayPrice(entry); return <Link key={entry.id} href={`/skills/${encodeURIComponent(entry.id)}`} className="overflow-hidden rounded-[14px] border border-black/5 bg-white shadow-sm sm:rounded-[20px]"><div className="aspect-[16/10] bg-[#ECECE7] sm:aspect-video">{entry.thumbnailUrl ? <img src={entry.thumbnailUrl} alt={entry.title || 'Prime Skill'} className="h-full w-full object-cover" loading="lazy"/> : null}</div><div className="p-2 sm:p-4"><h3 className="line-clamp-2 text-[11px] font-black leading-[15px] sm:text-sm">{entry.title}</h3>{price > 0 && <p className="mt-1 text-[10px] font-black text-[#E1352B] sm:text-xs">{(entry.packages || []).length ? 'From ' : ''}Rs {price.toLocaleString()}</p>}</div></Link>; })}</div></section>}
+      {related.length > 0 && <section className="mt-6 sm:mt-8"><div className="mb-3"><p className="text-[8px] font-black uppercase tracking-[.18em] text-[#0F6A5F]">Prime Skills</p><h2 className="mt-1 text-base font-black sm:text-xl">Related Skills</h2></div><div className="grid grid-cols-2 gap-1.5 sm:gap-5">{related.map((entry, index) => { const price = displayPrice(entry); const image = normalizeImageUrl(entry.thumbnailUrl); return <Link key={entry.id} href={`/skills/${encodeURIComponent(entry.id)}`} className="overflow-hidden rounded-[14px] border border-black/5 bg-white shadow-sm sm:rounded-[20px]"><div className="relative aspect-[16/10] bg-[#ECECE7] sm:aspect-video">{image ? <Image src={image} alt={entry.title || 'Prime Skill'} fill sizes="(max-width: 640px) 50vw, 480px" priority={index < 2} quality={72} className="object-cover"/> : null}</div><div className="p-2 sm:p-4"><h3 className="line-clamp-2 text-[11px] font-black leading-[15px] sm:text-sm">{entry.title}</h3>{price > 0 && <p className="mt-1 text-[10px] font-black text-[#E1352B] sm:text-xs">{(entry.packages || []).length ? 'From ' : ''}Rs {price.toLocaleString()}</p>}</div></Link>; })}</div></section>}
     </div>
   </main>;
 }
