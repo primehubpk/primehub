@@ -37,10 +37,15 @@ async function loadPublicCatalog() {
   }
 }
 
+// The catalog can contain hundreds of products, so re-reading the whole
+// collection every minute burns Firestore read quota very quickly. The
+// homepage already keeps live client listeners after hydration, therefore a
+// one-hour server snapshot is enough for fast first paint without repeatedly
+// draining quota.
 export const getPublicCatalogSnapshot = unstable_cache(
   loadPublicCatalog,
-  ['primehub-public-catalog-v1'],
-  { revalidate: 60, tags: ['public-catalog'] },
+  ['primehub-public-catalog-v2'],
+  { revalidate: 3600, tags: ['public-catalog'] },
 );
 
 async function loadStorefrontSettings() {
@@ -62,8 +67,8 @@ async function loadStorefrontSettings() {
 
 export const getStorefrontSettingsSnapshot = unstable_cache(
   loadStorefrontSettings,
-  ['primehub-storefront-settings-v1'],
-  { revalidate: 30, tags: ['storefront-settings'] },
+  ['primehub-storefront-settings-v2'],
+  { revalidate: 300, tags: ['storefront-settings'] },
 );
 
 async function loadPrimeSkills() {
@@ -86,6 +91,6 @@ async function loadPrimeSkills() {
 
 export const getPrimeSkillsSnapshot = unstable_cache(
   loadPrimeSkills,
-  ['primehub-prime-skills-v1'],
-  { revalidate: 60, tags: ['prime-skills'] },
+  ['primehub-prime-skills-v2'],
+  { revalidate: 600, tags: ['prime-skills'] },
 );
