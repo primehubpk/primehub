@@ -56,7 +56,7 @@ export default function HomePageClient({ initialProducts, initialCategories }: P
     <div className="min-h-screen bg-[#F4F4F1] text-[#14140F]">
       <Header />
       <CategorySwiper initialCategories={categories} liveUpdates={false} />
-      <HeroFlashBanner initialProducts={products as SharedProduct[]} />
+      <HeroFlashBanner initialProducts={products as SharedProduct[]} liveUpdates={false} />
       <NewArrivalsRail initialProducts={products} liveUpdates={false} />
       <PriceBuckets
         selectedMaxPrice={selectedMaxPrice}
@@ -67,6 +67,7 @@ export default function HomePageClient({ initialProducts, initialCategories }: P
       <div id="discover-deals-section">
         <ProductGridRewards
           initialProducts={products}
+          liveUpdates={false}
           selectedMaxPrice={selectedMaxPrice}
           wholesaleSelected={wholesaleSelected}
         />
