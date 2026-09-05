@@ -11,16 +11,27 @@ import { categoryHref } from '@/lib/categoryUtils';
 import { normalizeImageUrl } from '@/lib/imageUrl';
 import { Category } from '@/lib/types';
 
-export default function CategorySwiper({ initialCategories = [] }: { initialCategories?: Category[] }) {
+export default function CategorySwiper({
+  initialCategories = [],
+  liveUpdates = true,
+}: {
+  initialCategories?: Category[];
+  liveUpdates?: boolean;
+}) {
   const [categories, setCategories] = useState<Category[]>(initialCategories);
 
   useEffect(() => {
+    setCategories(initialCategories);
+  }, [initialCategories]);
+
+  useEffect(() => {
+    if (!liveUpdates) return;
     const stop = onSnapshot(
       collection(db, 'categories'),
       (snap) => setCategories(snap.docs.map((d) => ({ id: d.id, ...d.data() })) as Category[]),
     );
     return () => stop();
-  }, []);
+  }, [liveUpdates]);
 
   const visible = useMemo(
     () => categories
