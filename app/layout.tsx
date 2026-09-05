@@ -16,6 +16,7 @@ const BRAND_NAME = 'PrimeHubMall';
 const BRAND_ALIASES = ['Prime Hub Mall', 'PrimeHub Mall', 'Prime Hub', 'PrimeHub Deals', 'Prime Hub Deals'];
 const SITE_DESCRIPTION =
   'Shop bangles, jewellery, watches, retail and wholesale deals at PrimeHubMall Pakistan. Discover new arrivals, special offers and nationwide delivery.';
+const SOCIAL_IMAGE = 'https://images.primehubmall.com/products/1766930358870-fbc575bb0ca3.webp';
 
 export const metadata: Metadata = {
   title: {
@@ -54,11 +55,18 @@ export const metadata: Metadata = {
     type: 'website',
     ...(SITE_URL ? { url: SITE_URL } : {}),
     siteName: BRAND_NAME,
+    images: [
+      {
+        url: SOCIAL_IMAGE,
+        alt: 'PrimeHubMall bangles and jewellery shopping',
+      },
+    ],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'PrimeHubMall | Retail & Wholesale Shopping in Pakistan',
     description: SITE_DESCRIPTION,
+    images: [SOCIAL_IMAGE],
   },
   robots: {
     index: true,
@@ -106,6 +114,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
   return (
     <html lang="en">
+      <head>
+        <link rel="preconnect" href="https://images.primehubmall.com" />
+        <link rel="dns-prefetch" href="https://images.primehubmall.com" />
+        <link rel="dns-prefetch" href="https://i.ibb.co" />
+      </head>
       <body className="font-sans antialiased pb-24">
         <script
           type="application/ld+json"
