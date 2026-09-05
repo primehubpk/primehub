@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
 import ShopCatalog from '@/components/ShopCatalog';
+import { getPublicCatalogSnapshot } from '@/lib/publicCatalogServer';
 
 export const metadata: Metadata = {
   title: 'Shop Bangles, Jewellery, Watches & Wholesale Deals',
@@ -14,10 +15,11 @@ export const metadata: Metadata = {
   },
 };
 
-export default function ShopPage() {
+export default async function ShopPage() {
+  const snapshot = await getPublicCatalogSnapshot();
   return (
     <Suspense fallback={<div className="min-h-screen bg-[#F4F4F1] p-8 text-center text-xs text-black/50">Loading shop...</div>}>
-      <ShopCatalog />
+      <ShopCatalog initialProducts={snapshot.products} initialCategories={snapshot.categories} />
     </Suspense>
   );
 }
