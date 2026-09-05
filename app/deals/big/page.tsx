@@ -4,7 +4,7 @@ import { ArrowLeft, Clock3, ShoppingBag, Sparkles } from 'lucide-react';
 import { getStorefrontSettingsSnapshot } from '@/lib/publicCatalogServer';
 import { normalizeImageUrl } from '@/lib/imageUrl';
 
-export const revalidate = 30;
+export const dynamic = 'force-dynamic';
 
 type BigDeal = {
   productId?: string;
