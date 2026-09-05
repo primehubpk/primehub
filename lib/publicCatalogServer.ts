@@ -1,0 +1,68 @@
+import 'server-only';
+import { unstable_cache } from 'next/cache';
+import { getAdminDb } from '@/lib/firebaseAdmin';
+
+function toSerializable(value: any): any {
+  if (value == null) return value;
+  if (Array.isArray(value)) return value.map(toSerializable);
+  if (value instanceof Date) return value.toISOString();
+  if (typeof value === 'object') {
+    if (typeof value.toDate === 'function') {
+      try {
+        return value.toDate().toISOString();
+      } catch {
+        return null;
+      }
+    }
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, toSerializable(item)]));
+  }
+  return value;
+}
+
+async function loadPublicCatalog() {
+  try {
+    const db = getAdminDb();
+    const [productsSnap, categoriesSnap] = await Promise.all([
+      db.collection('products').get(),
+      db.collection('categories').get(),
+    ]);
+
+    return {
+      products: productsSnap.docs.map((doc) => ({ id: doc.id, ...toSerializable(doc.data()) })),
+      categories: categoriesSnap.docs.map((doc) => ({ id: doc.id, ...toSerializable(doc.data()) })),
+    };
+  } catch (error) {
+    console.error('public catalog preload failed', error);
+    return { products: [], categories: [] };
+  }
+}
+
+export const getPublicCatalogSnapshot = unstable_cache(
+  loadPublicCatalog,
+  ['primehub-public-catalog-v1'],
+  { revalidate: 60, tags: ['public-catalog'] },
+);
+
+async function loadPrimeSkills() {
+  try {
+    const db = getAdminDb();
+    const [skillsSnap, settingsSnap] = await Promise.all([
+      db.collection('prime_skills').get(),
+      db.collection('settings').doc('main').get(),
+    ]);
+
+    return {
+      skills: skillsSnap.docs.map((doc) => ({ id: doc.id, ...toSerializable(doc.data()) })),
+      skillsPage: settingsSnap.exists ? toSerializable(settingsSnap.data()?.skillsPage || null) : null,
+    };
+  } catch (error) {
+    console.error('prime skills preload failed', error);
+    return { skills: [], skillsPage: null };
+  }
+}
+
+export const getPrimeSkillsSnapshot = unstable_cache(
+  loadPrimeSkills,
+  ['primehub-prime-skills-v1'],
+  { revalidate: 60, tags: ['prime-skills'] },
+);
