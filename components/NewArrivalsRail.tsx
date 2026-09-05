@@ -21,19 +21,30 @@ export function newestFirst(products: Product[]) {
     .sort((a, b) => timeOf(b) - timeOf(a) || b.id.localeCompare(a.id));
 }
 
-export default function NewArrivalsRail({ initialProducts = [] }: { initialProducts?: Product[] }) {
+export default function NewArrivalsRail({
+  initialProducts = [],
+  liveUpdates = true,
+}: {
+  initialProducts?: Product[];
+  liveUpdates?: boolean;
+}) {
   const [products, setProducts] = useState<Product[]>(initialProducts);
   const [addedId, setAddedId] = useState<string | null>(null);
   const addItem = useCartStore((s) => s.addItem);
   const openVariantModal = useCartStore((s) => s.openVariantModal);
 
   useEffect(() => {
+    setProducts(initialProducts);
+  }, [initialProducts]);
+
+  useEffect(() => {
+    if (!liveUpdates) return;
     const stop = onSnapshot(
       collection(db, 'products'),
       (snapshot) => setProducts(snapshot.docs.map((d) => ({ id: d.id, ...d.data() }) as Product)),
     );
     return () => stop();
-  }, []);
+  }, [liveUpdates]);
 
   const newest = useMemo(() => newestFirst(products).slice(0, 10), [products]);
 
