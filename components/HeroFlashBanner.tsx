@@ -9,6 +9,7 @@ import { useSettings } from '@/lib/useSettings';
 import { useCartStore } from '@/lib/cartStore';
 import { db } from '@/lib/firebase';
 import { getEffectivePrice } from '@/lib/dealPricing';
+import { normalizeImageUrl } from '@/lib/imageUrl';
 import type { Product, Weekday } from '@/lib/types';
 import { WEEKDAY_LABELS, WEEKDAY_ORDER, dealTiming, pakistanNowWeekday, countdownParts, weeklyDealSavings } from '@/lib/weeklyDealUtils';
 
@@ -65,10 +66,14 @@ type BigDealFields = NonNullable<ReturnType<typeof useSettings>['settings']['dai
   stock?: number | string;
 };
 
-export default function HeroFlashBanner() {
+function productMap(list: Product[]) {
+  return Object.fromEntries(list.map((product) => [product.id, product]));
+}
+
+export default function HeroFlashBanner({ initialProducts = [] }: { initialProducts?: Product[] }) {
   const { settings } = useSettings();
   const [nowTick, setNowTick] = useState<number | null>(null);
-  const [products, setProducts] = useState<Record<string, Product>>({});
+  const [products, setProducts] = useState<Record<string, Product>>(() => productMap(initialProducts));
   const weeklyDeals = settings.weeklyDeals || [];
   const bigDeal = settings.dailyDeal as BigDealFields | undefined;
   const addItem = useCartStore((state) => state.addItem);
@@ -91,13 +96,15 @@ export default function HeroFlashBanner() {
           });
           setProducts(next);
         },
-        () => setProducts({}),
+        () => undefined,
       ),
     [],
   );
 
   useEffect(() => {
-    const urls = [bigDeal?.imageUrl, ...weeklyDeals.map((deal) => deal.imageUrl)].filter(Boolean) as string[];
+    const urls = [bigDeal?.imageUrl, ...weeklyDeals.map((deal) => deal.imageUrl)]
+      .filter(Boolean)
+      .map((url) => normalizeImageUrl(String(url)));
     urls.forEach((src) => {
       const image = new window.Image();
       image.decoding = 'async';
@@ -133,7 +140,7 @@ export default function HeroFlashBanner() {
     const isLive = todayKey === deal.day && specialPrice > 0 && price === specialPrice;
     if (!deal.productId || price <= 0 || Number((product as ProductDealFields | undefined)?.stock ?? 1) <= 0) return;
 
-    const image = product?.imageUrl || deal.imageUrl;
+    const image = normalizeImageUrl(product?.imageUrl || deal.imageUrl || '');
     const productWithDealPrice = {
       ...product,
       id: deal.productId,
@@ -144,9 +151,7 @@ export default function HeroFlashBanner() {
       imageUrl: image,
     } as Product;
 
-    if (hasProductVariants(productWithDealPrice) && openVariantModal(productWithDealPrice, 'cart')) {
-      return;
-    }
+    if (hasProductVariants(productWithDealPrice) && openVariantModal(productWithDealPrice, 'cart')) return;
 
     addItem({
       id: deal.productId,
@@ -168,7 +173,7 @@ export default function HeroFlashBanner() {
     const stock = Number(productData?.stock ?? productData?.quantity ?? bigDeal.stock ?? 0);
     if (currentPrice <= 0 || stock <= 0) return;
 
-    const image = productData?.imageUrl || bigDeal.imageUrl;
+    const image = normalizeImageUrl(productData?.imageUrl || bigDeal.imageUrl || '');
     const productWithDealPrice = {
       ...product,
       id: bigDeal.productId,
@@ -179,9 +184,7 @@ export default function HeroFlashBanner() {
       imageUrl: image,
     } as Product;
 
-    if (hasProductVariants(productWithDealPrice) && openVariantModal(productWithDealPrice, 'cart')) {
-      return;
-    }
+    if (hasProductVariants(productWithDealPrice) && openVariantModal(productWithDealPrice, 'cart')) return;
 
     addItem({
       id: bigDeal.productId,
@@ -201,9 +204,7 @@ export default function HeroFlashBanner() {
             <p className="text-[8px] font-black uppercase tracking-[0.2em] text-[#E1352B]">Deals every day</p>
             <h2 className="mt-0.5 text-lg font-black tracking-tight sm:text-xl">Weekly Deals</h2>
           </div>
-          <Link href="/weekly-deals" className="inline-flex shrink-0 items-center rounded-full bg-[#14140F] px-4 py-2.5 text-[9px] font-black uppercase tracking-[0.1em] text-white transition hover:bg-[#0F6A5F]">
-            View All Deals
-          </Link>
+          <Link href="/weekly-deals" className="inline-flex shrink-0 items-center rounded-full bg-[#14140F] px-4 py-2.5 text-[9px] font-black uppercase tracking-[0.1em] text-white transition hover:bg-[#0F6A5F]">View All Deals</Link>
         </div>
 
         <div className="overflow-hidden rounded-[26px] border border-black/8 bg-white shadow-[0_14px_42px_rgba(20,20,15,0.09)]">
@@ -221,46 +222,40 @@ export default function HeroFlashBanner() {
                 : deal
                   ? 'border-[#E1352B]/20 bg-gradient-to-b from-[#FFF9F5] to-white text-[#14140F] shadow-[0_10px_24px_rgba(225,53,43,0.10)] hover:-translate-y-1 hover:border-[#E1352B]/45 hover:shadow-[0_14px_30px_rgba(225,53,43,0.18)]'
                   : 'border-black/7 bg-[#FCFBF8] text-[#14140F] hover:-translate-y-0.5 hover:border-[#0F6A5F]/25 hover:shadow-[0_10px_26px_rgba(20,20,15,0.08)]';
+              const dealImage = normalizeImageUrl(deal?.imageUrl || '');
 
               return (
                 <div key={key} className={'group relative min-w-[145px] flex-1 overflow-hidden rounded-[20px] border-2 text-center transition duration-200 ' + cardClass}>
-                  {deal?.imageUrl ? (
+                  {deal && dealImage ? (
                     <Link href={`/product/${deal.productId}`} aria-label={`View ${deal.title}`} className="block">
                       <span className="relative block aspect-[4/3] w-full overflow-hidden">
-                        <Image src={deal.imageUrl} alt={label} fill priority={isLive} sizes="(max-width: 640px) 145px, (max-width: 1024px) 20vw, 180px" className="object-cover transition duration-200 group-hover:scale-105" />
+                        <Image src={dealImage} alt={label} fill priority={isLive} loading={isLive ? 'eager' : 'lazy'} sizes="(max-width: 640px) 145px, (max-width: 1024px) 20vw, 180px" quality={72} className="object-cover transition duration-200 group-hover:scale-105" />
                         <span className="absolute left-1.5 top-1.5 rounded-full bg-[#E1352B] px-1.5 py-0.5 text-[6px] font-black uppercase tracking-[0.08em] text-white shadow-sm">{isLive ? 'Sale' : label}</span>
                         {isLive && <span className="absolute bottom-1.5 left-1.5 rounded-full bg-emerald-500 px-1.5 py-0.5 text-[6px] font-black uppercase tracking-[0.08em] text-white shadow-sm">LIVE</span>}
-                        {savings > 0 && (
-                          <span className="absolute right-1.5 top-1.5 z-20 rounded-md bg-[#0F6A5F] px-1.5 py-0.5 text-[7px] font-medium leading-none text-white shadow-sm">
-                            Save Rs. {savings.toLocaleString()}
-                          </span>
-                        )}
+                        {savings > 0 && <span className="absolute right-1.5 top-1.5 z-20 rounded-md bg-[#0F6A5F] px-1.5 py-0.5 text-[7px] font-medium leading-none text-white shadow-sm">Save Rs. {savings.toLocaleString()}</span>}
                       </span>
                     </Link>
                   ) : (
                     <span className="relative flex aspect-[4/3] w-full items-center justify-center overflow-hidden bg-[#F4F4F1] text-[#0F6A5F]">
                       <Icon size={18} strokeWidth={2.3} />
-                      {savings > 0 && (
-                        <span className="absolute right-1.5 top-1.5 z-20 rounded-md bg-[#0F6A5F] px-1.5 py-0.5 text-[7px] font-medium leading-none text-white shadow-sm">
-                          Save Rs. {savings.toLocaleString()}
-                        </span>
-                      )}
+                      {savings > 0 && <span className="absolute right-1.5 top-1.5 z-20 rounded-md bg-[#0F6A5F] px-1.5 py-0.5 text-[7px] font-medium leading-none text-white shadow-sm">Save Rs. {savings.toLocaleString()}</span>}
                     </span>
                   )}
 
                   <span className="relative z-10 block px-2.5 pb-3 pt-2">
-                    <Link href={`/product/${deal?.productId || deal?.id}`} className="block cursor-pointer">
+                    {deal?.productId ? (
+                      <Link href={`/product/${deal.productId}`} className="block cursor-pointer">
+                        <span className="block whitespace-nowrap text-[10px] font-black uppercase tracking-[0.07em] text-[#14140F]">{label.toUpperCase()}</span>
+                        {!isLive && <span className="mt-1 flex items-center justify-center gap-1 text-[7px] font-black uppercase tracking-[0.04em] text-black/55"><LockKeyhole size={9} /> 🔒 Unlocks {WEEKDAY_LABELS[key]}</span>}
+                        <span className="mt-1 block text-[7px] font-black uppercase tracking-[0.08em] text-[#E1352B]">Deal Price</span>
+                        <span className="block text-[12px] font-black text-[#E1352B]">Rs. {dealPrice.toLocaleString()}</span>
+                        <span className="mt-0.5 block text-[7px] font-black uppercase tracking-[0.08em] text-black/40">Normal Price</span>
+                        <span className="block text-[9px] font-bold text-black/40 line-through">Rs. {normalPrice.toLocaleString()}</span>
+                      </Link>
+                    ) : (
                       <span className="block whitespace-nowrap text-[10px] font-black uppercase tracking-[0.07em] text-[#14140F]">{label.toUpperCase()}</span>
-                      {deal && (
-                        <>
-                          {!isLive && <span className="mt-1 flex items-center justify-center gap-1 text-[7px] font-black uppercase tracking-[0.04em] text-black/55"><LockKeyhole size={9} /> 🔒 Unlocks {WEEKDAY_LABELS[key]}</span>}
-                          <span className="mt-1 block text-[7px] font-black uppercase tracking-[0.08em] text-[#E1352B]">Deal Price</span>
-                          <span className="block text-[12px] font-black text-[#E1352B]">Rs. {dealPrice.toLocaleString()}</span>
-                          <span className="mt-0.5 block text-[7px] font-black uppercase tracking-[0.08em] text-black/40">Normal Price</span>
-                          <span className="block text-[9px] font-bold text-black/40 line-through">Rs. {normalPrice.toLocaleString()}</span>
-                        </>
-                      )}
-                    </Link>
+                    )}
+
                     {deal && (
                       <button
                         type="button"
@@ -293,55 +288,37 @@ export default function HeroFlashBanner() {
         const normalPrice = Number(deal.normalPrice || productData?.originalPrice || productData?.normalPrice || currentPrice);
         const savedAmount = normalPrice > currentPrice ? normalPrice - currentPrice : 0;
         const stock = Number(productData?.stock ?? productData?.quantity ?? deal.stock ?? 0);
-        const productImage = productData?.imageUrl || deal.imageUrl;
+        const productImage = normalizeImageUrl(productData?.imageUrl || deal.imageUrl || '');
+        const productHref = deal.productId ? `/product/${deal.productId}` : '/deals/big';
 
         return (
           <section className="mx-4 mt-4 overflow-hidden rounded-[30px] border border-black/8 bg-white shadow-[0_20px_52px_rgba(20,20,15,0.12)]">
-            <Link href={`/product/${deal.productId}`} aria-label={`View ${title}`} className="block">
+            <Link href={productHref} aria-label={`View ${title}`} className="block">
               <div className="relative w-full aspect-square overflow-hidden rounded-[26px] bg-neutral-100 shadow-inner">
                 {productImage ? (
-                  <Image
-                    src={productImage}
-                    alt={title}
-                    fill
-                    unoptimized
-                    className="object-cover object-center w-full h-full"
-                    onError={(event) => {
-                      event.currentTarget.src = '/placeholder.png';
-                    }}
-                  />
+                  <Image src={productImage} alt={title} fill priority fetchPriority="high" sizes="(max-width: 768px) 100vw, 920px" quality={78} className="object-cover object-center" />
                 ) : (
                   <div className="flex h-full items-center justify-center text-sm font-black uppercase tracking-[0.18em] text-black/30">Big Deal</div>
                 )}
 
-                <div className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-black/80 px-3 py-1.5 text-[10px] font-black text-white shadow backdrop-blur-md">
-                  <span>🔥</span> BIG DEAL OF THE DAY
-                </div>
-
-                {savedAmount > 0 && (
-                  <div className="absolute right-3 top-3 inline-flex items-center rounded-full bg-[#0F6A5F] px-3 py-1.5 text-[11px] font-black text-white shadow">
-                    Save Rs. {savedAmount.toLocaleString()}
-                  </div>
-                )}
+                <div className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-black/80 px-3 py-1.5 text-[10px] font-black text-white shadow backdrop-blur-md"><span>🔥</span> BIG DEAL OF THE DAY</div>
+                {savedAmount > 0 && <div className="absolute right-3 top-3 inline-flex items-center rounded-full bg-[#0F6A5F] px-3 py-1.5 text-[11px] font-black text-white shadow">Save Rs. {savedAmount.toLocaleString()}</div>}
               </div>
             </Link>
 
             <div className="bg-white px-5 py-5 sm:px-8 sm:py-6">
-              <Link href={`/product/${deal.productId}`} className="group/title block" aria-label={`View ${title}`}>
+              <Link href={productHref} className="group/title block" aria-label={`View ${title}`}>
                 <h2 className="line-clamp-2 text-2xl font-black leading-tight tracking-tight text-[#14140F] transition group-hover/title:text-[#0F6A5F] sm:text-4xl">{title}</h2>
               </Link>
 
               <div className="mt-4 flex flex-wrap items-center gap-2.5">
                 <span className="text-3xl font-black text-[#E1352B] sm:text-4xl">Rs. {currentPrice.toLocaleString()}</span>
-                {normalPrice > currentPrice && (
-                  <span className="text-sm font-bold text-black/40 line-through sm:text-base">Rs. {normalPrice.toLocaleString()}</span>
-                )}
+                {normalPrice > currentPrice && <span className="text-sm font-bold text-black/40 line-through sm:text-base">Rs. {normalPrice.toLocaleString()}</span>}
               </div>
 
               {stock > 0 && stock <= 10 && (
                 <div className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/15 px-3 py-1 text-[11px] font-black text-amber-700">
-                  <span className="h-2 w-2 rounded-full bg-amber-500 animate-ping" />
-                  Only {stock} left in stock - order soon!
+                  <span className="h-2 w-2 rounded-full bg-amber-500 animate-ping" />Only {stock} left in stock - order soon!
                 </div>
               )}
 
