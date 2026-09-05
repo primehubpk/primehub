@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { Check, ShoppingBag } from 'lucide-react';
 import WholesaleBadge from '@/components/WholesaleBadge';
@@ -13,9 +14,10 @@ type Props = {
   addProduct: (product: Product) => void;
   compact?: boolean;
   dense?: boolean;
+  priority?: boolean;
 };
 
-export default function CatalogProductCard({ product, addedId, addProduct, compact = false, dense = false }: Props) {
+export default function CatalogProductCard({ product, addedId, addProduct, compact = false, dense = false, priority = false }: Props) {
   const openVariantModal = useCartStore((state) => state.openVariantModal);
   const price = priceOf(product);
   const original = originalOf(product);
@@ -37,7 +39,16 @@ export default function CatalogProductCard({ product, addedId, addProduct, compa
       <Link href={`/product/${product.id}`} className="block">
         <div className="relative aspect-square overflow-hidden bg-[#F4F4F1]">
           {image ? (
-            <img src={image} alt={titleOf(product)} loading="lazy" className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]" />
+            <Image
+              src={image}
+              alt={titleOf(product)}
+              fill
+              priority={priority}
+              loading={priority ? 'eager' : 'lazy'}
+              fetchPriority={priority ? 'high' : 'auto'}
+              sizes={dense ? '(max-width: 767px) 33vw, 25vw' : '(max-width: 767px) 50vw, 25vw'}
+              className="object-cover transition duration-500 group-hover:scale-[1.03]"
+            />
           ) : (
             <div className="flex h-full items-center justify-center text-[10px] font-bold text-black/25">No image</div>
           )}
