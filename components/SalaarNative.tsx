@@ -94,7 +94,7 @@ export default function SalaarNative() {
     setReady(true);
 
     if (!localMessages.length) {
-      fetch(`/api/salaar/live?sessionId=${encodeURIComponent(id)}`, { cache: 'no-store' })
+      fetch(`/api/salaar/dual-live?sessionId=${encodeURIComponent(id)}`, { cache: 'no-store' })
         .then((response) => response.ok ? response.json() : null)
         .then((data) => {
           if (!Array.isArray(data?.messages) || !data.messages.length) return;
@@ -114,7 +114,7 @@ export default function SalaarNative() {
     const poll = async () => {
       if (document.visibilityState !== 'visible') return;
       try {
-        const response = await fetch(`/api/salaar/live?sessionId=${encodeURIComponent(sessionId)}`, { cache: 'no-store' });
+        const response = await fetch(`/api/salaar/dual-live?sessionId=${encodeURIComponent(sessionId)}`, { cache: 'no-store' });
         if (!response.ok) return;
         const data = await response.json();
         if (!Array.isArray(data?.messages)) return;
@@ -170,7 +170,7 @@ export default function SalaarNative() {
 
     try {
       const readyFlow = isReadyIntent(text);
-      const endpoint = readyFlow ? '/api/salaar/ready' : '/api/salaar/live';
+      const endpoint = readyFlow ? '/api/salaar/dual-ready' : '/api/salaar/dual-live';
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
