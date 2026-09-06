@@ -12,6 +12,11 @@ type PendingReply = {
 };
 
 const FIRESTORE_TIMEOUT_MS = 5000;
+const PROVIDER_TIMEOUT_MS = 12000;
+
+// Phase 3 verified this Groq production model against the configured preview key.
+// Keep the override local to the live customer path so a stale Vercel model env cannot break Salaar.
+process.env.SALAAR_GROQ_MODEL = process.env.SALAAR_GROQ_MODEL_VERIFIED || 'openai/gpt-oss-20b';
 
 function cleanText(value: unknown, max = 600): string {
   return typeof value === 'string' ? value.trim().slice(0, max) : '';
@@ -47,7 +52,7 @@ async function delegatePost(sessionId: string, message: string, shownProductIds:
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ sessionId, message, shownProductIds }),
   });
-  return chatPost(synthetic);
+  return withTimeout(chatPost(synthetic), 'Salaar chat/provider response', PROVIDER_TIMEOUT_MS);
 }
 
 async function claimExpiredPending(sessionId: string): Promise<PendingReply | null> {
