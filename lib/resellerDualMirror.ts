@@ -87,3 +87,16 @@ export async function mirrorLegacyApprovedReward(orderId: string) {
   const userId = String(d.resellerUserId || d.userId || '');
   if (userId) await mirrorResellerFirestoreDoc('reseller_profiles', userId);
 }
+
+export async function mirrorReleasedRewardsForUser(userId: string) {
+  if (!userId) return;
+  const snap = await getAdminDb().collection('reseller_reward_ledger').where('userId', '==', userId).where('status', '==', 'available').get();
+  for (const doc of snap.docs) await mirrorResellerFirestoreDoc('reseller_reward_ledger', doc.id);
+  await mirrorResellerFirestoreDoc('reseller_profiles', userId);
+}
+
+export async function mirrorResellerTaskEventsForUser(userId: string) {
+  if (!userId) return;
+  const snap = await getAdminDb().collection('reseller_task_events').where('userId', '==', userId).limit(100).get();
+  for (const doc of snap.docs) await mirrorResellerFirestoreDoc('reseller_task_events', doc.id);
+}
