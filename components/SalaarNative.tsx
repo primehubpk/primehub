@@ -35,6 +35,7 @@ type UiMessage = {
 const SESSION_KEY = 'primehub-salaar-session-v1';
 const MESSAGE_KEY = 'primehub-salaar-messages-v1';
 const SHOWN_KEY = 'primehub-salaar-shown-v1';
+const HUMAN_REPLY_POLL_MS = 8000;
 
 function randomId() {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID();
@@ -111,6 +112,7 @@ export default function SalaarNative() {
   useEffect(() => {
     if (!open || !sessionId) return;
     const poll = async () => {
+      if (document.visibilityState !== 'visible') return;
       try {
         const response = await fetch(`/api/salaar/live?sessionId=${encodeURIComponent(sessionId)}`, { cache: 'no-store' });
         if (!response.ok) return;
@@ -127,8 +129,13 @@ export default function SalaarNative() {
       }
     };
     void poll();
-    const timer = window.setInterval(() => void poll(), 2000);
-    return () => window.clearInterval(timer);
+    const timer = window.setInterval(() => void poll(), HUMAN_REPLY_POLL_MS);
+    const onVisibility = () => { if (document.visibilityState === 'visible') void poll(); };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
   }, [open, sessionId]);
 
   useEffect(() => {
