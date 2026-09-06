@@ -41,6 +41,11 @@ export function useShopCatalog(initialCategory?: string, initialQuery = '', init
   }, [initialQuery, urlQuery, urlMax]);
 
   useEffect(() => {
+    if (hasServerData) {
+      setLoading(false);
+      return;
+    }
+
     let cancelled = false;
     async function load() {
       try {
@@ -62,7 +67,7 @@ export function useShopCatalog(initialCategory?: string, initialQuery = '', init
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [hasServerData]);
 
   const buckets = useMemo(
     () => [...(settings.priceBuckets || [])].filter((bucket) => bucket.active).sort((a, b) => a.sortOrder - b.sortOrder),
