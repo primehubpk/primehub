@@ -38,18 +38,28 @@ export async function GET() {
   if (process.env.VERCEL_ENV === 'production') return NextResponse.json({ error: 'Not found' }, { status: 404 });
   const sessionId = `preview-phase2-${Date.now()}`;
   try {
-    const auto = await json(await livePost(liveRequest(sessionId, 'hello')));
+    // Use only deterministic store-intent queries here so Phase 2 verification never waits on an external LLM provider.
+    const auto = await json(await livePost(liveRequest(sessionId, 'Prime Skill kya hai?')));
     const human = await json(await adminPost(adminRequest({ sessionId, action: 'message', text: 'Ji, admin yahan hai.' })));
-    const held = await json(await livePost(liveRequest(sessionId, 'Bangles dikhao')));
+    const held = await json(await livePost(liveRequest(sessionId, 'Prime Skill kya hai?')));
     const continued = await json(await adminPost(adminRequest({ sessionId, action: 'continue' })));
     const hardWait = await json(await adminPost(adminRequest({ sessionId, action: 'wait' })));
-    const hardHeld = await json(await livePost(liveRequest(sessionId, 'kuch aur dikhao')));
+    const hardHeld = await json(await livePost(liveRequest(sessionId, 'Prime Skill kya hai?')));
     const threadResponse = await adminGet(new Request(`http://salaar.local/api/admin/salaar?sessionId=${encodeURIComponent(sessionId)}`, { headers: { cookie: 'primehub_admin_auth=true' } }));
     const thread = await json(threadResponse);
 
     return NextResponse.json({
-      ok: Boolean(auto?.reply) && human?.status === 'WAIT' && held?.silent === true && continued?.status === 'AUTO' && hardWait?.holdType === 'HARD' && hardHeld?.silent === true,
+      ok: Boolean(auto?.reply)
+        && auto?.provider === 'fallback'
+        && human?.status === 'WAIT'
+        && human?.holdType === 'SOFT'
+        && held?.silent === true
+        && continued?.status === 'AUTO'
+        && Boolean(continued?.reply?.reply)
+        && hardWait?.holdType === 'HARD'
+        && hardHeld?.silent === true,
       autoReply: auto?.reply || null,
+      autoProvider: auto?.provider || null,
       softHold: { adminMessage: human, customerSilent: held?.silent === true },
       continue: { status: continued?.status, pendingAnswered: Boolean(continued?.reply?.reply) },
       hardWait: { status: hardWait?.status, holdType: hardWait?.holdType, customerSilent: hardHeld?.silent === true },
