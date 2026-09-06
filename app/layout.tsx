@@ -100,7 +100,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     potentialAction: {
       '@type': 'SearchAction',
       target: `${SITE_URL || ''}/shop?q={search_term_string}`,
-      'query-input': 'required name=search_term_string',
+      'query-input': 'required name={search_term_string}',
     },
   };
 
@@ -135,7 +135,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <BottomNav />
         <CartMiniBar />
         <PWARegister />
-        <SalaarEmbed botPublicUrl={process.env.BOT_PUBLIC_URL} />
+        <SalaarEmbed
+          botPublicUrl={process.env.BOT_PUBLIC_URL || 'https://salaar-production.up.railway.app'}
+        />
       </body>
     </html>
   );
