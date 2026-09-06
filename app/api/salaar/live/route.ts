@@ -11,6 +11,8 @@ type PendingReply = {
   messageDocId?: string;
 };
 
+const FIRESTORE_TIMEOUT_MS = 5000;
+
 function cleanText(value: unknown, max = 600): string {
   return typeof value === 'string' ? value.trim().slice(0, max) : '';
 }
@@ -23,6 +25,20 @@ function asDate(value: unknown): Date | null {
   }
   const parsed = new Date(String(value));
   return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+async function withTimeout<T>(promise: Promise<T>, label: string, ms = FIRESTORE_TIMEOUT_MS): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 }
 
 async function delegatePost(sessionId: string, message: string, shownProductIds: string[]) {
@@ -73,13 +89,19 @@ async function resumeClaimed(sessionId: string, pending: PendingReply | null) {
   if (!pending?.message) return;
   const db = getAdminDb();
   if (pending.messageDocId) {
-    await db.collection('salaar_conversations').doc(sessionId).collection('messages').doc(pending.messageDocId).delete().catch(() => undefined);
+    await withTimeout(
+      db.collection('salaar_conversations').doc(sessionId).collection('messages').doc(pending.messageDocId).delete(),
+      'Salaar pending message delete',
+    ).catch(() => undefined);
   }
   await delegatePost(sessionId, pending.message, pending.shownProductIds);
 }
 
 async function currentState(sessionId: string) {
-  const snap = await getAdminDb().collection('salaar_conversations').doc(sessionId).get();
+  const snap = await withTimeout(
+    getAdminDb().collection('salaar_conversations').doc(sessionId).get(),
+    'Salaar conversation state read',
+  );
   return snap.exists ? (snap.data() || {}) : {};
 }
 
@@ -89,7 +111,7 @@ export async function GET(request: Request) {
   if (!sessionId) return NextResponse.json({ messages: [] });
 
   try {
-    const pending = await claimExpiredPending(sessionId);
+    const pending = await withTimeout(claimExpiredPending(sessionId), 'Salaar soft hold transaction');
     await resumeClaimed(sessionId, pending);
   } catch (error) {
     console.warn('Salaar soft hold resume failed', error);
@@ -109,7 +131,7 @@ export async function POST(request: Request) {
       : [];
     if (!message) return NextResponse.json({ error: 'Message required.' }, { status: 400 });
 
-    const expired = await claimExpiredPending(sessionId);
+    const expired = await withTimeout(claimExpiredPending(sessionId), 'Salaar soft hold transaction');
     await resumeClaimed(sessionId, expired);
 
     const state = await currentState(sessionId);
@@ -122,8 +144,11 @@ export async function POST(request: Request) {
       const db = getAdminDb();
       const ref = db.collection('salaar_conversations').doc(sessionId);
       const now = new Date();
-      const messageRef = await ref.collection('messages').add({ role: 'customer', text: message, createdAt: now, pending: true });
-      await ref.set({
+      const messageRef = await withTimeout(
+        ref.collection('messages').add({ role: 'customer', text: message, createdAt: now, pending: true }),
+        'Salaar pending customer write',
+      );
+      await withTimeout(ref.set({
         sessionId,
         lastMessage: message.slice(0, 160),
         lastRole: 'customer',
@@ -131,14 +156,17 @@ export async function POST(request: Request) {
         pendingCustomerMessage: message,
         pendingShownProductIds: shownProductIds,
         pendingMessageDocId: messageRef.id,
-      }, { merge: true });
+      }, { merge: true }), 'Salaar pending state write');
       return NextResponse.json({ sessionId, silent: true, status: 'WAIT' });
     }
 
     const response = await delegatePost(sessionId, message, shownProductIds);
     const data = await response.clone().json().catch(() => ({}));
     if (data?.needYou) {
-      await getAdminDb().collection('salaar_conversations').doc(sessionId).set({ needYou: true }, { merge: true }).catch(() => undefined);
+      await withTimeout(
+        getAdminDb().collection('salaar_conversations').doc(sessionId).set({ needYou: true }, { merge: true }),
+        'Salaar needYou write',
+      ).catch(() => undefined);
     }
     return response;
   } catch (error) {
