@@ -5,6 +5,20 @@ import { createUserWithEmailAndPassword, onAuthStateChanged, signInWithEmailAndP
 import { CheckCircle2, LogOut, UserRound } from 'lucide-react';
 import { auth } from '@/lib/firebase';
 
+async function mirrorIdentity(user: User | null) {
+  if (!user) return;
+  try {
+    const token = await user.getIdToken();
+    await fetch('/api/auth/bridge', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      cache: 'no-store',
+    });
+  } catch (error) {
+    console.warn('Account identity mirror skipped', error);
+  }
+}
+
 export default function AccountPage() {
   const [user, setUser] = useState<User | null>(null);
   const [mode, setMode] = useState<'signup' | 'login'>('signup');
@@ -14,7 +28,10 @@ export default function AccountPage() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
 
-  useEffect(() => onAuthStateChanged(auth, setUser), []);
+  useEffect(() => onAuthStateChanged(auth, (next) => {
+    setUser(next);
+    void mirrorIdentity(next);
+  }), []);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -24,9 +41,11 @@ export default function AccountPage() {
       if (mode === 'signup') {
         const credential = await createUserWithEmailAndPassword(auth, email.trim(), password);
         if (name.trim()) await updateProfile(credential.user, { displayName: name.trim() });
+        await mirrorIdentity(credential.user);
         setMessage('Account created successfully.');
       } else {
-        await signInWithEmailAndPassword(auth, email.trim(), password);
+        const credential = await signInWithEmailAndPassword(auth, email.trim(), password);
+        await mirrorIdentity(credential.user);
         setMessage('Welcome back.');
       }
       setPassword('');
