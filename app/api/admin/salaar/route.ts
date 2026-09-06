@@ -24,6 +24,28 @@ function iso(value: unknown): string | null {
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
+function cartSummary(value: any) {
+  if (!value || typeof value !== 'object') return null;
+  const items = Array.isArray(value.items) ? value.items.slice(0, 50).map((item: any) => ({
+    id: cleanText(item?.id, 160),
+    productId: cleanText(item?.productId, 140),
+    name: cleanText(item?.name, 160) || 'Product',
+    price: Number(item?.price || 0),
+    originalPrice: Number(item?.originalPrice || item?.price || 0),
+    image: cleanText(item?.image, 800),
+    qty: Math.max(1, Number(item?.qty || 1)),
+    variant: item?.variant && typeof item.variant === 'object' ? {
+      color: cleanText(item.variant.color, 80),
+      size: cleanText(item.variant.size, 80),
+    } : null,
+  })) : [];
+  return {
+    items,
+    itemCount: Math.max(0, Number(value.itemCount || items.reduce((sum: number, item: any) => sum + Number(item.qty || 0), 0))),
+    subtotal: Math.max(0, Number(value.subtotal || items.reduce((sum: number, item: any) => sum + Number(item.price || 0) * Number(item.qty || 0), 0))),
+  };
+}
+
 async function listConversations() {
   const db = getAdminDb();
   const snap = await db.collection('salaar_conversations').orderBy('updatedAt', 'desc').limit(100).get();
@@ -39,6 +61,11 @@ async function listConversations() {
       needYou: Boolean(data.needYou),
       updatedAt: iso(data.updatedAt),
       hasPending: Boolean(cleanText(data.pendingCustomerMessage, 20)),
+      orderStage: cleanText(data.orderStage, 30) || null,
+      advanceRequired: Math.max(0, Number(data.advanceRequired || 0)),
+      cartSummary: cartSummary(data.cartSummary),
+      readyAt: iso(data.readyAt),
+      orderCompletedAt: iso(data.orderCompletedAt),
     };
   });
 }
@@ -59,6 +86,11 @@ async function getThread(sessionId: string) {
       softHoldUntil: iso(data.softHoldUntil),
       needYou: Boolean(data.needYou),
       hasPending: Boolean(cleanText(data.pendingCustomerMessage, 20)),
+      orderStage: cleanText(data.orderStage, 30) || null,
+      advanceRequired: Math.max(0, Number(data.advanceRequired || 0)),
+      cartSummary: cartSummary(data.cartSummary),
+      readyAt: iso(data.readyAt),
+      orderCompletedAt: iso(data.orderCompletedAt),
     },
     messages: messages.docs.map((doc) => {
       const item = doc.data();
@@ -70,6 +102,7 @@ async function getThread(sessionId: string) {
         provider: cleanText(item.provider, 40) || null,
         needYou: Boolean(item.needYou),
         pending: Boolean(item.pending),
+        phase: cleanText(item.phase, 30) || null,
       };
     }),
   };
@@ -166,6 +199,30 @@ export async function POST(request: Request) {
     if (action === 'continue') {
       const reply = await continueSalaar(sessionId);
       return NextResponse.json({ ok: true, status: 'AUTO', reply });
+    }
+
+    if (action === 'complete') {
+      const snap = await ref.get();
+      const data = snap.exists ? snap.data() || {} : {};
+      if (cleanText(data.orderStage, 30) !== 'READY') {
+        return NextResponse.json({ error: 'No READY order intent on this chat.' }, { status: 400 });
+      }
+      const text = 'Order handoff marked Complete by PrimeHub admin.';
+      await Promise.all([
+        ref.collection('messages').add({ role: 'admin', text, createdAt: now, phase: 'COMPLETE' }),
+        ref.set({
+          orderStage: 'COMPLETE',
+          orderCompletedAt: now,
+          needYou: false,
+          status: 'AUTO',
+          holdType: null,
+          softHoldUntil: null,
+          lastMessage: text,
+          lastRole: 'admin',
+          updatedAt: now,
+        }, { merge: true }),
+      ]);
+      return NextResponse.json({ ok: true, orderStage: 'COMPLETE', status: 'AUTO' });
     }
 
     return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
