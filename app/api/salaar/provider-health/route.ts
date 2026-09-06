@@ -11,6 +11,8 @@ type Result = {
   workingKey: number | null;
   ok: boolean;
   latencyMs: number | null;
+  model?: string | null;
+  authOk?: boolean | null;
   error: string | null;
 };
 
@@ -30,9 +32,9 @@ function keysFor(provider: Provider): string[] {
 function shortError(error: unknown): string {
   if (error instanceof Error) {
     if (error.name === 'AbortError' || /timeout/i.test(error.message)) return 'timeout';
-    return error.message.slice(0, 120);
+    return error.message.slice(0, 160);
   }
-  return String(error || 'unknown error').slice(0, 120);
+  return String(error || 'unknown error').slice(0, 160);
 }
 
 async function timedFetch(url: string, init: RequestInit): Promise<Response> {
@@ -45,35 +47,56 @@ async function timedFetch(url: string, init: RequestInit): Promise<Response> {
   }
 }
 
-async function testGroq(key: string): Promise<void> {
-  const response = await timedFetch('https://api.groq.com/openai/v1/chat/completions', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
-    body: JSON.stringify({
-      model: process.env.SALAAR_GROQ_MODEL || 'llama-3.3-70b-versatile',
-      temperature: 0,
-      max_tokens: 8,
-      messages: [{ role: 'user', content: 'Reply only: OK' }],
-    }),
+async function groqAuthOk(key: string): Promise<boolean> {
+  const response = await timedFetch('https://api.groq.com/openai/v1/models', {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${key}` },
   });
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  return response.ok;
 }
 
-async function testOpenRouter(key: string): Promise<void> {
+async function testGroq(key: string): Promise<string> {
+  const candidates = Array.from(new Set([
+    process.env.SALAAR_GROQ_MODEL,
+    'llama-3.3-70b-versatile',
+    'llama-3.1-8b-instant',
+    'openai/gpt-oss-20b',
+  ].filter(Boolean) as string[]));
+  let last = 'no model worked';
+  for (const model of candidates) {
+    const response = await timedFetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+      body: JSON.stringify({
+        model,
+        temperature: 0,
+        max_tokens: 8,
+        messages: [{ role: 'user', content: 'Reply only: OK' }],
+      }),
+    });
+    if (response.ok) return model;
+    last = `${model}: HTTP ${response.status}`;
+  }
+  throw new Error(last);
+}
+
+async function testOpenRouter(key: string): Promise<string> {
+  const model = process.env.SALAAR_OPENROUTER_MODEL || 'google/gemini-2.0-flash-001';
   const response = await timedFetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
     body: JSON.stringify({
-      model: process.env.SALAAR_OPENROUTER_MODEL || 'google/gemini-2.0-flash-001',
+      model,
       temperature: 0,
       max_tokens: 8,
       messages: [{ role: 'user', content: 'Reply only: OK' }],
     }),
   });
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  return model;
 }
 
-async function testGemini(key: string): Promise<void> {
+async function testGemini(key: string): Promise<string> {
   const model = process.env.SALAAR_GEMINI_MODEL || 'gemini-2.5-flash';
   const response = await timedFetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`, {
     method: 'POST',
@@ -84,21 +107,26 @@ async function testGemini(key: string): Promise<void> {
     }),
   });
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  return model;
 }
 
 async function checkProvider(provider: Provider): Promise<Result> {
   const keys = keysFor(provider);
   if (!keys.length) {
-    return { provider, configured: false, keyCount: 0, workingKey: null, ok: false, latencyMs: null, error: 'not configured' };
+    return { provider, configured: false, keyCount: 0, workingKey: null, ok: false, latencyMs: null, model: null, authOk: null, error: 'not configured' };
   }
 
   let lastError = 'no working key';
+  let lastAuth: boolean | null = null;
   for (let i = 0; i < keys.length; i += 1) {
     const started = Date.now();
     try {
-      if (provider === 'groq') await testGroq(keys[i]);
-      else if (provider === 'openrouter') await testOpenRouter(keys[i]);
-      else await testGemini(keys[i]);
+      if (provider === 'groq') lastAuth = await groqAuthOk(keys[i]);
+      const model = provider === 'groq'
+        ? await testGroq(keys[i])
+        : provider === 'openrouter'
+          ? await testOpenRouter(keys[i])
+          : await testGemini(keys[i]);
       return {
         provider,
         configured: true,
@@ -106,6 +134,8 @@ async function checkProvider(provider: Provider): Promise<Result> {
         workingKey: i + 1,
         ok: true,
         latencyMs: Date.now() - started,
+        model,
+        authOk: provider === 'groq' ? lastAuth : null,
         error: null,
       };
     } catch (error) {
@@ -120,6 +150,8 @@ async function checkProvider(provider: Provider): Promise<Result> {
     workingKey: null,
     ok: false,
     latencyMs: null,
+    model: null,
+    authOk: provider === 'groq' ? lastAuth : null,
     error: lastError,
   };
 }
