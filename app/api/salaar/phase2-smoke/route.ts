@@ -34,19 +34,30 @@ async function cleanup(sessionId: string) {
   await ref.delete().catch(() => undefined);
 }
 
+function stage(name: string) {
+  console.log(`[phase2-smoke] ${name}`);
+}
+
 export async function GET() {
   if (process.env.VERCEL_ENV === 'production') return NextResponse.json({ error: 'Not found' }, { status: 404 });
   const sessionId = `preview-phase2-${Date.now()}`;
   try {
-    // Use only deterministic store-intent queries here so Phase 2 verification never waits on an external LLM provider.
+    stage('start');
     const auto = await json(await livePost(liveRequest(sessionId, 'Prime Skill kya hai?')));
+    stage('auto-complete');
     const human = await json(await adminPost(adminRequest({ sessionId, action: 'message', text: 'Ji, admin yahan hai.' })));
+    stage('admin-message-complete');
     const held = await json(await livePost(liveRequest(sessionId, 'Prime Skill kya hai?')));
+    stage('soft-held-complete');
     const continued = await json(await adminPost(adminRequest({ sessionId, action: 'continue' })));
+    stage('continue-complete');
     const hardWait = await json(await adminPost(adminRequest({ sessionId, action: 'wait' })));
+    stage('hard-wait-complete');
     const hardHeld = await json(await livePost(liveRequest(sessionId, 'Prime Skill kya hai?')));
+    stage('hard-held-complete');
     const threadResponse = await adminGet(new Request(`http://salaar.local/api/admin/salaar?sessionId=${encodeURIComponent(sessionId)}`, { headers: { cookie: 'primehub_admin_auth=true' } }));
     const thread = await json(threadResponse);
+    stage('thread-complete');
 
     return NextResponse.json({
       ok: Boolean(auto?.reply)
@@ -66,6 +77,8 @@ export async function GET() {
       roles: Array.isArray(thread?.messages) ? thread.messages.map((message: { role?: string }) => message.role) : [],
     });
   } finally {
+    stage('cleanup-start');
     await cleanup(sessionId);
+    stage('cleanup-complete');
   }
 }
