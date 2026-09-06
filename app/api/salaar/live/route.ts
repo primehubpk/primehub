@@ -13,6 +13,8 @@ type PendingReply = {
 
 const FIRESTORE_TIMEOUT_MS = 5000;
 const PROVIDER_TIMEOUT_MS = 12000;
+const DEGRADED_COOLDOWN_MS = 60_000;
+let firestoreDegradedUntil = 0;
 
 process.env.SALAAR_GROQ_MODEL = process.env.SALAAR_GROQ_MODEL_VERIFIED || 'openai/gpt-oss-20b';
 
@@ -28,6 +30,14 @@ function asDate(value: unknown): Date | null {
   }
   const parsed = new Date(String(value));
   return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function wantsProducts(message: string) {
+  return /(bangle|bangles|kara|karray|jewel|watch|product|item|deal|dikha|show|chahi|price|rate|budget|under|kam|wholesale|retail|gift|set)/i.test(message);
+}
+
+function shopSearchLink(message: string) {
+  return `/shop?q=${encodeURIComponent(message)}`;
 }
 
 async function withTimeout<T>(promise: Promise<T>, label: string, ms = FIRESTORE_TIMEOUT_MS): Promise<T> {
@@ -51,6 +61,25 @@ async function delegatePost(sessionId: string, message: string, shownProductIds:
     body: JSON.stringify({ sessionId, message, shownProductIds }),
   });
   return withTimeout(chatPost(synthetic), 'Salaar chat/provider response', PROVIDER_TIMEOUT_MS);
+}
+
+async function degradedChat(sessionId: string, message: string, shownProductIds: string[]) {
+  const response = await delegatePost(sessionId || crypto.randomUUID(), message, shownProductIds);
+  const data = await response.clone().json().catch(() => ({}));
+  const noProducts = !Array.isArray(data?.products) || data.products.length === 0;
+  if (wantsProducts(message) && noProducts) {
+    return NextResponse.json({
+      ...data,
+      reply: 'Ji, product catalog abhi refresh issue mein hai. Main aapko direct relevant Shop search khol deta hoon — wahan current products dekh sakte hain.',
+      products: [],
+      needYou: false,
+      whatsapp: null,
+      link: { href: shopSearchLink(message), label: 'Open matching products' },
+      degradedMode: true,
+      statePersistence: false,
+    });
+  }
+  return NextResponse.json({ ...data, degradedMode: true, statePersistence: false });
 }
 
 async function claimExpiredPending(sessionId: string): Promise<PendingReply | null> {
@@ -113,11 +142,14 @@ export async function GET(request: Request) {
   const sessionId = cleanText(url.searchParams.get('sessionId'), 100);
   if (!sessionId) return NextResponse.json({ messages: [] });
 
-  try {
-    const pending = await withTimeout(claimExpiredPending(sessionId), 'Salaar soft hold transaction');
-    await resumeClaimed(sessionId, pending);
-  } catch (error) {
-    console.warn('Salaar soft hold resume failed', error);
+  if (Date.now() >= firestoreDegradedUntil) {
+    try {
+      const pending = await withTimeout(claimExpiredPending(sessionId), 'Salaar soft hold transaction');
+      await resumeClaimed(sessionId, pending);
+    } catch (error) {
+      firestoreDegradedUntil = Date.now() + DEGRADED_COOLDOWN_MS;
+      console.warn('Salaar soft hold resume failed', error);
+    }
   }
 
   const delegated = new Request(new URL(`/api/salaar/chat?sessionId=${encodeURIComponent(sessionId)}`, request.url), { method: 'GET' });
@@ -137,6 +169,10 @@ export async function POST(request: Request) {
       ? body.shownProductIds.map((id: unknown) => String(id)).slice(-100)
       : [];
     if (!message) return NextResponse.json({ error: 'Message required.' }, { status: 400 });
+
+    if (Date.now() < firestoreDegradedUntil) {
+      return degradedChat(sessionId, message, shownProductIds);
+    }
 
     const expired = await withTimeout(claimExpiredPending(sessionId), 'Salaar soft hold transaction');
     await resumeClaimed(sessionId, expired);
@@ -177,12 +213,11 @@ export async function POST(request: Request) {
     }
     return response;
   } catch (error) {
+    firestoreDegradedUntil = Date.now() + DEGRADED_COOLDOWN_MS;
     console.error('Salaar live wrapper state unavailable; using degraded chat mode', error);
     if (message) {
       try {
-        const response = await delegatePost(sessionId || crypto.randomUUID(), message, shownProductIds);
-        const data = await response.clone().json().catch(() => ({}));
-        return NextResponse.json({ ...data, degradedMode: true, statePersistence: false });
+        return await degradedChat(sessionId, message, shownProductIds);
       } catch (delegateError) {
         console.error('Salaar degraded chat delegation failed', delegateError);
       }
