@@ -9,6 +9,7 @@ import GlobalFooter from '@/components/GlobalFooter';
 import CartMiniBar from '@/components/CartMiniBar';
 import PWARegister from '@/components/PWARegister';
 import GlobalVariantSelector from '@/components/GlobalVariantSelector';
+import SalaarEmbed from '@/components/SalaarEmbed';
 import './globals.css';
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL;
@@ -134,6 +135,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <BottomNav />
         <CartMiniBar />
         <PWARegister />
+        <SalaarEmbed botPublicUrl={process.env.BOT_PUBLIC_URL} />
       </body>
     </html>
   );
