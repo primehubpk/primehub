@@ -51,6 +51,15 @@ function loadJson<T>(key: string, fallback: T): T {
   }
 }
 
+function mergeServerMessages(current: UiMessage[], incoming: UiMessage[]): UiMessage[] {
+  const next = [...current];
+  for (const item of incoming) {
+    const alreadyThere = next.some((existing) => existing.role === item.role && existing.text === item.text);
+    if (!alreadyThere) next.push(item);
+  }
+  return next.slice(-60);
+}
+
 export default function SalaarNative() {
   const [open, setOpen] = useState(false);
   const [sessionId, setSessionId] = useState('');
@@ -76,9 +85,8 @@ export default function SalaarNative() {
     setShownProductIds(shown);
     setReady(true);
 
-    // If local history is empty, recover the saved Firestore thread when available.
     if (!localMessages.length) {
-      fetch(`/api/salaar/chat?sessionId=${encodeURIComponent(id)}`, { cache: 'no-store' })
+      fetch(`/api/salaar/live?sessionId=${encodeURIComponent(id)}`, { cache: 'no-store' })
         .then((response) => response.ok ? response.json() : null)
         .then((data) => {
           if (!Array.isArray(data?.messages) || !data.messages.length) return;
@@ -92,6 +100,29 @@ export default function SalaarNative() {
         .catch(() => undefined);
     }
   }, []);
+
+  useEffect(() => {
+    if (!open || !sessionId) return;
+    const poll = async () => {
+      try {
+        const response = await fetch(`/api/salaar/live?sessionId=${encodeURIComponent(sessionId)}`, { cache: 'no-store' });
+        if (!response.ok) return;
+        const data = await response.json();
+        if (!Array.isArray(data?.messages)) return;
+        const recovered: UiMessage[] = data.messages.map((item: any, index: number) => ({
+          id: `server-${sessionId}-${index}-${String(item?.createdAt || '')}`,
+          role: item?.role === 'customer' ? 'customer' : 'salaar',
+          text: String(item?.text || ''),
+        })).filter((item: UiMessage) => item.text);
+        setMessages((current) => mergeServerMessages(current, recovered));
+      } catch {
+        // Keep local chat usable if polling briefly fails.
+      }
+    };
+    void poll();
+    const timer = window.setInterval(() => void poll(), 2000);
+    return () => window.clearInterval(timer);
+  }, [open, sessionId]);
 
   useEffect(() => {
     if (!ready) return;
@@ -127,13 +158,14 @@ export default function SalaarNative() {
     setMessages((current) => [...current, customer]);
 
     try {
-      const response = await fetch('/api/salaar/chat', {
+      const response = await fetch('/api/salaar/live', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessionId, message: text, shownProductIds }),
         cache: 'no-store',
       });
       const data = await response.json();
+      if (data?.silent) return;
       const products: ProductCard[] = Array.isArray(data?.products) ? data.products : [];
       if (products.length) {
         setShownProductIds((current) => Array.from(new Set([...current, ...products.map((product) => product.id)])));
