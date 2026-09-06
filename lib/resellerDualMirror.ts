@@ -61,3 +61,29 @@ export async function mirrorResellerDocAndProfile(collection: string, id: string
   const userId = String(data.userId || data.resellerUserId || '');
   if (userId) await mirrorResellerFirestoreDoc('reseller_profiles', userId);
 }
+
+export async function mirrorLegacyApprovedReward(orderId: string) {
+  const snap = await getAdminDb().collection('reseller_rewards').doc(orderId).get();
+  if (!snap.exists) return;
+  const d = snap.data() || {};
+  const row = {
+    id: orderId,
+    user_id: String(d.resellerUserId || d.userId || ''),
+    order_id: String(d.orderId || orderId),
+    reward_amount: num(d.amount ?? d.rewardAmount),
+    status: d.status || 'approved',
+    available_at: safe(d.availableAt) ?? null,
+    payload: safe({ ...d, legacyCollection: 'reseller_rewards' }),
+    authoritative_source: 'firebase',
+    mirror_status: 'synced',
+    mirror_error: null,
+    sync_version: Number(d.syncVersion || 1),
+  };
+  const result = await mirrorSupabaseUpsert({ table: 'reseller_reward_ledger', row });
+  if (result.attempted && !result.ok) {
+    console.error(`reseller_rewards/${orderId} Supabase ledger mirror failed`, result.error);
+    await recordMirrorFailure('reseller_reward_ledger', orderId, 'upsert', row);
+  }
+  const userId = String(d.resellerUserId || d.userId || '');
+  if (userId) await mirrorResellerFirestoreDoc('reseller_profiles', userId);
+}
