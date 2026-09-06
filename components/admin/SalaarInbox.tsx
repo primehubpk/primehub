@@ -74,7 +74,7 @@ export default function SalaarInbox() {
 
   async function loadList() {
     try {
-      const response = await fetch('/api/admin/salaar', { cache: 'no-store' });
+      const response = await fetch('/api/admin/salaar-dual', { cache: 'no-store' });
       if (!response.ok) throw new Error('Inbox load failed');
       const data = await response.json();
       const items: Conversation[] = Array.isArray(data?.conversations) ? data.conversations : [];
@@ -88,7 +88,7 @@ export default function SalaarInbox() {
   async function loadThread(sessionId: string) {
     if (!sessionId) return;
     try {
-      const response = await fetch(`/api/admin/salaar?sessionId=${encodeURIComponent(sessionId)}`, { cache: 'no-store' });
+      const response = await fetch(`/api/admin/salaar-dual?sessionId=${encodeURIComponent(sessionId)}`, { cache: 'no-store' });
       if (!response.ok) throw new Error('Thread load failed');
       setThread(await response.json());
       setError('');
@@ -115,7 +115,7 @@ export default function SalaarInbox() {
     setBusy(true);
     setError('');
     try {
-      const response = await fetch('/api/admin/salaar', {
+      const response = await fetch('/api/admin/salaar-dual', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessionId: selected, action, text: message }),
