@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getAdminDb } from '@/lib/firebaseAdmin';
+import { mapFirebaseDocumentToSupabase, mirrorSupabaseDelete, mirrorSupabaseUpsert, recordMirrorFailure } from '@/lib/dualWriteServer';
 
 export const runtime = 'nodejs';
 
@@ -16,6 +17,18 @@ function normalize(name: string, value: Record<string, any>) {
   return { ...value, imageUrl, iconUrl: typeof value.iconUrl === 'string' ? value.iconUrl : imageUrl };
 }
 
+async function mirrorFinalDocument(name: string, id: string) {
+  const snapshot = await getAdminDb().collection(name).doc(id).get();
+  if (!snapshot.exists) return;
+  const row = mapFirebaseDocumentToSupabase(name, id, snapshot.data() || {});
+  if (!row) return;
+  const result = await mirrorSupabaseUpsert({ table: name, row });
+  if (result.attempted && !result.ok) {
+    console.error(`Admin ${name}/${id} Supabase mirror failed`, result.error);
+    await recordMirrorFailure(name, id, 'upsert', row);
+  }
+}
+
 export async function POST(request: Request) {
   if (!isAuthorized(request)) return NextResponse.json({ error: 'Authentication required.' }, { status: 401 });
 
@@ -29,25 +42,34 @@ export async function POST(request: Request) {
     if (!name) return NextResponse.json({ error: 'Collection name is required.' }, { status: 400 });
 
     if (action === 'create') {
-      const ref = await db.collection(name).add({ ...normalize(name, body.value || {}), adminActor: ADMIN_EMAIL });
+      const ref = db.collection(name).doc();
+      await ref.set({ ...normalize(name, body.value || {}), adminActor: ADMIN_EMAIL });
+      await mirrorFinalDocument(name, ref.id);
       return NextResponse.json({ success: true, id: ref.id });
     }
 
     if (action === 'update') {
       if (!id) return NextResponse.json({ error: 'Document id is required.' }, { status: 400 });
       await db.collection(name).doc(id).update(normalize(name, body.value || {}));
+      await mirrorFinalDocument(name, id);
       return NextResponse.json({ success: true, id });
     }
 
     if (action === 'set') {
       if (!id) return NextResponse.json({ error: 'Document id is required.' }, { status: 400 });
       await db.collection(name).doc(id).set(normalize(name, body.value || {}), { merge: true });
+      await mirrorFinalDocument(name, id);
       return NextResponse.json({ success: true, id });
     }
 
     if (action === 'delete') {
       if (!id) return NextResponse.json({ error: 'Document id is required.' }, { status: 400 });
       await db.collection(name).doc(id).delete();
+      const result = await mirrorSupabaseDelete({ table: name, id });
+      if (result.attempted && !result.ok) {
+        console.error(`Admin ${name}/${id} Supabase delete mirror failed`, result.error);
+        await recordMirrorFailure(name, id, 'delete', {});
+      }
       return NextResponse.json({ success: true, id });
     }
 
