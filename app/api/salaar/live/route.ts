@@ -14,8 +14,6 @@ type PendingReply = {
 const FIRESTORE_TIMEOUT_MS = 5000;
 const PROVIDER_TIMEOUT_MS = 12000;
 
-// Phase 3 verified this Groq production model against the configured preview key.
-// Keep the override local to the live customer path so a stale Vercel model env cannot break Salaar.
 process.env.SALAAR_GROQ_MODEL = process.env.SALAAR_GROQ_MODEL_VERIFIED || 'openai/gpt-oss-20b';
 
 function cleanText(value: unknown, max = 600): string {
@@ -127,11 +125,15 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  let sessionId = '';
+  let message = '';
+  let shownProductIds: string[] = [];
+
   try {
     const body = await request.json();
-    const sessionId = cleanText(body?.sessionId, 100) || crypto.randomUUID();
-    const message = cleanText(body?.message, 600);
-    const shownProductIds = Array.isArray(body?.shownProductIds)
+    sessionId = cleanText(body?.sessionId, 100) || crypto.randomUUID();
+    message = cleanText(body?.message, 600);
+    shownProductIds = Array.isArray(body?.shownProductIds)
       ? body.shownProductIds.map((id: unknown) => String(id)).slice(-100)
       : [];
     if (!message) return NextResponse.json({ error: 'Message required.' }, { status: 400 });
@@ -175,7 +177,16 @@ export async function POST(request: Request) {
     }
     return response;
   } catch (error) {
-    console.error('Salaar live wrapper failed', error);
+    console.error('Salaar live wrapper state unavailable; using degraded chat mode', error);
+    if (message) {
+      try {
+        const response = await delegatePost(sessionId || crypto.randomUUID(), message, shownProductIds);
+        const data = await response.clone().json().catch(() => ({}));
+        return NextResponse.json({ ...data, degradedMode: true, statePersistence: false });
+      } catch (delegateError) {
+        console.error('Salaar degraded chat delegation failed', delegateError);
+      }
+    }
     return NextResponse.json({ reply: 'Ji, abhi short technical issue hai. WhatsApp 03238878009 par message kar dein.', provider: 'fallback', needYou: true, whatsapp: 'https://wa.me/923238878009' });
   }
 }
