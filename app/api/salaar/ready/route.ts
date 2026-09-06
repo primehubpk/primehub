@@ -20,6 +20,7 @@ type CartItem = {
 };
 
 function cleanText(value: unknown, max = 600): string {
+  if (typeof value === 'number') return String(value).slice(0, max);
   return typeof value === 'string' ? value.trim().slice(0, max) : '';
 }
 
@@ -74,6 +75,32 @@ function whatsappLink(sessionId: string, itemCount: number, subtotal: number) {
   return `https://wa.me/923238878009?text=${encodeURIComponent(text)}`;
 }
 
+async function notifyOps(sessionId: string, items: ReturnType<typeof normalizeCart>, itemCount: number, subtotal: number) {
+  const apiKey = cleanText(process.env.RESEND_API_KEY, 500);
+  const to = cleanText(process.env.SALAAR_OPS_EMAIL, 320);
+  const from = cleanText(process.env.SALAAR_FROM_EMAIL, 320);
+  if (!apiKey || !to || !from) return { configured: false, sent: false };
+  const lines = items.map((item) => `${item.name} × ${item.qty} — Rs ${Math.round(item.price * item.qty).toLocaleString('en-PK')}`);
+  try {
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        from,
+        to: [to],
+        subject: `Salaar READY · ${itemCount} item(s) · Rs ${Math.round(subtotal).toLocaleString('en-PK')}`,
+        text: [`Salaar session: ${sessionId}`, 'Order stage: READY', 'Advance required: Rs 300', '', ...lines, '', `Subtotal: Rs ${Math.round(subtotal).toLocaleString('en-PK')}`, `WhatsApp: ${WHATSAPP_NUMBER}`].join('\n'),
+      }),
+      cache: 'no-store',
+    });
+    if (!response.ok) throw new Error(`ops email ${response.status}`);
+    return { configured: true, sent: true };
+  } catch (error) {
+    console.warn('Salaar ops email unavailable', error);
+    return { configured: true, sent: false };
+  }
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
@@ -121,6 +148,8 @@ export async function POST(request: Request) {
       }, { merge: true }),
     ]), 'Salaar ready persistence');
 
+    const opsEmail = await notifyOps(sessionId, items, itemCount, subtotal);
+
     return NextResponse.json({
       sessionId,
       reply,
@@ -131,6 +160,7 @@ export async function POST(request: Request) {
       advanceRequired: 300,
       cartSummary: { itemCount, subtotal: Math.round(subtotal) },
       whatsapp,
+      opsEmail,
     });
   } catch (error) {
     console.error('Salaar ready handoff failed', error);
