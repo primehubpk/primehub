@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getAdminAuth } from '@/lib/firebaseAdmin';
 import { createResellerTaskClaim, recordResellerTaskOpen } from '@/lib/resellerServer';
-import { mirrorResellerFirestoreDoc } from '@/lib/resellerDualMirror';
+import { mirrorResellerFirestoreDoc, mirrorResellerTaskEventsForUser } from '@/lib/resellerDualMirror';
 
 export const runtime = 'nodejs';
 
@@ -14,6 +14,7 @@ export async function POST(request: Request) {
     const taskId = String(body?.taskId || '');
     if (body?.action === 'open') {
       await recordResellerTaskOpen(user.uid, taskId);
+      await mirrorResellerTaskEventsForUser(user.uid);
       return NextResponse.json({ ok: true });
     }
     const result = await createResellerTaskClaim(user.uid, taskId, String(body?.proof || ''));
