@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getAdminDb } from '@/lib/firebaseAdmin';
-import { getPublicCatalogSnapshot } from '@/lib/publicCatalogServer';
+import { getSalaarCatalogSnapshot, SALAAR_CATEGORY_BATCH_SIZE } from '@/lib/salaarCatalogCache';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -96,6 +96,23 @@ function productTerms(message: string): string[] {
   return message.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter((word) => word.length > 2 && !ignored.has(word));
 }
 
+function isMoreProductsMessage(message: string): boolean {
+  const value = message.trim().toLowerCase();
+  return /^(aur|or|more|next|mazeed|mazid|baqi|baaki)(\s+(dikha|dikhao|show|products?|items?))?[!.?]*$/i.test(value)
+    || /^(aur|more|next)\s+(dikha|dikhao|show)/i.test(value);
+}
+
+function effectiveProductMessage(message: string, history: ChatMessage[]): string {
+  if (!isMoreProductsMessage(message)) return message;
+  for (const item of [...history].reverse()) {
+    if (item.role !== 'customer') continue;
+    if (!wantsProducts(item.text)) continue;
+    if (productTerms(item.text).length === 0) continue;
+    return item.text;
+  }
+  return message;
+}
+
 function pickProducts(products: any[], message: string, shown: string[]): ProductCard[] {
   if (!wantsProducts(message)) return [];
   const shownSet = new Set(shown.map(String));
@@ -110,7 +127,7 @@ function pickProducts(products: any[], message: string, shown: string[]): Produc
     .sort((a, b) => b.score - a.score);
   const matching = scored.filter((entry) => entry.score > 0);
   const source = matching.length ? matching : scored;
-  return source.slice(0, 3).map(({ p }) => {
+  return source.slice(0, SALAAR_CATEGORY_BATCH_SIZE).map(({ p }) => {
     const price = safePrice(p?.price || p?.salePrice || p?.retailPrice);
     const originalPrice = safePrice(p?.originalPrice || p?.compareAtPrice || p?.retailPrice || price);
     return {
@@ -161,8 +178,15 @@ function deterministicReply(message: string, products: ProductCard[]): { text: s
   return { text: `Ji, main help karta hoon. Product, order, Prime Skill ya Reseller Club — jo masla hai short mein batayein. Zarurat par ${WHATSAPP_NUMBER} bhi available hai.` };
 }
 
+function llmProductContext(products: ProductCard[]) {
+  // The customer can see up to 30 cards, but the LLM only needs a compact sample.
+  // This keeps token/API usage bounded even for large categories.
+  return products.slice(0, 10);
+}
+
 async function callOpenAiCompatible(baseUrl: string, apiKey: string, model: string, user: string, products: ProductCard[], history: ChatMessage[]): Promise<string> {
-  const productContext = products.length ? `\nProducts available now:\n${products.map((p) => `- ${p.name} | Rs ${p.price} | id ${p.id}`).join('\n')}` : '';
+  const contextProducts = llmProductContext(products);
+  const productContext = contextProducts.length ? `\nProducts available now:\n${contextProducts.map((p) => `- ${p.name} | Rs ${p.price} | id ${p.id}`).join('\n')}` : '';
   const response = await fetch(`${baseUrl}/chat/completions`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
@@ -186,7 +210,8 @@ async function callOpenAiCompatible(baseUrl: string, apiKey: string, model: stri
 }
 
 async function callGemini(apiKey: string, model: string, user: string, products: ProductCard[], history: ChatMessage[]): Promise<string> {
-  const productContext = products.length ? `\nProducts available now:\n${products.map((p) => `- ${p.name} | Rs ${p.price} | id ${p.id}`).join('\n')}` : '';
+  const contextProducts = llmProductContext(products);
+  const productContext = contextProducts.length ? `\nProducts available now:\n${contextProducts.map((p) => `- ${p.name} | Rs ${p.price} | id ${p.id}`).join('\n')}` : '';
   const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -271,11 +296,12 @@ export async function POST(request: Request) {
     const body = await request.json();
     const sessionId = cleanText(body?.sessionId, 100) || crypto.randomUUID();
     const message = cleanText(body?.message, 600);
-    const shownProductIds = Array.isArray(body?.shownProductIds) ? body.shownProductIds.map((id: unknown) => String(id)).slice(-100) : [];
+    const shownProductIds = Array.isArray(body?.shownProductIds) ? body.shownProductIds.map((id: unknown) => String(id)).slice(-400) : [];
     if (!message) return NextResponse.json({ error: 'Message required.' }, { status: 400 });
 
-    const [{ products }, history] = await Promise.all([getPublicCatalogSnapshot(), loadHistory(sessionId)]);
-    const cards = pickProducts(Array.isArray(products) ? products : [], message, shownProductIds);
+    const [catalog, history] = await Promise.all([getSalaarCatalogSnapshot(), loadHistory(sessionId)]);
+    const queryMessage = effectiveProductMessage(message, history);
+    const cards = pickProducts(Array.isArray(catalog.products) ? catalog.products : [], queryMessage, shownProductIds);
     await saveMessage(sessionId, 'customer', message);
 
     const deterministic = deterministicReply(message, cards);
@@ -305,6 +331,12 @@ export async function POST(request: Request) {
       needYou,
       whatsapp: needYou ? `https://wa.me/923238878009` : null,
       link: deterministic.link || null,
+      catalog: {
+        source: catalog.source,
+        batchSize: SALAAR_CATEGORY_BATCH_SIZE,
+        returned: cards.length,
+        refreshedAt: catalog.refreshedAt,
+      },
     });
   } catch (error) {
     console.error('Native Salaar chat failed', error);
