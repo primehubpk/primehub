@@ -143,7 +143,7 @@ export default function SalaarNative() {
   }, [messages, ready]);
 
   useEffect(() => {
-    if (ready) localStorage.setItem(SHOWN_KEY, JSON.stringify(shownProductIds.slice(-100)));
+    if (ready) localStorage.setItem(SHOWN_KEY, JSON.stringify(shownProductIds.slice(-400)));
   }, [shownProductIds, ready]);
 
   useEffect(() => {
