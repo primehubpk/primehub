@@ -2,12 +2,11 @@
 
 import { FormEvent, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { signInWithCustomToken, signOut } from 'firebase/auth';
 import { Eye, EyeOff, LockKeyhole, LogOut, ShieldCheck } from 'lucide-react';
+import { auth } from '@/lib/firebase';
 
 const ADMIN_EMAIL = 'primehubpk1@gmail.com';
-const ADMIN_PASSWORD = 'junaid00';
-const SESSION_KEY = 'primehub_admin_auth';
-const SESSION_COOKIE = 'primehub_admin_auth';
 
 type Props = { children: React.ReactNode };
 
@@ -22,45 +21,76 @@ export default function AdminAuthGuard({ children }: Props) {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    const isAuthenticated = window.localStorage.getItem(SESSION_KEY) === 'true';
-    setAuthenticated(isAuthenticated);
-    setChecking(false);
+    let active = true;
+    fetch('/api/admin/session', { cache: 'no-store' })
+      .then((response) => response.json().catch(() => null))
+      .then((data) => {
+        if (!active) return;
+        setAuthenticated(data?.authenticated === true);
+      })
+      .catch(() => {
+        if (active) setAuthenticated(false);
+      })
+      .finally(() => {
+        if (active) setChecking(false);
+      });
+    return () => { active = false; };
   }, []);
 
-  function setSession() {
-    window.localStorage.setItem(SESSION_KEY, 'true');
-    document.cookie = `${SESSION_COOKIE}=true; Path=/; Max-Age=604800; SameSite=Lax`;
-  }
-
-  function clearSession() {
-    window.localStorage.removeItem(SESSION_KEY);
-    document.cookie = `${SESSION_COOKIE}=; Path=/; Max-Age=0; SameSite=Lax`;
-  }
-
-  function login(event: FormEvent) {
+  async function login(event: FormEvent) {
     event.preventDefault();
+    if (busy) return;
     setError('');
     setBusy(true);
 
-    const normalizedEmail = email.trim().toLowerCase();
-    const expectedPassword = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || ADMIN_PASSWORD;
+    try {
+      const response = await fetch('/api/admin/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email.trim().toLowerCase(), password }),
+        cache: 'no-store',
+      });
+      const data = await response.json().catch(() => null);
+      if (!response.ok || !data?.customToken) throw new Error(String(data?.error || 'Admin login failed.'));
 
-    if (normalizedEmail !== ADMIN_EMAIL || password !== expectedPassword) {
-      setError('Invalid password. Please enter correct credentials.');
+      const credential = await signInWithCustomToken(auth, String(data.customToken));
+      const idToken = await credential.user.getIdToken(true);
+      const sessionResponse = await fetch('/api/admin/session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idToken }),
+        cache: 'no-store',
+      });
+      const sessionData = await sessionResponse.json().catch(() => null);
+      if (!sessionResponse.ok || sessionData?.authenticated !== true) {
+        await signOut(auth).catch(() => undefined);
+        throw new Error(String(sessionData?.error || 'Secure admin session failed.'));
+      }
+
+      setAuthenticated(true);
+      setPassword('');
+      router.replace('/admin');
+      router.refresh();
+    } catch (loginError) {
+      setAuthenticated(false);
+      setError(loginError instanceof Error ? loginError.message : 'Admin login failed.');
+    } finally {
       setBusy(false);
-      return;
     }
-
-    setSession();
-    setAuthenticated(true);
-    router.replace('/admin');
   }
 
-  function logout() {
-    clearSession();
-    setAuthenticated(false);
-    setPassword('');
-    router.replace('/admin');
+  async function logout() {
+    setBusy(true);
+    try {
+      await fetch('/api/admin/session', { method: 'DELETE', cache: 'no-store' }).catch(() => undefined);
+      await signOut(auth).catch(() => undefined);
+    } finally {
+      setAuthenticated(false);
+      setPassword('');
+      setBusy(false);
+      router.replace('/admin');
+      router.refresh();
+    }
   }
 
   if (checking) {
@@ -74,7 +104,7 @@ export default function AdminAuthGuard({ children }: Props) {
           <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#14140F] text-white"><ShieldCheck size={24} /></div>
           <p className="mt-5 text-[9px] font-black uppercase tracking-[0.25em] text-[#E1352B]">PrimeHub Admin</p>
           <h1 className="mt-1 text-2xl font-black">Secure Login</h1>
-          <p className="mt-2 text-xs leading-5 text-black/40">Enter the authorized PrimeHub Admin credentials.</p>
+          <p className="mt-2 text-xs leading-5 text-black/40">Authorized PrimeHub Admin credentials server par verify hoti hain.</p>
           {error && <div className="mt-4 rounded-2xl bg-[#E1352B]/10 p-3 text-[10px] font-bold leading-4 text-[#E1352B]">{error}</div>}
           <label className="mt-5 block"><span className="mb-1.5 block text-[9px] font-black uppercase tracking-wider text-black/40">Admin Email</span><input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full rounded-2xl bg-[#F4F4F1] px-3 py-3.5 text-xs font-bold outline-none" placeholder="admin@example.com" autoComplete="username" /></label>
           <label className="mt-3 block"><span className="mb-1.5 block text-[9px] font-black uppercase tracking-wider text-black/40">Password</span><div className="flex items-center gap-2 rounded-2xl bg-[#F4F4F1] px-3"><LockKeyhole size={15} className="text-black/30" /><input required type={showPassword ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-transparent py-3.5 text-xs font-bold outline-none" placeholder="Enter password" autoComplete="current-password" /><button type="button" onClick={() => setShowPassword((value) => !value)} className="p-1 text-black/40" aria-label={showPassword ? 'Hide password' : 'Show password'}>{showPassword ? <EyeOff size={16} /> : <Eye size={16} />}</button></div></label>
@@ -86,7 +116,7 @@ export default function AdminAuthGuard({ children }: Props) {
 
   return (
     <div className="min-h-screen">
-      <div className="sticky top-0 z-[150] flex items-center justify-end gap-2 border-b border-black/5 bg-white/90 px-4 py-2 backdrop-blur"><span className="mr-auto truncate text-[9px] font-bold text-black/35">{ADMIN_EMAIL}</span><button type="button" onClick={logout} className="flex items-center gap-1.5 rounded-full bg-[#F4F4F1] px-3 py-2 text-[9px] font-black"><LogOut size={12} /> Logout</button></div>
+      <div className="sticky top-0 z-[150] flex items-center justify-end gap-2 border-b border-black/5 bg-white/90 px-4 py-2 backdrop-blur"><span className="mr-auto truncate text-[9px] font-bold text-black/35">{ADMIN_EMAIL}</span><button type="button" onClick={() => void logout()} disabled={busy} className="flex items-center gap-1.5 rounded-full bg-[#F4F4F1] px-3 py-2 text-[9px] font-black disabled:opacity-50"><LogOut size={12} /> Logout</button></div>
       {children}
     </div>
   );
