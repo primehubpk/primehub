@@ -1,11 +1,42 @@
 import { NextResponse } from 'next/server';
 import { getAdminDb } from '@/lib/firebaseAdmin';
 import { getSalaarCatalogSnapshot, SALAAR_CATEGORY_BATCH_SIZE } from '@/lib/salaarCatalogCache';
+import { getSalaarStoreKnowledgeSnapshot } from '@/lib/salaarStoreKnowledge';
+import {
+  directStoreKnowledgeReply,
+  storeKnowledgePromptContext,
+  type SalaarStoreKnowledge,
+} from '@/lib/salaarStoreKnowledgeCore';
+import {
+  effectiveProductQuery,
+  intentNeedsLlm,
+  parseSalesIntent,
+  rankProductsForIntent,
+  type SalesIntent,
+} from '@/lib/salaarSalesIntent';
+import {
+  runSalaarAi,
+  sanitizeSalaarImageUrls,
+  type SalaarProvider,
+} from '@/lib/salaarAiRouter';
+import {
+  parseSalaarVisionAnalysis,
+  SALAAR_VISION_ANALYSIS_SYSTEM,
+  visionCatalogQuery,
+  type SalaarVisionAnalysis,
+} from '@/lib/salaarVisionCore';
+import {
+  emptySalaarSalesMemory,
+  resolveSalesTurnWithMemory,
+  salesMemoryPromptContext,
+  sanitizeSalaarSalesMemory,
+  updateSalaarSalesMemory,
+  type SalaarSalesMemory,
+} from '@/lib/salaarSalesMemoryCore';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-type Provider = 'groq' | 'openrouter' | 'gemini';
 type ProductCard = {
   id: string;
   name: string;
@@ -13,6 +44,8 @@ type ProductCard = {
   originalPrice: number;
   image: string;
   href: string;
+  dealLive?: boolean;
+  dealLabel?: string;
   hasVariants?: boolean;
   variantColors?: unknown;
   variantSizes?: unknown;
@@ -23,41 +56,41 @@ type ProductCard = {
   colorImages?: unknown;
 };
 
-type ChatMessage = { role: 'customer' | 'salaar'; text: string; createdAt?: string };
+type ChatMessage = {
+  role: 'customer' | 'salaar';
+  text: string;
+  createdAt?: string;
+  imageUrls?: string[];
+  referencedProduct?: ProductCard | null;
+};
 
 const WHATSAPP_NUMBER = '03238878009';
-const SYSTEM_PROMPT = `You are Salaar, a human-style salesman for PrimeHubMall Pakistan.
-Reply in short Roman Urdu/English matching the customer's length. Use pyar, adab and ehtram. Never write long AI essays, menus, or "press 1" prompts.
+const DEFAULT_IMAGE_MESSAGE = 'Is image ko dekh kar design, color aur matching PrimeHub products ke bare mein help karein.';
+const SYSTEM_PROMPT = `You are Salaar, a professional human-style salesman for PrimeHubMall Pakistan.
+Reply in short, natural Roman Urdu/English matching the customer's language and length. Use pyar, adab and ehtram. Never sound like a menu-driven bot and never write long AI essays.
+Think like a real salesman: understand what the customer is trying to buy or ask, use the supplied sales intent, bounded sales memory and grounded product/store context, ask one short clarification only when genuinely needed, and keep the conversation moving naturally.
 You help with bangles, jewellery, watches, retail/wholesale shopping, Prime Skill, Reseller Club, cart/order questions and general store help.
-Store facts:
+Known operational flow that must stay grounded:
 - Prime Skill is PrimeHubMall's practical skill area. Send customer to /prime-skill when relevant.
 - Reseller Club is for wholesale/reseller customers. Send customer to /reseller-club when relevant.
 - Ready/order lock flow: customer confirms cart/details, then Rs 300 advance locks the order. Complete ready video is shared on WhatsApp, remaining payment follows, then dispatch.
 - Human support WhatsApp: ${WHATSAPP_NUMBER}.
-If product cards are supplied below, mention them naturally and do not invent prices or products outside that list.
-If confused, payment is stuck, customer is angry, or you are not confident, give ${WHATSAPP_NUMBER} and keep it short.`;
-
-let rotationCursor = 0;
-
-function splitKeys(value?: string): string[] {
-  if (!value) return [];
-  return value.split(/[\n,;]+/).map((v) => v.trim()).filter(Boolean);
-}
-
-function providerKeys(provider: Provider): string[] {
-  if (provider === 'groq') return [...splitKeys(process.env.GROQ_API_KEYS), ...splitKeys(process.env.GROQ_API_KEY)];
-  if (provider === 'openrouter') return [...splitKeys(process.env.OPENROUTER_API_KEYS), ...splitKeys(process.env.OPENROUTER_API_KEY)];
-  return [...splitKeys(process.env.GEMINI_API_KEYS), ...splitKeys(process.env.GEMINI_API_KEY)];
-}
-
-function rotated<T>(items: T[], offset: number): T[] {
-  if (!items.length) return items;
-  const start = ((offset % items.length) + items.length) % items.length;
-  return [...items.slice(start), ...items.slice(0, start)];
-}
+Rules:
+- Never invent a price, product, stock state, policy, deal, discount or store fact that is not supplied in grounded context.
+- Treat the Store Knowledge block as current admin-managed website truth for this turn.
+- Treat Sales Memory as bounded context for follow-ups, not as authority for live price/stock.
+- If product cards are supplied below, refer to them naturally. Do not claim another product exists unless it is in grounded context.
+- If a customer quoted/replied to a product image, the quoted product card is the exact grounded product they mean for this turn.
+- If an image is supplied, inspect it carefully and answer only what can actually be inferred from the image. Never claim an exact product match unless a grounded product card supports it.
+- If a store/deal fact is not supplied, say briefly that you need the live store detail instead of guessing.
+- If confused, payment is stuck, customer is angry, or you are not confident about a sensitive fact, involve human support at ${WHATSAPP_NUMBER} and keep it short.`;
 
 function cleanText(value: unknown, max = 600): string {
   return typeof value === 'string' ? value.trim().slice(0, max) : '';
+}
+
+function cleanProductId(value: unknown): string {
+  return cleanText(value, 160).replace(/[^a-z0-9._:-]/gi, '');
 }
 
 function safePrice(value: unknown): number {
@@ -81,180 +114,238 @@ function productImage(product: any): string {
   return '';
 }
 
-function searchable(product: any): string {
-  const tags = Array.isArray(product?.tags) ? product.tags.join(' ') : '';
-  return [product?.title, product?.name, product?.category, product?.subcategory, product?.description, product?.material, product?.color, tags]
-    .filter(Boolean).join(' ').toLowerCase();
+function toProductCard(p: any): ProductCard {
+  const price = safePrice(p?.salePrice || p?.price || p?.retailPrice);
+  const originalPrice = safePrice(p?.originalPrice || p?.compareAtPrice || p?.retailPrice || price);
+  return {
+    id: String(p.id),
+    name: productName(p),
+    price,
+    originalPrice: originalPrice || price,
+    image: productImage(p),
+    href: `/product/${encodeURIComponent(String(p.id))}`,
+    dealLive: p?.salaarDealLive === true,
+    dealLabel: cleanText(p?.salaarDealLabel, 100) || undefined,
+    hasVariants: Boolean(p?.hasVariants || p?.variants?.length || p?.variantMatrix?.length || p?.variantColors?.length || p?.variantSizes?.length),
+    variantColors: p?.variantColors,
+    variantSizes: p?.variantSizes,
+    colors: p?.colors,
+    sizes: p?.sizes,
+    variants: p?.variants,
+    variantMatrix: p?.variantMatrix,
+    colorImages: p?.colorImages,
+  };
 }
 
-function wantsProducts(message: string): boolean {
-  return /(bangle|bangles|kara|karray|jewel|watch|product|item|deal|dikha|show|chahi|price|rate|budget|under|kam|wholesale|retail|gift|set)/i.test(message);
+function compactReferencedProduct(product: ProductCard | null): ProductCard | null {
+  if (!product) return null;
+  return {
+    id: product.id,
+    name: product.name,
+    price: product.price,
+    originalPrice: product.originalPrice,
+    image: product.image,
+    href: product.href,
+    dealLive: product.dealLive,
+    dealLabel: product.dealLabel,
+  };
 }
 
-function productTerms(message: string): string[] {
-  const ignored = new Set(['mujhe','mery','meri','mera','koi','kuch','aur','show','dikhao','dikha','chahiye','chahi','price','rate','under','tak','se','kam','ka','ki','ke','hai','hain','please','plz','want','need','product','products','item','items']);
-  return message.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter((word) => word.length > 2 && !ignored.has(word));
+function savedReferencedProduct(value: unknown): ProductCard | null {
+  if (!value || typeof value !== 'object') return null;
+  const source = value as Record<string, unknown>;
+  const id = cleanProductId(source.id);
+  const name = cleanText(source.name, 100);
+  if (!id || !name) return null;
+  const price = safePrice(source.price);
+  const originalPrice = safePrice(source.originalPrice || price);
+  return {
+    id,
+    name,
+    price,
+    originalPrice: originalPrice || price,
+    image: cleanText(source.image, 600),
+    href: cleanText(source.href, 300) || `/product/${encodeURIComponent(id)}`,
+    dealLive: source.dealLive === true,
+    dealLabel: cleanText(source.dealLabel, 100) || undefined,
+  };
 }
 
-function isMoreProductsMessage(message: string): boolean {
-  const value = message.trim().toLowerCase();
-  return /^(aur|or|more|next|mazeed|mazid|baqi|baaki)(\s+(dikha|dikhao|show|products?|items?))?[!.?]*$/i.test(value)
-    || /^(aur|more|next)\s+(dikha|dikhao|show)/i.test(value);
+function findReferenceProduct(products: any[], id: string): any | null {
+  if (!id) return null;
+  return products.find((product) => String(product?.id || '') === id && product?.active !== false && product?.published !== false) || null;
 }
 
-function effectiveProductMessage(message: string, history: ChatMessage[]): string {
-  if (!isMoreProductsMessage(message)) return message;
-  for (const item of [...history].reverse()) {
-    if (item.role !== 'customer') continue;
-    if (!wantsProducts(item.text)) continue;
-    if (productTerms(item.text).length === 0) continue;
-    return item.text;
+function pickProducts(products: any[], intent: SalesIntent, shown: string[]): ProductCard[] {
+  return rankProductsForIntent(products, intent, shown).slice(0, SALAAR_CATEGORY_BATCH_SIZE).map(toProductCard);
+}
+
+function pickProductsByIds(products: any[], ids: string[]): ProductCard[] {
+  const map = new Map(products.map((product) => [String(product?.id || ''), product]));
+  return ids.map((id) => map.get(String(id))).filter(Boolean).slice(0, SALAAR_CATEGORY_BATCH_SIZE).map(toProductCard);
+}
+
+function priceSummary(intent: SalesIntent): string {
+  const { minPrice, maxPrice, targetPrice } = intent.filters;
+  if (minPrice != null && maxPrice != null) return `Rs ${minPrice.toLocaleString()} se Rs ${maxPrice.toLocaleString()} tak`;
+  if (maxPrice != null) return `Rs ${maxPrice.toLocaleString()} tak`;
+  if (minPrice != null) return `Rs ${minPrice.toLocaleString()} se upar`;
+  if (targetPrice != null) return `Rs ${targetPrice.toLocaleString()} ke qareeb`;
+  return '';
+}
+
+function imageMatchRequest(message: string, wasImageOnly: boolean) {
+  if (wasImageOnly) return true;
+  return /(jaisa|jaisi|same|similar|matching|match|milta|milti|available|product|option|dikha|show|chahi|find|search)/i.test(message);
+}
+
+function referenceWantsAlternatives(message: string): boolean {
+  return /(jaisa|jaisi|same|similar|matching|match|aur|more|next|dikha|show|option|doosra|dusra|sasta|mehnga|premium)/i.test(message);
+}
+
+function readableValues(value: unknown, max = 5): string[] {
+  const result: string[] = [];
+  const add = (candidate: unknown) => {
+    if (typeof candidate !== 'string') return;
+    const text = candidate.trim();
+    if (text && !result.includes(text) && result.length < max) result.push(text);
+  };
+  if (typeof value === 'string') add(value);
+  else if (Array.isArray(value)) {
+    value.forEach((item) => {
+      if (typeof item === 'string') add(item);
+      else if (item && typeof item === 'object') {
+        const source = item as Record<string, unknown>;
+        add(source.name || source.label || source.value || source.color || source.size);
+      }
+    });
   }
-  return message;
+  return result;
 }
 
-function pickProducts(products: any[], message: string, shown: string[]): ProductCard[] {
-  if (!wantsProducts(message)) return [];
-  const shownSet = new Set(shown.map(String));
-  const terms = productTerms(message);
-  const scored = products
-    .filter((p) => p && p.id != null && !shownSet.has(String(p.id)))
-    .map((p) => {
-      const hay = searchable(p);
-      const score = terms.reduce((sum, term) => sum + (hay.includes(term) ? 2 : 0), 0) + (p?.active === false ? -20 : 0);
-      return { p, score };
-    })
-    .sort((a, b) => b.score - a.score);
-  const matching = scored.filter((entry) => entry.score > 0);
-  const source = matching.length ? matching : scored;
-  return source.slice(0, SALAAR_CATEGORY_BATCH_SIZE).map(({ p }) => {
-    const price = safePrice(p?.price || p?.salePrice || p?.retailPrice);
-    const originalPrice = safePrice(p?.originalPrice || p?.compareAtPrice || p?.retailPrice || price);
-    return {
-      id: String(p.id),
-      name: productName(p),
-      price,
-      originalPrice: originalPrice || price,
-      image: productImage(p),
-      href: `/product/${encodeURIComponent(String(p.id))}`,
-      hasVariants: Boolean(p?.hasVariants || p?.variants?.length || p?.variantMatrix?.length || p?.variantColors?.length || p?.variantSizes?.length),
-      variantColors: p?.variantColors,
-      variantSizes: p?.variantSizes,
-      colors: p?.colors,
-      sizes: p?.sizes,
-      variants: p?.variants,
-      variantMatrix: p?.variantMatrix,
-      colorImages: p?.colorImages,
-    };
-  });
+function productOptionContext(product: ProductCard): string {
+  const colors = [...readableValues(product.variantColors), ...readableValues(product.colors)].slice(0, 5);
+  const sizes = [...readableValues(product.variantSizes), ...readableValues(product.sizes)].slice(0, 5);
+  const extras = [
+    colors.length ? `colors=${colors.join(',')}` : '',
+    sizes.length ? `sizes=${sizes.join(',')}` : '',
+    product.hasVariants ? 'variants=yes' : '',
+    product.dealLive ? `liveDeal=${product.dealLabel || 'yes'}` : '',
+  ].filter(Boolean);
+  return extras.length ? ` | ${extras.join(' | ')}` : '';
 }
 
-function deterministicReply(message: string, products: ProductCard[]): { text: string; needYou?: boolean; link?: { href: string; label: string } } {
+function deterministicReply(
+  message: string,
+  intent: SalesIntent,
+  products: ProductCard[],
+  knowledge: SalaarStoreKnowledge | null,
+  hasImage: boolean,
+  memory: SalaarSalesMemory,
+  referenceOnly = false,
+): { text: string; needYou?: boolean; link?: { href: string; label: string } } {
   const m = message.toLowerCase();
+
+  if (intent.kind === 'greeting') {
+    return { text: 'Wa Alaikum Assalam ji 👋 Main Salaar hoon. Jo chahiye batayein — main aapko suitable option dhoond deta hoon.' };
+  }
+  if (intent.requiresVision && !hasImage) {
+    return { text: 'Ji, image bhej dein. Main design/color/style dekh kar aapko relevant PrimeHub options guide karunga.' };
+  }
   if (/prime\s*skill|skill kya|skills?/.test(m)) {
     return { text: 'Ji, Prime Skill se practical skills start kar sakte hain. Main aapko seedha wahan le jata hoon.', link: { href: '/prime-skill', label: 'Open Prime Skill' } };
   }
-  if (/reseller|wholesale|resale/.test(m) && !products.length) {
-    return { text: 'Ji, Reseller Club wholesale/reselling ke liye hai. Aap wahan join/details dekh sakte hain.', link: { href: '/reseller-club', label: 'Open Reseller Club' } };
+  if (intent.kind === 'wholesale' && !products.length) {
+    return { text: 'Ji, wholesale/reselling ke liye PrimeHub Reseller Club available hai. Aap details dekh sakte hain.', link: { href: '/reseller-club', label: 'Open Reseller Club' } };
   }
-  if (/payment.*(stuck|masla|issue)|samajh nahi|ghussa|angry|complain|problem/.test(m)) {
+  if (intent.kind === 'support') {
     return { text: `Ji, is case mein team ko involve karte hain. WhatsApp ${WHATSAPP_NUMBER} par message kar dein.`, needYou: true };
   }
-  if (/ready|order lock|advance|300/.test(m)) {
+  if (intent.kind === 'order' && /ready|order lock|advance|300/i.test(m)) {
     return { text: 'Ji. Order lock ke liye Rs 300 advance hota hai. Ready video WhatsApp par share hoti hai, phir remaining payment aur dispatch.' };
   }
-  if (/shipping|delivery|dispatch/.test(m)) {
+  if (intent.kind === 'order' && /cart/i.test(m) && memory.cart.length) {
+    const compact = memory.cart.slice(0, 6).map((item) => `${item.name || item.productId}${item.quantity ? ` x${item.quantity}` : ''}`).join(', ');
+    return { text: `Ji, aapke current cart context mein: ${compact}. Final price/stock Ready par live verify hoga.` };
+  }
+
+  if (referenceOnly && products.length === 1) {
+    const product = products[0];
+    if (/(price|rate|kitn[aei]|pkr|rs\b|deal price|qeemat)/i.test(m)) {
+      const deal = product.dealLive ? ` Ye abhi ${product.dealLabel || 'live deal'} par hai.` : '';
+      return { text: `Ji, ${product.name} ki current price Rs. ${product.price.toLocaleString()} hai.${deal}` };
+    }
+    if (/(available|stock|maujood)/i.test(m)) {
+      return { text: `Ji, aap ${product.name} ki availability pooch rahe hain. Final stock order se pehle live verify hoga.` };
+    }
+  }
+
+  if (knowledge) {
+    const grounded = directStoreKnowledgeReply(message, knowledge);
+    if (grounded) return grounded;
+  }
+
+  if (intent.kind === 'delivery') {
     return { text: 'Ji, Pakistan delivery available hai. Final delivery/dispatch detail order aur city ke mutabiq confirm hoti hai.' };
   }
-  if (/return|exchange|refund/.test(m)) {
+  if (intent.kind === 'policy') {
     return { text: `Ji, return/exchange case item aur order condition dekh kar team confirm karti hai. Zarurat ho to ${WHATSAPP_NUMBER} par help mil jayegi.` };
   }
+  if (referenceOnly && products.length === 1) {
+    return { text: `Ji, ${products[0].name} — isi product ke bare mein pooch rahe hain. Jo detail chahiye poochain, main current product context se guide karta hoon.` };
+  }
   if (products.length) {
-    return { text: products.length > 1 ? 'Ji, ye options dekhain. Pasand aye to yahin cart mein add kar dein.' : 'Ji, ye option dekhain. Pasand aye to cart mein add kar dein.' };
+    const budget = priceSummary(intent);
+    const category = intent.filters.category || intent.filters.subcategory || intent.filters.priceBucketLabel || '';
+    const smart = intent.sortBy === 'latest' ? 'latest' : intent.sortBy === 'cheapest' ? 'sab se budget-friendly' : intent.sortBy === 'premium' ? 'premium' : intent.sortBy === 'discount' ? 'discounted' : '';
+    const detail = [category, budget, smart].filter(Boolean).join(' · ');
+    const moreText = intent.followUp.more ? 'Ji, ye next options dekhain.' : products.length > 1 ? 'Ji, ye suitable options dekhain.' : 'Ji, ye matching option dekhain.';
+    return { text: `${moreText}${detail ? ` ${detail}.` : ''} Kisi image ke bare mein poochna ho to us par reply karein.` };
   }
-  if (/^(hi|hello|hey|salam|assalam|aoa)/i.test(message.trim())) {
-    return { text: 'Wa Alaikum Assalam ji 👋 Main Salaar hoon. Bangles, jewellery, watches ya order help — jo chahiye batayein.' };
+  if (intent.wantsProducts) {
+    const budget = priceSummary(intent);
+    const detail = [intent.filters.category, intent.filters.color, intent.filters.material, intent.filters.priceBucketLabel, budget].filter(Boolean).join(' · ');
+    return { text: detail ? `Ji, ${detail} ke mutabiq abhi matching product nahi mila. Aap budget ya choice thori change kar dein, main dobara dekh leta hoon.` : 'Ji, is request ka matching product current catalog mein nahi mila. Thora detail bata dein — category, budget, color ya style — main sahi options nikal deta hoon.' };
   }
-  return { text: `Ji, main help karta hoon. Product, order, Prime Skill ya Reseller Club — jo masla hai short mein batayein. Zarurat par ${WHATSAPP_NUMBER} bhi available hai.` };
+  if (intent.kind === 'deal') {
+    return { text: 'Ji, deal ka current detail live Store Knowledge se verify karke hi batana chahiye. Deal ka naam bata dein — jaise Big Deal — main exact current detail bata deta hoon.' };
+  }
+  return { text: 'Ji, batayein aap kya dhoond rahe hain ya kis cheez mein help chahiye. Main short mein guide karta hoon.' };
 }
 
 function llmProductContext(products: ProductCard[]) {
-  // The customer can see up to 30 cards, but the LLM only needs a compact sample.
-  // This keeps token/API usage bounded even for large categories.
   return products.slice(0, 10);
 }
 
-async function callOpenAiCompatible(baseUrl: string, apiKey: string, model: string, user: string, products: ProductCard[], history: ChatMessage[]): Promise<string> {
+function llmGrounding(intent: SalesIntent, products: ProductCard[], knowledge: SalaarStoreKnowledge | null, memory: SalaarSalesMemory, catalogProducts: any[]) {
   const contextProducts = llmProductContext(products);
-  const productContext = contextProducts.length ? `\nProducts available now:\n${contextProducts.map((p) => `- ${p.name} | Rs ${p.price} | id ${p.id}`).join('\n')}` : '';
-  const response = await fetch(`${baseUrl}/chat/completions`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-    body: JSON.stringify({
-      model,
-      temperature: 0.35,
-      max_tokens: 180,
-      messages: [
-        { role: 'system', content: `${SYSTEM_PROMPT}${productContext}` },
-        ...history.slice(-8).map((m) => ({ role: m.role === 'customer' ? 'user' : 'assistant', content: m.text })),
-        { role: 'user', content: user },
-      ],
-    }),
-    cache: 'no-store',
-  });
-  if (!response.ok) throw new Error(`provider ${response.status}`);
-  const data = await response.json();
-  const text = cleanText(data?.choices?.[0]?.message?.content, 700);
-  if (!text) throw new Error('empty provider reply');
-  return text;
+  const productContext = contextProducts.length
+    ? `\nGrounded products available now:\n${contextProducts.map((p, index) => `${index + 1}. ${p.name} | Rs ${p.price} | id ${p.id}${productOptionContext(p)}`).join('\n')}`
+    : '\nNo grounded product cards are available for this turn.';
+  const knowledgeContext = knowledge
+    ? `\nStore Knowledge (safe, admin-managed, current snapshot):\n${storeKnowledgePromptContext(knowledge)}`
+    : '\nStore Knowledge is temporarily unavailable for this turn. Do not guess store facts.';
+  const memoryContext = `\nBounded Sales Memory:\n${salesMemoryPromptContext(memory, catalogProducts)}`;
+  return `\nParsed sales intent: ${intent.summary || intent.kind}. Confidence=${intent.confidence}.${productContext}${knowledgeContext}${memoryContext}`;
 }
 
-async function callGemini(apiKey: string, model: string, user: string, products: ProductCard[], history: ChatMessage[]): Promise<string> {
-  const contextProducts = llmProductContext(products);
-  const productContext = contextProducts.length ? `\nProducts available now:\n${contextProducts.map((p) => `- ${p.name} | Rs ${p.price} | id ${p.id}`).join('\n')}` : '';
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      systemInstruction: { parts: [{ text: `${SYSTEM_PROMPT}${productContext}` }] },
-      contents: [
-        ...history.slice(-8).map((m) => ({ role: m.role === 'customer' ? 'user' : 'model', parts: [{ text: m.text }] })),
-        { role: 'user', parts: [{ text: user }] },
-      ],
-      generationConfig: { temperature: 0.35, maxOutputTokens: 180 },
-    }),
-    cache: 'no-store',
+async function llmReply(
+  user: string,
+  products: ProductCard[],
+  history: ChatMessage[],
+  intent: SalesIntent,
+  knowledge: SalaarStoreKnowledge | null,
+  memory: SalaarSalesMemory,
+  catalogProducts: any[],
+  imageUrls: string[],
+): Promise<{ text: string; provider: SalaarProvider; vision: boolean }> {
+  const grounding = llmGrounding(intent, products, knowledge, memory, catalogProducts);
+  return runSalaarAi({
+    system: `${SYSTEM_PROMPT}${grounding}`,
+    user,
+    history,
+    imageUrls,
   });
-  if (!response.ok) throw new Error(`gemini ${response.status}`);
-  const data = await response.json();
-  const text = cleanText(data?.candidates?.[0]?.content?.parts?.[0]?.text, 700);
-  if (!text) throw new Error('empty Gemini reply');
-  return text;
-}
-
-async function llmReply(user: string, products: ProductCard[], history: ChatMessage[]): Promise<{ text: string; provider?: Provider }> {
-  const providers: Provider[] = ['groq', 'openrouter', 'gemini'];
-  const start = rotationCursor++;
-  for (const provider of rotated(providers, start)) {
-    const keys = rotated(providerKeys(provider), start);
-    for (const key of keys) {
-      try {
-        if (provider === 'groq') {
-          const text = await callOpenAiCompatible('https://api.groq.com/openai/v1', key, process.env.SALAAR_GROQ_MODEL || 'llama-3.3-70b-versatile', user, products, history);
-          return { text, provider };
-        }
-        if (provider === 'openrouter') {
-          const text = await callOpenAiCompatible('https://openrouter.ai/api/v1', key, process.env.SALAAR_OPENROUTER_MODEL || 'google/gemini-2.0-flash-001', user, products, history);
-          return { text, provider };
-        }
-        const text = await callGemini(key, process.env.SALAAR_GEMINI_MODEL || 'gemini-2.5-flash', user, products, history);
-        return { text, provider };
-      } catch (error) {
-        console.warn(`Salaar ${provider} key failed; rotating`, error);
-      }
-    }
-  }
-  throw new Error('No working Salaar LLM provider key');
 }
 
 async function saveMessage(sessionId: string, role: 'customer' | 'salaar', text: string, extra: Record<string, unknown> = {}) {
@@ -277,66 +368,284 @@ async function loadHistory(sessionId: string): Promise<ChatMessage[]> {
     const snap = await db.collection('salaar_conversations').doc(sessionId).collection('messages').orderBy('createdAt', 'desc').limit(30).get();
     return snap.docs.reverse().map((doc) => {
       const data = doc.data();
-      return { role: data.role === 'customer' ? 'customer' : 'salaar', text: cleanText(data.text, 1000), createdAt: data.createdAt?.toDate?.()?.toISOString?.() } as ChatMessage;
+      return {
+        role: data.role === 'customer' ? 'customer' : 'salaar',
+        text: cleanText(data.text, 1000),
+        createdAt: data.createdAt?.toDate?.()?.toISOString?.(),
+        imageUrls: sanitizeSalaarImageUrls(data.imageUrls),
+        referencedProduct: savedReferencedProduct(data.referencedProduct),
+      } as ChatMessage;
     });
   } catch {
     return [];
   }
 }
 
+async function loadStoredMemory(sessionId: string): Promise<SalaarSalesMemory> {
+  try {
+    const snap = await getAdminDb().collection('salaar_conversations').doc(sessionId).get();
+    return sanitizeSalaarSalesMemory(snap.exists ? snap.data()?.salesMemory : null);
+  } catch {
+    return emptySalaarSalesMemory();
+  }
+}
+
+async function saveStoredMemory(sessionId: string, memory: SalaarSalesMemory) {
+  try {
+    await getAdminDb().collection('salaar_conversations').doc(sessionId).set({ salesMemory: memory, updatedAt: new Date() }, { merge: true });
+  } catch (error) {
+    console.warn('Salaar sales memory persistence unavailable', error);
+  }
+}
+
+function memoryTimestamp(memory: SalaarSalesMemory) {
+  const value = Date.parse(memory.updatedAt || '');
+  return Number.isFinite(value) ? value : 0;
+}
+
+function newestMemory(stored: SalaarSalesMemory, clientValue: unknown): SalaarSalesMemory {
+  const client = sanitizeSalaarSalesMemory(clientValue);
+  return memoryTimestamp(client) > memoryTimestamp(stored) ? client : stored;
+}
+
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const sessionId = cleanText(url.searchParams.get('sessionId'), 100);
-  if (!sessionId) return NextResponse.json({ messages: [] });
-  return NextResponse.json({ messages: await loadHistory(sessionId) });
+  if (!sessionId) return NextResponse.json({ messages: [], salesMemory: emptySalaarSalesMemory() });
+  const [messages, salesMemory] = await Promise.all([loadHistory(sessionId), loadStoredMemory(sessionId)]);
+  return NextResponse.json({ messages, salesMemory });
 }
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
     const sessionId = cleanText(body?.sessionId, 100) || crypto.randomUUID();
-    const message = cleanText(body?.message, 600);
+    const imageUrls = sanitizeSalaarImageUrls(
+      Array.isArray(body?.imageUrls) ? body.imageUrls : body?.imageUrl ? [body.imageUrl] : [],
+    );
+    const customerMessage = cleanText(body?.message, 600);
+    const message = customerMessage || (imageUrls.length ? DEFAULT_IMAGE_MESSAGE : '');
     const shownProductIds = Array.isArray(body?.shownProductIds) ? body.shownProductIds.map((id: unknown) => String(id)).slice(-400) : [];
-    if (!message) return NextResponse.json({ error: 'Message required.' }, { status: 400 });
+    const cartContext = Array.isArray(body?.cartContext) ? body.cartContext.slice(0, 20) : [];
+    const requestedReferenceId = cleanProductId(body?.referencedProductId);
+    if (!message) return NextResponse.json({ error: 'Message or image required.' }, { status: 400 });
 
-    const [catalog, history] = await Promise.all([getSalaarCatalogSnapshot(), loadHistory(sessionId)]);
-    const queryMessage = effectiveProductMessage(message, history);
-    const cards = pickProducts(Array.isArray(catalog.products) ? catalog.products : [], queryMessage, shownProductIds);
-    await saveMessage(sessionId, 'customer', message);
+    const knowledgePromise = getSalaarStoreKnowledgeSnapshot().catch((error) => {
+      console.warn('Salaar Store Knowledge unavailable for this turn', error);
+      return null;
+    });
+    const [catalog, knowledge, history, storedMemory] = await Promise.all([
+      getSalaarCatalogSnapshot(),
+      knowledgePromise,
+      loadHistory(sessionId),
+      loadStoredMemory(sessionId),
+    ]);
+    const baseMemory = newestMemory(storedMemory, body?.salesMemory);
+    const catalogContext = {
+      products: Array.isArray(catalog.products) ? catalog.products : [],
+      categories: Array.isArray(catalog.categories) ? catalog.categories : [],
+      priceBuckets: knowledge?.priceBuckets || [],
+    };
+    const referencedCatalogProduct = findReferenceProduct(catalogContext.products, requestedReferenceId);
+    const referencedProductCard = referencedCatalogProduct ? toProductCard(referencedCatalogProduct) : null;
+    const memoryForTurn = referencedProductCard
+      ? sanitizeSalaarSalesMemory({
+          ...baseMemory,
+          selectedProductId: referencedProductCard.id,
+          lastShownProductIds: [
+            referencedProductCard.id,
+            ...baseMemory.lastShownProductIds.filter((id) => id !== referencedProductCard.id),
+          ].slice(0, 30),
+        })
+      : baseMemory;
 
-    const deterministic = deterministicReply(message, cards);
-    let reply = deterministic.text;
-    let provider: Provider | undefined;
+    const rawIntent = parseSalesIntent(message, catalogContext);
+    let queryMessage = effectiveProductQuery(message, history, catalogContext);
+    let intent = parseSalesIntent(queryMessage, catalogContext);
+    let visionAnalysis: SalaarVisionAnalysis | null = null;
+    let provider: SalaarProvider | undefined;
+    let visionUsed = false;
 
-    // Keep critical store flows deterministic; use LLM for natural selling/help when configured.
-    const shouldUseLlm = !deterministic.needYou && !(/prime\s*skill|reseller|payment.*(stuck|masla|issue)|ready|order lock|advance|shipping|delivery|return|exchange|refund/i.test(message));
-    if (shouldUseLlm) {
+    if (imageUrls.length > 0) {
       try {
-        const ai = await llmReply(message, cards, history);
+        const visual = await runSalaarAi({
+          system: SALAAR_VISION_ANALYSIS_SYSTEM,
+          user: message,
+          history,
+          imageUrls,
+        });
+        provider = visual.provider;
+        visionUsed = visual.vision;
+        visionAnalysis = parseSalaarVisionAnalysis(visual.text);
+
+        const visualQuery = `${customerMessage} ${visionCatalogQuery(message, visionAnalysis)}`.trim();
+        if (visualQuery) {
+          queryMessage = visualQuery;
+          intent = parseSalesIntent(visualQuery, catalogContext);
+        }
+        const wantsMatches = imageMatchRequest(customerMessage, !customerMessage);
+        intent.wantsProducts = wantsMatches;
+        if (!wantsMatches && intent.kind === 'product_search') intent.kind = rawIntent.kind === 'product_search' ? 'general' : rawIntent.kind;
+      } catch (error) {
+        console.warn('Salaar structured vision analysis unavailable; falling back to normal vision reply', error);
+      }
+    }
+
+    intent.followUp.more = rawIntent.followUp.more;
+    intent.followUp.cheaper = rawIntent.followUp.cheaper || intent.followUp.cheaper;
+    intent.followUp.pricier = rawIntent.followUp.pricier || intent.followUp.pricier;
+    intent.followUp.compare = rawIntent.followUp.compare || intent.followUp.compare;
+    if (rawIntent.followUp.referencedPosition != null) intent.followUp.referencedPosition = rawIntent.followUp.referencedPosition;
+    intent.requiresVision = Boolean(imageUrls.length || rawIntent.requiresVision || intent.requiresVision);
+    intent.needsReasoning = Boolean(intent.requiresVision || rawIntent.needsReasoning || intent.needsReasoning);
+
+    const memoryResolution = resolveSalesTurnWithMemory(message, intent, memoryForTurn, catalogContext.products);
+    intent = memoryResolution.intent;
+    const explicitReferenceOnly = Boolean(
+      referencedProductCard
+      && !referenceWantsAlternatives(message)
+      && !intent.followUp.compare
+      && imageUrls.length === 0,
+    );
+
+    let cards: ProductCard[];
+    if (explicitReferenceOnly && referencedProductCard) {
+      cards = [referencedProductCard];
+    } else if (memoryResolution.referenceOnly && memoryResolution.selectedProductId) {
+      cards = pickProductsByIds(catalogContext.products, [memoryResolution.selectedProductId]);
+    } else if (memoryResolution.comparisonProductIds.length) {
+      cards = pickProductsByIds(catalogContext.products, memoryResolution.comparisonProductIds);
+    } else {
+      cards = pickProducts(catalogContext.products, intent, shownProductIds);
+    }
+
+    const referenceOnly = explicitReferenceOnly || memoryResolution.referenceOnly;
+    const selectedProductId = referencedProductCard?.id || memoryResolution.selectedProductId;
+    const nextMemory = updateSalaarSalesMemory({
+      previous: memoryForTurn,
+      message,
+      resolvedQuery: queryMessage,
+      intent,
+      shownProductIds: cards.map((card) => card.id),
+      selectedProductId,
+      comparisonProductIds: memoryResolution.comparisonProductIds,
+      visualSearchQuery: visionAnalysis?.searchQuery || null,
+      cart: cartContext,
+      referenceOnly,
+    });
+
+    await Promise.all([
+      saveMessage(sessionId, 'customer', message, {
+        imageUrls,
+        referencedProduct: compactReferencedProduct(referencedProductCard),
+        visionAnalysis: visionAnalysis ? {
+          searchQuery: visionAnalysis.searchQuery,
+          category: visionAnalysis.category || null,
+          color: visionAnalysis.color || null,
+          material: visionAnalysis.material || null,
+          styleTerms: visionAnalysis.styleTerms,
+        } : null,
+        salesIntent: {
+          kind: rawIntent.kind,
+          confidence: rawIntent.confidence,
+          filters: rawIntent.filters,
+          followUp: rawIntent.followUp,
+          sortBy: rawIntent.sortBy,
+          requiresVision: rawIntent.requiresVision,
+          summary: rawIntent.summary,
+        },
+        salesMemoryUsed: memoryResolution.memoryUsed || Boolean(referencedProductCard),
+        knowledgeRefreshedAt: knowledge?.refreshedAt || null,
+      }),
+      saveStoredMemory(sessionId, nextMemory),
+    ]);
+
+    const deterministic = deterministicReply(message, intent, cards, knowledge, imageUrls.length > 0, nextMemory, referenceOnly);
+    let reply = deterministic.text;
+
+    if (visionAnalysis) {
+      const suffix = cards.length
+        ? ` ${cards.length === 1 ? 'Ye matching PrimeHub option dekhain.' : 'Ye matching PrimeHub options dekhain.'}`
+        : intent.wantsProducts ? ' Current catalog mein close matching option nahi mila; main exact match invent nahi karunga.' : '';
+      reply = `${visionAnalysis.reply}${suffix}`.trim();
+    } else if (!deterministic.needYou && (imageUrls.length > 0 || intentNeedsLlm(intent))) {
+      try {
+        const ai = await llmReply(message, cards, history, intent, knowledge, nextMemory, catalogContext.products, imageUrls);
         reply = ai.text;
         provider = ai.provider;
+        visionUsed = ai.vision;
       } catch {
-        // The deterministic reply keeps Salaar useful even when no provider key is configured.
+        // Grounded deterministic reply keeps Salaar useful when providers are unavailable.
       }
     }
 
     const needYou = Boolean(deterministic.needYou || /not sure|confus|payment stuck|WhatsApp 03238878009/i.test(reply));
-    await saveMessage(sessionId, 'salaar', reply, { provider: provider || 'fallback', productIds: cards.map((p) => p.id), needYou });
+    await saveMessage(sessionId, 'salaar', reply, {
+      provider: provider || 'deterministic',
+      visionUsed,
+      productIds: cards.map((p) => p.id),
+      needYou,
+      knowledgeSources: knowledge?.sources || null,
+      knowledgeRefreshedAt: knowledge?.refreshedAt || null,
+      salesMemoryUsed: memoryResolution.memoryUsed || Boolean(referencedProductCard),
+      selectedProductId: nextMemory.selectedProductId,
+      comparisonProductIds: nextMemory.comparisonProductIds,
+      visionAnalysis: visionAnalysis ? {
+        searchQuery: visionAnalysis.searchQuery,
+        category: visionAnalysis.category || null,
+        color: visionAnalysis.color || null,
+        material: visionAnalysis.material || null,
+        styleTerms: visionAnalysis.styleTerms,
+      } : null,
+      salesIntent: {
+        kind: intent.kind,
+        confidence: intent.confidence,
+        filters: intent.filters,
+        followUp: intent.followUp,
+        sortBy: intent.sortBy,
+        requiresVision: intent.requiresVision,
+        summary: intent.summary,
+      },
+    });
 
     return NextResponse.json({
       sessionId,
       reply,
       products: cards,
-      provider: provider || 'fallback',
+      provider: provider || 'deterministic',
+      visionUsed,
       needYou,
       whatsapp: needYou ? `https://wa.me/923238878009` : null,
       link: deterministic.link || null,
+      salesMemory: nextMemory,
+      salesIntent: {
+        kind: intent.kind,
+        confidence: intent.confidence,
+        filters: intent.filters,
+        followUp: intent.followUp,
+        sortBy: intent.sortBy,
+        requiresVision: intent.requiresVision,
+      },
+      vision: visionAnalysis ? {
+        searchQuery: visionAnalysis.searchQuery,
+        category: visionAnalysis.category || null,
+        color: visionAnalysis.color || null,
+        material: visionAnalysis.material || null,
+        styleTerms: visionAnalysis.styleTerms,
+      } : null,
       catalog: {
         source: catalog.source,
         batchSize: SALAAR_CATEGORY_BATCH_SIZE,
         returned: cards.length,
         refreshedAt: catalog.refreshedAt,
       },
+      storeKnowledge: knowledge ? {
+        sources: knowledge.sources,
+        refreshedAt: knowledge.refreshedAt,
+        priceBuckets: knowledge.priceBuckets.length,
+        weeklyDeals: knowledge.weeklyDeals.length,
+        hasBigDeal: Boolean(knowledge.bigDeal),
+      } : null,
     });
   } catch (error) {
     console.error('Native Salaar chat failed', error);

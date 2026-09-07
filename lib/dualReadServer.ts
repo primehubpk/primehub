@@ -4,6 +4,7 @@ import { getAdminDb } from '@/lib/firebaseAdmin';
 type ReadMode = 'firebase-primary' | 'supabase-primary' | 'firebase-only' | 'supabase-only';
 
 type CatalogSnapshot = { products: any[]; categories: any[]; source: 'firebase' | 'supabase' | 'empty' };
+type CategoriesSnapshot = { categories: any[]; source: 'firebase' | 'supabase' | 'empty' };
 type SettingsSnapshot = { documents: Record<string, any>; source: 'firebase' | 'supabase' | 'empty' };
 type SkillsSnapshot = { skills: any[]; source: 'firebase' | 'supabase' | 'empty' };
 
@@ -127,12 +128,27 @@ async function supabaseCatalog(): Promise<CatalogSnapshot> {
   };
 }
 
+async function firebaseCategories(): Promise<CategoriesSnapshot> {
+  const snap = await getAdminDb().collection('categories').get();
+  return {
+    categories: snap.docs.map((doc) => ({ id: doc.id, ...serial(doc.data()) })),
+    source: 'firebase',
+  };
+}
+
+async function supabaseCategories(): Promise<CategoriesSnapshot> {
+  const rows = await sbRows('categories');
+  return { categories: rows.map(categoryFromSupabase), source: 'supabase' };
+}
+
 async function firebaseSettings(): Promise<SettingsSnapshot> {
-  const db = getAdminDb();
-  const ids = ['main', 'general', 'policy', 'contact', 'rewards', 'reseller'];
-  const snaps = await Promise.all(ids.map((id) => db.collection('settings').doc(id).get()));
+  // Read the collection rather than a fixed document-id list. This is server-side
+  // and lets future admin-created settings documents become available to safe
+  // consumers (such as Salaar Store Knowledge) without another code deployment.
+  const snap = await getAdminDb().collection('settings').get();
   const documents: Record<string, any> = {};
-  ids.forEach((id, index) => { if (snaps[index].exists) documents[id] = serial(snaps[index].data()); });
+  for (const doc of snap.docs) documents[doc.id] = serial(doc.data());
+  if (Object.keys(documents).length === 0) throw new Error('Firebase settings read returned no rows.');
   return { documents, source: 'firebase' };
 }
 
@@ -182,6 +198,10 @@ async function withFallback<T>(firebaseRead: () => Promise<T>, supabaseRead: () 
 
 export function getDualCatalog() {
   return withFallback(firebaseCatalog, supabaseCatalog, { products: [], categories: [], source: 'empty' as const });
+}
+
+export function getDualCategories() {
+  return withFallback(firebaseCategories, supabaseCategories, { categories: [], source: 'empty' as const });
 }
 
 export function getDualSettings() {

@@ -1,6 +1,7 @@
 import 'server-only';
 import { getAdminDb } from '@/lib/firebaseAdmin';
 import { mirrorSupabaseDelete, mirrorSupabaseUpsert, recordMirrorFailure } from '@/lib/dualWriteServer';
+import { sanitizeSalaarImageUrls } from '@/lib/salaarAiRouter';
 
 function safe(value: any): any {
   if (value == null) return value;
@@ -101,6 +102,7 @@ export async function loadSupabaseSalaarHistory(sessionId: string) {
     role: row.role === 'customer' ? 'customer' : 'salaar',
     text: String(row.text || ''),
     createdAt: row.created_at || null,
+    imageUrls: sanitizeSalaarImageUrls(row?.payload?.imageUrls),
   }));
 }
 

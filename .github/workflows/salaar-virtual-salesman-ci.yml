@@ -1,0 +1,57 @@
+name: Salaar Virtual Salesman CI
+
+on:
+  push:
+    branches:
+      - feature/salaar-virtual-salesman
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Phase 2 intent smoke
+        run: node scripts/salaar-phase2-intent-smoke.mjs
+
+      - name: Phase 3 store knowledge smoke
+        run: node scripts/salaar-phase3-knowledge-smoke.mjs
+
+      - name: Phase 4 smart search smoke
+        run: node scripts/salaar-phase4-search-smoke.mjs
+
+      - name: Phase 5 vision smoke
+        run: node scripts/salaar-phase5-vision-smoke.mjs
+
+      - name: Phase 6 sales memory smoke
+        run: node scripts/salaar-phase6-memory-smoke.mjs
+
+      - name: Phase 7 admin inbox smoke
+        run: node scripts/salaar-phase7-admin-inbox-smoke.mjs
+
+      - name: Phase 8 professional salesman QA
+        run: node scripts/salaar-phase8-professional-qa.mjs
+
+      - name: Phase 9 chat experience smoke
+        run: node scripts/salaar-phase9-chat-experience-smoke.mjs
+
+      - name: Build
+        run: npm run build

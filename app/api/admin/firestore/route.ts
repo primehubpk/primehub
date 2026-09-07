@@ -25,6 +25,13 @@ function refreshCachesForCollection(name: string) {
   }
   if (name === 'settings') revalidateTag('storefront-settings');
   if (name === 'prime_skills') revalidateTag('prime-skills');
+
+  // Salaar Store Knowledge is derived from settings, categories and Prime Skills.
+  // Product changes can also affect future deal/search knowledge, so invalidate on
+  // all storefront-managed sources rather than waiting for the 15-minute safety TTL.
+  if (name === 'settings' || name === 'categories' || name === 'prime_skills' || name === 'products') {
+    revalidateTag('salaar-store-knowledge');
+  }
 }
 
 async function mirrorFinalDocument(name: string, id: string) {

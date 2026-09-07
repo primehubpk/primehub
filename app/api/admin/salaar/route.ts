@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getAdminDb } from '@/lib/firebaseAdmin';
+import { verifyPrimeHubAdminRequest } from '@/lib/adminSession';
+import { sanitizeSalaarImageUrls } from '@/lib/salaarAiRouter';
+import { sanitizeSalaarSalesMemory } from '@/lib/salaarSalesMemoryCore';
 import { POST as chatPost } from '../../salaar/chat/route';
 
 export const runtime = 'nodejs';
@@ -7,11 +10,6 @@ export const dynamic = 'force-dynamic';
 
 function cleanText(value: unknown, max = 1000): string {
   return typeof value === 'string' ? value.trim().slice(0, max) : '';
-}
-
-function isAdmin(request: Request): boolean {
-  const cookie = request.headers.get('cookie') || '';
-  return /(?:^|;\s*)primehub_admin_auth=true(?:;|$)/.test(cookie);
 }
 
 function iso(value: unknown): string | null {
@@ -22,6 +20,10 @@ function iso(value: unknown): string | null {
   }
   const date = new Date(String(value));
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
+function compactCart(value: unknown): unknown[] {
+  return Array.isArray(value) ? value.slice(0, 20) : [];
 }
 
 function cartSummary(value: any) {
@@ -60,7 +62,7 @@ async function listConversations() {
       softHoldUntil: iso(data.softHoldUntil),
       needYou: Boolean(data.needYou),
       updatedAt: iso(data.updatedAt),
-      hasPending: Boolean(cleanText(data.pendingCustomerMessage, 20)),
+      hasPending: Boolean(cleanText(data.pendingCustomerMessage, 20) || sanitizeSalaarImageUrls(data.pendingImageUrls).length),
       orderStage: cleanText(data.orderStage, 30) || null,
       advanceRequired: Math.max(0, Number(data.advanceRequired || 0)),
       cartSummary: cartSummary(data.cartSummary),
@@ -85,12 +87,13 @@ async function getThread(sessionId: string) {
       holdType: data.holdType === 'HARD' ? 'HARD' : data.holdType === 'SOFT' ? 'SOFT' : null,
       softHoldUntil: iso(data.softHoldUntil),
       needYou: Boolean(data.needYou),
-      hasPending: Boolean(cleanText(data.pendingCustomerMessage, 20)),
+      hasPending: Boolean(cleanText(data.pendingCustomerMessage, 20) || sanitizeSalaarImageUrls(data.pendingImageUrls).length),
       orderStage: cleanText(data.orderStage, 30) || null,
       advanceRequired: Math.max(0, Number(data.advanceRequired || 0)),
       cartSummary: cartSummary(data.cartSummary),
       readyAt: iso(data.readyAt),
       orderCompletedAt: iso(data.orderCompletedAt),
+      salesMemory: sanitizeSalaarSalesMemory(data.salesMemory),
     },
     messages: messages.docs.map((doc) => {
       const item = doc.data();
@@ -98,8 +101,10 @@ async function getThread(sessionId: string) {
         id: doc.id,
         role: item.role === 'customer' ? 'customer' : item.role === 'admin' ? 'admin' : 'salaar',
         text: cleanText(item.text, 2000),
+        imageUrls: sanitizeSalaarImageUrls(item.imageUrls),
         createdAt: iso(item.createdAt),
         provider: cleanText(item.provider, 40) || null,
+        visionUsed: Boolean(item.visionUsed),
         needYou: Boolean(item.needYou),
         pending: Boolean(item.pending),
         phase: cleanText(item.phase, 30) || null,
@@ -113,11 +118,15 @@ async function continueSalaar(sessionId: string) {
   const ref = db.collection('salaar_conversations').doc(sessionId);
   const snap = await ref.get();
   const data = snap.exists ? snap.data() || {} : {};
-  const pending = cleanText(data.pendingCustomerMessage, 600);
+  const imageUrls = sanitizeSalaarImageUrls(data.pendingImageUrls);
+  const pending = cleanText(data.pendingCustomerMessage, 600)
+    || (imageUrls.length ? 'Is image ko dekh kar design, color aur matching PrimeHub products ke bare mein help karein.' : '');
   const pendingDocId = cleanText(data.pendingMessageDocId, 120);
   const shownProductIds = Array.isArray(data.pendingShownProductIds)
-    ? data.pendingShownProductIds.map((id: unknown) => String(id)).slice(-100)
+    ? data.pendingShownProductIds.map((id: unknown) => String(id)).slice(-400)
     : [];
+  const salesMemory = sanitizeSalaarSalesMemory(data.pendingSalesMemory || data.salesMemory);
+  const cartContext = compactCart(data.pendingCartContext);
 
   await ref.set({
     status: 'AUTO',
@@ -125,6 +134,9 @@ async function continueSalaar(sessionId: string) {
     softHoldUntil: null,
     pendingCustomerMessage: null,
     pendingShownProductIds: [],
+    pendingImageUrls: [],
+    pendingSalesMemory: null,
+    pendingCartContext: [],
     pendingMessageDocId: null,
     needYou: false,
     updatedAt: new Date(),
@@ -136,7 +148,7 @@ async function continueSalaar(sessionId: string) {
   const synthetic = new Request('http://salaar.local/api/salaar/chat', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ sessionId, message: pending, shownProductIds }),
+    body: JSON.stringify({ sessionId, message: pending, shownProductIds, imageUrls, salesMemory, cartContext }),
   });
   const response = await chatPost(synthetic);
   const result = await response.json().catch(() => null);
@@ -145,7 +157,7 @@ async function continueSalaar(sessionId: string) {
 }
 
 export async function GET(request: Request) {
-  if (!isAdmin(request)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!await verifyPrimeHubAdminRequest(request)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   try {
     const url = new URL(request.url);
     const sessionId = cleanText(url.searchParams.get('sessionId'), 100);
@@ -158,7 +170,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  if (!isAdmin(request)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!await verifyPrimeHubAdminRequest(request)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   try {
     const body = await request.json();
     const sessionId = cleanText(body?.sessionId, 100);
@@ -184,6 +196,9 @@ export async function POST(request: Request) {
           softHoldUntil: new Date(now.getTime() + 60 * 60 * 1000),
           pendingCustomerMessage: null,
           pendingShownProductIds: [],
+          pendingImageUrls: [],
+          pendingSalesMemory: null,
+          pendingCartContext: [],
           pendingMessageDocId: null,
           needYou: false,
         }, { merge: true }),
