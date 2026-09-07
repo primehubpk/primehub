@@ -49,12 +49,13 @@ Verify on the feature branch before any main merge:
 - Vercel runtime source is inspected so a Firebase fallback is not mistaken for a successful Supabase-primary read.
 
 ## Required production environment gate
-For the intended Supabase-primary setup to be truly active on Vercel, the Vercel project must have the required Supabase server runtime variables configured. GitHub Actions environment secrets do not automatically become Vercel runtime environment variables.
+For the intended Supabase-primary setup to be truly active on Vercel, the Vercel project must have the required Supabase runtime variables configured. GitHub Actions environment secrets do not automatically become Vercel runtime environment variables.
 
-At minimum for the current server dual-read/dual-write design:
+Required for the current server dual-read/dual-write design:
 - `SUPABASE_URL`
-- `SUPABASE_SERVICE_ROLE_KEY` (server-only; never `NEXT_PUBLIC_` and never committed)
+- `SUPABASE_PUBLISHABLE_KEY` for RLS-protected public catalog/category/skill reads
+- `SUPABASE_SERVICE_ROLE_KEY` for server-only private reads and Firebase-primary -> Supabase write mirroring
 
-A publishable/anon key may be configured separately for public-read paths if desired, but it does not replace the server service-role requirement for the current admin mirror/private server reads.
+`SUPABASE_SERVICE_ROLE_KEY` must remain server-only, must never use a `NEXT_PUBLIC_` name, and must never be committed. The publishable key is not a replacement for the service-role requirement on the current private/mirroring paths.
 
 Do not merge this feature to main while Vercel reports Supabase-primary mode but serves the catalog from Firebase because Supabase runtime credentials are missing.
