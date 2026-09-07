@@ -25,6 +25,14 @@ import {
   visionCatalogQuery,
   type SalaarVisionAnalysis,
 } from '@/lib/salaarVisionCore';
+import {
+  emptySalaarSalesMemory,
+  resolveSalesTurnWithMemory,
+  salesMemoryPromptContext,
+  sanitizeSalaarSalesMemory,
+  updateSalaarSalesMemory,
+  type SalaarSalesMemory,
+} from '@/lib/salaarSalesMemoryCore';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -52,7 +60,7 @@ const WHATSAPP_NUMBER = '03238878009';
 const DEFAULT_IMAGE_MESSAGE = 'Is image ko dekh kar design, color aur matching PrimeHub products ke bare mein help karein.';
 const SYSTEM_PROMPT = `You are Salaar, a professional human-style salesman for PrimeHubMall Pakistan.
 Reply in short, natural Roman Urdu/English matching the customer's language and length. Use pyar, adab and ehtram. Never sound like a menu-driven bot and never write long AI essays.
-Think like a real salesman: understand what the customer is trying to buy or ask, use the supplied sales intent and grounded product/store context, ask one short clarification only when genuinely needed, and keep the conversation moving naturally.
+Think like a real salesman: understand what the customer is trying to buy or ask, use the supplied sales intent, bounded sales memory and grounded product/store context, ask one short clarification only when genuinely needed, and keep the conversation moving naturally.
 You help with bangles, jewellery, watches, retail/wholesale shopping, Prime Skill, Reseller Club, cart/order questions and general store help.
 Known operational flow that must stay grounded:
 - Prime Skill is PrimeHubMall's practical skill area. Send customer to /prime-skill when relevant.
@@ -62,6 +70,7 @@ Known operational flow that must stay grounded:
 Rules:
 - Never invent a price, product, stock state, policy, deal, discount or store fact that is not supplied in grounded context.
 - Treat the Store Knowledge block as current admin-managed website truth for this turn.
+- Treat Sales Memory as bounded context for follow-ups, not as authority for live price/stock.
 - If product cards are supplied below, refer to them naturally. Do not claim another product exists unless it is in grounded context.
 - If an image is supplied, inspect it carefully and answer only what can actually be inferred from the image. Never claim an exact product match unless a grounded product card supports it.
 - If a store/deal fact is not supplied, say briefly that you need the live store detail instead of guessing.
@@ -92,28 +101,34 @@ function productImage(product: any): string {
   return '';
 }
 
+function toProductCard(p: any): ProductCard {
+  const price = safePrice(p?.salePrice || p?.price || p?.retailPrice);
+  const originalPrice = safePrice(p?.originalPrice || p?.compareAtPrice || p?.retailPrice || price);
+  return {
+    id: String(p.id),
+    name: productName(p),
+    price,
+    originalPrice: originalPrice || price,
+    image: productImage(p),
+    href: `/product/${encodeURIComponent(String(p.id))}`,
+    hasVariants: Boolean(p?.hasVariants || p?.variants?.length || p?.variantMatrix?.length || p?.variantColors?.length || p?.variantSizes?.length),
+    variantColors: p?.variantColors,
+    variantSizes: p?.variantSizes,
+    colors: p?.colors,
+    sizes: p?.sizes,
+    variants: p?.variants,
+    variantMatrix: p?.variantMatrix,
+    colorImages: p?.colorImages,
+  };
+}
+
 function pickProducts(products: any[], intent: SalesIntent, shown: string[]): ProductCard[] {
-  const ranked = rankProductsForIntent(products, intent, shown).slice(0, SALAAR_CATEGORY_BATCH_SIZE);
-  return ranked.map((p) => {
-    const price = safePrice(p?.salePrice || p?.price || p?.retailPrice);
-    const originalPrice = safePrice(p?.originalPrice || p?.compareAtPrice || p?.retailPrice || price);
-    return {
-      id: String(p.id),
-      name: productName(p),
-      price,
-      originalPrice: originalPrice || price,
-      image: productImage(p),
-      href: `/product/${encodeURIComponent(String(p.id))}`,
-      hasVariants: Boolean(p?.hasVariants || p?.variants?.length || p?.variantMatrix?.length || p?.variantColors?.length || p?.variantSizes?.length),
-      variantColors: p?.variantColors,
-      variantSizes: p?.variantSizes,
-      colors: p?.colors,
-      sizes: p?.sizes,
-      variants: p?.variants,
-      variantMatrix: p?.variantMatrix,
-      colorImages: p?.colorImages,
-    };
-  });
+  return rankProductsForIntent(products, intent, shown).slice(0, SALAAR_CATEGORY_BATCH_SIZE).map(toProductCard);
+}
+
+function pickProductsByIds(products: any[], ids: string[]): ProductCard[] {
+  const map = new Map(products.map((product) => [String(product?.id || ''), product]));
+  return ids.map((id) => map.get(String(id))).filter(Boolean).slice(0, SALAAR_CATEGORY_BATCH_SIZE).map(toProductCard);
 }
 
 function priceSummary(intent: SalesIntent): string {
@@ -136,6 +151,8 @@ function deterministicReply(
   products: ProductCard[],
   knowledge: SalaarStoreKnowledge | null,
   hasImage: boolean,
+  memory: SalaarSalesMemory,
+  referenceOnly = false,
 ): { text: string; needYou?: boolean; link?: { href: string; label: string } } {
   const m = message.toLowerCase();
 
@@ -157,6 +174,10 @@ function deterministicReply(
   if (intent.kind === 'order' && /ready|order lock|advance|300/i.test(m)) {
     return { text: 'Ji. Order lock ke liye Rs 300 advance hota hai. Ready video WhatsApp par share hoti hai, phir remaining payment aur dispatch.' };
   }
+  if (intent.kind === 'order' && /cart/i.test(m) && memory.cart.length) {
+    const compact = memory.cart.slice(0, 6).map((item) => `${item.name || item.productId}${item.quantity ? ` x${item.quantity}` : ''}`).join(', ');
+    return { text: `Ji, aapke current cart context mein: ${compact}. Final price/stock Ready par live verify hoga.` };
+  }
 
   if (knowledge) {
     const grounded = directStoreKnowledgeReply(message, knowledge);
@@ -168,6 +189,9 @@ function deterministicReply(
   }
   if (intent.kind === 'policy') {
     return { text: `Ji, return/exchange case item aur order condition dekh kar team confirm karti hai. Zarurat ho to ${WHATSAPP_NUMBER} par help mil jayegi.` };
+  }
+  if (referenceOnly && products.length === 1) {
+    return { text: `Ji, ${products[0].name} — ye wala aap select kar rahe hain. Iska color/variant ya is jaisa aur chahiye ho to bata dein.` };
   }
   if (products.length) {
     const budget = priceSummary(intent);
@@ -192,7 +216,7 @@ function llmProductContext(products: ProductCard[]) {
   return products.slice(0, 10);
 }
 
-function llmGrounding(intent: SalesIntent, products: ProductCard[], knowledge: SalaarStoreKnowledge | null) {
+function llmGrounding(intent: SalesIntent, products: ProductCard[], knowledge: SalaarStoreKnowledge | null, memory: SalaarSalesMemory, catalogProducts: any[]) {
   const contextProducts = llmProductContext(products);
   const productContext = contextProducts.length
     ? `\nGrounded products available now:\n${contextProducts.map((p, index) => `${index + 1}. ${p.name} | Rs ${p.price} | id ${p.id}`).join('\n')}`
@@ -200,7 +224,8 @@ function llmGrounding(intent: SalesIntent, products: ProductCard[], knowledge: S
   const knowledgeContext = knowledge
     ? `\nStore Knowledge (safe, admin-managed, current snapshot):\n${storeKnowledgePromptContext(knowledge)}`
     : '\nStore Knowledge is temporarily unavailable for this turn. Do not guess store facts.';
-  return `\nParsed sales intent: ${intent.summary || intent.kind}. Confidence=${intent.confidence}.${productContext}${knowledgeContext}`;
+  const memoryContext = `\nBounded Sales Memory:\n${salesMemoryPromptContext(memory, catalogProducts)}`;
+  return `\nParsed sales intent: ${intent.summary || intent.kind}. Confidence=${intent.confidence}.${productContext}${knowledgeContext}${memoryContext}`;
 }
 
 async function llmReply(
@@ -209,9 +234,11 @@ async function llmReply(
   history: ChatMessage[],
   intent: SalesIntent,
   knowledge: SalaarStoreKnowledge | null,
+  memory: SalaarSalesMemory,
+  catalogProducts: any[],
   imageUrls: string[],
 ): Promise<{ text: string; provider: SalaarProvider; vision: boolean }> {
-  const grounding = llmGrounding(intent, products, knowledge);
+  const grounding = llmGrounding(intent, products, knowledge, memory, catalogProducts);
   return runSalaarAi({
     system: `${SYSTEM_PROMPT}${grounding}`,
     user,
@@ -252,11 +279,39 @@ async function loadHistory(sessionId: string): Promise<ChatMessage[]> {
   }
 }
 
+async function loadStoredMemory(sessionId: string): Promise<SalaarSalesMemory> {
+  try {
+    const snap = await getAdminDb().collection('salaar_conversations').doc(sessionId).get();
+    return sanitizeSalaarSalesMemory(snap.exists ? snap.data()?.salesMemory : null);
+  } catch {
+    return emptySalaarSalesMemory();
+  }
+}
+
+async function saveStoredMemory(sessionId: string, memory: SalaarSalesMemory) {
+  try {
+    await getAdminDb().collection('salaar_conversations').doc(sessionId).set({ salesMemory: memory, updatedAt: new Date() }, { merge: true });
+  } catch (error) {
+    console.warn('Salaar sales memory persistence unavailable', error);
+  }
+}
+
+function memoryTimestamp(memory: SalaarSalesMemory) {
+  const value = Date.parse(memory.updatedAt || '');
+  return Number.isFinite(value) ? value : 0;
+}
+
+function newestMemory(stored: SalaarSalesMemory, clientValue: unknown): SalaarSalesMemory {
+  const client = sanitizeSalaarSalesMemory(clientValue);
+  return memoryTimestamp(client) > memoryTimestamp(stored) ? client : stored;
+}
+
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const sessionId = cleanText(url.searchParams.get('sessionId'), 100);
-  if (!sessionId) return NextResponse.json({ messages: [] });
-  return NextResponse.json({ messages: await loadHistory(sessionId) });
+  if (!sessionId) return NextResponse.json({ messages: [], salesMemory: emptySalaarSalesMemory() });
+  const [messages, salesMemory] = await Promise.all([loadHistory(sessionId), loadStoredMemory(sessionId)]);
+  return NextResponse.json({ messages, salesMemory });
 }
 
 export async function POST(request: Request) {
@@ -269,17 +324,20 @@ export async function POST(request: Request) {
     const customerMessage = cleanText(body?.message, 600);
     const message = customerMessage || (imageUrls.length ? DEFAULT_IMAGE_MESSAGE : '');
     const shownProductIds = Array.isArray(body?.shownProductIds) ? body.shownProductIds.map((id: unknown) => String(id)).slice(-400) : [];
+    const cartContext = Array.isArray(body?.cartContext) ? body.cartContext.slice(0, 20) : [];
     if (!message) return NextResponse.json({ error: 'Message or image required.' }, { status: 400 });
 
     const knowledgePromise = getSalaarStoreKnowledgeSnapshot().catch((error) => {
       console.warn('Salaar Store Knowledge unavailable for this turn', error);
       return null;
     });
-    const [catalog, knowledge, history] = await Promise.all([
+    const [catalog, knowledge, history, storedMemory] = await Promise.all([
       getSalaarCatalogSnapshot(),
       knowledgePromise,
       loadHistory(sessionId),
+      loadStoredMemory(sessionId),
     ]);
+    const baseMemory = newestMemory(storedMemory, body?.salesMemory);
     const catalogContext = {
       products: Array.isArray(catalog.products) ? catalog.products : [],
       categories: Array.isArray(catalog.categories) ? catalog.categories : [],
@@ -287,7 +345,7 @@ export async function POST(request: Request) {
     };
 
     const rawIntent = parseSalesIntent(message, catalogContext);
-    const queryMessage = effectiveProductQuery(message, history, catalogContext);
+    let queryMessage = effectiveProductQuery(message, history, catalogContext);
     let intent = parseSalesIntent(queryMessage, catalogContext);
     let visionAnalysis: SalaarVisionAnalysis | null = null;
     let provider: SalaarProvider | undefined;
@@ -306,7 +364,10 @@ export async function POST(request: Request) {
         visionAnalysis = parseSalaarVisionAnalysis(visual.text);
 
         const visualQuery = `${customerMessage} ${visionCatalogQuery(message, visionAnalysis)}`.trim();
-        if (visualQuery) intent = parseSalesIntent(visualQuery, catalogContext);
+        if (visualQuery) {
+          queryMessage = visualQuery;
+          intent = parseSalesIntent(visualQuery, catalogContext);
+        }
         const wantsMatches = imageMatchRequest(customerMessage, !customerMessage);
         intent.wantsProducts = wantsMatches;
         if (!wantsMatches && intent.kind === 'product_search') intent.kind = rawIntent.kind === 'product_search' ? 'general' : rawIntent.kind;
@@ -323,29 +384,57 @@ export async function POST(request: Request) {
     intent.requiresVision = Boolean(imageUrls.length || rawIntent.requiresVision || intent.requiresVision);
     intent.needsReasoning = Boolean(intent.requiresVision || rawIntent.needsReasoning || intent.needsReasoning);
 
-    const cards = pickProducts(catalogContext.products, intent, shownProductIds);
-    await saveMessage(sessionId, 'customer', message, {
-      imageUrls,
-      visionAnalysis: visionAnalysis ? {
-        searchQuery: visionAnalysis.searchQuery,
-        category: visionAnalysis.category || null,
-        color: visionAnalysis.color || null,
-        material: visionAnalysis.material || null,
-        styleTerms: visionAnalysis.styleTerms,
-      } : null,
-      salesIntent: {
-        kind: rawIntent.kind,
-        confidence: rawIntent.confidence,
-        filters: rawIntent.filters,
-        followUp: rawIntent.followUp,
-        sortBy: rawIntent.sortBy,
-        requiresVision: rawIntent.requiresVision,
-        summary: rawIntent.summary,
-      },
-      knowledgeRefreshedAt: knowledge?.refreshedAt || null,
+    const memoryResolution = resolveSalesTurnWithMemory(message, intent, baseMemory, catalogContext.products);
+    intent = memoryResolution.intent;
+
+    let cards: ProductCard[];
+    if (memoryResolution.referenceOnly && memoryResolution.selectedProductId) {
+      cards = pickProductsByIds(catalogContext.products, [memoryResolution.selectedProductId]);
+    } else if (memoryResolution.comparisonProductIds.length) {
+      cards = pickProductsByIds(catalogContext.products, memoryResolution.comparisonProductIds);
+    } else {
+      cards = pickProducts(catalogContext.products, intent, shownProductIds);
+    }
+
+    const nextMemory = updateSalaarSalesMemory({
+      previous: baseMemory,
+      message,
+      resolvedQuery: queryMessage,
+      intent,
+      shownProductIds: cards.map((card) => card.id),
+      selectedProductId: memoryResolution.selectedProductId,
+      comparisonProductIds: memoryResolution.comparisonProductIds,
+      visualSearchQuery: visionAnalysis?.searchQuery || null,
+      cart: cartContext,
+      referenceOnly: memoryResolution.referenceOnly,
     });
 
-    const deterministic = deterministicReply(message, intent, cards, knowledge, imageUrls.length > 0);
+    await Promise.all([
+      saveMessage(sessionId, 'customer', message, {
+        imageUrls,
+        visionAnalysis: visionAnalysis ? {
+          searchQuery: visionAnalysis.searchQuery,
+          category: visionAnalysis.category || null,
+          color: visionAnalysis.color || null,
+          material: visionAnalysis.material || null,
+          styleTerms: visionAnalysis.styleTerms,
+        } : null,
+        salesIntent: {
+          kind: rawIntent.kind,
+          confidence: rawIntent.confidence,
+          filters: rawIntent.filters,
+          followUp: rawIntent.followUp,
+          sortBy: rawIntent.sortBy,
+          requiresVision: rawIntent.requiresVision,
+          summary: rawIntent.summary,
+        },
+        salesMemoryUsed: memoryResolution.memoryUsed,
+        knowledgeRefreshedAt: knowledge?.refreshedAt || null,
+      }),
+      saveStoredMemory(sessionId, nextMemory),
+    ]);
+
+    const deterministic = deterministicReply(message, intent, cards, knowledge, imageUrls.length > 0, nextMemory, memoryResolution.referenceOnly);
     let reply = deterministic.text;
 
     if (visionAnalysis) {
@@ -355,7 +444,7 @@ export async function POST(request: Request) {
       reply = `${visionAnalysis.reply}${suffix}`.trim();
     } else if (!deterministic.needYou && (imageUrls.length > 0 || intentNeedsLlm(intent))) {
       try {
-        const ai = await llmReply(message, cards, history, intent, knowledge, imageUrls);
+        const ai = await llmReply(message, cards, history, intent, knowledge, nextMemory, catalogContext.products, imageUrls);
         reply = ai.text;
         provider = ai.provider;
         visionUsed = ai.vision;
@@ -372,6 +461,9 @@ export async function POST(request: Request) {
       needYou,
       knowledgeSources: knowledge?.sources || null,
       knowledgeRefreshedAt: knowledge?.refreshedAt || null,
+      salesMemoryUsed: memoryResolution.memoryUsed,
+      selectedProductId: nextMemory.selectedProductId,
+      comparisonProductIds: nextMemory.comparisonProductIds,
       visionAnalysis: visionAnalysis ? {
         searchQuery: visionAnalysis.searchQuery,
         category: visionAnalysis.category || null,
@@ -399,6 +491,7 @@ export async function POST(request: Request) {
       needYou,
       whatsapp: needYou ? `https://wa.me/923238878009` : null,
       link: deterministic.link || null,
+      salesMemory: nextMemory,
       salesIntent: {
         kind: intent.kind,
         confidence: intent.confidence,
