@@ -1,11 +1,13 @@
 import { NextResponse } from 'next/server';
 import { getAdminDb } from '@/lib/firebaseAdmin';
+import { getLiveSalaarCatalogSnapshot } from '@/lib/salaarCatalogCache';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 const WHATSAPP_NUMBER = '03238878009';
 const FIRESTORE_TIMEOUT_MS = 5000;
+const CATALOG_TIMEOUT_MS = 10000;
 
 type CartItem = {
   id?: string | number;
@@ -65,6 +67,68 @@ function normalizeCart(value: unknown) {
   }).filter((item) => item.productId && item.price > 0);
 }
 
+function liveProductPrice(product: any): number {
+  return numberValue(product?.price || product?.salePrice || product?.retailPrice);
+}
+
+function liveProductName(product: any, fallback: string): string {
+  return cleanText(product?.title || product?.name, 160) || fallback;
+}
+
+function liveProductImage(product: any, fallback: string): string {
+  const direct = cleanText(product?.imageUrl || product?.image, 800);
+  if (direct) return direct;
+  if (Array.isArray(product?.images)) {
+    for (const raw of product.images) {
+      if (typeof raw === 'string' && raw) return cleanText(raw, 800);
+      const nested = cleanText(raw?.url || raw?.imageUrl, 800);
+      if (nested) return nested;
+    }
+  }
+  return fallback;
+}
+
+function explicitOutOfStock(product: any): boolean {
+  const raw = product?.stock;
+  if (raw === null || raw === undefined || raw === '') return false;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed <= 0;
+}
+
+async function reconcileCartWithLiveCatalog(items: ReturnType<typeof normalizeCart>) {
+  const catalog = await withTimeout(getLiveSalaarCatalogSnapshot(), 'Salaar live catalog verification', CATALOG_TIMEOUT_MS);
+  const byId = new Map((Array.isArray(catalog.products) ? catalog.products : []).map((product: any) => [String(product.id), product]));
+  const issues: string[] = [];
+  let priceAdjusted = false;
+
+  const verified = items.map((item) => {
+    const product = byId.get(String(item.productId));
+    if (!product) {
+      issues.push(`${item.name}: product not found`);
+      return item;
+    }
+    if (product.active === false) issues.push(`${item.name}: unavailable`);
+    if (explicitOutOfStock(product)) issues.push(`${item.name}: out of stock`);
+
+    const livePrice = liveProductPrice(product);
+    if (!livePrice) {
+      issues.push(`${item.name}: current price unavailable`);
+      return item;
+    }
+    if (Math.round(livePrice) !== Math.round(item.price)) priceAdjusted = true;
+
+    return {
+      ...item,
+      name: liveProductName(product, item.name),
+      price: livePrice,
+      originalPrice: numberValue(product?.originalPrice || product?.compareAtPrice || product?.retailPrice) || livePrice,
+      image: liveProductImage(product, item.image),
+    };
+  });
+
+  return { items: verified, issues, priceAdjusted, source: catalog.source };
+}
+
 function whatsappLink(sessionId: string, itemCount: number, subtotal: number) {
   const text = [
     'Assalam o Alaikum, PrimeHubMall order Ready karna hai.',
@@ -106,9 +170,9 @@ export async function POST(request: Request) {
     const body = await request.json();
     const sessionId = cleanText(body?.sessionId, 100) || crypto.randomUUID();
     const customerText = cleanText(body?.message, 600) || 'Ready';
-    const items = normalizeCart(body?.cartItems);
+    const submittedItems = normalizeCart(body?.cartItems);
 
-    if (!items.length) {
+    if (!submittedItems.length) {
       return NextResponse.json({
         sessionId,
         reply: 'Ji, Ready kar dete hain. Abhi cart empty hai — pehle product cart mein add kar dein, phir Ready bol dein.',
@@ -120,10 +184,27 @@ export async function POST(request: Request) {
       });
     }
 
+    const live = await reconcileCartWithLiveCatalog(submittedItems);
+    if (live.issues.length) {
+      return NextResponse.json({
+        sessionId,
+        reply: 'Ji, Ready se pehle latest catalog check mein ek item ka price/stock/availability confirm nahi hua. Cart ko refresh kar dein ya WhatsApp par team se confirm kar lein — order abhi lock nahi hua.',
+        provider: 'phase4-ready-live-check',
+        needYou: true,
+        orderIntentSaved: false,
+        orderStage: 'REVIEW_REQUIRED',
+        catalogSource: live.source,
+        reviewItems: live.issues.slice(0, 10),
+        whatsapp: 'https://wa.me/923238878009',
+      });
+    }
+
+    const items = live.items;
     const itemCount = items.reduce((sum, item) => sum + item.qty, 0);
     const subtotal = items.reduce((sum, item) => sum + item.price * item.qty, 0);
     const now = new Date();
-    const reply = `Ji, aapka cart Ready handoff mein aa gaya: ${itemCount} item(s), approx Rs ${Math.round(subtotal).toLocaleString('en-PK')}. Order lock Rs 300 advance ke baad team confirm karegi — abhi order final/locked nahi hua.`;
+    const priceNote = live.priceAdjusted ? ' Latest catalog price cart mein update kar di gayi hai.' : '';
+    const reply = `Ji, aapka cart Ready handoff mein aa gaya: ${itemCount} item(s), approx Rs ${Math.round(subtotal).toLocaleString('en-PK')}.${priceNote} Order lock Rs 300 advance ke baad team confirm karegi — abhi order final/locked nahi hua.`;
     const whatsapp = whatsappLink(sessionId, itemCount, subtotal);
 
     const db = getAdminDb();
@@ -142,6 +223,9 @@ export async function POST(request: Request) {
         needYou: true,
         orderStage: 'READY',
         advanceRequired: 300,
+        catalogVerifiedAt: now,
+        catalogSource: live.source,
+        priceAdjusted: live.priceAdjusted,
         cartSummary: { items, itemCount, subtotal: Math.round(subtotal) },
         readyAt: now,
         orderCompletedAt: null,
@@ -158,6 +242,8 @@ export async function POST(request: Request) {
       orderIntentSaved: true,
       orderStage: 'READY',
       advanceRequired: 300,
+      catalogSource: live.source,
+      priceAdjusted: live.priceAdjusted,
       cartSummary: { itemCount, subtotal: Math.round(subtotal) },
       whatsapp,
       opsEmail,
@@ -165,7 +251,7 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error('Salaar ready handoff failed', error);
     return NextResponse.json({
-      reply: `Ji, Ready request mil gayi lekin backend abhi save confirm nahi kar saka. WhatsApp ${WHATSAPP_NUMBER} par cart/order message kar dein — order ko locked na samjhein jab tak team confirm na kare.`,
+      reply: `Ji, Ready request mil gayi lekin latest catalog/backend abhi confirm nahi ho saka. WhatsApp ${WHATSAPP_NUMBER} par cart/order message kar dein — order ko locked na samjhein jab tak team confirm na kare.`,
       provider: 'fallback',
       needYou: true,
       orderIntentSaved: false,

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { revalidateTag } from 'next/cache';
 import { getAdminDb } from '@/lib/firebaseAdmin';
 import { mapFirebaseDocumentToSupabase, mirrorSupabaseDelete, mirrorSupabaseUpsert, recordMirrorFailure } from '@/lib/dualWriteServer';
 
@@ -15,6 +16,15 @@ function normalize(name: string, value: Record<string, any>) {
   if (name !== 'categories') return value;
   const imageUrl = typeof value.imageUrl === 'string' ? value.imageUrl : typeof value.iconUrl === 'string' ? value.iconUrl : '';
   return { ...value, imageUrl, iconUrl: typeof value.iconUrl === 'string' ? value.iconUrl : imageUrl };
+}
+
+function refreshCachesForCollection(name: string) {
+  if (name === 'products' || name === 'categories') {
+    revalidateTag('public-catalog');
+    revalidateTag('salaar-catalog');
+  }
+  if (name === 'settings') revalidateTag('storefront-settings');
+  if (name === 'prime_skills') revalidateTag('prime-skills');
 }
 
 async function mirrorFinalDocument(name: string, id: string) {
@@ -45,6 +55,7 @@ export async function POST(request: Request) {
       const ref = db.collection(name).doc();
       await ref.set({ ...normalize(name, body.value || {}), adminActor: ADMIN_EMAIL });
       await mirrorFinalDocument(name, ref.id);
+      refreshCachesForCollection(name);
       return NextResponse.json({ success: true, id: ref.id });
     }
 
@@ -52,6 +63,7 @@ export async function POST(request: Request) {
       if (!id) return NextResponse.json({ error: 'Document id is required.' }, { status: 400 });
       await db.collection(name).doc(id).update(normalize(name, body.value || {}));
       await mirrorFinalDocument(name, id);
+      refreshCachesForCollection(name);
       return NextResponse.json({ success: true, id });
     }
 
@@ -59,6 +71,7 @@ export async function POST(request: Request) {
       if (!id) return NextResponse.json({ error: 'Document id is required.' }, { status: 400 });
       await db.collection(name).doc(id).set(normalize(name, body.value || {}), { merge: true });
       await mirrorFinalDocument(name, id);
+      refreshCachesForCollection(name);
       return NextResponse.json({ success: true, id });
     }
 
@@ -70,6 +83,7 @@ export async function POST(request: Request) {
         console.error(`Admin ${name}/${id} Supabase delete mirror failed`, result.error);
         await recordMirrorFailure(name, id, 'delete', {});
       }
+      refreshCachesForCollection(name);
       return NextResponse.json({ success: true, id });
     }
 
