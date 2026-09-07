@@ -82,7 +82,7 @@ function ids(items) { return items.map((item) => item.id); }
 {
   const intent = parseSalesIntent('sab se sasti glass bangles dikhao', catalog);
   assert.equal(intent.sortBy, 'cheapest');
-  assert.deepEqual(ids(rankProductsForIntent(catalog.products, intent, [])), ['g99', 'g450', 'g1200']);
+  assert.deepEqual(ids(rankProductsForIntent(catalog.products, intent, [])), ['g99', 'g450', 'w900', 'g1200']);
 }
 {
   const intent = parseSalesIntent('in stock glass bangles dikhao', catalog);
