@@ -144,8 +144,8 @@ export async function runSalaarAi(request: SalaarAiRequest): Promise<{ text: str
         }
         if (provider === 'openrouter') {
           const model = vision
-            ? process.env.SALAAR_OPENROUTER_VISION_MODEL?.trim() || process.env.SALAAR_OPENROUTER_MODEL?.trim() || 'google/gemini-2.0-flash-001'
-            : process.env.SALAAR_OPENROUTER_MODEL?.trim() || 'google/gemini-2.0-flash-001';
+            ? process.env.SALAAR_OPENROUTER_VISION_MODEL?.trim() || process.env.SALAAR_OPENROUTER_MODEL?.trim() || 'google/gemini-2.5-flash'
+            : process.env.SALAAR_OPENROUTER_MODEL?.trim() || 'google/gemini-2.5-flash';
           const text = await callOpenAiCompatible('https://openrouter.ai/api/v1', key, model, request, images);
           return { text, provider, vision };
         }
