@@ -19,6 +19,12 @@ import {
   sanitizeSalaarImageUrls,
   type SalaarProvider,
 } from '@/lib/salaarAiRouter';
+import {
+  parseSalaarVisionAnalysis,
+  SALAAR_VISION_ANALYSIS_SYSTEM,
+  visionCatalogQuery,
+  type SalaarVisionAnalysis,
+} from '@/lib/salaarVisionCore';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -40,9 +46,10 @@ type ProductCard = {
   colorImages?: unknown;
 };
 
-type ChatMessage = { role: 'customer' | 'salaar'; text: string; createdAt?: string };
+type ChatMessage = { role: 'customer' | 'salaar'; text: string; createdAt?: string; imageUrls?: string[] };
 
 const WHATSAPP_NUMBER = '03238878009';
+const DEFAULT_IMAGE_MESSAGE = 'Is image ko dekh kar design, color aur matching PrimeHub products ke bare mein help karein.';
 const SYSTEM_PROMPT = `You are Salaar, a professional human-style salesman for PrimeHubMall Pakistan.
 Reply in short, natural Roman Urdu/English matching the customer's language and length. Use pyar, adab and ehtram. Never sound like a menu-driven bot and never write long AI essays.
 Think like a real salesman: understand what the customer is trying to buy or ask, use the supplied sales intent and grounded product/store context, ask one short clarification only when genuinely needed, and keep the conversation moving naturally.
@@ -116,6 +123,11 @@ function priceSummary(intent: SalesIntent): string {
   if (minPrice != null) return `Rs ${minPrice.toLocaleString()} se upar`;
   if (targetPrice != null) return `Rs ${targetPrice.toLocaleString()} ke qareeb`;
   return '';
+}
+
+function imageMatchRequest(message: string, wasImageOnly: boolean) {
+  if (wasImageOnly) return true;
+  return /(jaisa|jaisi|same|similar|matching|match|milta|milti|available|product|option|dikha|show|chahi|find|search)/i.test(message);
 }
 
 function deterministicReply(
@@ -228,7 +240,12 @@ async function loadHistory(sessionId: string): Promise<ChatMessage[]> {
     const snap = await db.collection('salaar_conversations').doc(sessionId).collection('messages').orderBy('createdAt', 'desc').limit(30).get();
     return snap.docs.reverse().map((doc) => {
       const data = doc.data();
-      return { role: data.role === 'customer' ? 'customer' : 'salaar', text: cleanText(data.text, 1000), createdAt: data.createdAt?.toDate?.()?.toISOString?.() } as ChatMessage;
+      return {
+        role: data.role === 'customer' ? 'customer' : 'salaar',
+        text: cleanText(data.text, 1000),
+        createdAt: data.createdAt?.toDate?.()?.toISOString?.(),
+        imageUrls: sanitizeSalaarImageUrls(data.imageUrls),
+      } as ChatMessage;
     });
   } catch {
     return [];
@@ -249,8 +266,8 @@ export async function POST(request: Request) {
     const imageUrls = sanitizeSalaarImageUrls(
       Array.isArray(body?.imageUrls) ? body.imageUrls : body?.imageUrl ? [body.imageUrl] : [],
     );
-    const message = cleanText(body?.message, 600)
-      || (imageUrls.length ? 'Is image ko dekh kar design, color aur matching PrimeHub products ke bare mein help karein.' : '');
+    const customerMessage = cleanText(body?.message, 600);
+    const message = customerMessage || (imageUrls.length ? DEFAULT_IMAGE_MESSAGE : '');
     const shownProductIds = Array.isArray(body?.shownProductIds) ? body.shownProductIds.map((id: unknown) => String(id)).slice(-400) : [];
     if (!message) return NextResponse.json({ error: 'Message or image required.' }, { status: 400 });
 
@@ -268,9 +285,36 @@ export async function POST(request: Request) {
       categories: Array.isArray(catalog.categories) ? catalog.categories : [],
       priceBuckets: knowledge?.priceBuckets || [],
     };
+
     const rawIntent = parseSalesIntent(message, catalogContext);
     const queryMessage = effectiveProductQuery(message, history, catalogContext);
-    const intent = parseSalesIntent(queryMessage, catalogContext);
+    let intent = parseSalesIntent(queryMessage, catalogContext);
+    let visionAnalysis: SalaarVisionAnalysis | null = null;
+    let provider: SalaarProvider | undefined;
+    let visionUsed = false;
+
+    if (imageUrls.length > 0) {
+      try {
+        const visual = await runSalaarAi({
+          system: SALAAR_VISION_ANALYSIS_SYSTEM,
+          user: message,
+          history,
+          imageUrls,
+        });
+        provider = visual.provider;
+        visionUsed = visual.vision;
+        visionAnalysis = parseSalaarVisionAnalysis(visual.text);
+
+        const visualQuery = `${customerMessage} ${visionCatalogQuery(message, visionAnalysis)}`.trim();
+        if (visualQuery) intent = parseSalesIntent(visualQuery, catalogContext);
+        const wantsMatches = imageMatchRequest(customerMessage, !customerMessage);
+        intent.wantsProducts = wantsMatches;
+        if (!wantsMatches && intent.kind === 'product_search') intent.kind = rawIntent.kind === 'product_search' ? 'general' : rawIntent.kind;
+      } catch (error) {
+        console.warn('Salaar structured vision analysis unavailable; falling back to normal vision reply', error);
+      }
+    }
+
     intent.followUp.more = rawIntent.followUp.more;
     intent.followUp.cheaper = rawIntent.followUp.cheaper || intent.followUp.cheaper;
     intent.followUp.pricier = rawIntent.followUp.pricier || intent.followUp.pricier;
@@ -282,6 +326,13 @@ export async function POST(request: Request) {
     const cards = pickProducts(catalogContext.products, intent, shownProductIds);
     await saveMessage(sessionId, 'customer', message, {
       imageUrls,
+      visionAnalysis: visionAnalysis ? {
+        searchQuery: visionAnalysis.searchQuery,
+        category: visionAnalysis.category || null,
+        color: visionAnalysis.color || null,
+        material: visionAnalysis.material || null,
+        styleTerms: visionAnalysis.styleTerms,
+      } : null,
       salesIntent: {
         kind: rawIntent.kind,
         confidence: rawIntent.confidence,
@@ -296,10 +347,13 @@ export async function POST(request: Request) {
 
     const deterministic = deterministicReply(message, intent, cards, knowledge, imageUrls.length > 0);
     let reply = deterministic.text;
-    let provider: SalaarProvider | undefined;
-    let visionUsed = false;
 
-    if (!deterministic.needYou && (imageUrls.length > 0 || intentNeedsLlm(intent))) {
+    if (visionAnalysis) {
+      const suffix = cards.length
+        ? ` ${cards.length === 1 ? 'Ye matching PrimeHub option dekhain.' : 'Ye matching PrimeHub options dekhain.'}`
+        : intent.wantsProducts ? ' Current catalog mein close matching option nahi mila; main exact match invent nahi karunga.' : '';
+      reply = `${visionAnalysis.reply}${suffix}`.trim();
+    } else if (!deterministic.needYou && (imageUrls.length > 0 || intentNeedsLlm(intent))) {
       try {
         const ai = await llmReply(message, cards, history, intent, knowledge, imageUrls);
         reply = ai.text;
@@ -318,6 +372,13 @@ export async function POST(request: Request) {
       needYou,
       knowledgeSources: knowledge?.sources || null,
       knowledgeRefreshedAt: knowledge?.refreshedAt || null,
+      visionAnalysis: visionAnalysis ? {
+        searchQuery: visionAnalysis.searchQuery,
+        category: visionAnalysis.category || null,
+        color: visionAnalysis.color || null,
+        material: visionAnalysis.material || null,
+        styleTerms: visionAnalysis.styleTerms,
+      } : null,
       salesIntent: {
         kind: intent.kind,
         confidence: intent.confidence,
@@ -346,6 +407,13 @@ export async function POST(request: Request) {
         sortBy: intent.sortBy,
         requiresVision: intent.requiresVision,
       },
+      vision: visionAnalysis ? {
+        searchQuery: visionAnalysis.searchQuery,
+        category: visionAnalysis.category || null,
+        color: visionAnalysis.color || null,
+        material: visionAnalysis.material || null,
+        styleTerms: visionAnalysis.styleTerms,
+      } : null,
       catalog: {
         source: catalog.source,
         batchSize: SALAAR_CATEGORY_BATCH_SIZE,
