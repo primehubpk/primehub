@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { ImagePlus, Send, ShoppingCart, X } from 'lucide-react';
 import { useCartStore } from '@/lib/cartStore';
+import { compressSalaarImageBeforeUpload } from '@/lib/salaarClientImage';
 
 type ProductCard = {
   id: string;
@@ -35,9 +36,12 @@ type UiMessage = {
 
 type PendingImage = { file: File; previewUrl: string };
 
+type ClientSalesMemory = Record<string, unknown>;
+
 const SESSION_KEY = 'primehub-salaar-session-v1';
 const MESSAGE_KEY = 'primehub-salaar-messages-v1';
 const SHOWN_KEY = 'primehub-salaar-shown-v1';
+const MEMORY_KEY = 'primehub-salaar-sales-memory-v1';
 const HUMAN_REPLY_POLL_MS = 8000;
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/avif']);
@@ -99,6 +103,7 @@ export default function SalaarNative() {
   const [sessionId, setSessionId] = useState('');
   const [messages, setMessages] = useState<UiMessage[]>([]);
   const [shownProductIds, setShownProductIds] = useState<string[]>([]);
+  const [salesMemory, setSalesMemory] = useState<ClientSalesMemory | null>(null);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [ready, setReady] = useState(false);
@@ -119,14 +124,17 @@ export default function SalaarNative() {
     setSessionId(id);
     const localMessages = loadJson<UiMessage[]>(MESSAGE_KEY, []);
     const shown = loadJson<string[]>(SHOWN_KEY, []);
+    const memory = loadJson<ClientSalesMemory | null>(MEMORY_KEY, null);
     setMessages(localMessages);
     setShownProductIds(shown);
+    setSalesMemory(memory);
     setReady(true);
 
     if (!localMessages.length) {
       fetch(`/api/salaar/dual-live?sessionId=${encodeURIComponent(id)}`, { cache: 'no-store' })
         .then((response) => response.ok ? response.json() : null)
         .then((data) => {
+          if (data?.salesMemory && typeof data.salesMemory === 'object') setSalesMemory(data.salesMemory);
           if (!Array.isArray(data?.messages) || !data.messages.length) return;
           const recovered: UiMessage[] = data.messages.map((item: any, index: number) => ({
             id: `${id}-${index}`,
@@ -148,6 +156,7 @@ export default function SalaarNative() {
         const response = await fetch(`/api/salaar/dual-live?sessionId=${encodeURIComponent(sessionId)}`, { cache: 'no-store' });
         if (!response.ok) return;
         const data = await response.json();
+        if (data?.salesMemory && typeof data.salesMemory === 'object') setSalesMemory(data.salesMemory);
         if (!Array.isArray(data?.messages)) return;
         const recovered: UiMessage[] = data.messages.map((item: any, index: number) => ({
           id: `server-${sessionId}-${index}-${String(item?.createdAt || '')}`,
@@ -177,6 +186,12 @@ export default function SalaarNative() {
   useEffect(() => {
     if (ready) localStorage.setItem(SHOWN_KEY, JSON.stringify(shownProductIds.slice(-400)));
   }, [shownProductIds, ready]);
+
+  useEffect(() => {
+    if (!ready) return;
+    if (salesMemory) localStorage.setItem(MEMORY_KEY, JSON.stringify(salesMemory));
+    else localStorage.removeItem(MEMORY_KEY);
+  }, [salesMemory, ready]);
 
   useEffect(() => {
     if (!open) return;
@@ -221,9 +236,10 @@ export default function SalaarNative() {
 
   async function uploadSelectedImage(): Promise<string | null> {
     if (!pendingImage) return null;
+    const compactFile = await compressSalaarImageBeforeUpload(pendingImage.file);
     const form = new FormData();
     form.set('sessionId', sessionId);
-    form.set('image', pendingImage.file);
+    form.set('image', compactFile);
     const response = await fetch('/api/salaar/upload-image', { method: 'POST', body: form, cache: 'no-store' });
     const data = await response.json().catch(() => ({}));
     if (!response.ok || !data?.success || typeof data?.url !== 'string') {
@@ -254,6 +270,11 @@ export default function SalaarNative() {
 
       const readyFlow = !imageUrl && isReadyIntent(text);
       const endpoint = readyFlow ? '/api/salaar/dual-ready' : '/api/salaar/dual-live';
+      const cartContext = cartItems.slice(0, 20).map((item: any) => ({
+        productId: String(item?.productId || item?.id || ''),
+        name: String(item?.name || item?.title || '').slice(0, 100),
+        quantity: Number(item?.quantity || item?.qty || 1) || 1,
+      })).filter((item) => item.productId);
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -261,12 +282,15 @@ export default function SalaarNative() {
           sessionId,
           message: text,
           shownProductIds,
+          salesMemory,
+          cartContext,
           ...(imageUrl ? { imageUrls: [imageUrl] } : {}),
           ...(readyFlow ? { cartItems } : {}),
         }),
         cache: 'no-store',
       });
       const data = await response.json();
+      if (data?.salesMemory && typeof data.salesMemory === 'object') setSalesMemory(data.salesMemory);
       if (data?.silent) return;
       const products: ProductCard[] = Array.isArray(data?.products) ? data.products : [];
       if (products.length) {
@@ -366,12 +390,12 @@ export default function SalaarNative() {
                 {message.whatsapp ? <a href={message.whatsapp} target="_blank" rel="noreferrer" className="mt-2 inline-flex rounded-full bg-[#25D366] px-3 py-1.5 text-xs font-bold text-white">WhatsApp 03238878009</a> : null}
               </div>
             ))}
-            {sending ? <div className="mr-auto rounded-2xl rounded-bl-md bg-white px-3 py-2 text-xs text-black/60 shadow-sm">{pendingImage ? 'Image upload ho rahi hai…' : 'Salaar dekh raha hai…'}</div> : null}
+            {sending ? <div className="mr-auto rounded-2xl rounded-bl-md bg-white px-3 py-2 text-xs text-black/60 shadow-sm">{pendingImage ? 'Image compress/upload ho rahi hai…' : 'Salaar dekh raha hai…'}</div> : null}
           </div>
 
           <div className="border-t border-black/10 bg-white px-3 py-3">
             {messages.length === 0 ? <div className="mb-2 flex gap-2 overflow-x-auto pb-1 text-[11px]"><button onClick={() => void sendMessage(undefined, 'Bangles dikhao')} className="shrink-0 rounded-full bg-black/5 px-3 py-1.5 font-semibold">Bangles dikhao</button><button onClick={() => void sendMessage(undefined, 'Prime Skill kya hai?')} className="shrink-0 rounded-full bg-black/5 px-3 py-1.5 font-semibold">Prime Skill?</button><button onClick={() => void sendMessage(undefined, 'Reseller Club kya hai?')} className="shrink-0 rounded-full bg-black/5 px-3 py-1.5 font-semibold">Reseller Club?</button></div> : null}
-            {pendingImage ? <div className="mb-2 flex items-center gap-2 rounded-2xl border border-black/10 bg-[#fafaf7] p-2"><img src={pendingImage.previewUrl} alt="Selected for Salaar" className="h-16 w-16 rounded-xl object-cover" /><div className="min-w-0 flex-1"><div className="truncate text-xs font-bold text-black">Image ready</div><div className="mt-0.5 text-[11px] text-black/55">Salaar image dekh kar jawab dega.</div></div><button type="button" onClick={clearPendingImage} disabled={sending} className="grid h-8 w-8 place-items-center rounded-full bg-black/5 text-black/60" aria-label="Remove selected image"><X size={15} /></button></div> : null}
+            {pendingImage ? <div className="mb-2 flex items-center gap-2 rounded-2xl border border-black/10 bg-[#fafaf7] p-2"><img src={pendingImage.previewUrl} alt="Selected for Salaar" className="h-16 w-16 rounded-xl object-cover" /><div className="min-w-0 flex-1"><div className="truncate text-xs font-bold text-black">Image ready</div><div className="mt-0.5 text-[11px] text-black/55">Auto-compress ho kar Salaar vision ko jayegi.</div></div><button type="button" onClick={clearPendingImage} disabled={sending} className="grid h-8 w-8 place-items-center rounded-full bg-black/5 text-black/60" aria-label="Remove selected image"><X size={15} /></button></div> : null}
             {imageError ? <div className="mb-2 text-xs font-semibold text-red-600">{imageError}</div> : null}
             <form onSubmit={(event) => void sendMessage(event)} className="flex items-end gap-2">
               <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/avif" className="hidden" onChange={(event) => chooseImage(event.target.files?.[0])} />
