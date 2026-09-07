@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { ImagePlus, Menu, Send, ShoppingCart, X } from 'lucide-react';
+import { ImagePlus, Maximize2, Menu, Minimize2, Minus, Reply, Send, X } from 'lucide-react';
 import { useCartStore } from '@/lib/cartStore';
 import { compressSalaarImageBeforeUpload } from '@/lib/salaarClientImage';
 import SalaarAdminInbox from '@/components/salaar/SalaarAdminInbox';
@@ -14,6 +14,8 @@ type ProductCard = {
   originalPrice: number;
   image: string;
   href: string;
+  dealLive?: boolean;
+  dealLabel?: string;
   hasVariants?: boolean;
   variantColors?: unknown;
   variantSizes?: unknown;
@@ -30,6 +32,7 @@ type UiMessage = {
   text: string;
   imageUrls?: string[];
   products?: ProductCard[];
+  referencedProduct?: ProductCard | null;
   needYou?: boolean;
   whatsapp?: string | null;
   link?: { href: string; label: string } | null;
@@ -37,6 +40,7 @@ type UiMessage = {
 
 type PendingImage = { file: File; previewUrl: string };
 type ClientSalesMemory = Record<string, unknown>;
+type LightboxState = { url: string; label: string } | null;
 
 const SESSION_KEY = 'primehub-salaar-session-v1';
 const MESSAGE_KEY = 'primehub-salaar-messages-v1';
@@ -70,6 +74,28 @@ function safeMessageImages(value: unknown): string[] {
     .slice(0, 2);
 }
 
+function safeProduct(value: unknown): ProductCard | null {
+  if (!value || typeof value !== 'object') return null;
+  const source = value as Record<string, unknown>;
+  const id = String(source.id || '').trim();
+  const name = String(source.name || source.title || '').trim().slice(0, 120);
+  if (!id || !name) return null;
+  const price = Number(source.price || 0);
+  const originalPrice = Number(source.originalPrice || price || 0);
+  const image = typeof source.image === 'string' ? source.image : '';
+  const href = typeof source.href === 'string' && source.href ? source.href : `/product/${encodeURIComponent(id)}`;
+  return {
+    id,
+    name,
+    price: Number.isFinite(price) ? price : 0,
+    originalPrice: Number.isFinite(originalPrice) ? originalPrice : 0,
+    image,
+    href,
+    dealLive: source.dealLive === true,
+    dealLabel: typeof source.dealLabel === 'string' ? source.dealLabel.slice(0, 100) : undefined,
+  };
+}
+
 function mergeServerMessages(current: UiMessage[], incoming: UiMessage[]): UiMessage[] {
   const next = [...current];
   for (const item of incoming) {
@@ -100,6 +126,7 @@ function SalaarAvatar({ compact = false }: { compact?: boolean }) {
 
 export default function SalaarNative() {
   const [open, setOpen] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const [sessionId, setSessionId] = useState('');
   const [messages, setMessages] = useState<UiMessage[]>([]);
   const [shownProductIds, setShownProductIds] = useState<string[]>([]);
@@ -111,11 +138,11 @@ export default function SalaarNative() {
   const [imageError, setImageError] = useState('');
   const [adminAuthenticated, setAdminAuthenticated] = useState(false);
   const [adminInboxOpen, setAdminInboxOpen] = useState(false);
+  const [referencedProduct, setReferencedProduct] = useState<ProductCard | null>(null);
+  const [lightbox, setLightbox] = useState<LightboxState>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cartItems = useCartStore((state) => state.items);
-  const addItem = useCartStore((state) => state.addItem);
-  const openVariantModal = useCartStore((state) => state.openVariantModal);
 
   useEffect(() => {
     let id = localStorage.getItem(SESSION_KEY) || '';
@@ -125,11 +152,9 @@ export default function SalaarNative() {
     }
     setSessionId(id);
     const localMessages = loadJson<UiMessage[]>(MESSAGE_KEY, []);
-    const shown = loadJson<string[]>(SHOWN_KEY, []);
-    const memory = loadJson<ClientSalesMemory | null>(MEMORY_KEY, null);
     setMessages(localMessages);
-    setShownProductIds(shown);
-    setSalesMemory(memory);
+    setShownProductIds(loadJson<string[]>(SHOWN_KEY, []));
+    setSalesMemory(loadJson<ClientSalesMemory | null>(MEMORY_KEY, null));
     setReady(true);
 
     if (!localMessages.length) {
@@ -143,6 +168,7 @@ export default function SalaarNative() {
             role: item?.role === 'customer' ? 'customer' : 'salaar',
             text: String(item?.text || ''),
             imageUrls: safeMessageImages(item?.imageUrls),
+            referencedProduct: safeProduct(item?.referencedProduct),
           })).filter((item: UiMessage) => item.text);
           setMessages(recovered);
         })
@@ -184,6 +210,7 @@ export default function SalaarNative() {
           role: item?.role === 'customer' ? 'customer' : 'salaar',
           text: String(item?.text || ''),
           imageUrls: safeMessageImages(item?.imageUrls),
+          referencedProduct: safeProduct(item?.referencedProduct),
         })).filter((item: UiMessage) => item.text);
         setMessages((current) => mergeServerMessages(current, recovered));
       } catch {
@@ -220,17 +247,35 @@ export default function SalaarNative() {
       if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }, 50);
     return () => window.clearTimeout(timer);
-  }, [messages, sending, open, adminInboxOpen]);
+  }, [messages, sending, open, adminInboxOpen, expanded]);
 
   useEffect(() => () => {
     if (pendingImage?.previewUrl) URL.revokeObjectURL(pendingImage.previewUrl);
   }, [pendingImage]);
+
+  useEffect(() => {
+    if (!lightbox) return;
+    const currentState = typeof history.state === 'object' && history.state ? history.state : {};
+    history.pushState({ ...currentState, salaarImageViewer: true }, '');
+    const onPopState = () => setLightbox(null);
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, [lightbox?.url]);
 
   const welcome = useMemo<UiMessage>(() => ({
     id: 'welcome',
     role: 'salaar',
     text: 'Assalam o Alaikum ji 👋 Main Salaar hoon. Product, order, Prime Skill ya Reseller Club — bata dein kya help chahiye?',
   }), []);
+
+  function openImage(url: string, label: string) {
+    if (url) setLightbox({ url, label });
+  }
+
+  function closeImage() {
+    if (typeof history !== 'undefined' && history.state?.salaarImageViewer) history.back();
+    else setLightbox(null);
+  }
 
   function clearPendingImage() {
     setPendingImage((current) => {
@@ -273,6 +318,7 @@ export default function SalaarNative() {
     event?.preventDefault();
     const text = (preset ?? input).trim();
     if ((!text && !pendingImage) || sending || !sessionId) return;
+    const quoted = referencedProduct;
     setSending(true);
     setImageError('');
 
@@ -281,11 +327,13 @@ export default function SalaarNative() {
       imageUrl = await uploadSelectedImage();
       const customerText = text || (imageUrl ? 'Image bheji hai — isko dekh kar guide karein.' : '');
       setInput('');
+      setReferencedProduct(null);
       setMessages((current) => [...current, {
         id: randomId(),
         role: 'customer',
         text: customerText,
         imageUrls: imageUrl ? [imageUrl] : [],
+        referencedProduct: quoted,
       }]);
       if (imageUrl) clearPendingImage();
 
@@ -305,6 +353,7 @@ export default function SalaarNative() {
           shownProductIds,
           salesMemory,
           cartContext,
+          ...(quoted ? { referencedProductId: quoted.id } : {}),
           ...(imageUrl ? { imageUrls: [imageUrl] } : {}),
           ...(readyFlow ? { cartItems } : {}),
         }),
@@ -328,8 +377,10 @@ export default function SalaarNative() {
       }]);
     } catch (error) {
       const detail = error instanceof Error ? error.message : '';
-      if (!imageUrl && pendingImage) setImageError(detail || 'Image upload nahi ho saki. Dobara try karein.');
-      else {
+      if (!imageUrl && pendingImage) {
+        setImageError(detail || 'Image upload nahi ho saki. Dobara try karein.');
+        if (quoted) setReferencedProduct(quoted);
+      } else {
         setMessages((current) => [...current, {
           id: randomId(),
           role: 'salaar',
@@ -343,109 +394,106 @@ export default function SalaarNative() {
     }
   }
 
-  function addProduct(product: ProductCard) {
-    if (product.hasVariants) {
-      const opened = openVariantModal({
-        id: product.id,
-        name: product.name,
-        title: product.name,
-        price: product.price,
-        originalPrice: product.originalPrice,
-        image: product.image,
-        imageUrl: product.image,
-        hasVariants: true,
-        variantColors: product.variantColors as any,
-        variantSizes: product.variantSizes as any,
-        colors: product.colors as any,
-        sizes: product.sizes as any,
-        variants: product.variants as any,
-        variantMatrix: product.variantMatrix as any,
-        colorImages: product.colorImages as any,
-      }, 'cart');
-      if (opened) return;
-    }
-    addItem({
-      id: `salaar:${product.id}`,
-      productId: product.id,
-      name: product.name,
-      price: product.price,
-      originalPrice: product.originalPrice || product.price,
-      image: product.image,
-      imageUrl: product.image,
-    });
-  }
-
   const renderedMessages = messages.length ? messages : [welcome];
   if (!ready) return null;
 
   return (
-    <div className="fixed bottom-24 right-3 z-[95] md:bottom-5 md:right-5">
-      {open ? (
-        <section className="flex h-[min(72vh,620px)] w-[min(94vw,390px)] flex-col overflow-hidden rounded-[24px] border border-black/10 bg-white shadow-2xl">
-          <header className="flex items-center justify-between border-b border-black/5 bg-white px-4 py-3 text-[#171712]">
-            <div className="flex min-w-0 items-center gap-3">
-              <SalaarAvatar compact />
-              <div className="min-w-0">
-                <div className="truncate text-sm font-black tracking-tight">Salaar · PrimeHubMall</div>
-                <div className="mt-0.5 flex items-center gap-1.5 text-[11px] font-semibold text-emerald-700">
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                  {adminInboxOpen ? 'Admin inbox · secure session' : 'Professional sales help · online'}
+    <>
+      <div className="fixed bottom-24 right-3 z-[95] md:bottom-5 md:right-5">
+        {open ? (
+          <section className={`flex flex-col overflow-hidden border border-black/10 bg-white shadow-2xl transition-[width,height] duration-200 ${expanded ? 'h-[min(90vh,820px)] w-[min(96vw,760px)] rounded-[26px]' : 'h-[min(72vh,620px)] w-[min(94vw,390px)] rounded-[24px]'}`}>
+            <header className="flex items-center justify-between border-b border-black/5 bg-white px-3 py-3 text-[#171712] sm:px-4">
+              <div className="flex min-w-0 items-center gap-3">
+                <SalaarAvatar compact />
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-black tracking-tight">Salaar · PrimeHubMall</div>
+                  <div className="mt-0.5 flex items-center gap-1.5 text-[11px] font-semibold text-emerald-700">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                    {adminInboxOpen ? 'Admin inbox · secure session' : 'Professional sales help · online'}
+                  </div>
                 </div>
               </div>
-            </div>
-            <div className="flex items-center gap-1">
-              {adminAuthenticated ? <button type="button" onClick={() => setAdminInboxOpen((value) => !value)} className={`grid h-9 w-9 shrink-0 place-items-center rounded-full transition ${adminInboxOpen ? 'bg-[#14140F] text-white' : 'bg-black/5 text-black/70 hover:bg-black/10'}`} aria-label={adminInboxOpen ? 'Back to Salaar chat' : 'Open all Salaar chats'}><Menu size={18} /></button> : null}
-              <button type="button" onClick={() => { setAdminInboxOpen(false); setOpen(false); }} className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-black/5 text-black/70 transition hover:bg-black/10" aria-label="Close Salaar chat"><X size={18} /></button>
-            </div>
-          </header>
-
-          {adminInboxOpen && adminAuthenticated ? (
-            <SalaarAdminInbox onBackToCustomerChat={() => setAdminInboxOpen(false)} />
-          ) : (
-            <>
-              <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto bg-[#f7f6f1] px-3 py-4">
-                {renderedMessages.map((message) => (
-                  <div key={message.id} className={message.role === 'customer' ? 'ml-auto max-w-[84%]' : 'mr-auto max-w-[94%]'}>
-                    {message.imageUrls?.length ? <div className={`mb-1.5 grid gap-1 overflow-hidden rounded-2xl ${message.imageUrls.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}>{message.imageUrls.map((url) => <img key={url} src={url} alt="Customer shared" className="max-h-52 w-full bg-white object-cover" loading="lazy" />)}</div> : null}
-                    <div className={message.role === 'customer' ? 'rounded-2xl rounded-br-md bg-[#0d7468] px-3 py-2 text-sm leading-5 text-white' : 'rounded-2xl rounded-bl-md border border-black/5 bg-white px-3 py-2 text-sm leading-5 text-[#171712] shadow-sm'}>{message.text}</div>
-                    {message.products?.length ? <div className="mt-2 space-y-2">{message.products.map((product) => (
-                      <div key={product.id} className="flex gap-2 rounded-2xl border border-black/10 bg-white p-2 shadow-sm">
-                        {product.image ? <img src={product.image} alt={product.name} className="h-20 w-20 shrink-0 rounded-xl object-cover" /> : <div className="grid h-20 w-20 shrink-0 place-items-center rounded-xl bg-black/5 text-xs">Product</div>}
-                        <div className="min-w-0 flex-1"><Link href={product.href} className="line-clamp-2 text-xs font-bold leading-4 text-black">{product.name}</Link><div className="mt-1 text-sm font-black text-[#d9342b]">Rs. {product.price.toLocaleString()}</div><button type="button" onClick={() => addProduct(product)} className="mt-2 inline-flex items-center gap-1 rounded-full bg-[#14140f] px-3 py-1.5 text-[11px] font-bold text-white"><ShoppingCart size={13} /> Add to cart</button></div>
-                      </div>
-                    ))}</div> : null}
-                    {message.link ? <Link href={message.link.href} className="mt-2 inline-flex rounded-full border border-[#0d7468]/30 bg-white px-3 py-1.5 text-xs font-bold text-[#0d7468]">{message.link.label}</Link> : null}
-                    {message.whatsapp ? <a href={message.whatsapp} target="_blank" rel="noreferrer" className="mt-2 inline-flex rounded-full bg-[#25D366] px-3 py-1.5 text-xs font-bold text-white">WhatsApp 03238878009</a> : null}
-                  </div>
-                ))}
-                {sending ? <div className="mr-auto rounded-2xl rounded-bl-md bg-white px-3 py-2 text-xs text-black/60 shadow-sm">{pendingImage ? 'Image compress/upload ho rahi hai…' : 'Salaar dekh raha hai…'}</div> : null}
+              <div className="flex items-center gap-1">
+                {adminAuthenticated ? <button type="button" onClick={() => setAdminInboxOpen((value) => !value)} className={`grid h-8 w-8 shrink-0 place-items-center rounded-full transition ${adminInboxOpen ? 'bg-[#14140F] text-white' : 'bg-black/5 text-black/70 hover:bg-black/10'}`} aria-label={adminInboxOpen ? 'Back to Salaar chat' : 'Open all Salaar chats'}><Menu size={16} /></button> : null}
+                <button type="button" onClick={() => setOpen(false)} className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-black/5 text-black/65 hover:bg-black/10" aria-label="Minimize Salaar chat"><Minus size={16} /></button>
+                <button type="button" onClick={() => setExpanded((value) => !value)} className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-black/5 text-black/65 hover:bg-black/10" aria-label={expanded ? 'Return Salaar chat to normal size' : 'Expand Salaar chat'}>{expanded ? <Minimize2 size={15} /> : <Maximize2 size={15} />}</button>
+                <button type="button" onClick={() => { setAdminInboxOpen(false); setExpanded(false); setOpen(false); }} className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-black/5 text-black/65 hover:bg-black/10" aria-label="Close Salaar chat"><X size={16} /></button>
               </div>
+            </header>
 
-              <div className="border-t border-black/10 bg-white px-3 py-3">
-                {messages.length === 0 ? <div className="mb-2 flex gap-2 overflow-x-auto pb-1 text-[11px]"><button onClick={() => void sendMessage(undefined, 'Bangles dikhao')} className="shrink-0 rounded-full bg-black/5 px-3 py-1.5 font-semibold">Bangles dikhao</button><button onClick={() => void sendMessage(undefined, 'Prime Skill kya hai?')} className="shrink-0 rounded-full bg-black/5 px-3 py-1.5 font-semibold">Prime Skill?</button><button onClick={() => void sendMessage(undefined, 'Reseller Club kya hai?')} className="shrink-0 rounded-full bg-black/5 px-3 py-1.5 font-semibold">Reseller Club?</button></div> : null}
-                {pendingImage ? <div className="mb-2 flex items-center gap-2 rounded-2xl border border-black/10 bg-[#fafaf7] p-2"><img src={pendingImage.previewUrl} alt="Selected for Salaar" className="h-16 w-16 rounded-xl object-cover" /><div className="min-w-0 flex-1"><div className="truncate text-xs font-bold text-black">Image ready</div><div className="mt-0.5 text-[11px] text-black/55">Auto-compress ho kar Salaar vision ko jayegi.</div></div><button type="button" onClick={clearPendingImage} disabled={sending} className="grid h-8 w-8 place-items-center rounded-full bg-black/5 text-black/60" aria-label="Remove selected image"><X size={15} /></button></div> : null}
-                {imageError ? <div className="mb-2 text-xs font-semibold text-red-600">{imageError}</div> : null}
-                <form onSubmit={(event) => void sendMessage(event)} className="flex items-end gap-2">
-                  <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/avif" className="hidden" onChange={(event) => chooseImage(event.target.files?.[0])} />
-                  <button type="button" onClick={() => fileInputRef.current?.click()} disabled={sending} className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-black/10 bg-[#fafaf7] text-[#0d7468] disabled:opacity-40" aria-label="Send image to Salaar"><ImagePlus size={19} /></button>
-                  <textarea value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void sendMessage(); } }} rows={1} maxLength={600} placeholder={pendingImage ? 'Image ke bare mein poochain…' : 'Salaar se poochain…'} className="max-h-24 min-h-11 flex-1 resize-none rounded-2xl border border-black/10 bg-[#fafaf7] px-3 py-3 text-sm outline-none focus:border-[#0d7468]" />
-                  <button type="submit" disabled={(!input.trim() && !pendingImage) || sending} className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[#0d7468] text-white disabled:opacity-40" aria-label="Send message"><Send size={18} /></button>
-                </form>
-              </div>
-            </>
-          )}
-        </section>
-      ) : (
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          className="group relative grid h-14 w-14 place-items-center rounded-full bg-white shadow-[0_10px_30px_rgba(0,0,0,0.22)] ring-1 ring-black/10 transition hover:-translate-y-0.5 hover:shadow-[0_14px_34px_rgba(0,0,0,0.26)]"
-          aria-label="Open Salaar help"
-        >
-          <span className="absolute -top-8 right-0 whitespace-nowrap rounded-full border border-black/10 bg-white px-2.5 py-1 text-[11px] font-bold text-[#171712] shadow-sm">Need help?</span>
-          <SalaarAvatar />
-        </button>
-      )}
-    </div>
+            {adminInboxOpen && adminAuthenticated ? (
+              <SalaarAdminInbox onBackToCustomerChat={() => setAdminInboxOpen(false)} />
+            ) : (
+              <>
+                <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto bg-[#f7f6f1] px-3 py-4">
+                  {renderedMessages.map((message) => (
+                    <div key={message.id} className={message.role === 'customer' ? 'ml-auto max-w-[86%]' : 'mr-auto max-w-[96%]'}>
+                      {message.referencedProduct ? (
+                        <div className={`mb-1.5 flex items-center gap-2 rounded-xl border px-2 py-1.5 text-xs ${message.role === 'customer' ? 'border-white/30 bg-[#0a6158] text-white' : 'border-black/10 bg-white text-black'}`}>
+                          {message.referencedProduct.image ? <button type="button" onClick={() => openImage(message.referencedProduct!.image, message.referencedProduct!.name)}><img src={message.referencedProduct.image} alt="Referenced product" className="h-10 w-10 rounded-lg object-cover" /></button> : null}
+                          <div className="min-w-0"><div className="truncate font-bold">{message.referencedProduct.name}</div><div className="opacity-75">Rs. {message.referencedProduct.price.toLocaleString()}</div></div>
+                        </div>
+                      ) : null}
+                      {message.imageUrls?.length ? (
+                        <div className={`mb-1.5 grid gap-1 overflow-hidden rounded-2xl ${message.imageUrls.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                          {message.imageUrls.map((url) => <button type="button" key={url} onClick={() => openImage(url, 'Shared image')} className="block overflow-hidden"><img src={url} alt="Customer shared" className="max-h-52 w-full bg-white object-cover transition hover:scale-[1.01]" loading="lazy" /></button>)}
+                        </div>
+                      ) : null}
+                      <div className={message.role === 'customer' ? 'rounded-2xl rounded-br-md bg-[#0d7468] px-3 py-2 text-sm leading-5 text-white' : 'rounded-2xl rounded-bl-md border border-black/5 bg-white px-3 py-2 text-sm leading-5 text-[#171712] shadow-sm'}>{message.text}</div>
+                      {message.products?.length ? (
+                        <div className={`mt-2 grid gap-2 ${expanded ? 'grid-cols-2 sm:grid-cols-3' : 'grid-cols-2'}`}>
+                          {message.products.map((product) => (
+                            <article key={product.id} className="overflow-hidden rounded-2xl border border-black/10 bg-white shadow-sm">
+                              <div className="relative aspect-square bg-[#f1f0eb]">
+                                {product.image ? <button type="button" onClick={() => openImage(product.image, product.name)} className="h-full w-full"><img src={product.image} alt={product.name} className="h-full w-full object-cover" loading="lazy" /></button> : <div className="grid h-full w-full place-items-center text-xs text-black/40">Product</div>}
+                                <button type="button" onClick={() => setReferencedProduct(product)} className="absolute right-2 top-2 grid h-8 w-8 place-items-center rounded-full bg-white/95 text-[#0d7468] shadow ring-1 ring-black/10" aria-label={`Ask Salaar about ${product.name}`}><Reply size={14} /></button>
+                                {product.dealLive ? <span className="absolute bottom-2 left-2 rounded-full bg-[#E1352B] px-2 py-1 text-[8px] font-black text-white">LIVE DEAL</span> : null}
+                              </div>
+                              <div className="p-2.5">
+                                <Link href={product.href} className="line-clamp-2 text-[11px] font-bold leading-4 text-black">{product.name}</Link>
+                                <div className="mt-1 flex flex-wrap items-baseline gap-1.5"><span className="text-sm font-black text-[#d9342b]">Rs. {product.price.toLocaleString()}</span>{product.originalPrice > product.price ? <span className="text-[9px] text-black/35 line-through">Rs. {product.originalPrice.toLocaleString()}</span> : null}</div>
+                                <button type="button" onClick={() => setReferencedProduct(product)} className="mt-2 inline-flex items-center gap-1 text-[10px] font-bold text-[#0d7468]"><Reply size={12} /> Ask about this</button>
+                              </div>
+                            </article>
+                          ))}
+                        </div>
+                      ) : null}
+                      {message.link ? <Link href={message.link.href} className="mt-2 inline-flex rounded-full border border-[#0d7468]/30 bg-white px-3 py-1.5 text-xs font-bold text-[#0d7468]">{message.link.label}</Link> : null}
+                      {message.whatsapp ? <a href={message.whatsapp} target="_blank" rel="noreferrer" className="mt-2 inline-flex rounded-full bg-[#25D366] px-3 py-1.5 text-xs font-bold text-white">WhatsApp 03238878009</a> : null}
+                    </div>
+                  ))}
+                  {sending ? <div className="mr-auto rounded-2xl rounded-bl-md bg-white px-3 py-2 text-xs text-black/60 shadow-sm">{pendingImage ? 'Image compress/upload ho rahi hai…' : 'Salaar dekh raha hai…'}</div> : null}
+                </div>
+
+                <div className="border-t border-black/10 bg-white px-3 py-3">
+                  {messages.length === 0 ? <div className="mb-2 flex gap-2 overflow-x-auto pb-1 text-[11px]"><button onClick={() => void sendMessage(undefined, 'Bangles dikhao')} className="shrink-0 rounded-full bg-black/5 px-3 py-1.5 font-semibold">Bangles dikhao</button><button onClick={() => void sendMessage(undefined, 'Prime Skill kya hai?')} className="shrink-0 rounded-full bg-black/5 px-3 py-1.5 font-semibold">Prime Skill?</button><button onClick={() => void sendMessage(undefined, 'Reseller Club kya hai?')} className="shrink-0 rounded-full bg-black/5 px-3 py-1.5 font-semibold">Reseller Club?</button></div> : null}
+                  {referencedProduct ? <div className="mb-2 flex items-center gap-2 rounded-2xl border-l-4 border-[#0d7468] bg-[#f6f7f3] p-2"><button type="button" onClick={() => referencedProduct.image && openImage(referencedProduct.image, referencedProduct.name)}>{referencedProduct.image ? <img src={referencedProduct.image} alt="Referenced product" className="h-12 w-12 rounded-lg object-cover" /> : null}</button><div className="min-w-0 flex-1"><div className="text-[10px] font-bold text-[#0d7468]">Replying to product</div><div className="truncate text-xs font-bold text-black">{referencedProduct.name}</div><div className="text-[11px] text-black/55">Rs. {referencedProduct.price.toLocaleString()}</div></div><button type="button" onClick={() => setReferencedProduct(null)} className="grid h-8 w-8 place-items-center rounded-full bg-black/5 text-black/60" aria-label="Cancel product reply"><X size={14} /></button></div> : null}
+                  {pendingImage ? <div className="mb-2 flex items-center gap-2 rounded-2xl border border-black/10 bg-[#fafaf7] p-2"><button type="button" onClick={() => openImage(pendingImage.previewUrl, 'Selected image')}><img src={pendingImage.previewUrl} alt="Selected for Salaar" className="h-16 w-16 rounded-xl object-cover" /></button><div className="min-w-0 flex-1"><div className="truncate text-xs font-bold text-black">Image ready</div><div className="mt-0.5 text-[11px] text-black/55">Auto-compress ho kar Salaar vision ko jayegi.</div></div><button type="button" onClick={clearPendingImage} disabled={sending} className="grid h-8 w-8 place-items-center rounded-full bg-black/5 text-black/60" aria-label="Remove selected image"><X size={15} /></button></div> : null}
+                  {imageError ? <div className="mb-2 text-xs font-semibold text-red-600">{imageError}</div> : null}
+                  <form onSubmit={(event) => void sendMessage(event)} className="flex items-end gap-2">
+                    <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/avif" className="hidden" onChange={(event) => chooseImage(event.target.files?.[0])} />
+                    <button type="button" onClick={() => fileInputRef.current?.click()} disabled={sending} className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-black/10 bg-[#fafaf7] text-[#0d7468] disabled:opacity-40" aria-label="Send image to Salaar"><ImagePlus size={19} /></button>
+                    <textarea value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void sendMessage(); } }} rows={1} maxLength={600} placeholder={referencedProduct ? 'Is product ke bare mein poochain…' : pendingImage ? 'Image ke bare mein poochain…' : 'Salaar se poochain…'} className="max-h-24 min-h-11 flex-1 resize-none rounded-2xl border border-black/10 bg-[#fafaf7] px-3 py-3 text-sm outline-none focus:border-[#0d7468]" />
+                    <button type="submit" disabled={(!input.trim() && !pendingImage) || sending} className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[#0d7468] text-white disabled:opacity-40" aria-label="Send message"><Send size={18} /></button>
+                  </form>
+                </div>
+              </>
+            )}
+          </section>
+        ) : (
+          <button type="button" onClick={() => setOpen(true)} className="group relative grid h-14 w-14 place-items-center rounded-full bg-white shadow-[0_10px_30px_rgba(0,0,0,0.22)] ring-1 ring-black/10 transition hover:-translate-y-0.5 hover:shadow-[0_14px_34px_rgba(0,0,0,0.26)]" aria-label="Open Salaar help">
+            <span className="absolute -top-8 right-0 whitespace-nowrap rounded-full border border-black/10 bg-white px-2.5 py-1 text-[11px] font-bold text-[#171712] shadow-sm">Need help?</span>
+            <SalaarAvatar />
+          </button>
+        )}
+      </div>
+
+      {lightbox ? (
+        <div className="fixed inset-0 z-[140] flex items-center justify-center bg-black/95 p-3" role="dialog" aria-modal="true" aria-label="Image viewer">
+          <button type="button" onClick={closeImage} className="absolute right-4 top-4 grid h-11 w-11 place-items-center rounded-full bg-white/15 text-white backdrop-blur" aria-label="Close image viewer"><X size={24} /></button>
+          <img src={lightbox.url} alt={lightbox.label} className="max-h-[92vh] max-w-[96vw] object-contain" />
+        </div>
+      ) : null}
+    </>
   );
 }
