@@ -223,7 +223,7 @@ function hasExplicitSearchFilter(filters: SalaarMemoryFilters): boolean {
 function followUpCue(message: string, intent: MemoryIntent): boolean {
   const value = normalize(message);
   if (intent.followUp.more || intent.followUp.cheaper || intent.followUp.pricier || intent.followUp.referencedPosition != null) return true;
-  if (/\b(?:isko|is ko|iss ko|isi|same|usko|uss ko|wala|wali|jaisa|jaisi|similar|aur isi|same category|same design)\b/i.test(value)) return true;
+  if (/\b(?:isko|is ko|iss ko|iska|iski|iske|is ka|is ki|is ke|iss ka|iss ki|iss ke|isi|same|usko|uss ko|uska|uski|uske|wala|wali|jaisa|jaisi|similar|aur isi|same category|same design)\b/i.test(value)) return true;
   if ((intent.filters.color || intent.filters.material) && !intent.filters.category && value.split(' ').length <= 8) return true;
   return false;
 }
