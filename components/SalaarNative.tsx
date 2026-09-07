@@ -2,9 +2,10 @@
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { ImagePlus, Send, ShoppingCart, X } from 'lucide-react';
+import { ImagePlus, Menu, Send, ShoppingCart, X } from 'lucide-react';
 import { useCartStore } from '@/lib/cartStore';
 import { compressSalaarImageBeforeUpload } from '@/lib/salaarClientImage';
+import SalaarAdminInbox from '@/components/salaar/SalaarAdminInbox';
 
 type ProductCard = {
   id: string;
@@ -35,7 +36,6 @@ type UiMessage = {
 };
 
 type PendingImage = { file: File; previewUrl: string };
-
 type ClientSalesMemory = Record<string, unknown>;
 
 const SESSION_KEY = 'primehub-salaar-session-v1';
@@ -109,6 +109,8 @@ export default function SalaarNative() {
   const [ready, setReady] = useState(false);
   const [pendingImage, setPendingImage] = useState<PendingImage | null>(null);
   const [imageError, setImageError] = useState('');
+  const [adminAuthenticated, setAdminAuthenticated] = useState(false);
+  const [adminInboxOpen, setAdminInboxOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cartItems = useCartStore((state) => state.items);
@@ -149,7 +151,26 @@ export default function SalaarNative() {
   }, []);
 
   useEffect(() => {
-    if (!open || !sessionId) return;
+    if (!open) return;
+    let active = true;
+    fetch('/api/admin/session', { cache: 'no-store' })
+      .then((response) => response.json().catch(() => null))
+      .then((data) => {
+        if (!active) return;
+        const isAdmin = data?.authenticated === true;
+        setAdminAuthenticated(isAdmin);
+        if (!isAdmin) setAdminInboxOpen(false);
+      })
+      .catch(() => {
+        if (!active) return;
+        setAdminAuthenticated(false);
+        setAdminInboxOpen(false);
+      });
+    return () => { active = false; };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open || !sessionId || adminInboxOpen) return;
     const poll = async () => {
       if (document.visibilityState !== 'visible') return;
       try {
@@ -177,7 +198,7 @@ export default function SalaarNative() {
       window.clearInterval(timer);
       document.removeEventListener('visibilitychange', onVisibility);
     };
-  }, [open, sessionId]);
+  }, [open, sessionId, adminInboxOpen]);
 
   useEffect(() => {
     if (ready) localStorage.setItem(MESSAGE_KEY, JSON.stringify(messages.slice(-60)));
@@ -194,12 +215,12 @@ export default function SalaarNative() {
   }, [salesMemory, ready]);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || adminInboxOpen) return;
     const timer = window.setTimeout(() => {
       if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }, 50);
     return () => window.clearTimeout(timer);
-  }, [messages, sending, open]);
+  }, [messages, sending, open, adminInboxOpen]);
 
   useEffect(() => () => {
     if (pendingImage?.previewUrl) URL.revokeObjectURL(pendingImage.previewUrl);
@@ -368,42 +389,51 @@ export default function SalaarNative() {
                 <div className="truncate text-sm font-black tracking-tight">Salaar · PrimeHubMall</div>
                 <div className="mt-0.5 flex items-center gap-1.5 text-[11px] font-semibold text-emerald-700">
                   <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                  Professional sales help · online
+                  {adminInboxOpen ? 'Admin inbox · secure session' : 'Professional sales help · online'}
                 </div>
               </div>
             </div>
-            <button type="button" onClick={() => setOpen(false)} className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-black/5 text-black/70 transition hover:bg-black/10" aria-label="Close Salaar chat"><X size={18} /></button>
+            <div className="flex items-center gap-1">
+              {adminAuthenticated ? <button type="button" onClick={() => setAdminInboxOpen((value) => !value)} className={`grid h-9 w-9 shrink-0 place-items-center rounded-full transition ${adminInboxOpen ? 'bg-[#14140F] text-white' : 'bg-black/5 text-black/70 hover:bg-black/10'}`} aria-label={adminInboxOpen ? 'Back to Salaar chat' : 'Open all Salaar chats'}><Menu size={18} /></button> : null}
+              <button type="button" onClick={() => { setAdminInboxOpen(false); setOpen(false); }} className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-black/5 text-black/70 transition hover:bg-black/10" aria-label="Close Salaar chat"><X size={18} /></button>
+            </div>
           </header>
 
-          <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto bg-[#f7f6f1] px-3 py-4">
-            {renderedMessages.map((message) => (
-              <div key={message.id} className={message.role === 'customer' ? 'ml-auto max-w-[84%]' : 'mr-auto max-w-[94%]'}>
-                {message.imageUrls?.length ? <div className={`mb-1.5 grid gap-1 overflow-hidden rounded-2xl ${message.imageUrls.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}>{message.imageUrls.map((url) => <img key={url} src={url} alt="Customer shared" className="max-h-52 w-full bg-white object-cover" loading="lazy" />)}</div> : null}
-                <div className={message.role === 'customer' ? 'rounded-2xl rounded-br-md bg-[#0d7468] px-3 py-2 text-sm leading-5 text-white' : 'rounded-2xl rounded-bl-md border border-black/5 bg-white px-3 py-2 text-sm leading-5 text-[#171712] shadow-sm'}>{message.text}</div>
-                {message.products?.length ? <div className="mt-2 space-y-2">{message.products.map((product) => (
-                  <div key={product.id} className="flex gap-2 rounded-2xl border border-black/10 bg-white p-2 shadow-sm">
-                    {product.image ? <img src={product.image} alt={product.name} className="h-20 w-20 shrink-0 rounded-xl object-cover" /> : <div className="grid h-20 w-20 shrink-0 place-items-center rounded-xl bg-black/5 text-xs">Product</div>}
-                    <div className="min-w-0 flex-1"><Link href={product.href} className="line-clamp-2 text-xs font-bold leading-4 text-black">{product.name}</Link><div className="mt-1 text-sm font-black text-[#d9342b]">Rs. {product.price.toLocaleString()}</div><button type="button" onClick={() => addProduct(product)} className="mt-2 inline-flex items-center gap-1 rounded-full bg-[#14140f] px-3 py-1.5 text-[11px] font-bold text-white"><ShoppingCart size={13} /> Add to cart</button></div>
+          {adminInboxOpen && adminAuthenticated ? (
+            <SalaarAdminInbox onBackToCustomerChat={() => setAdminInboxOpen(false)} />
+          ) : (
+            <>
+              <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto bg-[#f7f6f1] px-3 py-4">
+                {renderedMessages.map((message) => (
+                  <div key={message.id} className={message.role === 'customer' ? 'ml-auto max-w-[84%]' : 'mr-auto max-w-[94%]'}>
+                    {message.imageUrls?.length ? <div className={`mb-1.5 grid gap-1 overflow-hidden rounded-2xl ${message.imageUrls.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}>{message.imageUrls.map((url) => <img key={url} src={url} alt="Customer shared" className="max-h-52 w-full bg-white object-cover" loading="lazy" />)}</div> : null}
+                    <div className={message.role === 'customer' ? 'rounded-2xl rounded-br-md bg-[#0d7468] px-3 py-2 text-sm leading-5 text-white' : 'rounded-2xl rounded-bl-md border border-black/5 bg-white px-3 py-2 text-sm leading-5 text-[#171712] shadow-sm'}>{message.text}</div>
+                    {message.products?.length ? <div className="mt-2 space-y-2">{message.products.map((product) => (
+                      <div key={product.id} className="flex gap-2 rounded-2xl border border-black/10 bg-white p-2 shadow-sm">
+                        {product.image ? <img src={product.image} alt={product.name} className="h-20 w-20 shrink-0 rounded-xl object-cover" /> : <div className="grid h-20 w-20 shrink-0 place-items-center rounded-xl bg-black/5 text-xs">Product</div>}
+                        <div className="min-w-0 flex-1"><Link href={product.href} className="line-clamp-2 text-xs font-bold leading-4 text-black">{product.name}</Link><div className="mt-1 text-sm font-black text-[#d9342b]">Rs. {product.price.toLocaleString()}</div><button type="button" onClick={() => addProduct(product)} className="mt-2 inline-flex items-center gap-1 rounded-full bg-[#14140f] px-3 py-1.5 text-[11px] font-bold text-white"><ShoppingCart size={13} /> Add to cart</button></div>
+                      </div>
+                    ))}</div> : null}
+                    {message.link ? <Link href={message.link.href} className="mt-2 inline-flex rounded-full border border-[#0d7468]/30 bg-white px-3 py-1.5 text-xs font-bold text-[#0d7468]">{message.link.label}</Link> : null}
+                    {message.whatsapp ? <a href={message.whatsapp} target="_blank" rel="noreferrer" className="mt-2 inline-flex rounded-full bg-[#25D366] px-3 py-1.5 text-xs font-bold text-white">WhatsApp 03238878009</a> : null}
                   </div>
-                ))}</div> : null}
-                {message.link ? <Link href={message.link.href} className="mt-2 inline-flex rounded-full border border-[#0d7468]/30 bg-white px-3 py-1.5 text-xs font-bold text-[#0d7468]">{message.link.label}</Link> : null}
-                {message.whatsapp ? <a href={message.whatsapp} target="_blank" rel="noreferrer" className="mt-2 inline-flex rounded-full bg-[#25D366] px-3 py-1.5 text-xs font-bold text-white">WhatsApp 03238878009</a> : null}
+                ))}
+                {sending ? <div className="mr-auto rounded-2xl rounded-bl-md bg-white px-3 py-2 text-xs text-black/60 shadow-sm">{pendingImage ? 'Image compress/upload ho rahi hai…' : 'Salaar dekh raha hai…'}</div> : null}
               </div>
-            ))}
-            {sending ? <div className="mr-auto rounded-2xl rounded-bl-md bg-white px-3 py-2 text-xs text-black/60 shadow-sm">{pendingImage ? 'Image compress/upload ho rahi hai…' : 'Salaar dekh raha hai…'}</div> : null}
-          </div>
 
-          <div className="border-t border-black/10 bg-white px-3 py-3">
-            {messages.length === 0 ? <div className="mb-2 flex gap-2 overflow-x-auto pb-1 text-[11px]"><button onClick={() => void sendMessage(undefined, 'Bangles dikhao')} className="shrink-0 rounded-full bg-black/5 px-3 py-1.5 font-semibold">Bangles dikhao</button><button onClick={() => void sendMessage(undefined, 'Prime Skill kya hai?')} className="shrink-0 rounded-full bg-black/5 px-3 py-1.5 font-semibold">Prime Skill?</button><button onClick={() => void sendMessage(undefined, 'Reseller Club kya hai?')} className="shrink-0 rounded-full bg-black/5 px-3 py-1.5 font-semibold">Reseller Club?</button></div> : null}
-            {pendingImage ? <div className="mb-2 flex items-center gap-2 rounded-2xl border border-black/10 bg-[#fafaf7] p-2"><img src={pendingImage.previewUrl} alt="Selected for Salaar" className="h-16 w-16 rounded-xl object-cover" /><div className="min-w-0 flex-1"><div className="truncate text-xs font-bold text-black">Image ready</div><div className="mt-0.5 text-[11px] text-black/55">Auto-compress ho kar Salaar vision ko jayegi.</div></div><button type="button" onClick={clearPendingImage} disabled={sending} className="grid h-8 w-8 place-items-center rounded-full bg-black/5 text-black/60" aria-label="Remove selected image"><X size={15} /></button></div> : null}
-            {imageError ? <div className="mb-2 text-xs font-semibold text-red-600">{imageError}</div> : null}
-            <form onSubmit={(event) => void sendMessage(event)} className="flex items-end gap-2">
-              <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/avif" className="hidden" onChange={(event) => chooseImage(event.target.files?.[0])} />
-              <button type="button" onClick={() => fileInputRef.current?.click()} disabled={sending} className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-black/10 bg-[#fafaf7] text-[#0d7468] disabled:opacity-40" aria-label="Send image to Salaar"><ImagePlus size={19} /></button>
-              <textarea value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void sendMessage(); } }} rows={1} maxLength={600} placeholder={pendingImage ? 'Image ke bare mein poochain…' : 'Salaar se poochain…'} className="max-h-24 min-h-11 flex-1 resize-none rounded-2xl border border-black/10 bg-[#fafaf7] px-3 py-3 text-sm outline-none focus:border-[#0d7468]" />
-              <button type="submit" disabled={(!input.trim() && !pendingImage) || sending} className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[#0d7468] text-white disabled:opacity-40" aria-label="Send message"><Send size={18} /></button>
-            </form>
-          </div>
+              <div className="border-t border-black/10 bg-white px-3 py-3">
+                {messages.length === 0 ? <div className="mb-2 flex gap-2 overflow-x-auto pb-1 text-[11px]"><button onClick={() => void sendMessage(undefined, 'Bangles dikhao')} className="shrink-0 rounded-full bg-black/5 px-3 py-1.5 font-semibold">Bangles dikhao</button><button onClick={() => void sendMessage(undefined, 'Prime Skill kya hai?')} className="shrink-0 rounded-full bg-black/5 px-3 py-1.5 font-semibold">Prime Skill?</button><button onClick={() => void sendMessage(undefined, 'Reseller Club kya hai?')} className="shrink-0 rounded-full bg-black/5 px-3 py-1.5 font-semibold">Reseller Club?</button></div> : null}
+                {pendingImage ? <div className="mb-2 flex items-center gap-2 rounded-2xl border border-black/10 bg-[#fafaf7] p-2"><img src={pendingImage.previewUrl} alt="Selected for Salaar" className="h-16 w-16 rounded-xl object-cover" /><div className="min-w-0 flex-1"><div className="truncate text-xs font-bold text-black">Image ready</div><div className="mt-0.5 text-[11px] text-black/55">Auto-compress ho kar Salaar vision ko jayegi.</div></div><button type="button" onClick={clearPendingImage} disabled={sending} className="grid h-8 w-8 place-items-center rounded-full bg-black/5 text-black/60" aria-label="Remove selected image"><X size={15} /></button></div> : null}
+                {imageError ? <div className="mb-2 text-xs font-semibold text-red-600">{imageError}</div> : null}
+                <form onSubmit={(event) => void sendMessage(event)} className="flex items-end gap-2">
+                  <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/avif" className="hidden" onChange={(event) => chooseImage(event.target.files?.[0])} />
+                  <button type="button" onClick={() => fileInputRef.current?.click()} disabled={sending} className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-black/10 bg-[#fafaf7] text-[#0d7468] disabled:opacity-40" aria-label="Send image to Salaar"><ImagePlus size={19} /></button>
+                  <textarea value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void sendMessage(); } }} rows={1} maxLength={600} placeholder={pendingImage ? 'Image ke bare mein poochain…' : 'Salaar se poochain…'} className="max-h-24 min-h-11 flex-1 resize-none rounded-2xl border border-black/10 bg-[#fafaf7] px-3 py-3 text-sm outline-none focus:border-[#0d7468]" />
+                  <button type="submit" disabled={(!input.trim() && !pendingImage) || sending} className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[#0d7468] text-white disabled:opacity-40" aria-label="Send message"><Send size={18} /></button>
+                </form>
+              </div>
+            </>
+          )}
         </section>
       ) : (
         <button
