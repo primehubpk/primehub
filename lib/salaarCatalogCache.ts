@@ -60,13 +60,22 @@ function compactCategory(category: any) {
 
 async function loadSalaarCatalog() {
   const result = await getDualCatalog();
+  const products = (Array.isArray(result.products) ? result.products : [])
+    .filter((product) => product?.id != null)
+    .map(compactProduct);
+  const categories = (Array.isArray(result.categories) ? result.categories : [])
+    .filter((category) => category?.id != null)
+    .map(compactCategory);
+
+  // A transient dual-backend outage must never become a valid 15-minute cache entry.
+  // Throwing keeps "empty because both sources failed" distinct from real catalog data.
+  if (result.source === 'empty' || products.length === 0) {
+    throw new Error('Salaar catalog unavailable from all configured sources.');
+  }
+
   return {
-    products: (Array.isArray(result.products) ? result.products : [])
-      .filter((product) => product?.id != null)
-      .map(compactProduct),
-    categories: (Array.isArray(result.categories) ? result.categories : [])
-      .filter((category) => category?.id != null)
-      .map(compactCategory),
+    products,
+    categories,
     source: result.source,
     refreshedAt: new Date().toISOString(),
   };
@@ -74,7 +83,7 @@ async function loadSalaarCatalog() {
 
 export const getSalaarCatalogSnapshot = unstable_cache(
   loadSalaarCatalog,
-  ['primehub-salaar-catalog-v1'],
+  ['primehub-salaar-catalog-v2'],
   {
     revalidate: SALAAR_CATALOG_REVALIDATE_SECONDS,
     tags: ['salaar-catalog'],
