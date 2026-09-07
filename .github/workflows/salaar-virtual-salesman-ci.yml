@@ -32,5 +32,8 @@ jobs:
       - name: Phase 2 intent smoke
         run: node scripts/salaar-phase2-intent-smoke.mjs
 
+      - name: Phase 3 store knowledge smoke
+        run: node scripts/salaar-phase3-knowledge-smoke.mjs
+
       - name: Build
         run: npm run build
