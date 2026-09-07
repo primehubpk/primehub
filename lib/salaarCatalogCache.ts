@@ -36,6 +36,9 @@ function compactProduct(product: any) {
     price: product?.price,
     salePrice: product?.salePrice,
     retailPrice: product?.retailPrice,
+    normalPrice: product?.normalPrice,
+    dealPrice: product?.dealPrice,
+    dealDay: serialText(product?.dealDay, 40),
     originalPrice: product?.originalPrice,
     compareAtPrice: product?.compareAtPrice,
     stock: product?.stock ?? product?.quantity,
@@ -96,7 +99,7 @@ async function loadSalaarCatalog() {
 
 export const getSalaarCatalogSnapshot = unstable_cache(
   loadSalaarCatalog,
-  ['primehub-salaar-catalog-v3'],
+  ['primehub-salaar-catalog-v4'],
   {
     revalidate: SALAAR_CATALOG_REVALIDATE_SECONDS,
     tags: ['salaar-catalog'],
