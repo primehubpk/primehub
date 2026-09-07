@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getAdminAuth, getAdminDb } from '@/lib/firebaseAdmin';
 import { reviewResellerTaskClaim, reviewResellerWithdrawal } from '@/lib/resellerServer';
+import { mirrorResellerDocAndProfile, mirrorResellerFirestoreDoc } from '@/lib/resellerDualMirror';
 
 export const runtime = 'nodejs';
 const ADMIN_UID = process.env.FIREBASE_ADMIN_UID || '';
@@ -44,9 +45,12 @@ export async function POST(request: Request) {
     if (kind === 'task') {
       if (!['approve', 'reject'].includes(action)) return NextResponse.json({ error: 'Invalid task action.' }, { status: 400 });
       await reviewResellerTaskClaim(id, action as 'approve' | 'reject', String(body?.adminNote || '').trim());
+      await mirrorResellerDocAndProfile('reseller_task_claims', id);
+      if (action === 'approve') await mirrorResellerFirestoreDoc('reseller_point_ledger', id);
     } else {
       if (!['approve', 'reject', 'paid'].includes(action)) return NextResponse.json({ error: 'Invalid withdrawal action.' }, { status: 400 });
       await reviewResellerWithdrawal(id, action as 'approve' | 'reject' | 'paid', String(body?.adminNote || '').trim());
+      await mirrorResellerDocAndProfile('reseller_withdrawals', id);
     }
     return NextResponse.json({ ok: true, id, action });
   } catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : 'Unable to review record.' }, { status: 400 }); }

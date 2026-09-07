@@ -1,10 +1,8 @@
 // lib/useSettings.ts
-// Shared live storefront settings reader. The admin panel writes settings/main, settings/policy and settings/contact.
+// Shared storefront settings reader. Phase 4 routes reads through the server-side dual backend layer.
 'use client';
 
 import { useEffect, useState } from 'react';
-import { doc, onSnapshot } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
 import { SiteSettings } from '@/lib/types';
 
 const DEFAULT_SETTINGS: SiteSettings = {
@@ -46,50 +44,59 @@ function resolveRotatingBigDeal(settings: RawSettings): RawSettings {
   return { ...settings, dailyDeal: { ...dailyDeal, imageUrl } };
 }
 
+function buildSettings(documents: Record<string, any>): SiteSettings {
+  const mainData = (documents.main || {}) as RawSettings;
+  const legacyData = (documents.general || {}) as RawSettings;
+  const policyData = (documents.policy || {}) as RawPolicy;
+  const contactData = (documents.contact || {}) as RawContact;
+  const merged: RawSettings = resolveRotatingBigDeal({ ...DEFAULT_SETTINGS, ...legacyData, ...mainData });
+  const mainWhatsApp = typeof mainData.whatsappNumber === 'string' ? mainData.whatsappNumber : '';
+  const contactWhatsApp = typeof contactData.whatsappNumber === 'string' ? contactData.whatsappNumber : '';
+  const privacyPolicy = typeof policyData.privacyPolicy === 'string' ? policyData.privacyPolicy : DEFAULT_SETTINGS.policies?.privacyPolicy?.content || '';
+  const returnPolicy = typeof policyData.returnPolicy === 'string' ? policyData.returnPolicy : DEFAULT_SETTINGS.policies?.returnPolicy?.content || '';
+
+  return {
+    ...merged,
+    announcementText: resolveAnnouncement(mainData, legacyData),
+    whatsappNumber: contactWhatsApp || mainWhatsApp || DEFAULT_SETTINGS.whatsappNumber,
+    contact: {
+      whatsappNumber: contactWhatsApp || mainWhatsApp || '',
+      email: typeof contactData.email === 'string' ? contactData.email : '',
+      physicalAddress: typeof contactData.physicalAddress === 'string' ? contactData.physicalAddress : '',
+    },
+    policies: {
+      ...DEFAULT_SETTINGS.policies,
+      ...(merged.policies || {}),
+      privacyPolicy: { title: 'Privacy Policy', content: privacyPolicy },
+      returnPolicy: { title: 'Return Policy', content: returnPolicy },
+    },
+  } as SiteSettings;
+}
+
 export function useSettings() {
   const [settings, setSettings] = useState<SiteSettings>(DEFAULT_SETTINGS);
   const [loading, setLoading] = useState(true);
-  useEffect(() => {
-    let mainData: RawSettings = {};
-    let legacyData: RawSettings = {};
-    let policyData: RawPolicy = {};
-    let contactData: RawContact = {};
-    let mainReady = false;
-    let policyReady = false;
-    let contactReady = false;
 
-    const publish = () => {
-      const merged: RawSettings = resolveRotatingBigDeal({ ...DEFAULT_SETTINGS, ...legacyData, ...mainData });
-      const mainWhatsApp = typeof mainData.whatsappNumber === 'string' ? mainData.whatsappNumber : '';
-      const contactWhatsApp = typeof contactData.whatsappNumber === 'string' ? contactData.whatsappNumber : '';
-      const privacyPolicy = typeof policyData.privacyPolicy === 'string' ? policyData.privacyPolicy : DEFAULT_SETTINGS.policies?.privacyPolicy?.content || '';
-      const returnPolicy = typeof policyData.returnPolicy === 'string' ? policyData.returnPolicy : DEFAULT_SETTINGS.policies?.returnPolicy?.content || '';
-      setSettings({
-        ...merged,
-        announcementText: resolveAnnouncement(mainData, legacyData),
-        whatsappNumber: contactWhatsApp || mainWhatsApp || DEFAULT_SETTINGS.whatsappNumber,
-        contact: {
-          whatsappNumber: contactWhatsApp || mainWhatsApp || '',
-          email: typeof contactData.email === 'string' ? contactData.email : '',
-          physicalAddress: typeof contactData.physicalAddress === 'string' ? contactData.physicalAddress : '',
-        },
-        policies: {
-          ...DEFAULT_SETTINGS.policies,
-          ...(merged.policies || {}),
-          privacyPolicy: { title: 'Privacy Policy', content: privacyPolicy },
-          returnPolicy: { title: 'Return Policy', content: returnPolicy },
-        },
-      } as SiteSettings);
-      if (mainReady && policyReady && contactReady) setLoading(false);
+  useEffect(() => {
+    let cancelled = false;
+
+    const load = async () => {
+      try {
+        const response = await fetch('/api/storefront/read?type=settings', { cache: 'no-store' });
+        if (!response.ok) throw new Error(`settings read ${response.status}`);
+        const data = await response.json();
+        if (!cancelled) setSettings(buildSettings(data?.documents || {}));
+      } catch (error) {
+        console.warn('storefront settings dual read unavailable', error);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
     };
 
-    const unsubscribeMain = onSnapshot(doc(db, 'settings', 'main'), (snap) => { mainReady = true; mainData = snap.exists() ? (snap.data() as RawSettings) : {}; publish(); }, () => { mainReady = true; publish(); });
-    const unsubscribeLegacy = onSnapshot(doc(db, 'settings', 'general'), (snap) => { legacyData = snap.exists() ? (snap.data() as RawSettings) : {}; publish(); }, () => publish());
-    const unsubscribePolicy = onSnapshot(doc(db, 'settings', 'policy'), (snap) => { policyReady = true; policyData = snap.exists() ? (snap.data() as RawPolicy) : {}; publish(); }, () => { policyReady = true; publish(); });
-    const unsubscribeContact = onSnapshot(doc(db, 'settings', 'contact'), (snap) => { contactReady = true; contactData = snap.exists() ? (snap.data() as RawContact) : {}; publish(); }, () => { contactReady = true; publish(); });
-    const rotationTimer = window.setInterval(publish, 60_000);
-
-    return () => { unsubscribeMain(); unsubscribeLegacy(); unsubscribePolicy(); unsubscribeContact(); window.clearInterval(rotationTimer); };
+    load();
+    const timer = window.setInterval(load, 60_000);
+    return () => { cancelled = true; window.clearInterval(timer); };
   }, []);
+
   return { settings, loading, policy: settings.policies, contact: settings.contact };
 }

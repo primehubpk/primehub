@@ -1,0 +1,11 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "env": {
+    "PRIMEHUB_DATA_READ_MODE": "supabase-primary"
+  },
+  "git": {
+    "deploymentEnabled": {
+      "feature/supabase-migration": true
+    }
+  }
+}

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { calculateDeliveryCharge } from '@/lib/deliveryCharges';
 import { getAdminAuth, getAdminDb } from '@/lib/firebaseAdmin';
+import { mapOrderToSupabase, mirrorSupabaseUpsert, recordMirrorFailure } from '@/lib/dualWriteServer';
 import { isWholesaleProduct } from '@/lib/wholesale';
 
 export const runtime = 'nodejs';
@@ -113,17 +114,24 @@ export async function POST(request: Request) {
     const customer = body?.customer as Customer | undefined;
     if (!customer?.name?.trim() || !customer?.phone?.trim() || (!selfCollect && (!customer?.address?.trim() || !customer?.city?.trim()))) return NextResponse.json({ error: selfCollect ? 'Name and phone are required.' : 'Name, phone, address and city are required.' }, { status: 400 });
     const resellerUserId = reseller?.userId || '';
+    const orderRef = getAdminDb().collection('orders').doc();
     const orderData: any = {
       customer: { name: customer.name.trim(), phone: customer.phone.trim(), email: String(customer.email || '').trim(), address: selfCollect ? 'PrimeHub Shop Pickup' : customer.address.trim(), city: selfCollect ? 'Lahore' : customer.city.trim(), notes: String(customer.notes || '').trim() },
       ...quote,
+      idempotencyKey: `website-order:${orderRef.id}`,
       currency: 'PKR', status: 'pending', source: 'website', createdAt: new Date(),
     };
     if (resellerUserId) orderData.resellerUserId = resellerUserId;
-    const orderRef = await getAdminDb().collection('orders').add(orderData);
+    await orderRef.set(orderData);
+    const supabaseRow = mapOrderToSupabase(orderRef.id, orderData);
+    const mirror = await mirrorSupabaseUpsert({ table: 'orders', row: supabaseRow });
+    if (mirror.attempted && !mirror.ok) {
+      console.error('Order Supabase mirror failed:', mirror.error);
+      await recordMirrorFailure('orders', orderRef.id, 'upsert', supabaseRow);
+    }
     return NextResponse.json({ orderId: orderRef.id, ...quote, resellerLinked: Boolean(resellerUserId) });
   } catch (error) {
     console.error('Secure order creation failed:', error);
     return NextResponse.json({ error: error instanceof Error ? error.message : 'Unable to place order.' }, { status: 400 });
   }
 }
-

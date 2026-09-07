@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { calculateDeliveryCharge } from '@/lib/deliveryCharges';
 import { getAdminAuth, getAdminDb } from '@/lib/firebaseAdmin';
 import { ResellerTierId } from '@/lib/resellerTypes';
+import { mirrorResellerFirestoreDoc } from '@/lib/resellerDualMirror';
 
 export const runtime = 'nodejs';
 
@@ -35,7 +36,10 @@ export async function POST(request: Request) {
     const delivery = selfCollect ? { baseDelivery: 0, wholesaleItems: 0, wholesaleSurcharge: 0, deliveryCharge: 0 } : calculateDeliveryCharge(items);
     const total = subtotal + delivery.deliveryCharge;
     const code = resellerCode(uid);
-    const ref = await getAdminDb().collection('reseller_whatsapp_orders').add({
+    const ref = getAdminDb().collection('reseller_whatsapp_orders').doc();
+    await ref.set({
+      id: ref.id,
+      idempotencyKey: `wa-order:${ref.id}`,
       resellerUserId: uid,
       resellerCode: code,
       resellerEmail: String(profile.email || ''),
@@ -52,6 +56,7 @@ export async function POST(request: Request) {
       createdAt: new Date(),
       updatedAt: new Date(),
     });
+    await mirrorResellerFirestoreDoc('reseller_whatsapp_orders', ref.id);
     return NextResponse.json({ requestId: ref.id, resellerCode: code, status: 'pending' });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unable to create WhatsApp reseller request.';

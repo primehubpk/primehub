@@ -1,7 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { collection, doc, getDoc, getDocs } from 'firebase/firestore';
 import { useParams, useRouter } from 'next/navigation';
-import { db } from '@/lib/firebase';
 import { getVariantRows, useCartStore } from '@/lib/cartStore';
 import { useSettings } from '@/lib/useSettings';
 import { WEEKDAY_LABELS, WEEKDAY_ORDER, countdownParts, dealTiming } from '@/lib/weeklyDealUtils';
@@ -20,7 +18,7 @@ export function useProductDetail(): ProductDetailModel {
  const params=useParams<{id:string}>(),router=useRouter(),id=String(params?.id||''),{settings}=useSettings(),addItem=useCartStore(s=>s.addItem);
  const [product,setProduct]=useState<Product|null>(null),[weeklyProducts,setWeeklyProducts]=useState<Record<string,Product>>({}),[loading,setLoading]=useState(true),[failed,setFailed]=useState(false),[activeImage,setActiveImage]=useState(0),[quantity,setQuantity]=useState(1),[wished,setWished]=useState(false),[videoOpen,setVideoOpen]=useState(false),[added,setAdded]=useState(false),[nowTick,setNowTick]=useState<number|null>(null),[variantModalOpen,setVariantModalOpen]=useState(false),[variantMode,setVariantMode]=useState<'cart'|'buy'>('cart'),[variantSelection,setVariantSelection]=useState<ProductVariantSelection|undefined>();
  useEffect(()=>{setNowTick(Date.now());const timer=window.setInterval(()=>setNowTick(Date.now()),1000);return()=>window.clearInterval(timer);},[]);
- useEffect(()=>{let cancelled=false;async function load(){if(!id)return;setLoading(true);try{const [productSnap,productsSnap]=await Promise.all([getDoc(doc(db,'products',id)),getDocs(collection(db,'products'))]);if(cancelled)return;if(!productSnap.exists()){setProduct(null);setFailed(true);}else{const nextProduct={id:productSnap.id,...productSnap.data()} as Product;setProduct(nextProduct);rememberProduct(productSnap.id);}const nextProducts:Record<string,Product>={};productsSnap.forEach(item=>{nextProducts[item.id]={id:item.id,...item.data()} as Product;});setWeeklyProducts(nextProducts);}catch{if(!cancelled)setFailed(true);}finally{if(!cancelled)setLoading(false);}}load();return()=>{cancelled=true;};},[id]);
+ useEffect(()=>{let cancelled=false;async function load(){if(!id)return;setLoading(true);setFailed(false);try{const response=await fetch('/api/storefront/read?type=catalog',{cache:'no-store'});if(!response.ok)throw new Error(`catalog read ${response.status}`);const data=await response.json();if(cancelled)return;const products=Array.isArray(data?.products)?data.products:[];const nextProducts:Record<string,Product>={};for(const item of products){if(item?.id!=null)nextProducts[String(item.id)]=item as Product;}setWeeklyProducts(nextProducts);const nextProduct=nextProducts[id]||null;if(!nextProduct){setProduct(null);setFailed(true);}else{setProduct(nextProduct);rememberProduct(id);}}catch{if(!cancelled)setFailed(true);}finally{if(!cancelled)setLoading(false);}}load();return()=>{cancelled=true;};},[id]);
  const images=useMemo(()=>product?imagesOf(product):[],[product]);
  const regularPrice=product?regularPriceOf(product):0,productOriginal=product?originalPriceOf(product):0,stock=Number(product?.stock??product?.quantity??product?.inventory??10),rating=Number(product?.rating||0),reviews=Number(product?.reviews||0);
  const variantRows=useMemo(()=>product?getVariantRows(product):[],[product]);

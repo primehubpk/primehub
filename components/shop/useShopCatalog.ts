@@ -1,9 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { collection, getDocs } from 'firebase/firestore';
 import { useSearchParams } from 'next/navigation';
-import { db } from '@/lib/firebase';
 import { useSettings } from '@/lib/useSettings';
 import { useCartStore } from '@/lib/cartStore';
 import { categoryHref, categoryLabel, productMatchesCategory, slugifyCategory } from '@/lib/categoryUtils';
@@ -49,13 +47,14 @@ export function useShopCatalog(initialCategory?: string, initialQuery = '', init
     let cancelled = false;
     async function load() {
       try {
-        const [productSnap, categorySnap] = await Promise.all([
-          getDocs(collection(db, 'products')),
-          getDocs(collection(db, 'categories')),
-        ]);
+        const response = await fetch('/api/storefront/read?type=catalog', { cache: 'no-store' });
+        if (!response.ok) throw new Error(`catalog read ${response.status}`);
+        const data = await response.json();
         if (cancelled) return;
-        setProducts(shuffleProducts(productSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Product))));
-        setCategories(categorySnap.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Category)));
+        setProducts(shuffleProducts((Array.isArray(data?.products) ? data.products : []) as Product[]));
+        setCategories((Array.isArray(data?.categories) ? data.categories : []) as Category[]);
+      } catch (error) {
+        console.warn('shop dual catalog read unavailable', error);
       } finally {
         if (!cancelled) {
           setFiltersOpen(false);

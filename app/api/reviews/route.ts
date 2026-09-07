@@ -1,6 +1,7 @@
 import { createHash } from 'crypto';
 import { NextResponse } from 'next/server';
 import { getAdminDb } from '@/lib/firebaseAdmin';
+import { mapReviewToSupabase, mirrorSupabaseUpsert, recordMirrorFailure } from '@/lib/dualWriteServer';
 
 export const runtime = 'nodejs';
 
@@ -81,13 +82,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'This product is not part of the verified order.' }, { status: 403 });
     }
 
-    const ref = db.collection('reviews').doc(reviewDocId(orderId, productId));
+    const id = reviewDocId(orderId, productId);
+    const ref = db.collection('reviews').doc(id);
     const existing = await ref.get();
     if (existing.exists) {
       return NextResponse.json({ error: 'You already reviewed this product from this order.' }, { status: 409 });
     }
 
-    await ref.set({
+    const reviewData = {
       productId,
       orderId,
       name,
@@ -98,7 +100,15 @@ export async function POST(request: Request) {
       verified: true,
       source: 'verified_order',
       createdAt: new Date(),
-    });
+    };
+    await ref.set(reviewData);
+
+    const supabaseRow = mapReviewToSupabase(id, reviewData);
+    const mirror = await mirrorSupabaseUpsert({ table: 'reviews', row: supabaseRow });
+    if (mirror.attempted && !mirror.ok) {
+      console.error('Review Supabase mirror failed:', mirror.error);
+      await recordMirrorFailure('reviews', id, 'upsert', supabaseRow);
+    }
 
     return NextResponse.json({ ok: true });
   } catch (error) {

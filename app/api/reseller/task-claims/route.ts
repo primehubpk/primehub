@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getAdminAuth } from '@/lib/firebaseAdmin';
 import { createResellerTaskClaim, recordResellerTaskOpen } from '@/lib/resellerServer';
+import { mirrorResellerFirestoreDoc, mirrorResellerTaskEventsForUser } from '@/lib/resellerDualMirror';
 
 export const runtime = 'nodejs';
 
@@ -13,8 +14,11 @@ export async function POST(request: Request) {
     const taskId = String(body?.taskId || '');
     if (body?.action === 'open') {
       await recordResellerTaskOpen(user.uid, taskId);
+      await mirrorResellerTaskEventsForUser(user.uid);
       return NextResponse.json({ ok: true });
     }
-    return NextResponse.json(await createResellerTaskClaim(user.uid, taskId, String(body?.proof || '')));
+    const result = await createResellerTaskClaim(user.uid, taskId, String(body?.proof || ''));
+    await mirrorResellerFirestoreDoc('reseller_task_claims', result.claimId);
+    return NextResponse.json(result);
   } catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : 'Task action failed.' }, { status: 400 }); }
 }

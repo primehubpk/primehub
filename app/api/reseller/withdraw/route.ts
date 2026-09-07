@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getAdminAuth } from '@/lib/firebaseAdmin';
 import { createResellerWithdrawal } from '@/lib/resellerServer';
+import { mirrorResellerDocAndProfile } from '@/lib/resellerDualMirror';
 export const runtime = 'nodejs';
 
 export async function POST(request: Request) {
@@ -14,7 +15,8 @@ export async function POST(request: Request) {
     const accountTitle = String(body?.accountTitle || '');
     const accountNumber = String(body?.accountNumber || '');
     const bankName = String(body?.bankName || '');
-    return NextResponse.json(await createResellerWithdrawal(user.uid, amount, method, accountTitle, accountNumber, bankName));
+    const result = await createResellerWithdrawal(user.uid, amount, method, accountTitle, accountNumber, bankName);
+    await mirrorResellerDocAndProfile('reseller_withdrawals', result.withdrawalId);
+    return NextResponse.json(result);
   } catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : 'Withdrawal failed.' }, { status: 400 }); }
 }
-

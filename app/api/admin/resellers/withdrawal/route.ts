@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getAdminAuth } from '@/lib/firebaseAdmin';
 import { reviewResellerWithdrawal } from '@/lib/resellerServer';
+import { mirrorResellerDocAndProfile } from '@/lib/resellerDualMirror';
 export const runtime = 'nodejs';
 const ADMIN_UID = 'BZfIarsxGkXwZUIEcfFXa9u7Ge02';
 
@@ -18,6 +19,7 @@ export async function POST(request: Request) {
     const action = body?.action;
     if (!id || !['approve', 'reject', 'paid'].includes(action)) return NextResponse.json({ error: 'Withdrawal ID and valid action are required.' }, { status: 400 });
     await reviewResellerWithdrawal(id, action, String(body?.adminNote || ''));
+    await mirrorResellerDocAndProfile('reseller_withdrawals', id);
     return NextResponse.json({ success: true });
   } catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : 'Withdrawal review failed.' }, { status: 400 }); }
 }
