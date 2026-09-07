@@ -1,0 +1,39 @@
+name: Phase 3 Public Catalog to Supabase
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feature/supabase-migration
+    paths:
+      - .github/phase3-public-run-trigger
+
+permissions:
+  contents: read
+
+jobs:
+  migrate-public-catalog:
+    if: github.ref == 'refs/heads/feature/supabase-migration'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+    steps:
+      - name: Checkout migration branch
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Verify required secrets
+        shell: bash
+        run: |
+          test -n "$SUPABASE_URL" || (echo "Missing SUPABASE_URL" && exit 1)
+          test -n "$SUPABASE_SERVICE_ROLE_KEY" || (echo "Missing SUPABASE_SERVICE_ROLE_KEY" && exit 1)
+
+      - name: Run public catalog migration
+        run: node scripts/migrate-public-catalog-to-supabase.mjs
