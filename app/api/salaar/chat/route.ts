@@ -1,6 +1,13 @@
 import { NextResponse } from 'next/server';
 import { getAdminDb } from '@/lib/firebaseAdmin';
 import { getSalaarCatalogSnapshot, SALAAR_CATEGORY_BATCH_SIZE } from '@/lib/salaarCatalogCache';
+import {
+  effectiveProductQuery,
+  intentNeedsLlm,
+  parseSalesIntent,
+  rankProductsForIntent,
+  type SalesIntent,
+} from '@/lib/salaarSalesIntent';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -26,16 +33,20 @@ type ProductCard = {
 type ChatMessage = { role: 'customer' | 'salaar'; text: string; createdAt?: string };
 
 const WHATSAPP_NUMBER = '03238878009';
-const SYSTEM_PROMPT = `You are Salaar, a human-style salesman for PrimeHubMall Pakistan.
-Reply in short Roman Urdu/English matching the customer's length. Use pyar, adab and ehtram. Never write long AI essays, menus, or "press 1" prompts.
+const SYSTEM_PROMPT = `You are Salaar, a professional human-style salesman for PrimeHubMall Pakistan.
+Reply in short, natural Roman Urdu/English matching the customer's language and length. Use pyar, adab and ehtram. Never sound like a menu-driven bot and never write long AI essays.
+Think like a real salesman: understand what the customer is trying to buy or ask, use the supplied sales intent and grounded product/store context, ask one short clarification only when genuinely needed, and keep the conversation moving naturally.
 You help with bangles, jewellery, watches, retail/wholesale shopping, Prime Skill, Reseller Club, cart/order questions and general store help.
-Store facts:
+Verified store facts currently available to this route:
 - Prime Skill is PrimeHubMall's practical skill area. Send customer to /prime-skill when relevant.
 - Reseller Club is for wholesale/reseller customers. Send customer to /reseller-club when relevant.
 - Ready/order lock flow: customer confirms cart/details, then Rs 300 advance locks the order. Complete ready video is shared on WhatsApp, remaining payment follows, then dispatch.
 - Human support WhatsApp: ${WHATSAPP_NUMBER}.
-If product cards are supplied below, mention them naturally and do not invent prices or products outside that list.
-If confused, payment is stuck, customer is angry, or you are not confident, give ${WHATSAPP_NUMBER} and keep it short.`;
+Rules:
+- Never invent a price, product, stock state, policy, deal, discount or store fact that is not supplied in grounded context.
+- If product cards are supplied below, refer to them naturally. Do not claim another product exists unless it is in grounded context.
+- If a store/deal fact is not yet supplied, say briefly that you need the live store detail instead of guessing.
+- If confused, payment is stuck, customer is angry, or you are not confident about a sensitive fact, involve human support at ${WHATSAPP_NUMBER} and keep it short.`;
 
 let rotationCursor = 0;
 
@@ -81,53 +92,9 @@ function productImage(product: any): string {
   return '';
 }
 
-function searchable(product: any): string {
-  const tags = Array.isArray(product?.tags) ? product.tags.join(' ') : '';
-  return [product?.title, product?.name, product?.category, product?.subcategory, product?.description, product?.material, product?.color, tags]
-    .filter(Boolean).join(' ').toLowerCase();
-}
-
-function wantsProducts(message: string): boolean {
-  return /(bangle|bangles|kara|karray|jewel|watch|product|item|deal|dikha|show|chahi|price|rate|budget|under|kam|wholesale|retail|gift|set)/i.test(message);
-}
-
-function productTerms(message: string): string[] {
-  const ignored = new Set(['mujhe','mery','meri','mera','koi','kuch','aur','show','dikhao','dikha','chahiye','chahi','price','rate','under','tak','se','kam','ka','ki','ke','hai','hain','please','plz','want','need','product','products','item','items']);
-  return message.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter((word) => word.length > 2 && !ignored.has(word));
-}
-
-function isMoreProductsMessage(message: string): boolean {
-  const value = message.trim().toLowerCase();
-  return /^(aur|or|more|next|mazeed|mazid|baqi|baaki)(\s+(dikha|dikhao|show|products?|items?))?[!.?]*$/i.test(value)
-    || /^(aur|more|next)\s+(dikha|dikhao|show)/i.test(value);
-}
-
-function effectiveProductMessage(message: string, history: ChatMessage[]): string {
-  if (!isMoreProductsMessage(message)) return message;
-  for (const item of [...history].reverse()) {
-    if (item.role !== 'customer') continue;
-    if (!wantsProducts(item.text)) continue;
-    if (productTerms(item.text).length === 0) continue;
-    return item.text;
-  }
-  return message;
-}
-
-function pickProducts(products: any[], message: string, shown: string[]): ProductCard[] {
-  if (!wantsProducts(message)) return [];
-  const shownSet = new Set(shown.map(String));
-  const terms = productTerms(message);
-  const scored = products
-    .filter((p) => p && p.id != null && !shownSet.has(String(p.id)))
-    .map((p) => {
-      const hay = searchable(p);
-      const score = terms.reduce((sum, term) => sum + (hay.includes(term) ? 2 : 0), 0) + (p?.active === false ? -20 : 0);
-      return { p, score };
-    })
-    .sort((a, b) => b.score - a.score);
-  const matching = scored.filter((entry) => entry.score > 0);
-  const source = matching.length ? matching : scored;
-  return source.slice(0, SALAAR_CATEGORY_BATCH_SIZE).map(({ p }) => {
+function pickProducts(products: any[], intent: SalesIntent, shown: string[]): ProductCard[] {
+  const ranked = rankProductsForIntent(products, intent, shown).slice(0, SALAAR_CATEGORY_BATCH_SIZE);
+  return ranked.map((p) => {
     const price = safePrice(p?.price || p?.salePrice || p?.retailPrice);
     const originalPrice = safePrice(p?.originalPrice || p?.compareAtPrice || p?.retailPrice || price);
     return {
@@ -149,53 +116,80 @@ function pickProducts(products: any[], message: string, shown: string[]): Produc
   });
 }
 
-function deterministicReply(message: string, products: ProductCard[]): { text: string; needYou?: boolean; link?: { href: string; label: string } } {
+function priceSummary(intent: SalesIntent): string {
+  const { minPrice, maxPrice, targetPrice } = intent.filters;
+  if (minPrice != null && maxPrice != null) return `Rs ${minPrice.toLocaleString()} se Rs ${maxPrice.toLocaleString()} tak`;
+  if (maxPrice != null) return `Rs ${maxPrice.toLocaleString()} tak`;
+  if (minPrice != null) return `Rs ${minPrice.toLocaleString()} se upar`;
+  if (targetPrice != null) return `Rs ${targetPrice.toLocaleString()} ke qareeb`;
+  return '';
+}
+
+function deterministicReply(message: string, intent: SalesIntent, products: ProductCard[]): { text: string; needYou?: boolean; link?: { href: string; label: string } } {
   const m = message.toLowerCase();
+
+  if (intent.kind === 'greeting') {
+    return { text: 'Wa Alaikum Assalam ji 👋 Main Salaar hoon. Jo chahiye batayein — main aapko suitable option dhoond deta hoon.' };
+  }
   if (/prime\s*skill|skill kya|skills?/.test(m)) {
     return { text: 'Ji, Prime Skill se practical skills start kar sakte hain. Main aapko seedha wahan le jata hoon.', link: { href: '/prime-skill', label: 'Open Prime Skill' } };
   }
-  if (/reseller|wholesale|resale/.test(m) && !products.length) {
-    return { text: 'Ji, Reseller Club wholesale/reselling ke liye hai. Aap wahan join/details dekh sakte hain.', link: { href: '/reseller-club', label: 'Open Reseller Club' } };
+  if (intent.kind === 'wholesale' && !products.length) {
+    return { text: 'Ji, wholesale/reselling ke liye PrimeHub Reseller Club available hai. Aap details dekh sakte hain.', link: { href: '/reseller-club', label: 'Open Reseller Club' } };
   }
-  if (/payment.*(stuck|masla|issue)|samajh nahi|ghussa|angry|complain|problem/.test(m)) {
+  if (intent.kind === 'support') {
     return { text: `Ji, is case mein team ko involve karte hain. WhatsApp ${WHATSAPP_NUMBER} par message kar dein.`, needYou: true };
   }
-  if (/ready|order lock|advance|300/.test(m)) {
+  if (intent.kind === 'order' && /ready|order lock|advance|300/i.test(m)) {
     return { text: 'Ji. Order lock ke liye Rs 300 advance hota hai. Ready video WhatsApp par share hoti hai, phir remaining payment aur dispatch.' };
   }
-  if (/shipping|delivery|dispatch/.test(m)) {
+  if (intent.kind === 'delivery') {
     return { text: 'Ji, Pakistan delivery available hai. Final delivery/dispatch detail order aur city ke mutabiq confirm hoti hai.' };
   }
-  if (/return|exchange|refund/.test(m)) {
+  if (intent.kind === 'policy') {
     return { text: `Ji, return/exchange case item aur order condition dekh kar team confirm karti hai. Zarurat ho to ${WHATSAPP_NUMBER} par help mil jayegi.` };
   }
   if (products.length) {
-    return { text: products.length > 1 ? 'Ji, ye options dekhain. Pasand aye to yahin cart mein add kar dein.' : 'Ji, ye option dekhain. Pasand aye to cart mein add kar dein.' };
+    const budget = priceSummary(intent);
+    const category = intent.filters.category || intent.filters.subcategory || '';
+    const detail = [category, budget].filter(Boolean).join(' · ');
+    const moreText = intent.followUp.more ? 'Ji, ye next options dekhain.' : products.length > 1 ? 'Ji, ye suitable options dekhain.' : 'Ji, ye matching option dekhain.';
+    return { text: `${moreText}${detail ? ` ${detail}.` : ''} Pasand aye to yahin cart mein add kar dein.` };
   }
-  if (/^(hi|hello|hey|salam|assalam|aoa)/i.test(message.trim())) {
-    return { text: 'Wa Alaikum Assalam ji 👋 Main Salaar hoon. Bangles, jewellery, watches ya order help — jo chahiye batayein.' };
+  if (intent.wantsProducts) {
+    const budget = priceSummary(intent);
+    const detail = [intent.filters.category, intent.filters.color, intent.filters.material, budget].filter(Boolean).join(' · ');
+    return { text: detail ? `Ji, ${detail} ke mutabiq abhi matching product nahi mila. Aap budget ya choice thori change kar dein, main dobara dekh leta hoon.` : 'Ji, is request ka matching product current catalog mein nahi mila. Thora detail bata dein — category, budget, color ya style — main sahi options nikal deta hoon.' };
   }
-  return { text: `Ji, main help karta hoon. Product, order, Prime Skill ya Reseller Club — jo masla hai short mein batayein. Zarurat par ${WHATSAPP_NUMBER} bhi available hai.` };
+  if (intent.kind === 'deal') {
+    return { text: 'Ji, deal ka current detail live store data se verify karke hi batana chahiye. Deal ka naam bata dein — jaise Big Deal — main us par help karta hoon.' };
+  }
+  return { text: 'Ji, batayein aap kya dhoond rahe hain ya kis cheez mein help chahiye. Main short mein guide karta hoon.' };
 }
 
 function llmProductContext(products: ProductCard[]) {
-  // The customer can see up to 30 cards, but the LLM only needs a compact sample.
-  // This keeps token/API usage bounded even for large categories.
   return products.slice(0, 10);
 }
 
-async function callOpenAiCompatible(baseUrl: string, apiKey: string, model: string, user: string, products: ProductCard[], history: ChatMessage[]): Promise<string> {
+function llmGrounding(intent: SalesIntent, products: ProductCard[]) {
   const contextProducts = llmProductContext(products);
-  const productContext = contextProducts.length ? `\nProducts available now:\n${contextProducts.map((p) => `- ${p.name} | Rs ${p.price} | id ${p.id}`).join('\n')}` : '';
+  const productContext = contextProducts.length
+    ? `\nGrounded products available now:\n${contextProducts.map((p, index) => `${index + 1}. ${p.name} | Rs ${p.price} | id ${p.id}`).join('\n')}`
+    : '\nNo grounded product cards are available for this turn.';
+  return `\nParsed sales intent: ${intent.summary || intent.kind}. Confidence=${intent.confidence}.${productContext}`;
+}
+
+async function callOpenAiCompatible(baseUrl: string, apiKey: string, model: string, user: string, products: ProductCard[], history: ChatMessage[], intent: SalesIntent): Promise<string> {
+  const grounding = llmGrounding(intent, products);
   const response = await fetch(`${baseUrl}/chat/completions`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
     body: JSON.stringify({
       model,
-      temperature: 0.35,
+      temperature: 0.3,
       max_tokens: 180,
       messages: [
-        { role: 'system', content: `${SYSTEM_PROMPT}${productContext}` },
+        { role: 'system', content: `${SYSTEM_PROMPT}${grounding}` },
         ...history.slice(-8).map((m) => ({ role: m.role === 'customer' ? 'user' : 'assistant', content: m.text })),
         { role: 'user', content: user },
       ],
@@ -209,19 +203,18 @@ async function callOpenAiCompatible(baseUrl: string, apiKey: string, model: stri
   return text;
 }
 
-async function callGemini(apiKey: string, model: string, user: string, products: ProductCard[], history: ChatMessage[]): Promise<string> {
-  const contextProducts = llmProductContext(products);
-  const productContext = contextProducts.length ? `\nProducts available now:\n${contextProducts.map((p) => `- ${p.name} | Rs ${p.price} | id ${p.id}`).join('\n')}` : '';
+async function callGemini(apiKey: string, model: string, user: string, products: ProductCard[], history: ChatMessage[], intent: SalesIntent): Promise<string> {
+  const grounding = llmGrounding(intent, products);
   const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      systemInstruction: { parts: [{ text: `${SYSTEM_PROMPT}${productContext}` }] },
+      systemInstruction: { parts: [{ text: `${SYSTEM_PROMPT}${grounding}` }] },
       contents: [
         ...history.slice(-8).map((m) => ({ role: m.role === 'customer' ? 'user' : 'model', parts: [{ text: m.text }] })),
         { role: 'user', parts: [{ text: user }] },
       ],
-      generationConfig: { temperature: 0.35, maxOutputTokens: 180 },
+      generationConfig: { temperature: 0.3, maxOutputTokens: 180 },
     }),
     cache: 'no-store',
   });
@@ -232,7 +225,7 @@ async function callGemini(apiKey: string, model: string, user: string, products:
   return text;
 }
 
-async function llmReply(user: string, products: ProductCard[], history: ChatMessage[]): Promise<{ text: string; provider?: Provider }> {
+async function llmReply(user: string, products: ProductCard[], history: ChatMessage[], intent: SalesIntent): Promise<{ text: string; provider?: Provider }> {
   const providers: Provider[] = ['groq', 'openrouter', 'gemini'];
   const start = rotationCursor++;
   for (const provider of rotated(providers, start)) {
@@ -240,14 +233,14 @@ async function llmReply(user: string, products: ProductCard[], history: ChatMess
     for (const key of keys) {
       try {
         if (provider === 'groq') {
-          const text = await callOpenAiCompatible('https://api.groq.com/openai/v1', key, process.env.SALAAR_GROQ_MODEL || 'llama-3.3-70b-versatile', user, products, history);
+          const text = await callOpenAiCompatible('https://api.groq.com/openai/v1', key, process.env.SALAAR_GROQ_MODEL || 'llama-3.3-70b-versatile', user, products, history, intent);
           return { text, provider };
         }
         if (provider === 'openrouter') {
-          const text = await callOpenAiCompatible('https://openrouter.ai/api/v1', key, process.env.SALAAR_OPENROUTER_MODEL || 'google/gemini-2.0-flash-001', user, products, history);
+          const text = await callOpenAiCompatible('https://openrouter.ai/api/v1', key, process.env.SALAAR_OPENROUTER_MODEL || 'google/gemini-2.0-flash-001', user, products, history, intent);
           return { text, provider };
         }
-        const text = await callGemini(key, process.env.SALAAR_GEMINI_MODEL || 'gemini-2.5-flash', user, products, history);
+        const text = await callGemini(key, process.env.SALAAR_GEMINI_MODEL || 'gemini-2.5-flash', user, products, history, intent);
         return { text, provider };
       } catch (error) {
         console.warn(`Salaar ${provider} key failed; rotating`, error);
@@ -300,37 +293,72 @@ export async function POST(request: Request) {
     if (!message) return NextResponse.json({ error: 'Message required.' }, { status: 400 });
 
     const [catalog, history] = await Promise.all([getSalaarCatalogSnapshot(), loadHistory(sessionId)]);
-    const queryMessage = effectiveProductMessage(message, history);
-    const cards = pickProducts(Array.isArray(catalog.products) ? catalog.products : [], queryMessage, shownProductIds);
-    await saveMessage(sessionId, 'customer', message);
+    const catalogContext = {
+      products: Array.isArray(catalog.products) ? catalog.products : [],
+      categories: Array.isArray(catalog.categories) ? catalog.categories : [],
+    };
+    const rawIntent = parseSalesIntent(message, catalogContext);
+    const queryMessage = effectiveProductQuery(message, history, catalogContext);
+    const intent = parseSalesIntent(queryMessage, catalogContext);
+    intent.followUp.more = rawIntent.followUp.more;
+    intent.followUp.cheaper = rawIntent.followUp.cheaper || intent.followUp.cheaper;
+    intent.followUp.pricier = rawIntent.followUp.pricier || intent.followUp.pricier;
+    intent.followUp.compare = rawIntent.followUp.compare || intent.followUp.compare;
+    if (rawIntent.followUp.referencedPosition != null) intent.followUp.referencedPosition = rawIntent.followUp.referencedPosition;
 
-    const deterministic = deterministicReply(message, cards);
+    const cards = pickProducts(catalogContext.products, intent, shownProductIds);
+    await saveMessage(sessionId, 'customer', message, {
+      salesIntent: {
+        kind: rawIntent.kind,
+        confidence: rawIntent.confidence,
+        filters: rawIntent.filters,
+        followUp: rawIntent.followUp,
+        summary: rawIntent.summary,
+      },
+    });
+
+    const deterministic = deterministicReply(message, intent, cards);
     let reply = deterministic.text;
     let provider: Provider | undefined;
 
-    // Keep critical store flows deterministic; use LLM for natural selling/help when configured.
-    const shouldUseLlm = !deterministic.needYou && !(/prime\s*skill|reseller|payment.*(stuck|masla|issue)|ready|order lock|advance|shipping|delivery|return|exchange|refund/i.test(message));
-    if (shouldUseLlm) {
+    if (!deterministic.needYou && intentNeedsLlm(intent)) {
       try {
-        const ai = await llmReply(message, cards, history);
+        const ai = await llmReply(message, cards, history, intent);
         reply = ai.text;
         provider = ai.provider;
       } catch {
-        // The deterministic reply keeps Salaar useful even when no provider key is configured.
+        // Grounded deterministic reply keeps Salaar useful when providers are unavailable.
       }
     }
 
     const needYou = Boolean(deterministic.needYou || /not sure|confus|payment stuck|WhatsApp 03238878009/i.test(reply));
-    await saveMessage(sessionId, 'salaar', reply, { provider: provider || 'fallback', productIds: cards.map((p) => p.id), needYou });
+    await saveMessage(sessionId, 'salaar', reply, {
+      provider: provider || 'deterministic',
+      productIds: cards.map((p) => p.id),
+      needYou,
+      salesIntent: {
+        kind: intent.kind,
+        confidence: intent.confidence,
+        filters: intent.filters,
+        followUp: intent.followUp,
+        summary: intent.summary,
+      },
+    });
 
     return NextResponse.json({
       sessionId,
       reply,
       products: cards,
-      provider: provider || 'fallback',
+      provider: provider || 'deterministic',
       needYou,
       whatsapp: needYou ? `https://wa.me/923238878009` : null,
       link: deterministic.link || null,
+      salesIntent: {
+        kind: intent.kind,
+        confidence: intent.confidence,
+        filters: intent.filters,
+        followUp: intent.followUp,
+      },
       catalog: {
         source: catalog.source,
         batchSize: SALAAR_CATEGORY_BATCH_SIZE,
