@@ -61,8 +61,40 @@ type BuildInput = {
   refreshedAt?: string;
 };
 
-const BLOCKED_KEY = /(?:^|[_-])(api|secret|token|password|credential|private|service.?role|firebase|supabase|admin|auth|bearer|key)(?:$|[_-])/i;
+const BLOCKED_KEY_PARTS = new Set([
+  'api',
+  'key',
+  'secret',
+  'token',
+  'password',
+  'credential',
+  'credentials',
+  'private',
+  'service',
+  'role',
+  'firebase',
+  'supabase',
+  'admin',
+  'auth',
+  'bearer',
+]);
 const PRESENTATION_ONLY_KEY = /(?:image|icon|accent|colour|color|created.?at|updated.?at|timestamp)/i;
+
+function keyParts(key: string): string[] {
+  return key
+    .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .split('_')
+    .filter(Boolean);
+}
+
+function isBlockedKey(key: string): boolean {
+  const parts = keyParts(key);
+  if (parts.some((part) => BLOCKED_KEY_PARTS.has(part))) return true;
+  const compact = parts.join('');
+  return /(?:apikey|secretkey|accesstoken|refreshtoken|servicerole|privatekey|clientsecret|clienttoken)/i.test(compact);
+}
 
 function cleanString(value: unknown, max = 800): string {
   return typeof value === 'string' ? value.trim().slice(0, max) : '';
@@ -109,7 +141,7 @@ function safeDocumentValue(value: unknown, path: string, out: SalaarStoreKnowled
   if (typeof value !== 'object') return;
 
   for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
-    if (BLOCKED_KEY.test(key) || PRESENTATION_ONLY_KEY.test(key)) continue;
+    if (isBlockedKey(key) || PRESENTATION_ONLY_KEY.test(key)) continue;
     safeDocumentValue(child, path ? `${path}.${key}` : key, out, depth + 1);
     if (out.length >= 120) break;
   }
@@ -118,7 +150,7 @@ function safeDocumentValue(value: unknown, path: string, out: SalaarStoreKnowled
 function publicFacts(documents: Record<string, any>) {
   const facts: SalaarStoreKnowledge['publicFacts'] = [];
   for (const [documentId, document] of Object.entries(documents || {})) {
-    if (BLOCKED_KEY.test(documentId)) continue;
+    if (isBlockedKey(documentId)) continue;
     safeDocumentValue(document, `settings.${documentId}`, facts);
     if (facts.length >= 120) break;
   }
