@@ -97,7 +97,7 @@ async function claimExpiredPending(sessionId: string): Promise<PendingReply | nu
 
     const message = cleanText(data.pendingCustomerMessage, 600);
     const shownProductIds = Array.isArray(data.pendingShownProductIds)
-      ? data.pendingShownProductIds.map((id: unknown) => String(id)).slice(-100)
+      ? data.pendingShownProductIds.map((id: unknown) => String(id)).slice(-400)
       : [];
     const messageDocId = cleanText(data.pendingMessageDocId, 120) || undefined;
 
@@ -166,7 +166,7 @@ export async function POST(request: Request) {
     sessionId = cleanText(body?.sessionId, 100) || crypto.randomUUID();
     message = cleanText(body?.message, 600);
     shownProductIds = Array.isArray(body?.shownProductIds)
-      ? body.shownProductIds.map((id: unknown) => String(id)).slice(-100)
+      ? body.shownProductIds.map((id: unknown) => String(id)).slice(-400)
       : [];
     if (!message) return NextResponse.json({ error: 'Message required.' }, { status: 400 });
 
