@@ -14,11 +14,15 @@ import {
   rankProductsForIntent,
   type SalesIntent,
 } from '@/lib/salaarSalesIntent';
+import {
+  runSalaarAi,
+  sanitizeSalaarImageUrls,
+  type SalaarProvider,
+} from '@/lib/salaarAiRouter';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-type Provider = 'groq' | 'openrouter' | 'gemini';
 type ProductCard = {
   id: string;
   name: string;
@@ -52,27 +56,9 @@ Rules:
 - Never invent a price, product, stock state, policy, deal, discount or store fact that is not supplied in grounded context.
 - Treat the Store Knowledge block as current admin-managed website truth for this turn.
 - If product cards are supplied below, refer to them naturally. Do not claim another product exists unless it is in grounded context.
+- If an image is supplied, inspect it carefully and answer only what can actually be inferred from the image. Never claim an exact product match unless a grounded product card supports it.
 - If a store/deal fact is not supplied, say briefly that you need the live store detail instead of guessing.
 - If confused, payment is stuck, customer is angry, or you are not confident about a sensitive fact, involve human support at ${WHATSAPP_NUMBER} and keep it short.`;
-
-let rotationCursor = 0;
-
-function splitKeys(value?: string): string[] {
-  if (!value) return [];
-  return value.split(/[\n,;]+/).map((v) => v.trim()).filter(Boolean);
-}
-
-function providerKeys(provider: Provider): string[] {
-  if (provider === 'groq') return [...splitKeys(process.env.GROQ_API_KEYS), ...splitKeys(process.env.GROQ_API_KEY)];
-  if (provider === 'openrouter') return [...splitKeys(process.env.OPENROUTER_API_KEYS), ...splitKeys(process.env.OPENROUTER_API_KEY)];
-  return [...splitKeys(process.env.GEMINI_API_KEYS), ...splitKeys(process.env.GEMINI_API_KEY)];
-}
-
-function rotated<T>(items: T[], offset: number): T[] {
-  if (!items.length) return items;
-  const start = ((offset % items.length) + items.length) % items.length;
-  return [...items.slice(start), ...items.slice(0, start)];
-}
 
 function cleanText(value: unknown, max = 600): string {
   return typeof value === 'string' ? value.trim().slice(0, max) : '';
@@ -102,7 +88,7 @@ function productImage(product: any): string {
 function pickProducts(products: any[], intent: SalesIntent, shown: string[]): ProductCard[] {
   const ranked = rankProductsForIntent(products, intent, shown).slice(0, SALAAR_CATEGORY_BATCH_SIZE);
   return ranked.map((p) => {
-    const price = safePrice(p?.price || p?.salePrice || p?.retailPrice);
+    const price = safePrice(p?.salePrice || p?.price || p?.retailPrice);
     const originalPrice = safePrice(p?.originalPrice || p?.compareAtPrice || p?.retailPrice || price);
     return {
       id: String(p.id),
@@ -137,11 +123,15 @@ function deterministicReply(
   intent: SalesIntent,
   products: ProductCard[],
   knowledge: SalaarStoreKnowledge | null,
+  hasImage: boolean,
 ): { text: string; needYou?: boolean; link?: { href: string; label: string } } {
   const m = message.toLowerCase();
 
   if (intent.kind === 'greeting') {
     return { text: 'Wa Alaikum Assalam ji 👋 Main Salaar hoon. Jo chahiye batayein — main aapko suitable option dhoond deta hoon.' };
+  }
+  if (intent.requiresVision && !hasImage) {
+    return { text: 'Ji, image bhej dein. Main design/color/style dekh kar aapko relevant PrimeHub options guide karunga.' };
   }
   if (/prime\s*skill|skill kya|skills?/.test(m)) {
     return { text: 'Ji, Prime Skill se practical skills start kar sakte hain. Main aapko seedha wahan le jata hoon.', link: { href: '/prime-skill', label: 'Open Prime Skill' } };
@@ -169,14 +159,15 @@ function deterministicReply(
   }
   if (products.length) {
     const budget = priceSummary(intent);
-    const category = intent.filters.category || intent.filters.subcategory || '';
-    const detail = [category, budget].filter(Boolean).join(' · ');
+    const category = intent.filters.category || intent.filters.subcategory || intent.filters.priceBucketLabel || '';
+    const smart = intent.sortBy === 'latest' ? 'latest' : intent.sortBy === 'cheapest' ? 'sab se budget-friendly' : intent.sortBy === 'premium' ? 'premium' : intent.sortBy === 'discount' ? 'discounted' : '';
+    const detail = [category, budget, smart].filter(Boolean).join(' · ');
     const moreText = intent.followUp.more ? 'Ji, ye next options dekhain.' : products.length > 1 ? 'Ji, ye suitable options dekhain.' : 'Ji, ye matching option dekhain.';
     return { text: `${moreText}${detail ? ` ${detail}.` : ''} Pasand aye to yahin cart mein add kar dein.` };
   }
   if (intent.wantsProducts) {
     const budget = priceSummary(intent);
-    const detail = [intent.filters.category, intent.filters.color, intent.filters.material, budget].filter(Boolean).join(' · ');
+    const detail = [intent.filters.category, intent.filters.color, intent.filters.material, intent.filters.priceBucketLabel, budget].filter(Boolean).join(' · ');
     return { text: detail ? `Ji, ${detail} ke mutabiq abhi matching product nahi mila. Aap budget ya choice thori change kar dein, main dobara dekh leta hoon.` : 'Ji, is request ka matching product current catalog mein nahi mila. Thora detail bata dein — category, budget, color ya style — main sahi options nikal deta hoon.' };
   }
   if (intent.kind === 'deal') {
@@ -200,98 +191,21 @@ function llmGrounding(intent: SalesIntent, products: ProductCard[], knowledge: S
   return `\nParsed sales intent: ${intent.summary || intent.kind}. Confidence=${intent.confidence}.${productContext}${knowledgeContext}`;
 }
 
-async function callOpenAiCompatible(
-  baseUrl: string,
-  apiKey: string,
-  model: string,
-  user: string,
-  products: ProductCard[],
-  history: ChatMessage[],
-  intent: SalesIntent,
-  knowledge: SalaarStoreKnowledge | null,
-): Promise<string> {
-  const grounding = llmGrounding(intent, products, knowledge);
-  const response = await fetch(`${baseUrl}/chat/completions`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-    body: JSON.stringify({
-      model,
-      temperature: 0.3,
-      max_tokens: 180,
-      messages: [
-        { role: 'system', content: `${SYSTEM_PROMPT}${grounding}` },
-        ...history.slice(-8).map((m) => ({ role: m.role === 'customer' ? 'user' : 'assistant', content: m.text })),
-        { role: 'user', content: user },
-      ],
-    }),
-    cache: 'no-store',
-  });
-  if (!response.ok) throw new Error(`provider ${response.status}`);
-  const data = await response.json();
-  const text = cleanText(data?.choices?.[0]?.message?.content, 700);
-  if (!text) throw new Error('empty provider reply');
-  return text;
-}
-
-async function callGemini(
-  apiKey: string,
-  model: string,
-  user: string,
-  products: ProductCard[],
-  history: ChatMessage[],
-  intent: SalesIntent,
-  knowledge: SalaarStoreKnowledge | null,
-): Promise<string> {
-  const grounding = llmGrounding(intent, products, knowledge);
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      systemInstruction: { parts: [{ text: `${SYSTEM_PROMPT}${grounding}` }] },
-      contents: [
-        ...history.slice(-8).map((m) => ({ role: m.role === 'customer' ? 'user' : 'model', parts: [{ text: m.text }] })),
-        { role: 'user', parts: [{ text: user }] },
-      ],
-      generationConfig: { temperature: 0.3, maxOutputTokens: 180 },
-    }),
-    cache: 'no-store',
-  });
-  if (!response.ok) throw new Error(`gemini ${response.status}`);
-  const data = await response.json();
-  const text = cleanText(data?.candidates?.[0]?.content?.parts?.[0]?.text, 700);
-  if (!text) throw new Error('empty Gemini reply');
-  return text;
-}
-
 async function llmReply(
   user: string,
   products: ProductCard[],
   history: ChatMessage[],
   intent: SalesIntent,
   knowledge: SalaarStoreKnowledge | null,
-): Promise<{ text: string; provider?: Provider }> {
-  const providers: Provider[] = ['groq', 'openrouter', 'gemini'];
-  const start = rotationCursor++;
-  for (const provider of rotated(providers, start)) {
-    const keys = rotated(providerKeys(provider), start);
-    for (const key of keys) {
-      try {
-        if (provider === 'groq') {
-          const text = await callOpenAiCompatible('https://api.groq.com/openai/v1', key, process.env.SALAAR_GROQ_MODEL || 'llama-3.3-70b-versatile', user, products, history, intent, knowledge);
-          return { text, provider };
-        }
-        if (provider === 'openrouter') {
-          const text = await callOpenAiCompatible('https://openrouter.ai/api/v1', key, process.env.SALAAR_OPENROUTER_MODEL || 'google/gemini-2.0-flash-001', user, products, history, intent, knowledge);
-          return { text, provider };
-        }
-        const text = await callGemini(key, process.env.SALAAR_GEMINI_MODEL || 'gemini-2.5-flash', user, products, history, intent, knowledge);
-        return { text, provider };
-      } catch (error) {
-        console.warn(`Salaar ${provider} key failed; rotating`, error);
-      }
-    }
-  }
-  throw new Error('No working Salaar LLM provider key');
+  imageUrls: string[],
+): Promise<{ text: string; provider: SalaarProvider; vision: boolean }> {
+  const grounding = llmGrounding(intent, products, knowledge);
+  return runSalaarAi({
+    system: `${SYSTEM_PROMPT}${grounding}`,
+    user,
+    history,
+    imageUrls,
+  });
 }
 
 async function saveMessage(sessionId: string, role: 'customer' | 'salaar', text: string, extra: Record<string, unknown> = {}) {
@@ -332,9 +246,13 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     const sessionId = cleanText(body?.sessionId, 100) || crypto.randomUUID();
-    const message = cleanText(body?.message, 600);
+    const imageUrls = sanitizeSalaarImageUrls(
+      Array.isArray(body?.imageUrls) ? body.imageUrls : body?.imageUrl ? [body.imageUrl] : [],
+    );
+    const message = cleanText(body?.message, 600)
+      || (imageUrls.length ? 'Is image ko dekh kar design, color aur matching PrimeHub products ke bare mein help karein.' : '');
     const shownProductIds = Array.isArray(body?.shownProductIds) ? body.shownProductIds.map((id: unknown) => String(id)).slice(-400) : [];
-    if (!message) return NextResponse.json({ error: 'Message required.' }, { status: 400 });
+    if (!message) return NextResponse.json({ error: 'Message or image required.' }, { status: 400 });
 
     const knowledgePromise = getSalaarStoreKnowledgeSnapshot().catch((error) => {
       console.warn('Salaar Store Knowledge unavailable for this turn', error);
@@ -348,6 +266,7 @@ export async function POST(request: Request) {
     const catalogContext = {
       products: Array.isArray(catalog.products) ? catalog.products : [],
       categories: Array.isArray(catalog.categories) ? catalog.categories : [],
+      priceBuckets: knowledge?.priceBuckets || [],
     };
     const rawIntent = parseSalesIntent(message, catalogContext);
     const queryMessage = effectiveProductQuery(message, history, catalogContext);
@@ -357,28 +276,35 @@ export async function POST(request: Request) {
     intent.followUp.pricier = rawIntent.followUp.pricier || intent.followUp.pricier;
     intent.followUp.compare = rawIntent.followUp.compare || intent.followUp.compare;
     if (rawIntent.followUp.referencedPosition != null) intent.followUp.referencedPosition = rawIntent.followUp.referencedPosition;
+    intent.requiresVision = Boolean(imageUrls.length || rawIntent.requiresVision || intent.requiresVision);
+    intent.needsReasoning = Boolean(intent.requiresVision || rawIntent.needsReasoning || intent.needsReasoning);
 
     const cards = pickProducts(catalogContext.products, intent, shownProductIds);
     await saveMessage(sessionId, 'customer', message, {
+      imageUrls,
       salesIntent: {
         kind: rawIntent.kind,
         confidence: rawIntent.confidence,
         filters: rawIntent.filters,
         followUp: rawIntent.followUp,
+        sortBy: rawIntent.sortBy,
+        requiresVision: rawIntent.requiresVision,
         summary: rawIntent.summary,
       },
       knowledgeRefreshedAt: knowledge?.refreshedAt || null,
     });
 
-    const deterministic = deterministicReply(message, intent, cards, knowledge);
+    const deterministic = deterministicReply(message, intent, cards, knowledge, imageUrls.length > 0);
     let reply = deterministic.text;
-    let provider: Provider | undefined;
+    let provider: SalaarProvider | undefined;
+    let visionUsed = false;
 
-    if (!deterministic.needYou && intentNeedsLlm(intent)) {
+    if (!deterministic.needYou && (imageUrls.length > 0 || intentNeedsLlm(intent))) {
       try {
-        const ai = await llmReply(message, cards, history, intent, knowledge);
+        const ai = await llmReply(message, cards, history, intent, knowledge, imageUrls);
         reply = ai.text;
         provider = ai.provider;
+        visionUsed = ai.vision;
       } catch {
         // Grounded deterministic reply keeps Salaar useful when providers are unavailable.
       }
@@ -387,6 +313,7 @@ export async function POST(request: Request) {
     const needYou = Boolean(deterministic.needYou || /not sure|confus|payment stuck|WhatsApp 03238878009/i.test(reply));
     await saveMessage(sessionId, 'salaar', reply, {
       provider: provider || 'deterministic',
+      visionUsed,
       productIds: cards.map((p) => p.id),
       needYou,
       knowledgeSources: knowledge?.sources || null,
@@ -396,6 +323,8 @@ export async function POST(request: Request) {
         confidence: intent.confidence,
         filters: intent.filters,
         followUp: intent.followUp,
+        sortBy: intent.sortBy,
+        requiresVision: intent.requiresVision,
         summary: intent.summary,
       },
     });
@@ -405,6 +334,7 @@ export async function POST(request: Request) {
       reply,
       products: cards,
       provider: provider || 'deterministic',
+      visionUsed,
       needYou,
       whatsapp: needYou ? `https://wa.me/923238878009` : null,
       link: deterministic.link || null,
@@ -413,6 +343,8 @@ export async function POST(request: Request) {
         confidence: intent.confidence,
         filters: intent.filters,
         followUp: intent.followUp,
+        sortBy: intent.sortBy,
+        requiresVision: intent.requiresVision,
       },
       catalog: {
         source: catalog.source,
