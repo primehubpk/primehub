@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getAdminDb } from '@/lib/firebaseAdmin';
 import { GET as liveGet, POST as livePost } from '../live/route';
-import { loadSupabaseSalaarHistory, mirrorSalaarConversation, mirrorSalaarMessage } from '@/lib/salaarDualServer';
+import { loadSupabaseSalaarHistory, loadSupabaseSalaarState, mirrorSalaarConversation, mirrorSalaarMessage } from '@/lib/salaarDualServer';
+import { sanitizeSalaarSalesMemory } from '@/lib/salaarSalesMemoryCore';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -26,13 +27,27 @@ export async function GET(request: Request) {
   const response = await liveGet(request);
   const data = await response.clone().json().catch(() => null);
   await syncSession(sessionId);
-  if (sessionId && (!Array.isArray(data?.messages) || data.messages.length === 0)) {
-    try {
-      const fallback = await loadSupabaseSalaarHistory(sessionId);
-      if (fallback.length) return NextResponse.json({ ...data, messages: fallback, backendFallback: 'supabase' });
-    } catch (error) {
-      console.warn('Salaar Supabase history fallback unavailable', error);
-    }
+
+  if (!sessionId) return response;
+  const needsHistoryFallback = !Array.isArray(data?.messages) || data.messages.length === 0;
+  const needsMemoryFallback = !data?.salesMemory?.updatedAt;
+  if (!needsHistoryFallback && !needsMemoryFallback) return response;
+
+  try {
+    const [fallbackHistory, fallbackState] = await Promise.all([
+      needsHistoryFallback ? loadSupabaseSalaarHistory(sessionId) : Promise.resolve([]),
+      needsMemoryFallback ? loadSupabaseSalaarState(sessionId) : Promise.resolve({}),
+    ]);
+    const fallbackMemory = sanitizeSalaarSalesMemory((fallbackState as any)?.salesMemory);
+    const payload = {
+      ...data,
+      ...(needsHistoryFallback && fallbackHistory.length ? { messages: fallbackHistory } : {}),
+      ...(needsMemoryFallback && fallbackMemory.updatedAt ? { salesMemory: fallbackMemory } : {}),
+      backendFallback: (fallbackHistory.length || fallbackMemory.updatedAt) ? 'supabase' : data?.backendFallback,
+    };
+    if (fallbackHistory.length || fallbackMemory.updatedAt) return NextResponse.json(payload);
+  } catch (error) {
+    console.warn('Salaar Supabase history/memory fallback unavailable', error);
   }
   return response;
 }
