@@ -22,6 +22,12 @@ async function syncSession(sessionId: string) {
   }
 }
 
+function withoutEmptyMemory(data: any) {
+  if (!data || data?.salesMemory?.updatedAt) return data;
+  const { salesMemory: _emptyMemory, ...rest } = data;
+  return rest;
+}
+
 export async function GET(request: Request) {
   const sessionId = clean(new URL(request.url).searchParams.get('sessionId'));
   const response = await liveGet(request);
@@ -40,7 +46,7 @@ export async function GET(request: Request) {
     ]);
     const fallbackMemory = sanitizeSalaarSalesMemory((fallbackState as any)?.salesMemory);
     const payload = {
-      ...data,
+      ...withoutEmptyMemory(data),
       ...(needsHistoryFallback && fallbackHistory.length ? { messages: fallbackHistory } : {}),
       ...(needsMemoryFallback && fallbackMemory.updatedAt ? { salesMemory: fallbackMemory } : {}),
       backendFallback: (fallbackHistory.length || fallbackMemory.updatedAt) ? 'supabase' : data?.backendFallback,
@@ -49,6 +55,8 @@ export async function GET(request: Request) {
   } catch (error) {
     console.warn('Salaar Supabase history/memory fallback unavailable', error);
   }
+
+  if (needsMemoryFallback) return NextResponse.json(withoutEmptyMemory(data));
   return response;
 }
 
