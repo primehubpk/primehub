@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
-import { compressForR2, isR2PublicUrl, salaarR2ObjectKey, uploadWebpToR2 } from '@/lib/r2';
+import { compressSalaarImageForR2, isR2PublicUrl, salaarR2ObjectKey, uploadWebpToR2 } from '@/lib/r2';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+const MAX_STORED_IMAGE_BYTES = 1500 * 1024;
 const RATE_WINDOW_MS = 10 * 60 * 1000;
 const MAX_UPLOADS_PER_WINDOW = 8;
 const ALLOWED_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/avif']);
@@ -63,8 +64,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: 'Too many image uploads. Please try again shortly.' }, { status: 429 });
     }
 
-    const compressed = await compressForR2(Buffer.from(await image.arrayBuffer()));
-    if (!compressed.length || compressed.length > 3 * 1024 * 1024) {
+    const compressed = await compressSalaarImageForR2(Buffer.from(await image.arrayBuffer()));
+    if (!compressed.length || compressed.length > MAX_STORED_IMAGE_BYTES) {
       return NextResponse.json({ success: false, error: 'Image could not be prepared safely.' }, { status: 422 });
     }
 
@@ -73,7 +74,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: 'Image storage returned an invalid URL.' }, { status: 502 });
     }
 
-    return NextResponse.json({ success: true, url, contentType: 'image/webp' }, { status: 200 });
+    return NextResponse.json({
+      success: true,
+      url,
+      contentType: 'image/webp',
+      originalBytes: image.size,
+      storedBytes: compressed.length,
+    }, { status: 200 });
   } catch (error) {
     console.error('Salaar customer image upload failed', error);
     return NextResponse.json({ success: false, error: 'Image upload is temporarily unavailable.' }, { status: 500 });
