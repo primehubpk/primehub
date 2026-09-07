@@ -37,8 +37,15 @@ function supabaseConfig() {
   return { url, key };
 }
 
-async function sbRows(table: string, select = '*') {
-  const { url, key } = supabaseConfig();
+function supabaseServiceConfig() {
+  const url = (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '').trim().replace(/\/+$/, '');
+  const key = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
+  if (!url || !key) throw new Error('Supabase server read credentials are not configured.');
+  return { url, key };
+}
+
+async function sbRows(table: string, select = '*', useServiceRole = false) {
+  const { url, key } = useServiceRole ? supabaseServiceConfig() : supabaseConfig();
   const response = await fetch(`${url}/rest/v1/${table}?select=${encodeURIComponent(select)}`, {
     headers: { apikey: key, Authorization: `Bearer ${key}` },
     cache: 'no-store',
@@ -122,7 +129,7 @@ async function supabaseCatalog(): Promise<CatalogSnapshot> {
 
 async function firebaseSettings(): Promise<SettingsSnapshot> {
   const db = getAdminDb();
-  const ids = ['main', 'general', 'policy', 'contact', 'reseller'];
+  const ids = ['main', 'general', 'policy', 'contact', 'rewards', 'reseller'];
   const snaps = await Promise.all(ids.map((id) => db.collection('settings').doc(id).get()));
   const documents: Record<string, any> = {};
   ids.forEach((id, index) => { if (snaps[index].exists) documents[id] = serial(snaps[index].data()); });
@@ -130,7 +137,12 @@ async function firebaseSettings(): Promise<SettingsSnapshot> {
 }
 
 async function supabaseSettings(): Promise<SettingsSnapshot> {
-  const rows = await sbRows('settings');
+  // Settings intentionally have no public RLS policy. Read them only server-side
+  // with the service-role key so private configuration never has to be opened to anon.
+  const rows = await sbRows('settings', '*', true);
+  if (!Array.isArray(rows) || rows.length === 0) {
+    throw new Error('Supabase settings read returned no rows.');
+  }
   const documents: Record<string, any> = {};
   for (const row of rows) documents[String(row.id)] = row?.payload && typeof row.payload === 'object' ? row.payload : {};
   return { documents, source: 'supabase' };
