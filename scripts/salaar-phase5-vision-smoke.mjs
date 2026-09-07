@@ -39,7 +39,8 @@ assert.ok(uploadRoute.includes('salaarR2ObjectKey'));
 assert.ok(uploadRoute.includes("image/jpeg"));
 assert.ok(uploadRoute.includes("image/png"));
 assert.ok(uploadRoute.includes("image/webp"));
-assert.ok(uploadRoute.includes("image/avif"));
+assert.equal(uploadRoute.includes("'image/avif']"), false);
+assert.ok(uploadRoute.includes('Raw AVIF/HEIF is deliberately rejected'));
 
 const widget = await readFile(new URL('../components/SalaarNative.tsx', import.meta.url), 'utf8');
 assert.ok(widget.includes("/api/salaar/upload-image"));
