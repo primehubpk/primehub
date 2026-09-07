@@ -9,23 +9,30 @@ function serialText(value: unknown, max = 1200): string {
   return typeof value === 'string' ? value.trim().slice(0, max) : '';
 }
 
-function compactProduct(product: any) {
-  const tags = Array.isArray(product?.tags)
-    ? product.tags.filter((item: unknown) => typeof item === 'string').slice(0, 30)
+function serialStringArray(value: unknown, max = 30): string[] {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0).slice(0, max)
     : [];
+}
+
+function compactProduct(product: any) {
+  const tags = serialStringArray(product?.tags, 30);
   const images = Array.isArray(product?.images) ? product.images.slice(0, 12) : [];
 
   return {
     id: String(product?.id ?? ''),
     title: serialText(product?.title || product?.name || product?.productName, 180),
     name: serialText(product?.name || product?.title || product?.productName, 180),
+    slug: serialText(product?.slug, 220),
     description: serialText(product?.description, 1000),
+    brand: serialText(product?.brand, 140),
     category: serialText(product?.category, 180),
     categoryId: serialText(product?.categoryId, 180),
     subcategory: serialText(product?.subcategory, 180),
     material: serialText(product?.material, 180),
     color: serialText(product?.color, 180),
     tags,
+    priceBucketIds: serialStringArray(product?.priceBucketIds, 20),
     price: product?.price,
     salePrice: product?.salePrice,
     retailPrice: product?.retailPrice,
@@ -33,6 +40,11 @@ function compactProduct(product: any) {
     compareAtPrice: product?.compareAtPrice,
     stock: product?.stock ?? product?.quantity,
     active: product?.active,
+    published: product?.published,
+    featured: product?.featured,
+    isWholesale: product?.isWholesale,
+    isFlashSale: product?.isFlashSale,
+    isWeekendSpecial: product?.isWeekendSpecial,
     imageUrl: product?.imageUrl || product?.image || '',
     image: product?.image || product?.imageUrl || '',
     images,
@@ -44,6 +56,7 @@ function compactProduct(product: any) {
     variants: product?.variants,
     variantMatrix: product?.variantMatrix,
     colorImages: product?.colorImages,
+    createdAt: product?.createdAt || product?.created_at || null,
     updatedAt: product?.updatedAt || product?.updated_at || null,
   };
 }
@@ -83,7 +96,7 @@ async function loadSalaarCatalog() {
 
 export const getSalaarCatalogSnapshot = unstable_cache(
   loadSalaarCatalog,
-  ['primehub-salaar-catalog-v2'],
+  ['primehub-salaar-catalog-v3'],
   {
     revalidate: SALAAR_CATALOG_REVALIDATE_SECONDS,
     tags: ['salaar-catalog'],
