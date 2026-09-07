@@ -8,7 +8,11 @@ type SettingsSnapshot = { documents: Record<string, any>; source: 'firebase' | '
 type SkillsSnapshot = { skills: any[]; source: 'firebase' | 'supabase' | 'empty' };
 
 function mode(): ReadMode {
-  const value = String(process.env.PRIMEHUB_DATA_READ_MODE || 'firebase-primary').trim().toLowerCase();
+  const value = String(
+    process.env.PRIMEHUB_DATA_READ_MODE ||
+    process.env.PRIMEHUB_BACKEND_READ_MODE ||
+    'firebase-primary'
+  ).trim().toLowerCase();
   if (value === 'supabase-primary' || value === 'firebase-only' || value === 'supabase-only') return value;
   return 'firebase-primary';
 }
