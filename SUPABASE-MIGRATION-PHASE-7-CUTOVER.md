@@ -15,33 +15,62 @@ Branch: `feature/supabase-migration`
 
 - Phase 1 audit: complete.
 - Phase 2 Supabase schema/security: complete.
-- Phase 3 initial live Firebase -> Supabase data copy: PENDING.
+- Phase 3 initial live Firebase -> Supabase data copy: COMPLETE and verified on 2026-09-07.
 - Phase 4 dual read layer: code complete and CI-built.
 - Phase 5 dual write/mirror layer: code complete and CI-built.
 - Phase 6 auth identity bridge + Salaar dual layer: code complete and CI-built.
-- Phase 7 final cutover preparation: complete when this checklist and final CI are green.
+- Phase 7 final cutover preparation: complete when final branch CI and preview smoke checks are green.
 
-## HARD BLOCKER before merge/cutover
+## Phase 3 completion evidence
 
-Do not switch either backend mode to `supabase-primary` and do not merge/deploy this branch until Phase 3 has been run successfully and verified.
+The trusted Firebase Admin -> Supabase migration workflow completed successfully on 2026-09-07 at `2026-09-07T08:57:19.433Z`.
 
-Required Phase 3 evidence:
+Verified Firebase -> Supabase counts:
 
-1. One-time migration workflow succeeds with trusted credentials.
-2. Firebase and Supabase collection/table counts are compared.
-3. Representative product, category, settings, order, reseller, reward and Salaar records are sampled.
-4. Existing Firebase document IDs are preserved in Supabase.
-5. Cloudflare image URLs remain unchanged.
-6. No partial-copy errors remain unresolved.
+- products: 506 -> 506
+- categories: 14 -> 14
+- settings: 5 -> 5
+- prime_skills: 5 -> 5
+- orders: 3 -> 3
+- reviews: 0 -> 0
+- reward_gifts: 3 -> 3
+- user_rewards: 1 -> 1
+- reward_redemptions: 0 -> 0
+- reseller_profiles: 2 -> 2
+- reseller_withdrawals: 0 -> 0
+- reseller_reward_ledger: 0 -> 0
+- reseller_task_claims: 0 -> 0
+- reseller_point_ledger: 0 -> 0
+- reseller_task_events: 0 -> 0
+- reseller_whatsapp_orders: 0 -> 0
+- salaar_conversations: 11 -> 11
+- salaar_messages: 50 -> 50
 
-## Safe environment defaults before Phase 3
+Additional preservation checks after copy:
+
+- all 506 product rows are marked `authoritative_source=firebase` and `mirror_status=synced`;
+- all 506 mapped product image URLs match the original Firebase payload snapshot;
+- all 14 category slugs match the original Firebase payload snapshot;
+- settings, orders, reseller profiles and Salaar conversation rows carry the expected Firebase source/synced markers;
+- Firebase document IDs are preserved by the migration mapper as Supabase primary keys (or the corresponding `user_id` / `session_id` key for those tables);
+- Firebase data is not deleted or modified by the migration.
+
+Production Firebase contained duplicate category slugs, which Firestore permits. Supabase's migration schema had an unnecessary unique slug index. Phase 3 therefore replaces that unique index with a normal indexed lookup so source records can be preserved exactly without renaming category slugs.
+
+## Post-Phase-3 environment settings
 
 ```env
-PRIMEHUB_BACKEND_READ_MODE=firebase-primary
+PRIMEHUB_DATA_READ_MODE=supabase-primary
 PRIMEHUB_BACKEND_WRITE_MODE=firebase-primary
 ```
 
-These defaults keep the current Firebase behavior authoritative while Supabase mirroring/fallback code is staged.
+`PRIMEHUB_DATA_READ_MODE` is the canonical read switch. Runtime keeps backward compatibility with the legacy `PRIMEHUB_BACKEND_READ_MODE` variable during cutover.
+
+This gives the intended first cutover behavior:
+
+- storefront/catalog/settings reads try Supabase first and fall back to Firebase if Supabase read fails;
+- financial/order writes remain Firebase-authoritative during stabilization and mirror to Supabase;
+- Firebase remains available for rollback/fallback and is not removed.
 
 Server-only secrets required for the final runtime:
 
@@ -50,7 +79,7 @@ SUPABASE_URL=
 SUPABASE_SERVICE_ROLE_KEY=
 ```
 
-Phase 3 migration runner additionally requires:
+The one-time Phase 3 migration runner additionally uses:
 
 ```env
 FIREBASE_SERVICE_ACCOUNT_KEY=
@@ -64,7 +93,7 @@ Never expose the service-role key or Firebase service account in client-side/NEX
 2. Verify the migration branch is not behind `main` or reconcile any new main changes first.
 3. Verify Supabase counts/samples again immediately before cutover.
 4. Keep `PRIMEHUB_BACKEND_WRITE_MODE=firebase-primary` for the first production deployment so financial/order transactions remain on the known authoritative path while mirrors populate.
-5. Set `PRIMEHUB_BACKEND_READ_MODE=supabase-primary` only after migrated catalog/settings data is verified.
+5. Set `PRIMEHUB_DATA_READ_MODE=supabase-primary` so verified catalog/settings reads are Supabase-first with Firebase fallback.
 6. Deploy/merge only with explicit owner approval.
 7. Run production smoke checks: Home, Shop, category, product detail, search, settings, account login/signup, website order, review, reseller flows, Salaar normal chat, WAIT, Continue, NEED YOU, READY and Complete.
 8. Compare Firebase/Supabase mirrored records after smoke tests.
@@ -81,8 +110,8 @@ Fast rollback does not require deleting Supabase data.
 
 ## Home vs Shop note
 
-The old production behavior could show products in Shop while Home displayed an empty-catalog fallback because Shop had a client Firestore retry while Home relied on a cached server snapshot. The dual read layer removes that architectural mismatch by centralizing the backend read/fallback path. This should still be verified in production smoke testing after final deployment.
+The old production behavior could show products in Shop while Home displayed an empty-catalog fallback because Shop had a client Firestore retry while Home relied on a cached server snapshot. The dual read layer removes that architectural mismatch by centralizing the backend read/fallback path. This should still be verified in preview/production smoke testing after final deployment.
 
 ## Release gate
 
-Phase 7 code/preparation can be marked complete with green CI, but the migration is **NOT READY TO MERGE/DEPLOY** until Phase 3 live data copy and verification are complete.
+Phase 3 live data copy and verification are complete. The branch remains gated from merge/production until final CI, branch reconciliation with `main`, and explicit owner approval are complete.
