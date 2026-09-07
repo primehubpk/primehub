@@ -2,11 +2,6 @@ name: Phase 3 Firestore to Supabase
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - feature/supabase-migration
-    paths:
-      - .github/workflows/phase3-firestore-to-supabase.yml
 
 permissions:
   contents: read
