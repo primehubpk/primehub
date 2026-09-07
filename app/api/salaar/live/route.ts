@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getAdminDb } from '@/lib/firebaseAdmin';
 import { sanitizeSalaarImageUrls } from '@/lib/salaarAiRouter';
+import { sanitizeSalaarSalesMemory, type SalaarSalesMemory } from '@/lib/salaarSalesMemoryCore';
 import { GET as chatGet, POST as chatPost } from '../chat/route';
 
 export const runtime = 'nodejs';
@@ -10,6 +11,8 @@ type PendingReply = {
   message: string;
   shownProductIds: string[];
   imageUrls: string[];
+  salesMemory: SalaarSalesMemory;
+  cartContext: unknown[];
   messageDocId?: string;
 };
 
@@ -22,6 +25,10 @@ process.env.SALAAR_GROQ_MODEL = process.env.SALAAR_GROQ_MODEL_VERIFIED || 'opena
 
 function cleanText(value: unknown, max = 600): string {
   return typeof value === 'string' ? value.trim().slice(0, max) : '';
+}
+
+function compactCart(value: unknown): unknown[] {
+  return Array.isArray(value) ? value.slice(0, 20) : [];
 }
 
 function asDate(value: unknown): Date | null {
@@ -56,17 +63,31 @@ async function withTimeout<T>(promise: Promise<T>, label: string, ms = FIRESTORE
   }
 }
 
-async function delegatePost(sessionId: string, message: string, shownProductIds: string[], imageUrls: string[] = []) {
+async function delegatePost(
+  sessionId: string,
+  message: string,
+  shownProductIds: string[],
+  imageUrls: string[] = [],
+  salesMemory: unknown = null,
+  cartContext: unknown[] = [],
+) {
   const synthetic = new Request('http://salaar.local/api/salaar/chat', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ sessionId, message, shownProductIds, imageUrls }),
+    body: JSON.stringify({ sessionId, message, shownProductIds, imageUrls, salesMemory, cartContext }),
   });
   return withTimeout(chatPost(synthetic), 'Salaar chat/provider response', PROVIDER_TIMEOUT_MS);
 }
 
-async function degradedChat(sessionId: string, message: string, shownProductIds: string[], imageUrls: string[] = []) {
-  const response = await delegatePost(sessionId || crypto.randomUUID(), message, shownProductIds, imageUrls);
+async function degradedChat(
+  sessionId: string,
+  message: string,
+  shownProductIds: string[],
+  imageUrls: string[] = [],
+  salesMemory: unknown = null,
+  cartContext: unknown[] = [],
+) {
+  const response = await delegatePost(sessionId || crypto.randomUUID(), message, shownProductIds, imageUrls, salesMemory, cartContext);
   const data = await response.clone().json().catch(() => ({}));
   const noProducts = !Array.isArray(data?.products) || data.products.length === 0;
   if (wantsProducts(message) && noProducts && imageUrls.length === 0) {
@@ -103,6 +124,8 @@ async function claimExpiredPending(sessionId: string): Promise<PendingReply | nu
     const shownProductIds = Array.isArray(data.pendingShownProductIds)
       ? data.pendingShownProductIds.map((id: unknown) => String(id)).slice(-400)
       : [];
+    const salesMemory = sanitizeSalaarSalesMemory(data.pendingSalesMemory || data.salesMemory);
+    const cartContext = compactCart(data.pendingCartContext);
     const messageDocId = cleanText(data.pendingMessageDocId, 120) || undefined;
 
     tx.set(ref, {
@@ -112,11 +135,13 @@ async function claimExpiredPending(sessionId: string): Promise<PendingReply | nu
       pendingCustomerMessage: null,
       pendingShownProductIds: [],
       pendingImageUrls: [],
+      pendingSalesMemory: null,
+      pendingCartContext: [],
       pendingMessageDocId: null,
       updatedAt: new Date(),
     }, { merge: true });
 
-    if (message) claimed = { message, shownProductIds, imageUrls, messageDocId };
+    if (message) claimed = { message, shownProductIds, imageUrls, salesMemory, cartContext, messageDocId };
   });
 
   return claimed;
@@ -131,7 +156,7 @@ async function resumeClaimed(sessionId: string, pending: PendingReply | null) {
       'Salaar pending message delete',
     ).catch(() => undefined);
   }
-  await delegatePost(sessionId, pending.message, pending.shownProductIds, pending.imageUrls);
+  await delegatePost(sessionId, pending.message, pending.shownProductIds, pending.imageUrls, pending.salesMemory, pending.cartContext);
 }
 
 async function currentState(sessionId: string) {
@@ -166,6 +191,8 @@ export async function POST(request: Request) {
   let message = '';
   let shownProductIds: string[] = [];
   let imageUrls: string[] = [];
+  let salesMemory: SalaarSalesMemory = sanitizeSalaarSalesMemory(null);
+  let cartContext: unknown[] = [];
 
   try {
     const body = await request.json();
@@ -173,6 +200,8 @@ export async function POST(request: Request) {
     imageUrls = sanitizeSalaarImageUrls(
       Array.isArray(body?.imageUrls) ? body.imageUrls : body?.imageUrl ? [body.imageUrl] : [],
     );
+    salesMemory = sanitizeSalaarSalesMemory(body?.salesMemory);
+    cartContext = compactCart(body?.cartContext);
     message = cleanText(body?.message, 600)
       || (imageUrls.length ? 'Is image ko dekh kar design, color aur matching PrimeHub products ke bare mein help karein.' : '');
     shownProductIds = Array.isArray(body?.shownProductIds)
@@ -181,7 +210,7 @@ export async function POST(request: Request) {
     if (!message) return NextResponse.json({ error: 'Message or image required.' }, { status: 400 });
 
     if (Date.now() < firestoreDegradedUntil) {
-      return degradedChat(sessionId, message, shownProductIds, imageUrls);
+      return degradedChat(sessionId, message, shownProductIds, imageUrls, salesMemory, cartContext);
     }
 
     const expired = await withTimeout(claimExpiredPending(sessionId), 'Salaar soft hold transaction');
@@ -209,12 +238,14 @@ export async function POST(request: Request) {
         pendingCustomerMessage: message,
         pendingShownProductIds: shownProductIds,
         pendingImageUrls: imageUrls,
+        pendingSalesMemory: salesMemory,
+        pendingCartContext: cartContext,
         pendingMessageDocId: messageRef.id,
       }, { merge: true }), 'Salaar pending state write');
-      return NextResponse.json({ sessionId, silent: true, status: 'WAIT' });
+      return NextResponse.json({ sessionId, silent: true, status: 'WAIT', salesMemory });
     }
 
-    const response = await delegatePost(sessionId, message, shownProductIds, imageUrls);
+    const response = await delegatePost(sessionId, message, shownProductIds, imageUrls, salesMemory, cartContext);
     const data = await response.clone().json().catch(() => ({}));
     if (data?.needYou) {
       await withTimeout(
@@ -228,11 +259,11 @@ export async function POST(request: Request) {
     console.error('Salaar live wrapper state unavailable; using degraded chat mode', error);
     if (message) {
       try {
-        return await degradedChat(sessionId, message, shownProductIds, imageUrls);
+        return await degradedChat(sessionId, message, shownProductIds, imageUrls, salesMemory, cartContext);
       } catch (delegateError) {
         console.error('Salaar degraded chat delegation failed', delegateError);
       }
     }
-    return NextResponse.json({ reply: 'Ji, abhi short technical issue hai. WhatsApp 03238878009 par message kar dein.', provider: 'fallback', needYou: true, whatsapp: 'https://wa.me/923238878009' });
+    return NextResponse.json({ reply: 'Ji, abhi short technical issue hai. WhatsApp 03238878009 par message kar dein.', provider: 'fallback', needYou: true, whatsapp: 'https://wa.me/923238878009', salesMemory });
   }
 }
