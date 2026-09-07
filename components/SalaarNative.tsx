@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { Send, ShoppingCart, X } from 'lucide-react';
+import { ImagePlus, Send, ShoppingCart, X } from 'lucide-react';
 import { useCartStore } from '@/lib/cartStore';
 
 type ProductCard = {
@@ -26,16 +26,21 @@ type UiMessage = {
   id: string;
   role: 'customer' | 'salaar';
   text: string;
+  imageUrls?: string[];
   products?: ProductCard[];
   needYou?: boolean;
   whatsapp?: string | null;
   link?: { href: string; label: string } | null;
 };
 
+type PendingImage = { file: File; previewUrl: string };
+
 const SESSION_KEY = 'primehub-salaar-session-v1';
 const MESSAGE_KEY = 'primehub-salaar-messages-v1';
 const SHOWN_KEY = 'primehub-salaar-shown-v1';
 const HUMAN_REPLY_POLL_MS = 8000;
+const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/avif']);
 
 function randomId() {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID();
@@ -52,10 +57,20 @@ function loadJson<T>(key: string, fallback: T): T {
   }
 }
 
+function safeMessageImages(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((item): item is string => typeof item === 'string')
+    .map((item) => item.trim())
+    .filter((item) => /^https:\/\/(?:images\.primehubmall\.com|pub-[a-z0-9]+\.r2\.dev)\//i.test(item))
+    .slice(0, 2);
+}
+
 function mergeServerMessages(current: UiMessage[], incoming: UiMessage[]): UiMessage[] {
   const next = [...current];
   for (const item of incoming) {
-    const alreadyThere = next.some((existing) => existing.role === item.role && existing.text === item.text);
+    const imageKey = item.imageUrls?.[0] || '';
+    const alreadyThere = next.some((existing) => existing.role === item.role && existing.text === item.text && (existing.imageUrls?.[0] || '') === imageKey);
     if (!alreadyThere) next.push(item);
   }
   return next.slice(-60);
@@ -87,7 +102,10 @@ export default function SalaarNative() {
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [ready, setReady] = useState(false);
+  const [pendingImage, setPendingImage] = useState<PendingImage | null>(null);
+  const [imageError, setImageError] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const cartItems = useCartStore((state) => state.items);
   const addItem = useCartStore((state) => state.addItem);
   const openVariantModal = useCartStore((state) => state.openVariantModal);
@@ -114,6 +132,7 @@ export default function SalaarNative() {
             id: `${id}-${index}`,
             role: item?.role === 'customer' ? 'customer' : 'salaar',
             text: String(item?.text || ''),
+            imageUrls: safeMessageImages(item?.imageUrls),
           })).filter((item: UiMessage) => item.text);
           setMessages(recovered);
         })
@@ -134,6 +153,7 @@ export default function SalaarNative() {
           id: `server-${sessionId}-${index}-${String(item?.createdAt || '')}`,
           role: item?.role === 'customer' ? 'customer' : 'salaar',
           text: String(item?.text || ''),
+          imageUrls: safeMessageImages(item?.imageUrls),
         })).filter((item: UiMessage) => item.text);
         setMessages((current) => mergeServerMessages(current, recovered));
       } catch {
@@ -166,22 +186,73 @@ export default function SalaarNative() {
     return () => window.clearTimeout(timer);
   }, [messages, sending, open]);
 
+  useEffect(() => () => {
+    if (pendingImage?.previewUrl) URL.revokeObjectURL(pendingImage.previewUrl);
+  }, [pendingImage]);
+
   const welcome = useMemo<UiMessage>(() => ({
     id: 'welcome',
     role: 'salaar',
     text: 'Assalam o Alaikum ji 👋 Main Salaar hoon. Product, order, Prime Skill ya Reseller Club — bata dein kya help chahiye?',
   }), []);
 
+  function clearPendingImage() {
+    setPendingImage((current) => {
+      if (current?.previewUrl) URL.revokeObjectURL(current.previewUrl);
+      return null;
+    });
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  }
+
+  function chooseImage(file?: File | null) {
+    setImageError('');
+    if (!file) return;
+    if (!ALLOWED_IMAGE_TYPES.has(file.type)) {
+      setImageError('JPG, PNG, WEBP ya AVIF image bhejein.');
+      return;
+    }
+    if (!file.size || file.size > MAX_IMAGE_BYTES) {
+      setImageError('Image 8MB ya is se chhoti honi chahiye.');
+      return;
+    }
+    clearPendingImage();
+    setPendingImage({ file, previewUrl: URL.createObjectURL(file) });
+  }
+
+  async function uploadSelectedImage(): Promise<string | null> {
+    if (!pendingImage) return null;
+    const form = new FormData();
+    form.set('sessionId', sessionId);
+    form.set('image', pendingImage.file);
+    const response = await fetch('/api/salaar/upload-image', { method: 'POST', body: form, cache: 'no-store' });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data?.success || typeof data?.url !== 'string') {
+      throw new Error(String(data?.error || 'Image upload failed.'));
+    }
+    return data.url;
+  }
+
   async function sendMessage(event?: FormEvent, preset?: string) {
     event?.preventDefault();
     const text = (preset ?? input).trim();
-    if (!text || sending || !sessionId) return;
-    setInput('');
+    if ((!text && !pendingImage) || sending || !sessionId) return;
     setSending(true);
-    setMessages((current) => [...current, { id: randomId(), role: 'customer', text }]);
+    setImageError('');
 
+    let imageUrl: string | null = null;
     try {
-      const readyFlow = isReadyIntent(text);
+      imageUrl = await uploadSelectedImage();
+      const customerText = text || (imageUrl ? 'Image bheji hai — isko dekh kar guide karein.' : '');
+      setInput('');
+      setMessages((current) => [...current, {
+        id: randomId(),
+        role: 'customer',
+        text: customerText,
+        imageUrls: imageUrl ? [imageUrl] : [],
+      }]);
+      if (imageUrl) clearPendingImage();
+
+      const readyFlow = !imageUrl && isReadyIntent(text);
       const endpoint = readyFlow ? '/api/salaar/dual-ready' : '/api/salaar/dual-live';
       const response = await fetch(endpoint, {
         method: 'POST',
@@ -190,6 +261,7 @@ export default function SalaarNative() {
           sessionId,
           message: text,
           shownProductIds,
+          ...(imageUrl ? { imageUrls: [imageUrl] } : {}),
           ...(readyFlow ? { cartItems } : {}),
         }),
         cache: 'no-store',
@@ -209,14 +281,18 @@ export default function SalaarNative() {
         whatsapp: typeof data?.whatsapp === 'string' ? data.whatsapp : null,
         link: data?.link?.href && data?.link?.label ? { href: String(data.link.href), label: String(data.link.label) } : null,
       }]);
-    } catch {
-      setMessages((current) => [...current, {
-        id: randomId(),
-        role: 'salaar',
-        text: 'Ji, connection issue aa gaya. WhatsApp 03238878009 par message kar dein.',
-        needYou: true,
-        whatsapp: 'https://wa.me/923238878009',
-      }]);
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : '';
+      if (!imageUrl && pendingImage) setImageError(detail || 'Image upload nahi ho saki. Dobara try karein.');
+      else {
+        setMessages((current) => [...current, {
+          id: randomId(),
+          role: 'salaar',
+          text: 'Ji, connection issue aa gaya. WhatsApp 03238878009 par message kar dein.',
+          needYou: true,
+          whatsapp: 'https://wa.me/923238878009',
+        }]);
+      }
     } finally {
       setSending(false);
     }
@@ -278,6 +354,7 @@ export default function SalaarNative() {
           <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto bg-[#f7f6f1] px-3 py-4">
             {renderedMessages.map((message) => (
               <div key={message.id} className={message.role === 'customer' ? 'ml-auto max-w-[84%]' : 'mr-auto max-w-[94%]'}>
+                {message.imageUrls?.length ? <div className={`mb-1.5 grid gap-1 overflow-hidden rounded-2xl ${message.imageUrls.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}>{message.imageUrls.map((url) => <img key={url} src={url} alt="Customer shared" className="max-h-52 w-full bg-white object-cover" loading="lazy" />)}</div> : null}
                 <div className={message.role === 'customer' ? 'rounded-2xl rounded-br-md bg-[#0d7468] px-3 py-2 text-sm leading-5 text-white' : 'rounded-2xl rounded-bl-md border border-black/5 bg-white px-3 py-2 text-sm leading-5 text-[#171712] shadow-sm'}>{message.text}</div>
                 {message.products?.length ? <div className="mt-2 space-y-2">{message.products.map((product) => (
                   <div key={product.id} className="flex gap-2 rounded-2xl border border-black/10 bg-white p-2 shadow-sm">
@@ -289,14 +366,18 @@ export default function SalaarNative() {
                 {message.whatsapp ? <a href={message.whatsapp} target="_blank" rel="noreferrer" className="mt-2 inline-flex rounded-full bg-[#25D366] px-3 py-1.5 text-xs font-bold text-white">WhatsApp 03238878009</a> : null}
               </div>
             ))}
-            {sending ? <div className="mr-auto rounded-2xl rounded-bl-md bg-white px-3 py-2 text-xs text-black/60 shadow-sm">Salaar dekh raha hai…</div> : null}
+            {sending ? <div className="mr-auto rounded-2xl rounded-bl-md bg-white px-3 py-2 text-xs text-black/60 shadow-sm">{pendingImage ? 'Image upload ho rahi hai…' : 'Salaar dekh raha hai…'}</div> : null}
           </div>
 
           <div className="border-t border-black/10 bg-white px-3 py-3">
             {messages.length === 0 ? <div className="mb-2 flex gap-2 overflow-x-auto pb-1 text-[11px]"><button onClick={() => void sendMessage(undefined, 'Bangles dikhao')} className="shrink-0 rounded-full bg-black/5 px-3 py-1.5 font-semibold">Bangles dikhao</button><button onClick={() => void sendMessage(undefined, 'Prime Skill kya hai?')} className="shrink-0 rounded-full bg-black/5 px-3 py-1.5 font-semibold">Prime Skill?</button><button onClick={() => void sendMessage(undefined, 'Reseller Club kya hai?')} className="shrink-0 rounded-full bg-black/5 px-3 py-1.5 font-semibold">Reseller Club?</button></div> : null}
+            {pendingImage ? <div className="mb-2 flex items-center gap-2 rounded-2xl border border-black/10 bg-[#fafaf7] p-2"><img src={pendingImage.previewUrl} alt="Selected for Salaar" className="h-16 w-16 rounded-xl object-cover" /><div className="min-w-0 flex-1"><div className="truncate text-xs font-bold text-black">Image ready</div><div className="mt-0.5 text-[11px] text-black/55">Salaar image dekh kar jawab dega.</div></div><button type="button" onClick={clearPendingImage} disabled={sending} className="grid h-8 w-8 place-items-center rounded-full bg-black/5 text-black/60" aria-label="Remove selected image"><X size={15} /></button></div> : null}
+            {imageError ? <div className="mb-2 text-xs font-semibold text-red-600">{imageError}</div> : null}
             <form onSubmit={(event) => void sendMessage(event)} className="flex items-end gap-2">
-              <textarea value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void sendMessage(); } }} rows={1} maxLength={600} placeholder="Salaar se poochain…" className="max-h-24 min-h-11 flex-1 resize-none rounded-2xl border border-black/10 bg-[#fafaf7] px-3 py-3 text-sm outline-none focus:border-[#0d7468]" />
-              <button type="submit" disabled={!input.trim() || sending} className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[#0d7468] text-white disabled:opacity-40" aria-label="Send message"><Send size={18} /></button>
+              <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/avif" className="hidden" onChange={(event) => chooseImage(event.target.files?.[0])} />
+              <button type="button" onClick={() => fileInputRef.current?.click()} disabled={sending} className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-black/10 bg-[#fafaf7] text-[#0d7468] disabled:opacity-40" aria-label="Send image to Salaar"><ImagePlus size={19} /></button>
+              <textarea value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void sendMessage(); } }} rows={1} maxLength={600} placeholder={pendingImage ? 'Image ke bare mein poochain…' : 'Salaar se poochain…'} className="max-h-24 min-h-11 flex-1 resize-none rounded-2xl border border-black/10 bg-[#fafaf7] px-3 py-3 text-sm outline-none focus:border-[#0d7468]" />
+              <button type="submit" disabled={(!input.trim() && !pendingImage) || sending} className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[#0d7468] text-white disabled:opacity-40" aria-label="Send message"><Send size={18} /></button>
             </form>
           </div>
         </section>
