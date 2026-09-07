@@ -44,6 +44,8 @@ type ProductCard = {
   originalPrice: number;
   image: string;
   href: string;
+  dealLive?: boolean;
+  dealLabel?: string;
   hasVariants?: boolean;
   variantColors?: unknown;
   variantSizes?: unknown;
@@ -54,7 +56,13 @@ type ProductCard = {
   colorImages?: unknown;
 };
 
-type ChatMessage = { role: 'customer' | 'salaar'; text: string; createdAt?: string; imageUrls?: string[] };
+type ChatMessage = {
+  role: 'customer' | 'salaar';
+  text: string;
+  createdAt?: string;
+  imageUrls?: string[];
+  referencedProduct?: ProductCard | null;
+};
 
 const WHATSAPP_NUMBER = '03238878009';
 const DEFAULT_IMAGE_MESSAGE = 'Is image ko dekh kar design, color aur matching PrimeHub products ke bare mein help karein.';
@@ -72,12 +80,17 @@ Rules:
 - Treat the Store Knowledge block as current admin-managed website truth for this turn.
 - Treat Sales Memory as bounded context for follow-ups, not as authority for live price/stock.
 - If product cards are supplied below, refer to them naturally. Do not claim another product exists unless it is in grounded context.
+- If a customer quoted/replied to a product image, the quoted product card is the exact grounded product they mean for this turn.
 - If an image is supplied, inspect it carefully and answer only what can actually be inferred from the image. Never claim an exact product match unless a grounded product card supports it.
 - If a store/deal fact is not supplied, say briefly that you need the live store detail instead of guessing.
 - If confused, payment is stuck, customer is angry, or you are not confident about a sensitive fact, involve human support at ${WHATSAPP_NUMBER} and keep it short.`;
 
 function cleanText(value: unknown, max = 600): string {
   return typeof value === 'string' ? value.trim().slice(0, max) : '';
+}
+
+function cleanProductId(value: unknown): string {
+  return cleanText(value, 160).replace(/[^a-z0-9._:-]/gi, '');
 }
 
 function safePrice(value: unknown): number {
@@ -111,6 +124,8 @@ function toProductCard(p: any): ProductCard {
     originalPrice: originalPrice || price,
     image: productImage(p),
     href: `/product/${encodeURIComponent(String(p.id))}`,
+    dealLive: p?.salaarDealLive === true,
+    dealLabel: cleanText(p?.salaarDealLabel, 100) || undefined,
     hasVariants: Boolean(p?.hasVariants || p?.variants?.length || p?.variantMatrix?.length || p?.variantColors?.length || p?.variantSizes?.length),
     variantColors: p?.variantColors,
     variantSizes: p?.variantSizes,
@@ -120,6 +135,45 @@ function toProductCard(p: any): ProductCard {
     variantMatrix: p?.variantMatrix,
     colorImages: p?.colorImages,
   };
+}
+
+function compactReferencedProduct(product: ProductCard | null): ProductCard | null {
+  if (!product) return null;
+  return {
+    id: product.id,
+    name: product.name,
+    price: product.price,
+    originalPrice: product.originalPrice,
+    image: product.image,
+    href: product.href,
+    dealLive: product.dealLive,
+    dealLabel: product.dealLabel,
+  };
+}
+
+function savedReferencedProduct(value: unknown): ProductCard | null {
+  if (!value || typeof value !== 'object') return null;
+  const source = value as Record<string, unknown>;
+  const id = cleanProductId(source.id);
+  const name = cleanText(source.name, 100);
+  if (!id || !name) return null;
+  const price = safePrice(source.price);
+  const originalPrice = safePrice(source.originalPrice || price);
+  return {
+    id,
+    name,
+    price,
+    originalPrice: originalPrice || price,
+    image: cleanText(source.image, 600),
+    href: cleanText(source.href, 300) || `/product/${encodeURIComponent(id)}`,
+    dealLive: source.dealLive === true,
+    dealLabel: cleanText(source.dealLabel, 100) || undefined,
+  };
+}
+
+function findReferenceProduct(products: any[], id: string): any | null {
+  if (!id) return null;
+  return products.find((product) => String(product?.id || '') === id && product?.active !== false && product?.published !== false) || null;
 }
 
 function pickProducts(products: any[], intent: SalesIntent, shown: string[]): ProductCard[] {
@@ -143,6 +197,42 @@ function priceSummary(intent: SalesIntent): string {
 function imageMatchRequest(message: string, wasImageOnly: boolean) {
   if (wasImageOnly) return true;
   return /(jaisa|jaisi|same|similar|matching|match|milta|milti|available|product|option|dikha|show|chahi|find|search)/i.test(message);
+}
+
+function referenceWantsAlternatives(message: string): boolean {
+  return /(jaisa|jaisi|same|similar|matching|match|aur|more|next|dikha|show|option|doosra|dusra|sasta|mehnga|premium)/i.test(message);
+}
+
+function readableValues(value: unknown, max = 5): string[] {
+  const result: string[] = [];
+  const add = (candidate: unknown) => {
+    if (typeof candidate !== 'string') return;
+    const text = candidate.trim();
+    if (text && !result.includes(text) && result.length < max) result.push(text);
+  };
+  if (typeof value === 'string') add(value);
+  else if (Array.isArray(value)) {
+    value.forEach((item) => {
+      if (typeof item === 'string') add(item);
+      else if (item && typeof item === 'object') {
+        const source = item as Record<string, unknown>;
+        add(source.name || source.label || source.value || source.color || source.size);
+      }
+    });
+  }
+  return result;
+}
+
+function productOptionContext(product: ProductCard): string {
+  const colors = [...readableValues(product.variantColors), ...readableValues(product.colors)].slice(0, 5);
+  const sizes = [...readableValues(product.variantSizes), ...readableValues(product.sizes)].slice(0, 5);
+  const extras = [
+    colors.length ? `colors=${colors.join(',')}` : '',
+    sizes.length ? `sizes=${sizes.join(',')}` : '',
+    product.hasVariants ? 'variants=yes' : '',
+    product.dealLive ? `liveDeal=${product.dealLabel || 'yes'}` : '',
+  ].filter(Boolean);
+  return extras.length ? ` | ${extras.join(' | ')}` : '';
 }
 
 function deterministicReply(
@@ -179,6 +269,17 @@ function deterministicReply(
     return { text: `Ji, aapke current cart context mein: ${compact}. Final price/stock Ready par live verify hoga.` };
   }
 
+  if (referenceOnly && products.length === 1) {
+    const product = products[0];
+    if (/(price|rate|kitn[aei]|pkr|rs\b|deal price|qeemat)/i.test(m)) {
+      const deal = product.dealLive ? ` Ye abhi ${product.dealLabel || 'live deal'} par hai.` : '';
+      return { text: `Ji, ${product.name} ki current price Rs. ${product.price.toLocaleString()} hai.${deal}` };
+    }
+    if (/(available|stock|maujood)/i.test(m)) {
+      return { text: `Ji, aap ${product.name} ki availability pooch rahe hain. Final stock order se pehle live verify hoga.` };
+    }
+  }
+
   if (knowledge) {
     const grounded = directStoreKnowledgeReply(message, knowledge);
     if (grounded) return grounded;
@@ -191,7 +292,7 @@ function deterministicReply(
     return { text: `Ji, return/exchange case item aur order condition dekh kar team confirm karti hai. Zarurat ho to ${WHATSAPP_NUMBER} par help mil jayegi.` };
   }
   if (referenceOnly && products.length === 1) {
-    return { text: `Ji, ${products[0].name} — ye wala aap select kar rahe hain. Iska color/variant ya is jaisa aur chahiye ho to bata dein.` };
+    return { text: `Ji, ${products[0].name} — isi product ke bare mein pooch rahe hain. Jo detail chahiye poochain, main current product context se guide karta hoon.` };
   }
   if (products.length) {
     const budget = priceSummary(intent);
@@ -199,7 +300,7 @@ function deterministicReply(
     const smart = intent.sortBy === 'latest' ? 'latest' : intent.sortBy === 'cheapest' ? 'sab se budget-friendly' : intent.sortBy === 'premium' ? 'premium' : intent.sortBy === 'discount' ? 'discounted' : '';
     const detail = [category, budget, smart].filter(Boolean).join(' · ');
     const moreText = intent.followUp.more ? 'Ji, ye next options dekhain.' : products.length > 1 ? 'Ji, ye suitable options dekhain.' : 'Ji, ye matching option dekhain.';
-    return { text: `${moreText}${detail ? ` ${detail}.` : ''} Pasand aye to yahin cart mein add kar dein.` };
+    return { text: `${moreText}${detail ? ` ${detail}.` : ''} Kisi image ke bare mein poochna ho to us par reply karein.` };
   }
   if (intent.wantsProducts) {
     const budget = priceSummary(intent);
@@ -219,7 +320,7 @@ function llmProductContext(products: ProductCard[]) {
 function llmGrounding(intent: SalesIntent, products: ProductCard[], knowledge: SalaarStoreKnowledge | null, memory: SalaarSalesMemory, catalogProducts: any[]) {
   const contextProducts = llmProductContext(products);
   const productContext = contextProducts.length
-    ? `\nGrounded products available now:\n${contextProducts.map((p, index) => `${index + 1}. ${p.name} | Rs ${p.price} | id ${p.id}`).join('\n')}`
+    ? `\nGrounded products available now:\n${contextProducts.map((p, index) => `${index + 1}. ${p.name} | Rs ${p.price} | id ${p.id}${productOptionContext(p)}`).join('\n')}`
     : '\nNo grounded product cards are available for this turn.';
   const knowledgeContext = knowledge
     ? `\nStore Knowledge (safe, admin-managed, current snapshot):\n${storeKnowledgePromptContext(knowledge)}`
@@ -272,6 +373,7 @@ async function loadHistory(sessionId: string): Promise<ChatMessage[]> {
         text: cleanText(data.text, 1000),
         createdAt: data.createdAt?.toDate?.()?.toISOString?.(),
         imageUrls: sanitizeSalaarImageUrls(data.imageUrls),
+        referencedProduct: savedReferencedProduct(data.referencedProduct),
       } as ChatMessage;
     });
   } catch {
@@ -325,6 +427,7 @@ export async function POST(request: Request) {
     const message = customerMessage || (imageUrls.length ? DEFAULT_IMAGE_MESSAGE : '');
     const shownProductIds = Array.isArray(body?.shownProductIds) ? body.shownProductIds.map((id: unknown) => String(id)).slice(-400) : [];
     const cartContext = Array.isArray(body?.cartContext) ? body.cartContext.slice(0, 20) : [];
+    const requestedReferenceId = cleanProductId(body?.referencedProductId);
     if (!message) return NextResponse.json({ error: 'Message or image required.' }, { status: 400 });
 
     const knowledgePromise = getSalaarStoreKnowledgeSnapshot().catch((error) => {
@@ -343,6 +446,18 @@ export async function POST(request: Request) {
       categories: Array.isArray(catalog.categories) ? catalog.categories : [],
       priceBuckets: knowledge?.priceBuckets || [],
     };
+    const referencedCatalogProduct = findReferenceProduct(catalogContext.products, requestedReferenceId);
+    const referencedProductCard = referencedCatalogProduct ? toProductCard(referencedCatalogProduct) : null;
+    const memoryForTurn = referencedProductCard
+      ? sanitizeSalaarSalesMemory({
+          ...baseMemory,
+          selectedProductId: referencedProductCard.id,
+          lastShownProductIds: [
+            referencedProductCard.id,
+            ...baseMemory.lastShownProductIds.filter((id) => id !== referencedProductCard.id),
+          ].slice(0, 30),
+        })
+      : baseMemory;
 
     const rawIntent = parseSalesIntent(message, catalogContext);
     let queryMessage = effectiveProductQuery(message, history, catalogContext);
@@ -384,11 +499,19 @@ export async function POST(request: Request) {
     intent.requiresVision = Boolean(imageUrls.length || rawIntent.requiresVision || intent.requiresVision);
     intent.needsReasoning = Boolean(intent.requiresVision || rawIntent.needsReasoning || intent.needsReasoning);
 
-    const memoryResolution = resolveSalesTurnWithMemory(message, intent, baseMemory, catalogContext.products);
+    const memoryResolution = resolveSalesTurnWithMemory(message, intent, memoryForTurn, catalogContext.products);
     intent = memoryResolution.intent;
+    const explicitReferenceOnly = Boolean(
+      referencedProductCard
+      && !referenceWantsAlternatives(message)
+      && !intent.followUp.compare
+      && imageUrls.length === 0,
+    );
 
     let cards: ProductCard[];
-    if (memoryResolution.referenceOnly && memoryResolution.selectedProductId) {
+    if (explicitReferenceOnly && referencedProductCard) {
+      cards = [referencedProductCard];
+    } else if (memoryResolution.referenceOnly && memoryResolution.selectedProductId) {
       cards = pickProductsByIds(catalogContext.products, [memoryResolution.selectedProductId]);
     } else if (memoryResolution.comparisonProductIds.length) {
       cards = pickProductsByIds(catalogContext.products, memoryResolution.comparisonProductIds);
@@ -396,22 +519,25 @@ export async function POST(request: Request) {
       cards = pickProducts(catalogContext.products, intent, shownProductIds);
     }
 
+    const referenceOnly = explicitReferenceOnly || memoryResolution.referenceOnly;
+    const selectedProductId = referencedProductCard?.id || memoryResolution.selectedProductId;
     const nextMemory = updateSalaarSalesMemory({
-      previous: baseMemory,
+      previous: memoryForTurn,
       message,
       resolvedQuery: queryMessage,
       intent,
       shownProductIds: cards.map((card) => card.id),
-      selectedProductId: memoryResolution.selectedProductId,
+      selectedProductId,
       comparisonProductIds: memoryResolution.comparisonProductIds,
       visualSearchQuery: visionAnalysis?.searchQuery || null,
       cart: cartContext,
-      referenceOnly: memoryResolution.referenceOnly,
+      referenceOnly,
     });
 
     await Promise.all([
       saveMessage(sessionId, 'customer', message, {
         imageUrls,
+        referencedProduct: compactReferencedProduct(referencedProductCard),
         visionAnalysis: visionAnalysis ? {
           searchQuery: visionAnalysis.searchQuery,
           category: visionAnalysis.category || null,
@@ -428,13 +554,13 @@ export async function POST(request: Request) {
           requiresVision: rawIntent.requiresVision,
           summary: rawIntent.summary,
         },
-        salesMemoryUsed: memoryResolution.memoryUsed,
+        salesMemoryUsed: memoryResolution.memoryUsed || Boolean(referencedProductCard),
         knowledgeRefreshedAt: knowledge?.refreshedAt || null,
       }),
       saveStoredMemory(sessionId, nextMemory),
     ]);
 
-    const deterministic = deterministicReply(message, intent, cards, knowledge, imageUrls.length > 0, nextMemory, memoryResolution.referenceOnly);
+    const deterministic = deterministicReply(message, intent, cards, knowledge, imageUrls.length > 0, nextMemory, referenceOnly);
     let reply = deterministic.text;
 
     if (visionAnalysis) {
@@ -461,7 +587,7 @@ export async function POST(request: Request) {
       needYou,
       knowledgeSources: knowledge?.sources || null,
       knowledgeRefreshedAt: knowledge?.refreshedAt || null,
-      salesMemoryUsed: memoryResolution.memoryUsed,
+      salesMemoryUsed: memoryResolution.memoryUsed || Boolean(referencedProductCard),
       selectedProductId: nextMemory.selectedProductId,
       comparisonProductIds: nextMemory.comparisonProductIds,
       visionAnalysis: visionAnalysis ? {
