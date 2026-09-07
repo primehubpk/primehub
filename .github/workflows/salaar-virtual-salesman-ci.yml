@@ -50,5 +50,8 @@ jobs:
       - name: Phase 8 professional salesman QA
         run: node scripts/salaar-phase8-professional-qa.mjs
 
+      - name: Phase 9 chat experience smoke
+        run: node scripts/salaar-phase9-chat-experience-smoke.mjs
+
       - name: Build
         run: npm run build
