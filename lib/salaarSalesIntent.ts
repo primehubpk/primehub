@@ -43,6 +43,8 @@ type CatalogLike = {
   categories?: any[];
 };
 
+type AliasValue = { alias: string; canonical: string };
+
 const STOP_WORDS = new Set([
   'mujhe', 'muje', 'mery', 'mere', 'meri', 'mera', 'hum', 'ham', 'koi', 'kuch', 'aur', 'or', 'more', 'next', 'mazeed', 'mazid',
   'show', 'dikhao', 'dikha', 'dikhaye', 'dikhain', 'chahiye', 'chahi', 'chaheye', 'price', 'rate', 'budget', 'under', 'below',
@@ -127,6 +129,17 @@ function uniqueValues(values: string[]): string[] {
   return [...map.values()].sort((a, b) => normalize(b).length - normalize(a).length);
 }
 
+function uniqueAliases(values: AliasValue[]): AliasValue[] {
+  const map = new Map<string, AliasValue>();
+  for (const value of values) {
+    const key = normalize(value.alias);
+    const canonical = value.canonical.trim();
+    if (!key || key.length < 2 || !canonical) continue;
+    if (!map.has(key)) map.set(key, { alias: value.alias.trim(), canonical });
+  }
+  return [...map.values()].sort((a, b) => normalize(b.alias).length - normalize(a.alias).length);
+}
+
 function bestContained(message: string, values: string[]): string | undefined {
   const normalizedMessage = ` ${normalize(message)} `;
   for (const value of uniqueValues(values)) {
@@ -136,14 +149,34 @@ function bestContained(message: string, values: string[]): string | undefined {
   return undefined;
 }
 
+function bestContainedAlias(message: string, values: AliasValue[]): string | undefined {
+  const normalizedMessage = ` ${normalize(message)} `;
+  for (const value of uniqueAliases(values)) {
+    const candidate = normalize(value.alias);
+    if (candidate && normalizedMessage.includes(` ${candidate} `)) return value.canonical;
+  }
+  return undefined;
+}
+
 function catalogVocabulary(catalog: CatalogLike) {
   const products = Array.isArray(catalog.products) ? catalog.products : [];
   const categories = Array.isArray(catalog.categories) ? catalog.categories : [];
+  const categoryAliases: AliasValue[] = [];
+
+  for (const category of categories) {
+    const name = typeof category?.name === 'string' ? category.name.trim() : '';
+    const slug = typeof category?.slug === 'string' ? category.slug.trim() : '';
+    const canonical = name || slug;
+    if (!canonical) continue;
+    if (name) categoryAliases.push({ alias: name, canonical });
+    if (slug) categoryAliases.push({ alias: slug.replace(/[-_]+/g, ' '), canonical });
+  }
+  for (const product of products) {
+    for (const value of stringValues(product?.category)) categoryAliases.push({ alias: value, canonical: value });
+  }
+
   return {
-    categories: uniqueValues([
-      ...categories.flatMap((category) => [category?.name, category?.slug].filter((value): value is string => typeof value === 'string')),
-      ...products.flatMap((product) => stringValues(product?.category)),
-    ]),
+    categories: uniqueAliases(categoryAliases),
     subcategories: uniqueValues(products.flatMap((product) => stringValues(product?.subcategory))),
     colors: uniqueValues(products.flatMap((product) => [...stringValues(product?.color), ...stringValues(product?.colors), ...stringValues(product?.variantColors)])),
     materials: uniqueValues(products.flatMap((product) => [...stringValues(product?.material), ...stringValues(product?.materials)])),
@@ -199,7 +232,7 @@ export function parseSalesIntent(message: string, catalog: CatalogLike): SalesIn
   const value = normalize(message);
   const vocabulary = catalogVocabulary(catalog);
   const price = parsePriceFilters(message);
-  const category = bestContained(message, vocabulary.categories);
+  const category = bestContainedAlias(message, vocabulary.categories);
   const subcategory = bestContained(message, vocabulary.subcategories);
   const color = bestContained(message, vocabulary.colors);
   const material = bestContained(message, vocabulary.materials);
@@ -295,6 +328,9 @@ export function rankProductsForIntent(products: any[], intent: SalesIntent, show
     intent.filters.category || intent.filters.subcategory || intent.filters.color || intent.filters.material
     || intent.filters.minPrice != null || intent.filters.maxPrice != null || intent.filters.targetPrice != null
   );
+  if (intent.followUp.referencedPosition != null && !structuredFilterPresent && intent.terms.length === 0 && !intent.followUp.more && !intent.followUp.cheaper && !intent.followUp.pricier) {
+    return [];
+  }
 
   const candidates = products.filter((product) => {
     if (!product || product.id == null || product.active === false || shown.has(String(product.id))) return false;
