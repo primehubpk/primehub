@@ -81,7 +81,7 @@ assert.deepEqual(knowledge.categories.map((category) => category.name), ['Glass 
 assert.deepEqual(knowledge.skills.map((skill) => skill.title), ['Bangles Selling Skill']);
 
 const bigDealReply = directStoreKnowledgeReply('Big Deal kya hai?', knowledge);
-assert.ok(bigDealReply?.text.includes('2999'));
+assert.ok(bigDealReply?.text.includes('Rs 2,999'));
 assert.equal(bigDealReply?.link?.href, '/deals/big');
 
 const freeDeliveryReply = directStoreKnowledgeReply('free delivery kab milti hai?', knowledge);
