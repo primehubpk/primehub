@@ -30,7 +30,7 @@ jobs:
         run: npx tsc --noEmit
 
       - name: Phase 2 intent smoke
-        run: node --conditions=react-server scripts/salaar-phase2-intent-smoke.mjs
+        run: node scripts/salaar-phase2-intent-smoke.mjs
 
       - name: Build
         run: npm run build
