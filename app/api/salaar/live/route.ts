@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getAdminDb } from '@/lib/firebaseAdmin';
+import { sanitizeSalaarImageUrls } from '@/lib/salaarAiRouter';
 import { GET as chatGet, POST as chatPost } from '../chat/route';
 
 export const runtime = 'nodejs';
@@ -8,6 +9,7 @@ export const dynamic = 'force-dynamic';
 type PendingReply = {
   message: string;
   shownProductIds: string[];
+  imageUrls: string[];
   messageDocId?: string;
 };
 
@@ -54,20 +56,20 @@ async function withTimeout<T>(promise: Promise<T>, label: string, ms = FIRESTORE
   }
 }
 
-async function delegatePost(sessionId: string, message: string, shownProductIds: string[]) {
+async function delegatePost(sessionId: string, message: string, shownProductIds: string[], imageUrls: string[] = []) {
   const synthetic = new Request('http://salaar.local/api/salaar/chat', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ sessionId, message, shownProductIds }),
+    body: JSON.stringify({ sessionId, message, shownProductIds, imageUrls }),
   });
   return withTimeout(chatPost(synthetic), 'Salaar chat/provider response', PROVIDER_TIMEOUT_MS);
 }
 
-async function degradedChat(sessionId: string, message: string, shownProductIds: string[]) {
-  const response = await delegatePost(sessionId || crypto.randomUUID(), message, shownProductIds);
+async function degradedChat(sessionId: string, message: string, shownProductIds: string[], imageUrls: string[] = []) {
+  const response = await delegatePost(sessionId || crypto.randomUUID(), message, shownProductIds, imageUrls);
   const data = await response.clone().json().catch(() => ({}));
   const noProducts = !Array.isArray(data?.products) || data.products.length === 0;
-  if (wantsProducts(message) && noProducts) {
+  if (wantsProducts(message) && noProducts && imageUrls.length === 0) {
     return NextResponse.json({
       ...data,
       reply: 'Ji, product catalog abhi refresh issue mein hai. Main aapko direct relevant Shop search khol deta hoon — wahan current products dekh sakte hain.',
@@ -95,7 +97,9 @@ async function claimExpiredPending(sessionId: string): Promise<PendingReply | nu
     const until = asDate(data.softHoldUntil);
     if (!until || until.getTime() > Date.now()) return;
 
-    const message = cleanText(data.pendingCustomerMessage, 600);
+    const imageUrls = sanitizeSalaarImageUrls(data.pendingImageUrls);
+    const message = cleanText(data.pendingCustomerMessage, 600)
+      || (imageUrls.length ? 'Is image ko dekh kar design, color aur matching PrimeHub products ke bare mein help karein.' : '');
     const shownProductIds = Array.isArray(data.pendingShownProductIds)
       ? data.pendingShownProductIds.map((id: unknown) => String(id)).slice(-400)
       : [];
@@ -107,11 +111,12 @@ async function claimExpiredPending(sessionId: string): Promise<PendingReply | nu
       softHoldUntil: null,
       pendingCustomerMessage: null,
       pendingShownProductIds: [],
+      pendingImageUrls: [],
       pendingMessageDocId: null,
       updatedAt: new Date(),
     }, { merge: true });
 
-    if (message) claimed = { message, shownProductIds, messageDocId };
+    if (message) claimed = { message, shownProductIds, imageUrls, messageDocId };
   });
 
   return claimed;
@@ -126,7 +131,7 @@ async function resumeClaimed(sessionId: string, pending: PendingReply | null) {
       'Salaar pending message delete',
     ).catch(() => undefined);
   }
-  await delegatePost(sessionId, pending.message, pending.shownProductIds);
+  await delegatePost(sessionId, pending.message, pending.shownProductIds, pending.imageUrls);
 }
 
 async function currentState(sessionId: string) {
@@ -160,18 +165,23 @@ export async function POST(request: Request) {
   let sessionId = '';
   let message = '';
   let shownProductIds: string[] = [];
+  let imageUrls: string[] = [];
 
   try {
     const body = await request.json();
     sessionId = cleanText(body?.sessionId, 100) || crypto.randomUUID();
-    message = cleanText(body?.message, 600);
+    imageUrls = sanitizeSalaarImageUrls(
+      Array.isArray(body?.imageUrls) ? body.imageUrls : body?.imageUrl ? [body.imageUrl] : [],
+    );
+    message = cleanText(body?.message, 600)
+      || (imageUrls.length ? 'Is image ko dekh kar design, color aur matching PrimeHub products ke bare mein help karein.' : '');
     shownProductIds = Array.isArray(body?.shownProductIds)
       ? body.shownProductIds.map((id: unknown) => String(id)).slice(-400)
       : [];
-    if (!message) return NextResponse.json({ error: 'Message required.' }, { status: 400 });
+    if (!message) return NextResponse.json({ error: 'Message or image required.' }, { status: 400 });
 
     if (Date.now() < firestoreDegradedUntil) {
-      return degradedChat(sessionId, message, shownProductIds);
+      return degradedChat(sessionId, message, shownProductIds, imageUrls);
     }
 
     const expired = await withTimeout(claimExpiredPending(sessionId), 'Salaar soft hold transaction');
@@ -188,7 +198,7 @@ export async function POST(request: Request) {
       const ref = db.collection('salaar_conversations').doc(sessionId);
       const now = new Date();
       const messageRef = await withTimeout(
-        ref.collection('messages').add({ role: 'customer', text: message, createdAt: now, pending: true }),
+        ref.collection('messages').add({ role: 'customer', text: message, imageUrls, createdAt: now, pending: true }),
         'Salaar pending customer write',
       );
       await withTimeout(ref.set({
@@ -198,12 +208,13 @@ export async function POST(request: Request) {
         updatedAt: now,
         pendingCustomerMessage: message,
         pendingShownProductIds: shownProductIds,
+        pendingImageUrls: imageUrls,
         pendingMessageDocId: messageRef.id,
       }, { merge: true }), 'Salaar pending state write');
       return NextResponse.json({ sessionId, silent: true, status: 'WAIT' });
     }
 
-    const response = await delegatePost(sessionId, message, shownProductIds);
+    const response = await delegatePost(sessionId, message, shownProductIds, imageUrls);
     const data = await response.clone().json().catch(() => ({}));
     if (data?.needYou) {
       await withTimeout(
@@ -217,7 +228,7 @@ export async function POST(request: Request) {
     console.error('Salaar live wrapper state unavailable; using degraded chat mode', error);
     if (message) {
       try {
-        return await degradedChat(sessionId, message, shownProductIds);
+        return await degradedChat(sessionId, message, shownProductIds, imageUrls);
       } catch (delegateError) {
         console.error('Salaar degraded chat delegation failed', delegateError);
       }
