@@ -41,5 +41,8 @@ jobs:
       - name: Phase 5 vision smoke
         run: node scripts/salaar-phase5-vision-smoke.mjs
 
+      - name: Phase 6 sales memory smoke
+        run: node scripts/salaar-phase6-memory-smoke.mjs
+
       - name: Build
         run: npm run build
