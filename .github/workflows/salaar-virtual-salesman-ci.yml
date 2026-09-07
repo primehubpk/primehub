@@ -47,5 +47,8 @@ jobs:
       - name: Phase 7 admin inbox smoke
         run: node scripts/salaar-phase7-admin-inbox-smoke.mjs
 
+      - name: Phase 8 professional salesman QA
+        run: node scripts/salaar-phase8-professional-qa.mjs
+
       - name: Build
         run: npm run build
