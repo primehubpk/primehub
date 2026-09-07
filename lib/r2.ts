@@ -12,6 +12,22 @@ function requiredEnv(name: string) {
   return value;
 }
 
+function safeStem(originalName: string) {
+  return (originalName || 'image')
+    .replace(/\.[^.]+$/, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, '-')
+    .replace(/^-+|-+$/g, '') || 'image';
+}
+
+function safePathPart(value: string) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 96) || 'anonymous';
+}
+
 export function r2Client() {
   const accountId = requiredEnv('R2_ACCOUNT_ID');
   return new S3Client({
@@ -33,12 +49,12 @@ export async function compressForR2(buffer: Buffer) {
 }
 
 export function r2ObjectKey(originalName: string) {
-  const stem = (originalName || 'image')
-    .replace(/\.[^.]+$/, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9._-]+/g, '-')
-    .replace(/^-+|-+$/g, '') || 'image';
-  return `products/${Date.now()}-${stem}.webp`;
+  return `products/${Date.now()}-${safeStem(originalName)}.webp`;
+}
+
+export function salaarR2ObjectKey(sessionId: string, originalName: string) {
+  const random = crypto.randomUUID().slice(0, 8);
+  return `salaar/${safePathPart(sessionId)}/${Date.now()}-${random}-${safeStem(originalName)}.webp`;
 }
 
 export function r2PublicUrl(key: string) {
