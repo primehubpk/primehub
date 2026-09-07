@@ -322,6 +322,7 @@ export function updateSalaarSalesMemory(input: {
   const filters = shouldReplaceSearch
     ? sanitizeFilters(input.intent.filters)
     : Object.keys(previous.filters).length ? previous.filters : sanitizeFilters(input.intent.filters);
+  const cart = Array.isArray(input.cart) ? sanitizeCart(input.cart) : previous.cart;
 
   return {
     version: 1,
@@ -332,7 +333,7 @@ export function updateSalaarSalesMemory(input: {
     selectedProductId: cleanId(input.selectedProductId) || previous.selectedProductId,
     comparisonProductIds: sanitizeIds(input.comparisonProductIds, 4),
     visualSearchQuery: cleanText(input.visualSearchQuery, 220) || previous.visualSearchQuery,
-    cart: sanitizeCart(input.cart).length ? sanitizeCart(input.cart) : previous.cart,
+    cart,
     updatedAt: new Date().toISOString(),
   };
 }
