@@ -48,6 +48,30 @@ export async function compressForR2(buffer: Buffer) {
     .toBuffer();
 }
 
+export async function compressSalaarImageForR2(buffer: Buffer) {
+  let output = await sharp(buffer)
+    .rotate()
+    .resize({ width: 1024, height: 1024, fit: 'inside', withoutEnlargement: true })
+    .webp({ quality: 72, smartSubsample: true })
+    .toBuffer();
+
+  if (output.length > 900 * 1024) {
+    output = await sharp(output)
+      .resize({ width: 900, height: 900, fit: 'inside', withoutEnlargement: true })
+      .webp({ quality: 60, smartSubsample: true })
+      .toBuffer();
+  }
+
+  if (output.length > 1200 * 1024) {
+    output = await sharp(output)
+      .resize({ width: 768, height: 768, fit: 'inside', withoutEnlargement: true })
+      .webp({ quality: 52, smartSubsample: true })
+      .toBuffer();
+  }
+
+  return output;
+}
+
 export function r2ObjectKey(originalName: string) {
   return `products/${Date.now()}-${safeStem(originalName)}.webp`;
 }
