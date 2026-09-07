@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { MessageCircle, Send, ShoppingCart, X } from 'lucide-react';
+import { Send, ShoppingCart, X } from 'lucide-react';
 import { useCartStore } from '@/lib/cartStore';
 
 type ProductCard = {
@@ -65,6 +65,18 @@ function isReadyIntent(message: string) {
   const value = message.trim().toLowerCase();
   return /^(ready|ready kar|ready karo|order ready|order confirm|confirm order|order lock|lock order|cart ready)/i.test(value)
     || /(order|cart).*(ready|confirm|lock)/i.test(value);
+}
+
+function SalaarAvatar({ compact = false }: { compact?: boolean }) {
+  return (
+    <span
+      aria-hidden="true"
+      className={`${compact ? 'h-10 w-10 text-[23px]' : 'h-14 w-14 text-[31px]'} relative grid shrink-0 place-items-center overflow-hidden rounded-full border border-black/10 bg-gradient-to-b from-[#f7dfc9] to-[#d7a576] shadow-sm`}
+    >
+      <span className="translate-y-[1px]">👨🏻‍💼</span>
+      <span className="absolute bottom-[2px] right-[2px] h-3 w-3 rounded-full border-2 border-white bg-emerald-500" />
+    </span>
+  );
 }
 
 export default function SalaarNative() {
@@ -249,12 +261,18 @@ export default function SalaarNative() {
     <div className="fixed bottom-24 right-3 z-[95] md:bottom-5 md:right-5">
       {open ? (
         <section className="flex h-[min(72vh,620px)] w-[min(94vw,390px)] flex-col overflow-hidden rounded-[24px] border border-black/10 bg-white shadow-2xl">
-          <header className="flex items-center justify-between bg-[#14140f] px-4 py-3 text-white">
-            <div className="flex items-center gap-3">
-              <div className="grid h-10 w-10 place-items-center rounded-full bg-emerald-500 text-lg font-black">S</div>
-              <div><div className="text-sm font-black tracking-tight">Salaar · PrimeHubMall</div><div className="text-[11px] text-emerald-300">Customer help · online</div></div>
+          <header className="flex items-center justify-between border-b border-black/5 bg-white px-4 py-3 text-[#171712]">
+            <div className="flex min-w-0 items-center gap-3">
+              <SalaarAvatar compact />
+              <div className="min-w-0">
+                <div className="truncate text-sm font-black tracking-tight">Salaar · PrimeHubMall</div>
+                <div className="mt-0.5 flex items-center gap-1.5 text-[11px] font-semibold text-emerald-700">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                  Professional sales help · online
+                </div>
+              </div>
             </div>
-            <button type="button" onClick={() => setOpen(false)} className="grid h-9 w-9 place-items-center rounded-full bg-white/10" aria-label="Close Salaar chat"><X size={18} /></button>
+            <button type="button" onClick={() => setOpen(false)} className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-black/5 text-black/70 transition hover:bg-black/10" aria-label="Close Salaar chat"><X size={18} /></button>
           </header>
 
           <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto bg-[#f7f6f1] px-3 py-4">
@@ -282,7 +300,17 @@ export default function SalaarNative() {
             </form>
           </div>
         </section>
-      ) : <button type="button" onClick={() => setOpen(true)} className="flex items-center gap-2 rounded-full border border-black/10 bg-[#14140f] px-3 py-2.5 text-white shadow-xl" aria-label="Open Salaar help"><span className="grid h-9 w-9 place-items-center rounded-full bg-emerald-500 font-black">S</span><span className="pr-1 text-sm font-black">Need help?</span><MessageCircle size={17} /></button>}
+      ) : (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="group relative grid h-14 w-14 place-items-center rounded-full bg-white shadow-[0_10px_30px_rgba(0,0,0,0.22)] ring-1 ring-black/10 transition hover:-translate-y-0.5 hover:shadow-[0_14px_34px_rgba(0,0,0,0.26)]"
+          aria-label="Open Salaar help"
+        >
+          <span className="absolute -top-8 right-0 whitespace-nowrap rounded-full border border-black/10 bg-white px-2.5 py-1 text-[11px] font-bold text-[#171712] shadow-sm">Need help?</span>
+          <SalaarAvatar />
+        </button>
+      )}
     </div>
   );
 }
