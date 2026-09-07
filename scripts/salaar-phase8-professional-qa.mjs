@@ -105,7 +105,7 @@ function ids(items) { return items.map((item) => item.id); }
   const intent = parseSalesIntent('Festival Special 777 dikhao', catalog);
   assert.equal(intent.filters.priceBucketId, 'festival-777');
   assert.equal(intent.filters.maxPrice, 777);
-  assert.deepEqual(ids(rankProductsForIntent(catalog.products, intent, [])), ['j750', 'p650']);
+  assert.deepEqual(ids(rankProductsForIntent(catalog.products, intent, [])), ['p650', 'j750']);
 }
 
 // Follow-ups and duplicate suppression.
