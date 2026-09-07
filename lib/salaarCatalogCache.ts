@@ -1,6 +1,8 @@
 import 'server-only';
 import { unstable_cache } from 'next/cache';
 import { getDualCatalog } from '@/lib/dualReadServer';
+import { getSalaarStoreKnowledgeSnapshot } from '@/lib/salaarStoreKnowledge';
+import { withSalaarEffectivePricing } from '@/lib/salaarDealPricing';
 
 export const SALAAR_CATEGORY_BATCH_SIZE = 30;
 export const SALAAR_CATALOG_REVALIDATE_SECONDS = 15 * 60;
@@ -75,10 +77,17 @@ function compactCategory(category: any) {
 }
 
 async function loadSalaarCatalog() {
-  const result = await getDualCatalog();
+  const [result, knowledge] = await Promise.all([
+    getDualCatalog(),
+    getSalaarStoreKnowledgeSnapshot().catch((error) => {
+      console.warn('Salaar deal knowledge unavailable while building catalog snapshot', error);
+      return null;
+    }),
+  ]);
   const products = (Array.isArray(result.products) ? result.products : [])
     .filter((product) => product?.id != null)
-    .map(compactProduct);
+    .map(compactProduct)
+    .map((product) => withSalaarEffectivePricing(product, knowledge));
   const categories = (Array.isArray(result.categories) ? result.categories : [])
     .filter((category) => category?.id != null)
     .map(compactCategory);
@@ -99,10 +108,10 @@ async function loadSalaarCatalog() {
 
 export const getSalaarCatalogSnapshot = unstable_cache(
   loadSalaarCatalog,
-  ['primehub-salaar-catalog-v4'],
+  ['primehub-salaar-catalog-v5'],
   {
     revalidate: SALAAR_CATALOG_REVALIDATE_SECONDS,
-    tags: ['salaar-catalog'],
+    tags: ['salaar-catalog', 'salaar-store-knowledge'],
   },
 );
 
