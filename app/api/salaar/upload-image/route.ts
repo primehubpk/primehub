@@ -8,7 +8,9 @@ const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 const MAX_STORED_IMAGE_BYTES = 1500 * 1024;
 const RATE_WINDOW_MS = 10 * 60 * 1000;
 const MAX_UPLOADS_PER_WINDOW = 8;
-const ALLOWED_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/avif']);
+// Raw AVIF/HEIF is deliberately rejected at the server boundary. Customer browsers may
+// convert a selected AVIF to WebP before upload, but untrusted AVIF must never reach Sharp.
+const ALLOWED_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
 type RateEntry = { count: number; resetAt: number };
 const uploadRate = new Map<string, RateEntry>();
@@ -55,7 +57,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: 'Image file is required.' }, { status: 400 });
     }
     if (!ALLOWED_TYPES.has(image.type)) {
-      return NextResponse.json({ success: false, error: 'JPG, PNG, WEBP or AVIF image required.' }, { status: 415 });
+      return NextResponse.json({ success: false, error: 'JPG, PNG or WEBP image required.' }, { status: 415 });
     }
     if (!image.size || image.size > MAX_IMAGE_BYTES) {
       return NextResponse.json({ success: false, error: 'Image must be 8MB or smaller.' }, { status: 413 });
