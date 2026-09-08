@@ -3,14 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
-import {
-  CalendarCheck,
-  ChevronRight,
-  Instagram,
-  LockKeyhole,
-  Package,
-  ShoppingCart,
-} from "lucide-react";
+import { ChevronRight, Package, ShoppingCart } from "lucide-react";
 import HomeHeading from "./HomeHeading";
 import { useSettings } from "@/lib/useSettings";
 import { useCartStore } from "@/lib/cartStore";
@@ -28,7 +21,6 @@ import {
   isWholesalePriceBucket,
   sortPriceBuckets,
 } from "@/lib/priceBucketUtils";
-import { DEFAULT_RESELLER_TASKS, type ResellerTask } from "@/lib/resellerTasks";
 
 export function homePrice(product: Product) {
   return getEffectivePrice({
@@ -141,18 +133,10 @@ export default function HomeCollections({
     (settings.priceBuckets || []).filter((b) => b.active),
   );
   const packs = catalog.filter(isWholesaleProduct);
-  const tasks = (
-    (settings as typeof settings & { resellerTasks?: ResellerTask[] })
-      .resellerTasks || DEFAULT_RESELLER_TASKS
-  ).filter((t) => t.active !== false);
   function select(amount: number | null, wholesale = false) {
-    if (wholesale) onWholesaleSelect();
-    else onSelect(amount);
-    requestAnimationFrame(() =>
-      document
-        .getElementById("discover-deals-section")
-        ?.scrollIntoView({ behavior: "smooth", block: "start" }),
-    );
+    window.location.href = wholesale
+      ? "/shop?wholesale=1"
+      : `/shop?max=${Number(amount)}`;
   }
   return (
     <>
@@ -220,54 +204,6 @@ export default function HomeCollections({
               </div>
             );
           })}
-        </section>
-      )}
-      <section className="home-club">
-        <HomeHeading>Reseller Club</HomeHeading>
-        <Link href="/reseller/dashboard" className="home-club-link">
-          View your progress <LockKeyhole size={12} />
-        </Link>
-        <div className="home-task-grid">
-          {[...tasks]
-            .sort(
-              (a, b) =>
-                (["monthly-orders", "instagram"].includes(a.id) ? 0 : 1) -
-                (["monthly-orders", "instagram"].includes(b.id) ? 0 : 1),
-            )
-            .slice(0, 2)
-            .map((task) => (
-              <article className="home-task" key={task.id}>
-                <span
-                  className={`home-task-icon ${task.id.includes("instagram") ? "instagram" : ""}`}
-                >
-                  {task.id.includes("instagram") ? (
-                    <Instagram />
-                  ) : (
-                    <CalendarCheck />
-                  )}
-                </span>
-                <div>
-                  <h3>{task.title}</h3>
-                  <p>{task.description}</p>
-                  <Link className="home-task-button" href="/reseller/dashboard">
-                    View task <ChevronRight size={14} />
-                  </Link>
-                </div>
-              </article>
-            ))}
-        </div>
-      </section>
-      {packs.length > 0 && (
-        <section className="home-wholesale">
-          <HomeHeading>Wholesale Packages</HomeHeading>
-          <div className="home-pack-grid">
-            {packs.slice(0, 2).map((p) => (
-              <HomeProductCard key={p.id} product={p} horizontal pack />
-            ))}
-          </div>
-          <button className="home-view-all" onClick={() => select(null, true)}>
-            View all wholesale packages <ChevronRight size={14} />
-          </button>
         </section>
       )}
     </>
