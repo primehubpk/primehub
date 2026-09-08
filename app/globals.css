@@ -120,9 +120,9 @@ main > div > div > section:has(> div > [class*="bg-gradient-to-r"]) .live-deal-c
   }
 }
 
-/* Salaar: replace the youthful emoji with a mature Pakistani businessman-style brand portrait. */
+/* Salaar: use the selected professional human businessman portrait. */
 span[aria-hidden="true"][class*="bg-gradient-to-b"][class*="from-[#f7dfc9]"][class*="to-[#d7a576]"] {
-  background-image: url('/salaar-businessman.svg') !important;
+  background-image: url('/salaar-human-avatar.jpg') !important;
   background-position: center;
   background-repeat: no-repeat;
   background-size: cover;
