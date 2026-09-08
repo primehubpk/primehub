@@ -1,5 +1,5 @@
 // ==================== ADMIN SHARED TYPES ====================
-import { collection, doc, getDoc, getDocs } from 'firebase/firestore';
+import { collection } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
 export interface Product { id: string; title: string; price: number; originalPrice?: number; category: string; stock: number; imageUrl?: string; images?: Array<string | { url?: string }>; description?: string; isFlashSale?: boolean; isWeekendSpecial?: boolean; [key: string]: unknown }
@@ -13,10 +13,7 @@ export type AdminRole = 'super_admin' | 'admin' | 'manager' | 'editor' | 'suppor
 export type AdminPermission = 'dashboard.view'|'products.view'|'products.manage'|'categories.view'|'categories.manage'|'deals.view'|'deals.manage'|'orders.view'|'orders.manage'|'customers.view'|'customers.manage'|'inventory.view'|'inventory.manage'|'marketing.view'|'marketing.manage'|'content.view'|'content.manage'|'analytics.view'|'settings.view'|'settings.manage'|'suppliers.view'|'suppliers.manage'|'security.view'|'security.manage';
 export interface AdminProfile { id: string; email?: string; displayName?: string; role: AdminRole; permissions: AdminPermission[]; active: boolean; lastLoginAt?: unknown; createdAt?: unknown; [key: string]: unknown }
 
-async function adminWrite(action: 'create' | 'update' | 'set' | 'delete', name: string, id?: string, value?: Record<string, any>) {
-  // The secure admin session is owned by the server and stored in the
-  // primehub_admin_auth cookie. Do not gate writes on localStorage: the current
-  // secure login flow intentionally does not create that legacy client flag.
+async function adminRequest(action: 'create' | 'update' | 'set' | 'delete' | 'get' | 'list', name: string, id?: string, value?: Record<string, any>) {
   const response = await fetch('/api/admin/firestore', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -29,24 +26,60 @@ async function adminWrite(action: 'create' | 'update' | 'set' | 'delete', name: 
   return result;
 }
 
-/** New uploads go to Cloudflare R2. Existing ImgBB and legacy R2 URLs stay compatible. */
+async function adminWrite(action: 'create' | 'update' | 'set' | 'delete', name: string, id?: string, value?: Record<string, any>) {
+  return adminRequest(action, name, id, value);
+}
+
+/** New uploads prefer R2 and automatically fall back to the established ImgBB upload route. */
 export async function uploadImageToImgBB(file: File): Promise<string> {
   if (!file.type.startsWith('image/')) throw new Error('Only image files are allowed.');
   if (file.size > 10 * 1024 * 1024) throw new Error('Image must be 10MB or smaller.');
-  const form = new FormData();
-  form.append('image', file, file.name || 'upload');
-  const response = await fetch('/api/upload/r2', { method: 'POST', body: form, credentials: 'same-origin', cache: 'no-store' });
-  const result = await response.json().catch(() => null);
-  if (!response.ok || !result?.success || typeof result.url !== 'string') throw new Error(result?.error || 'Image upload failed. Please try again.');
-  if (!/^https:\/\/images\.primehubmall\.com\//i.test(result.url) && !/^https:\/\/pub-[a-z0-9]+\.r2\.dev\//i.test(result.url) && !/^https:\/\/i\.ibb\.co\//i.test(result.url)) {
+
+  async function tryUpload(endpoint: string) {
+    const form = new FormData();
+    form.append('image', file, file.name || 'upload');
+    const response = await fetch(endpoint, { method: 'POST', body: form, credentials: 'same-origin', cache: 'no-store' });
+    const result = await response.json().catch(() => null);
+    if (!response.ok || !result?.success || typeof result.url !== 'string') {
+      throw new Error(result?.error || 'Image upload failed.');
+    }
+    return result.url as string;
+  }
+
+  let url = '';
+  try {
+    url = await tryUpload('/api/upload/r2');
+  } catch {
+    url = await tryUpload('/api/upload/imgbb');
+  }
+
+  if (!/^https:\/\/images\.primehubmall\.com\//i.test(url) && !/^https:\/\/pub-[a-z0-9]+\.r2\.dev\//i.test(url) && !/^https:\/\/i\.ibb\.co\//i.test(url)) {
     throw new Error('Upload returned a non-CDN image URL.');
   }
-  return result.url;
+  return url;
 }
 
 export const adminCollection = (name: string) => collection(db, name);
-export const getAdminDocument = (name: string, id: string) => getDoc(doc(db, name, id));
-export const listAdminDocuments = (name: string) => getDocs(collection(db, name));
+
+export async function getAdminDocument(name: string, id: string) {
+  const result = await adminRequest('get', name, id);
+  return {
+    exists: () => result.exists === true,
+    data: () => result.data || undefined,
+    id,
+  };
+}
+
+export async function listAdminDocuments(name: string) {
+  const result = await adminRequest('list', name);
+  const rows = Array.isArray(result.documents) ? result.documents : [];
+  return {
+    docs: rows.map((row: any) => ({ id: String(row.id), data: () => row.data || {} })),
+    size: rows.length,
+    empty: rows.length === 0,
+  };
+}
+
 function normalizeAdminDocument(name: string, value: Record<string, any>) {
   if (name !== 'categories') return value;
   const imageUrl = typeof value.imageUrl === 'string' ? value.imageUrl : typeof value.iconUrl === 'string' ? value.iconUrl : '';

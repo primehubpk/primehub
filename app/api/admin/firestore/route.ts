@@ -25,10 +25,6 @@ function refreshCachesForCollection(name: string) {
   }
   if (name === 'settings') revalidateTag('storefront-settings');
   if (name === 'prime_skills') revalidateTag('prime-skills');
-
-  // Salaar Store Knowledge is derived from settings, categories and Prime Skills.
-  // Product changes can also affect future deal/search knowledge, so invalidate on
-  // all storefront-managed sources rather than waiting for the 15-minute safety TTL.
   if (name === 'settings' || name === 'categories' || name === 'prime_skills' || name === 'products') {
     revalidateTag('salaar-store-knowledge');
   }
@@ -98,6 +94,12 @@ export async function POST(request: Request) {
       if (!id) return NextResponse.json({ error: 'Document id is required.' }, { status: 400 });
       const snapshot = await db.collection(name).doc(id).get();
       return NextResponse.json({ success: true, exists: snapshot.exists, data: snapshot.exists ? snapshot.data() : null });
+    }
+
+    if (action === 'list') {
+      const snapshot = await db.collection(name).get();
+      const documents = snapshot.docs.map((doc) => ({ id: doc.id, data: doc.data() }));
+      return NextResponse.json({ success: true, documents });
     }
 
     return NextResponse.json({ error: 'Unsupported admin firestore action.' }, { status: 400 });
