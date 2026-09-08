@@ -145,6 +145,15 @@ export default function SalaarNative() {
   const cartItems = useCartStore((state) => state.items);
 
   useEffect(() => {
+    const openPhotoSearch = () => {
+      setOpen(true);
+      setInput('Help me find a product from a photo');
+    };
+    window.addEventListener('primehub:photo-search', openPhotoSearch);
+    return () => window.removeEventListener('primehub:photo-search', openPhotoSearch);
+  }, []);
+
+  useEffect(() => {
     let id = localStorage.getItem(SESSION_KEY) || '';
     if (!id) {
       id = randomId();
