@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import Header from "@/components/home/HomeHeader";
 import HomeCollections from "@/components/home/HomeCollections";
+import BigDealNextPreviewSync from "@/components/home/BigDealNextPreviewSync";
 import {
   HomePrimeSkills,
   HomeResellerTasks,
@@ -122,6 +123,7 @@ export default function HomePageClient({
             initialProducts={products as SharedProduct[]}
             liveUpdates={false}
           />
+          <BigDealNextPreviewSync />
           <NewArrivalsRail
             homeLayout
             initialProducts={products}
