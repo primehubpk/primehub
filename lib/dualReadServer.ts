@@ -9,14 +9,31 @@ type CategoriesSnapshot = { categories: any[]; source: 'firebase' | 'supabase' |
 type SettingsSnapshot = { documents: Record<string, any>; source: 'firebase' | 'supabase' | 'empty' };
 type SkillsSnapshot = { skills: any[]; source: 'firebase' | 'supabase' | 'empty' };
 
+function envValue(...names: string[]) {
+  for (const name of names) {
+    const value = String(process.env[name] || '').trim();
+    if (value) return value;
+  }
+  return '';
+}
+
 function mode(): ReadMode {
   const value = String(
     process.env.PRIMEHUB_DATA_READ_MODE ||
     process.env.PRIMEHUB_BACKEND_READ_MODE ||
-    'firebase-primary'
+    'supabase-primary'
   ).trim().toLowerCase();
-  if (value === 'supabase-primary' || value === 'firebase-only' || value === 'supabase-only') return value;
-  return 'firebase-primary';
+
+  if (
+    value === 'firebase-primary' ||
+    value === 'supabase-primary' ||
+    value === 'firebase-only' ||
+    value === 'supabase-only'
+  ) return value;
+
+  // Supabase is the canonical read backend. A missing/typoed mode must never
+  // silently switch the storefront back to Firebase.
+  return 'supabase-primary';
 }
 
 function serial(value: any): any {
@@ -32,17 +49,56 @@ function serial(value: any): any {
   return value;
 }
 
+function supabaseUrl() {
+  return envValue(
+    'SUPABASE_URL',
+    'NEXT_PUBLIC_SUPABASE_URL',
+  ).replace(/\/+$/, '');
+}
+
+function supabasePublicKey() {
+  return envValue(
+    'SUPABASE_PUBLISHABLE_KEY',
+    'SUPABASE_ANON_KEY',
+    'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
+    'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY',
+    'NEXT_PUBLIC_SUPABASE_ANON_KEY',
+  );
+}
+
+function supabaseServiceKey() {
+  return envValue(
+    'SUPABASE_SERVICE_ROLE_KEY',
+    'SUPABASE_SECRET_KEY',
+    'SUPABASE_SERVICE_KEY',
+  );
+}
+
+function supabaseConfigError(kind: 'public' | 'server', url: string, key: string) {
+  const environment = envValue('VERCEL_ENV', 'NODE_ENV') || 'unknown';
+  const hasPublicKey = Boolean(supabasePublicKey());
+  const hasServiceKey = Boolean(supabaseServiceKey());
+  return new Error(
+    `Supabase ${kind} read credentials are not configured ` +
+    `(environment=${environment}, url=${Boolean(url)}, publicKey=${hasPublicKey}, serviceKey=${hasServiceKey}, selectedKey=${Boolean(key)}).`,
+  );
+}
+
 function supabaseConfig() {
-  const url = (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '').trim().replace(/\/+$/, '');
-  const key = (process.env.SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '').trim();
-  if (!url || !key) throw new Error('Supabase public read credentials are not configured.');
+  const url = supabaseUrl();
+  // This module is server-only. Prefer the public/publishable key for public
+  // tables, but allow the server secret as a safe server-side fallback so a
+  // correctly configured Supabase project does not fall through to Firebase
+  // just because Vercel uses the newer secret-key variable naming.
+  const key = supabasePublicKey() || supabaseServiceKey();
+  if (!url || !key) throw supabaseConfigError('public', url, key);
   return { url, key };
 }
 
 function supabaseServiceConfig() {
-  const url = (process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '').trim().replace(/\/+$/, '');
-  const key = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
-  if (!url || !key) throw new Error('Supabase server read credentials are not configured.');
+  const url = supabaseUrl();
+  const key = supabaseServiceKey();
+  if (!url || !key) throw supabaseConfigError('server', url, key);
   return { url, key };
 }
 
@@ -181,7 +237,7 @@ async function firebaseSettings(): Promise<SettingsSnapshot> {
 
 async function supabaseSettings(): Promise<SettingsSnapshot> {
   // Settings intentionally have no public RLS policy. Read them only server-side
-  // with the service-role key so private configuration never has to be opened to anon.
+  // with the service-role/secret key so private configuration never has to be opened to anon.
   const rows = await sbRows('settings', '*', true);
   if (!Array.isArray(rows) || rows.length === 0) {
     throw new Error('Supabase settings read returned no rows.');
