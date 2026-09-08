@@ -84,6 +84,14 @@ function supabaseConfigError(kind: 'public' | 'server', url: string, key: string
   );
 }
 
+function isSupabaseConfigError(error: unknown) {
+  return error instanceof Error && /^Supabase (public|server) read credentials are not configured /.test(error.message);
+}
+
+function shouldProtectPreviewFirebase(error: unknown) {
+  return envValue('VERCEL_ENV') === 'preview' && isSupabaseConfigError(error);
+}
+
 function supabaseConfig() {
   const url = supabaseUrl();
   // This module is server-only. Prefer the public/publishable key for public
@@ -268,11 +276,21 @@ async function withFallback<T>(firebaseRead: () => Promise<T>, supabaseRead: () 
         : [firebaseRead];
 
   let lastError: unknown = null;
-  for (const attempt of attempts) {
+  for (let index = 0; index < attempts.length; index += 1) {
+    const attempt = attempts[index];
     try { return await attempt(); }
     catch (error) {
       lastError = error;
       console.warn('PrimeHub dual-read attempt failed', error);
+
+      // A Preview deployment with no Supabase credentials is a deployment
+      // configuration problem, not a Supabase outage. Do not burn Firestore
+      // fallback quota on every preview page request / settings poll. Production
+      // keeps the normal Supabase -> Firebase fallback for genuine read failures.
+      if (readMode === 'supabase-primary' && index === 0 && shouldProtectPreviewFirebase(error)) {
+        console.error('PrimeHub Preview is missing Supabase credentials; Firebase fallback skipped to protect quota.');
+        return empty;
+      }
     }
   }
   if (lastError) console.error('PrimeHub dual-read exhausted all configured sources', lastError);
