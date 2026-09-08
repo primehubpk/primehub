@@ -43,7 +43,7 @@ export default function CategorySwiper({
   if (!visible.length) return null;
 
   return (
-    <section className="mx-auto mt-7 max-w-6xl px-4">
+    <section className="home-categories mx-auto mt-7 max-w-6xl px-4">
       <div className="mb-3 flex items-end justify-between">
         <div>
           <p className="text-[9px] font-black uppercase tracking-[0.2em] text-[#0F6A5F]">Browse the collection</p>
@@ -66,7 +66,7 @@ export default function CategorySwiper({
                   priority={index < 6}
                   loading={index < 6 ? 'eager' : 'lazy'}
                   fetchPriority={index < 6 ? 'high' : 'auto'}
-                  sizes="80px"
+                  sizes="(max-width: 600px) 22vw, 195px"
                   quality={72}
                   className="object-cover"
                 />

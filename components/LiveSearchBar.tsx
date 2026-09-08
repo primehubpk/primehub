@@ -23,9 +23,9 @@ type Product = {
   published?: boolean;
 };
 
-type Props = { value: string; onChange: (value: string) => void; className?: string };
+type Props = { value: string; onChange: (value: string) => void; className?: string; placeholder?: string };
 
-export default function LiveSearchBar({ value, onChange, className = '' }: Props) {
+export default function LiveSearchBar({ value, onChange, className = '', placeholder = 'Search products, categories...' }: Props) {
   const [products, setProducts] = useState<Product[]>([]);
   const [focused, setFocused] = useState(false);
 
@@ -54,7 +54,7 @@ export default function LiveSearchBar({ value, onChange, className = '' }: Props
           autoComplete="off"
           spellCheck="false"
           aria-label="Search products"
-          placeholder="Search products, categories..."
+          placeholder={placeholder}
           className="block w-full min-w-0 bg-transparent text-sm outline-none"
         />
         <VoiceSearchButton

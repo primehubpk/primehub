@@ -1,6 +1,8 @@
 'use client';
 
 import Image from 'next/image';
+import HomeHeading from '@/components/home/HomeHeading';
+import { HomeProductCard } from '@/components/home/HomeCollections';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowRight, ShoppingCart, Sparkles } from 'lucide-react';
@@ -24,9 +26,11 @@ export function newestFirst(products: Product[]) {
 export default function NewArrivalsRail({
   initialProducts = [],
   liveUpdates = true,
+  homeLayout = false,
 }: {
   initialProducts?: Product[];
   liveUpdates?: boolean;
+  homeLayout?: boolean;
 }) {
   const [products, setProducts] = useState<Product[]>(initialProducts);
   const [addedId, setAddedId] = useState<string | null>(null);
@@ -64,6 +68,8 @@ export default function NewArrivalsRail({
   };
 
   if (!newest.length) return null;
+
+  if (homeLayout) return <section className="home-arrivals"><HomeHeading>New Arrivals</HomeHeading><div className="home-arrivals-grid">{newest.slice(0, 4).map(p => <HomeProductCard key={p.id} product={p} horizontal />)}</div><Link className="home-view-all" href="/new-arrivals">View all new arrivals <ArrowRight size={14} /></Link></section>;
 
   return (
     <section className="mt-5">

@@ -1,6 +1,7 @@
 'use client';
 
 import Image from 'next/image';
+import HomeHeading from '@/components/home/HomeHeading';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { Gift, Sparkles, Star, Tags, Trophy, WandSparkles, ShoppingCart, LockKeyhole } from 'lucide-react';
@@ -73,9 +74,11 @@ function productMap(list: Product[]) {
 export default function HeroFlashBanner({
   initialProducts = [],
   liveUpdates = true,
+  homeLayout = false,
 }: {
   initialProducts?: Product[];
   liveUpdates?: boolean;
+  homeLayout?: boolean;
 }) {
   const { settings } = useSettings();
   const [nowTick, setNowTick] = useState<number | null>(null);
@@ -203,6 +206,48 @@ export default function HeroFlashBanner({
       image,
       imageUrl: image,
     });
+  }
+
+  if (homeLayout) {
+    const product = bigDeal?.productId ? products[bigDeal.productId] as ProductDealFields | undefined : undefined;
+    const price = Number(bigDeal?.dealPrice || product?.dealPrice || product?.price || 0);
+    const stock = Number(product?.stock ?? product?.quantity ?? bigDeal?.stock ?? 0);
+    const src = normalizeImageUrl(bigDeal?.imageUrl || product?.imageUrl || '');
+    const end = bigDeal?.endAt ? new Date(bigDeal.endAt).getTime() : null;
+    const start = bigDeal?.startAt ? new Date(bigDeal.startAt).getTime() : null;
+    const live = nowTick !== null && (!start || nowTick >= start) && (!end || nowTick < end);
+    return <>
+      <section className="home-weekly" id="weekly-deals">
+        <HomeHeading>PrimeHubMall Weekly Deals</HomeHeading>
+        <div className="home-week-grid">{DAYS.map(({key, Icon}) => {
+          const deal = weeklyDeals.find(d => d.day === key && d.active !== false && Number(d.dealPrice) > 0);
+          const dealImage = normalizeImageUrl(deal?.imageUrl || (deal ? products[deal.productId]?.imageUrl : '') || '');
+          const isLive = Boolean(deal && todayKey === key);
+          return <Link className={`home-week-card ${isLive ? 'is-live' : ''}`} key={key} href={deal ? `/product/${deal.productId}` : '/weekly-deals'} aria-label={`${key}: ${deal ? deal.title + ', Rs. ' + deal.dealPrice + (isLive ? ', live today' : ', unlocks ' + key) : 'Upcoming deals'}`}>
+            <strong>{key.slice(0,3).toUpperCase()}</strong>
+            <span className={isLive ? 'home-live' : 'home-unlocks'}>{isLive ? '● LIVE' : <><LockKeyhole size={10} />{deal ? 'UNLOCKS' : 'SOON'}</>}</span>
+            <span className="home-week-image">{dealImage ? <Image src={dealImage} alt={deal?.title || key} fill sizes="(max-width: 600px) 80px, 170px" className="object-cover" /> : <Icon size={25} />}</span>
+            <b className="home-price">{deal ? `Rs. ${Number(deal.dealPrice).toLocaleString('en-PK')}` : 'Coming soon'}</b>
+          </Link>;
+        })}</div>
+      </section>
+      {bigDeal?.active && bigDeal.title && <section className="home-big-deal">
+        <HomeHeading>PrimeHubMall Big Deal of the Day</HomeHeading>
+        <div className="home-big-grid">
+          <article className="home-big-card">
+            <Link className="home-big-image" href={bigDeal.productId ? `/product/${bigDeal.productId}` : '/deals/big'}>
+              {src && <Image src={src} alt={bigDeal.title} fill priority sizes="(max-width: 600px) 50vw, 600px" className="object-cover" />}
+              <span className="home-live">{live ? '● LIVE' : 'SCHEDULED'}</span><span className="home-big-seal">BIG<br />DEAL<small>OF THE DAY</small></span>
+            </Link>
+            <div className="home-big-info"><Link href={bigDeal.productId ? `/product/${bigDeal.productId}` : '/deals/big'}>{bigDeal.title}</Link><strong className="home-price">Rs. {price.toLocaleString('en-PK')}</strong><small>Pakistan Time</small><button className="home-add" onClick={addBigDealToCart} disabled={!live || !product || stock <= 0 || price <= 0}><ShoppingCart size={14} />{stock <= 0 ? 'Sold out' : !live ? 'Deal unavailable' : 'Add to cart'}</button></div>
+          </article>
+          <div className="home-next-deal" aria-label="Next big deal is locked">
+            {src && <Image src={src} alt="" fill sizes="(max-width: 600px) 50vw, 600px" className="object-cover" />}
+            <span><LockKeyhole size={36} /><b>LOCKED</b><small>Next big deal</small></span>
+          </div>
+        </div>
+      </section>}
+    </>;
   }
 
   return (

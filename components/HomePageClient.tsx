@@ -2,10 +2,11 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import Header from '@/components/Header';
+import Header from '@/components/home/HomeHeader';
+import HomeCollections from '@/components/home/HomeCollections';
+import './home/home.css';
 import HeroFlashBanner from '@/components/HeroFlashBanner';
 import CategorySwiper from '@/components/CategorySwiper';
-import PriceBuckets from '@/components/PriceBuckets';
 import NewArrivalsRail from '@/components/NewArrivalsRail';
 import ProductGridRewards from '@/components/ProductGridRewards';
 import YouTubeGuide from '@/components/YouTubeGuide';
@@ -85,18 +86,16 @@ export default function HomePageClient({ initialProducts, initialCategories, ini
 
   return (
     <SettingsProvider initialSettings={initialSettings}>
-      <div className="min-h-screen bg-[#F4F4F1] text-[#14140F]">
+      <div className="home-storefront">
         <Header />
+        <main className="home-content">
+        <h1 className="sr-only">PrimeHubMall — Bangles, Jewellery &amp; Wholesale Deals</h1>
         <CategorySwiper initialCategories={categories} liveUpdates={false} />
-        <HeroFlashBanner initialProducts={products as SharedProduct[]} liveUpdates={false} />
-        <NewArrivalsRail initialProducts={products} liveUpdates={false} />
-        <PriceBuckets
-          selectedMaxPrice={selectedMaxPrice}
-          wholesaleSelected={wholesaleSelected}
-          onSelect={selectPrice}
-          onWholesaleSelect={selectWholesale}
-        />
+        <HeroFlashBanner homeLayout initialProducts={products as SharedProduct[]} liveUpdates={false} />
+        <NewArrivalsRail homeLayout initialProducts={products} liveUpdates={false} />
+        <HomeCollections products={products} onSelect={selectPrice} onWholesaleSelect={selectWholesale} />
         <div id="discover-deals-section">
+          {(selectedMaxPrice !== null || wholesaleSelected) && <div className="home-filter-status"><span>{wholesaleSelected ? 'Wholesale products' : `Products under Rs. ${selectedMaxPrice}`}</span><button className="home-add" onClick={() => { setSelectedMaxPrice(null); setWholesaleSelected(false); }}>Clear filter</button></div>}
           {catalogUnavailable ? (
             <section className="mt-8 px-4 pb-6">
               <div className="rounded-[24px] border border-black/8 bg-white px-5 py-7 text-center shadow-sm">
@@ -129,6 +128,7 @@ export default function HomePageClient({ initialProducts, initialCategories, ini
             </section>
           ) : (
             <ProductGridRewards
+              homeLayout
               initialProducts={products}
               liveUpdates={false}
               selectedMaxPrice={selectedMaxPrice}
@@ -136,6 +136,7 @@ export default function HomePageClient({ initialProducts, initialCategories, ini
             />
           )}
         </div>
+        </main>
         <YouTubeGuide />
         <Footer onWholesaleSelect={selectWholesale} />
       </div>

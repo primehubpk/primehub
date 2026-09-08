@@ -129,11 +129,13 @@ export default function ProductGridRewards({
   liveUpdates = true,
   selectedMaxPrice = null,
   wholesaleSelected = false,
+  homeLayout = false,
 }: {
   initialProducts?: Product[];
   liveUpdates?: boolean;
   selectedMaxPrice?: number | null;
   wholesaleSelected?: boolean;
+  homeLayout?: boolean;
 }) {
   const [products, setProducts] = useState<Product[]>(() => shuffleProducts(initialProducts));
   const [gifts, setGifts] = useState<Reward[]>([]);
@@ -343,7 +345,7 @@ export default function ProductGridRewards({
             <Sparkles size={13} />
             <span className="text-[9px] font-black uppercase tracking-[.2em]">Premium Picks</span>
           </div>
-          <h2 className="text-2xl font-black tracking-tight">Discover Deals</h2>
+          <h2 className="text-2xl font-black tracking-tight">{homeLayout ? 'PrimeHubMall Deals' : 'Discover Deals'}</h2>
           <p className="mt-1 text-xs text-black/45">{visible.length} product{visible.length === 1 ? '' : 's'} to explore</p>
         </div>
 
@@ -358,6 +360,7 @@ export default function ProductGridRewards({
         </label>
       </div>
 
+      {homeLayout && <Link href="/shop" className="home-view-all">View all products →</Link>}
       {notice && <p className="mb-3 rounded-xl bg-[#0F6A5F] p-3 text-center text-[10px] font-black text-white">{notice}</p>}
 
       {visible.length === 0 ? (
@@ -369,7 +372,7 @@ export default function ProductGridRewards({
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-2 md:grid-cols-3 md:gap-3 lg:grid-cols-4 xl:grid-cols-5">
-          {visible.map((p, index) => {
+          {(homeLayout && selectedMaxPrice === null && !wholesaleSelected ? visible.slice(0, 6) : visible).map((p, index) => {
             const r = rewards[p.id];
             const pts = points;
             const need = r ? Math.max(0, r.points - pts) : 0;
@@ -461,9 +464,9 @@ export default function ProductGridRewards({
                   )}
                 </div>
               </article>
-              {index === 5 && visible.length >= 6 ? <ShopFeatureBanner/> : null}
-              {index === 11 && visible.length >= 12 ? <MemberFeatureRail/> : null}
-              {index === 17 && visible.length >= 18 ? <PrimeSkillsHomeRail/> : null}
+              {!homeLayout && index === 5 && visible.length >= 6 ? <ShopFeatureBanner/> : null}
+              {!homeLayout && index === 11 && visible.length >= 12 ? <MemberFeatureRail/> : null}
+              {!homeLayout && index === 17 && visible.length >= 18 ? <PrimeSkillsHomeRail/> : null}
             </Fragment>;
           })}
         </div>
