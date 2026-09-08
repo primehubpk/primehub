@@ -69,7 +69,29 @@ export default function NewArrivalsRail({
 
   if (!newest.length) return null;
 
-  if (homeLayout) return <section className="home-arrivals"><HomeHeading>New Arrivals</HomeHeading><div className="home-arrivals-grid">{newest.slice(0, 4).map(p => <HomeProductCard key={p.id} product={p} horizontal />)}</div><Link className="home-view-all" href="/new-arrivals">View all new arrivals <ArrowRight size={14} /></Link></section>;
+  if (homeLayout) {
+    return (
+      <section className="home-arrivals">
+        <div className="mb-2 flex items-center justify-end">
+          <Link className="home-view-all !mt-0" href="/new-arrivals">
+            View all new arrivals <ArrowRight size={14} />
+          </Link>
+        </div>
+        <HomeHeading>
+          <Link href="/new-arrivals" aria-label="View all new arrivals">
+            New Arrivals
+          </Link>
+        </HomeHeading>
+        <div className="grid grid-flow-col grid-rows-2 auto-cols-[calc((100%-7px)/2)] gap-2 overflow-x-auto overscroll-x-contain pb-2 scroll-smooth snap-x snap-mandatory [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {newest.map((p) => (
+            <div key={p.id} className="min-w-0 snap-start">
+              <HomeProductCard product={p} horizontal />
+            </div>
+          ))}
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="mt-5">
