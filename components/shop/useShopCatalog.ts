@@ -8,6 +8,8 @@ import { categoryHref, categoryLabel, productMatchesCategory, slugifyCategory } 
 import { smartSearchProducts } from '@/lib/smartSearch';
 import { isWholesaleProduct } from '@/lib/wholesale';
 import { shuffleProducts } from '@/lib/shuffleProducts';
+import { getEffectivePrice } from '@/lib/dealPricing';
+import { priceBucketRange } from '@/lib/priceBucketUtils';
 import { Product, Category, ShopCatalogModel, imageOf, priceOf, originalOf, productHasVariants, titleOf } from './ShopTypes';
 
 export function useShopCatalog(initialCategory?: string, initialQuery = '', initialProducts: Product[] = [], initialCategories: Category[] = []): ShopCatalogModel {
@@ -27,7 +29,7 @@ export function useShopCatalog(initialCategory?: string, initialQuery = '', init
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [addedId, setAddedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(!hasServerData);
-  const [wholesaleOnly, setWholesaleOnly] = useState(searchParams.get('wholesale') === 'true');
+  const [wholesaleOnly, setWholesaleOnly] = useState(['true', '1'].includes(searchParams.get('wholesale') || ''));
 
   useEffect(() => {
     setCategory(initialCategory ? slugifyCategory(decodeURIComponent(initialCategory)) || initialCategory : 'all');
@@ -73,16 +75,43 @@ export function useShopCatalog(initialCategory?: string, initialQuery = '', init
     [settings.priceBuckets],
   );
 
+  const selectedBudgetRange = useMemo(() => {
+    if (maxPrice === 'all') return null;
+    const amount = Number(maxPrice);
+    if (!amount) return null;
+
+    const isKnownBucket = [99, 299, 999].includes(amount);
+    return isKnownBucket ? priceBucketRange(buckets, amount) : null;
+  }, [buckets, maxPrice]);
+
   const filtered = useMemo(() => {
     const searchable = smartSearchProducts(products.filter((p) => p.published !== false), search);
     return searchable.filter((p) => {
       const selectedCat = wholesaleOnly || productMatchesCategory(category, p, categories);
-      const matchesPrice = wholesaleOnly || maxPrice === 'all' || !Number(maxPrice) || priceOf(p) <= Number(maxPrice);
+      const effectivePrice = selectedBudgetRange
+        ? getEffectivePrice({
+            price: Number(p.normalPrice || p.price || 0),
+            dealPrice: Number(p.dealPrice || 0),
+            dealDay: String(p.dealDay || ''),
+          })
+        : priceOf(p);
+      const matchesPrice =
+        wholesaleOnly ||
+        maxPrice === 'all' ||
+        !Number(maxPrice) ||
+        (selectedBudgetRange
+          ? effectivePrice > selectedBudgetRange.minExclusive &&
+            effectivePrice <= selectedBudgetRange.maxInclusive
+          : effectivePrice <= Number(maxPrice));
       const matchesDeal = !onlyDeals || Boolean(p.isFlashSale);
-      const matchesWholesale = !wholesaleOnly || isWholesaleProduct(p);
+      const matchesWholesale = wholesaleOnly
+        ? isWholesaleProduct(p)
+        : selectedBudgetRange
+          ? !isWholesaleProduct(p)
+          : true;
       return selectedCat && matchesPrice && matchesDeal && matchesWholesale;
     });
-  }, [products, categories, search, category, maxPrice, onlyDeals, wholesaleOnly]);
+  }, [products, categories, search, category, maxPrice, onlyDeals, wholesaleOnly, selectedBudgetRange]);
 
   const rails = useMemo(() => {
     const used = new Set<string>();
