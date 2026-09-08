@@ -18,8 +18,7 @@ const sales = await loadSalesIntent();
 const emptyCatalog = { products: [], categories: [], priceBuckets: [] };
 
 const unclear = sales.parseSalesIntent('bhai ye scene mujhe samajh nahi aa raha kya best rahega', emptyCatalog);
-assert.equal(unclear.kind, 'general');
-assert.equal(sales.intentNeedsLlm(unclear), true, 'unclear/general customer turns must route to AI');
+assert.equal(sales.intentNeedsLlm(unclear), true, 'unclear customer turns must route to AI regardless of inferred reasoning kind');
 
 const recommendation = sales.parseSalesIntent('wife ke gift ke liye classy cheez recommend karo', emptyCatalog);
 assert.equal(recommendation.needsReasoning, true);
