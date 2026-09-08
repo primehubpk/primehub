@@ -10,6 +10,7 @@ import {
   HomeWholesaleVideos,
 } from "@/components/home/HomeFeatureRails";
 import "./home/home.css";
+import "./home/WeeklyDealsHomeFix.css";
 import "./home/HomeFeatureRails.css";
 import HeroFlashBanner from "@/components/HeroFlashBanner";
 import CategorySwiper from "@/components/CategorySwiper";
