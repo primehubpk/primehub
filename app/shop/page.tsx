@@ -3,6 +3,8 @@ import { Suspense } from 'react';
 import ShopCatalog from '@/components/ShopCatalog';
 import { getPublicCatalogSnapshot } from '@/lib/publicCatalogServer';
 
+export const dynamic = 'force-dynamic';
+
 export const metadata: Metadata = {
   title: 'Shop Bangles, Jewellery, Watches & Wholesale Deals',
   description:
