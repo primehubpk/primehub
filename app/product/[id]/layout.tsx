@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { cache } from 'react';
 import ProductRewardInfo from '@/components/ProductRewardInfo';
 import WeeklyDealProductExtras from '@/components/WeeklyDealProductExtras';
 import { getAdminDb } from '@/lib/firebaseAdmin';
@@ -29,7 +30,7 @@ function productImage(product: ProductMetadata) {
   return `${siteUrl()}${image.startsWith('/') ? '' : '/'}${image}`;
 }
 
-async function loadProduct(id: string) {
+const loadProduct = cache(async (id: string) => {
   try {
     const snapshot = await getAdminDb().collection('products').doc(id).get();
     if (!snapshot.exists) return null;
@@ -37,7 +38,7 @@ async function loadProduct(id: string) {
   } catch {
     return null;
   }
-}
+});
 
 export async function generateMetadata({
   params,

@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useShopCatalog } from './shop/useShopCatalog';
 import CatalogHeader from './shop/CatalogHeader';
@@ -10,6 +10,7 @@ import { FilterDrawer } from './shop/CatalogFilters';
 import CatalogProductGrid from './shop/CatalogProductGrid';
 import CompactCategoryStrip from './shop/CompactCategoryStrip';
 import { productMatchesCategory } from '@/lib/categoryUtils';
+import { cacheProductCatalog } from '@/lib/productNavigationCache';
 import type { Product, Category } from './shop/ShopTypes';
 
 function score(id: string) {
@@ -46,6 +47,10 @@ export default function ShopCatalog({
     (bucketParam === 'wholesale'
       ? shop.wholesaleOnly
       : numericBucket > 0 && shop.maxPrice === String(numericBucket));
+
+  useEffect(() => {
+    cacheProductCatalog(shop.products);
+  }, [shop.products]);
 
   const picks = useMemo(
     () => [...shop.filtered].sort((a, b) => score(a.id) - score(b.id)),

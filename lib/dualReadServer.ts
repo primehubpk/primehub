@@ -4,6 +4,7 @@ import { getAdminDb } from '@/lib/firebaseAdmin';
 type ReadMode = 'firebase-primary' | 'supabase-primary' | 'firebase-only' | 'supabase-only';
 
 type CatalogSnapshot = { products: any[]; categories: any[]; source: 'firebase' | 'supabase' | 'empty' };
+type ProductSnapshot = { product: any | null; source: 'firebase' | 'supabase' | 'empty' };
 type CategoriesSnapshot = { categories: any[]; source: 'firebase' | 'supabase' | 'empty' };
 type SettingsSnapshot = { documents: Record<string, any>; source: 'firebase' | 'supabase' | 'empty' };
 type SkillsSnapshot = { skills: any[]; source: 'firebase' | 'supabase' | 'empty' };
@@ -128,6 +129,32 @@ async function supabaseCatalog(): Promise<CatalogSnapshot> {
   };
 }
 
+async function firebaseProduct(id: string): Promise<ProductSnapshot> {
+  const snapshot = await getAdminDb().collection('products').doc(id).get();
+  if (!snapshot.exists) throw new Error(`Firebase product ${id} was not found.`);
+  return {
+    product: { id: snapshot.id, ...serial(snapshot.data()) },
+    source: 'firebase',
+  };
+}
+
+async function supabaseProduct(id: string): Promise<ProductSnapshot> {
+  const { url, key } = supabaseConfig();
+  const response = await fetch(
+    `${url}/rest/v1/products?select=*&id=eq.${encodeURIComponent(id)}&limit=1`,
+    {
+      headers: { apikey: key, Authorization: `Bearer ${key}` },
+      cache: 'no-store',
+    },
+  );
+  if (!response.ok) throw new Error(`Supabase product read failed ${response.status}`);
+  const rows = await response.json() as any[];
+  if (!Array.isArray(rows) || rows.length === 0) {
+    throw new Error(`Supabase product ${id} was not found.`);
+  }
+  return { product: productFromSupabase(rows[0]), source: 'supabase' };
+}
+
 async function firebaseCategories(): Promise<CategoriesSnapshot> {
   const snap = await getAdminDb().collection('categories').get();
   return {
@@ -198,6 +225,18 @@ async function withFallback<T>(firebaseRead: () => Promise<T>, supabaseRead: () 
 
 export function getDualCatalog() {
   return withFallback(firebaseCatalog, supabaseCatalog, { products: [], categories: [], source: 'empty' as const });
+}
+
+export function getDualProduct(id: string) {
+  const productId = String(id || '').trim();
+  if (!productId) {
+    return Promise.resolve({ product: null, source: 'empty' as const });
+  }
+  return withFallback(
+    () => firebaseProduct(productId),
+    () => supabaseProduct(productId),
+    { product: null, source: 'empty' as const },
+  );
 }
 
 export function getDualCategories() {

@@ -19,6 +19,7 @@ import NewArrivalsRail from "@/components/NewArrivalsRail";
 import ProductGridRewards from "@/components/ProductGridRewards";
 import YouTubeGuide from "@/components/YouTubeGuide";
 import Footer from "@/components/Footer";
+import { cacheProductCatalog } from "@/lib/productNavigationCache";
 import { SettingsProvider } from "@/lib/useSettings";
 import type {
   Category,
@@ -98,6 +99,10 @@ export default function HomePageClient({
       cancelled = true;
     };
   }, [initialProducts, initialCategories]);
+
+  useEffect(() => {
+    cacheProductCatalog(products);
+  }, [products]);
 
   const selectPrice = (amount: number | null) => {
     setSelectedMaxPrice(amount);

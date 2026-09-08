@@ -1,5 +1,11 @@
 import { NextResponse } from 'next/server';
-import { getDualCatalog, getDualSettings, getDualSkills, getConfiguredReadMode } from '@/lib/dualReadServer';
+import {
+  getConfiguredReadMode,
+  getDualCatalog,
+  getDualProduct,
+  getDualSettings,
+  getDualSkills,
+} from '@/lib/dualReadServer';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -15,6 +21,17 @@ export async function GET(request: Request) {
     if (type === 'skills') {
       const result = await getDualSkills();
       return NextResponse.json({ ...result, mode: getConfiguredReadMode() }, { headers: { 'Cache-Control': 'private, max-age=60' } });
+    }
+    if (type === 'product') {
+      const id = String(url.searchParams.get('id') || '').trim();
+      if (!id) {
+        return NextResponse.json({ error: 'Product id is required.' }, { status: 400 });
+      }
+      const result = await getDualProduct(id);
+      if (!result.product) {
+        return NextResponse.json({ error: 'Product not found.', mode: getConfiguredReadMode() }, { status: 404 });
+      }
+      return NextResponse.json({ ...result, mode: getConfiguredReadMode() }, { headers: { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=120' } });
     }
     const result = await getDualCatalog();
     return NextResponse.json({ ...result, mode: getConfiguredReadMode() }, { headers: { 'Cache-Control': 'private, max-age=60' } });
