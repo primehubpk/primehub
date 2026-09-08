@@ -2,27 +2,55 @@ import 'server-only';
 import { unstable_cache } from 'next/cache';
 import { getDualCatalog, getDualSettings, getDualSkills } from '@/lib/dualReadServer';
 
+const RETRY_DELAYS_MS = [0, 250, 750];
+
+async function wait(ms: number) {
+  if (ms <= 0) return;
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 async function loadPublicCatalog() {
-  const result = await getDualCatalog();
-  return { products: result.products, categories: result.categories };
+  let lastSource = 'empty';
+
+  for (const delay of RETRY_DELAYS_MS) {
+    await wait(delay);
+    const result = await getDualCatalog();
+    lastSource = result.source;
+
+    // Never put a temporary outage/empty fallback into Next's long-lived data cache.
+    if (result.source !== 'empty' && result.products.length > 0) {
+      return { products: result.products, categories: result.categories };
+    }
+  }
+
+  throw new Error(`Public catalog unavailable after retry (source: ${lastSource}).`);
 }
 
 export const getPublicCatalogSnapshot = unstable_cache(
   loadPublicCatalog,
-  ['primehub-public-catalog-dual-v1'],
+  ['primehub-public-catalog-dual-v2'],
   { revalidate: 3600, tags: ['public-catalog'] },
 );
 
 async function loadStorefrontSettings() {
-  const result = await getDualSettings();
-  const main = result.documents.main || {};
-  const legacy = result.documents.general || {};
-  return { ...legacy, ...main };
+  for (const delay of RETRY_DELAYS_MS) {
+    await wait(delay);
+    const result = await getDualSettings();
+
+    // Do not cache DEFAULT/blank settings caused by a transient backend failure.
+    if (result.source !== 'empty' && Object.keys(result.documents).length > 0) {
+      const main = result.documents.main || {};
+      const legacy = result.documents.general || {};
+      return { ...legacy, ...main };
+    }
+  }
+
+  throw new Error('Storefront settings unavailable after retry.');
 }
 
 export const getStorefrontSettingsSnapshot = unstable_cache(
   loadStorefrontSettings,
-  ['primehub-storefront-settings-dual-v1'],
+  ['primehub-storefront-settings-dual-v2'],
   { revalidate: 300, tags: ['storefront-settings'] },
 );
 

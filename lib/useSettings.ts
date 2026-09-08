@@ -2,7 +2,7 @@
 // Shared storefront settings reader. Phase 4 routes reads through the server-side dual backend layer.
 'use client';
 
-import { useEffect, useState } from 'react';
+import { createContext, createElement, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { SiteSettings } from '@/lib/types';
 
 const DEFAULT_SETTINGS: SiteSettings = {
@@ -73,9 +73,21 @@ function buildSettings(documents: Record<string, any>): SiteSettings {
   } as SiteSettings;
 }
 
+const SettingsSeedContext = createContext<SiteSettings | null>(null);
+
+export function SettingsProvider({ initialSettings, children }: { initialSettings?: Partial<SiteSettings>; children: ReactNode }) {
+  const seed = useMemo(
+    () => buildSettings(initialSettings && Object.keys(initialSettings).length > 0 ? { main: initialSettings } : {}),
+    [initialSettings],
+  );
+
+  return createElement(SettingsSeedContext.Provider, { value: seed }, children);
+}
+
 export function useSettings() {
-  const [settings, setSettings] = useState<SiteSettings>(DEFAULT_SETTINGS);
-  const [loading, setLoading] = useState(true);
+  const seededSettings = useContext(SettingsSeedContext);
+  const [settings, setSettings] = useState<SiteSettings>(() => seededSettings || DEFAULT_SETTINGS);
+  const [loading, setLoading] = useState(!seededSettings);
 
   useEffect(() => {
     let cancelled = false;
@@ -85,8 +97,10 @@ export function useSettings() {
         const response = await fetch('/api/storefront/read?type=settings', { cache: 'no-store' });
         if (!response.ok) throw new Error(`settings read ${response.status}`);
         const data = await response.json();
-        if (!cancelled) setSettings(buildSettings(data?.documents || {}));
+        const documents = data?.documents || {};
+        if (!cancelled && Object.keys(documents).length > 0) setSettings(buildSettings(documents));
       } catch (error) {
+        // Keep the server-provided last good settings instead of flashing blank weekly deals.
         console.warn('storefront settings dual read unavailable', error);
       } finally {
         if (!cancelled) setLoading(false);
