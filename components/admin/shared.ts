@@ -2,8 +2,6 @@
 import { collection, doc, getDoc, getDocs } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
-const ADMIN_SESSION_KEY = 'primehub_admin_auth';
-
 export interface Product { id: string; title: string; price: number; originalPrice?: number; category: string; stock: number; imageUrl?: string; images?: Array<string | { url?: string }>; description?: string; isFlashSale?: boolean; isWeekendSpecial?: boolean; [key: string]: unknown }
 export interface Category { id: string; title: string; iconUrl?: string; imageUrl?: string; active?: boolean; order?: number; sortOrder?: number; slug?: string; [key: string]: unknown }
 export interface Order { id: string; customer: { name?: string; phone?: string; city?: string; [key: string]: unknown }; items: Array<{ title?: string; quantity?: number; price?: number; [key: string]: unknown }>; total?: number; subtotal?: number; status?: string; createdAt?: unknown; [key: string]: unknown }
@@ -15,15 +13,10 @@ export type AdminRole = 'super_admin' | 'admin' | 'manager' | 'editor' | 'suppor
 export type AdminPermission = 'dashboard.view'|'products.view'|'products.manage'|'categories.view'|'categories.manage'|'deals.view'|'deals.manage'|'orders.view'|'orders.manage'|'customers.view'|'customers.manage'|'inventory.view'|'inventory.manage'|'marketing.view'|'marketing.manage'|'content.view'|'content.manage'|'analytics.view'|'settings.view'|'settings.manage'|'suppliers.view'|'suppliers.manage'|'security.view'|'security.manage';
 export interface AdminProfile { id: string; email?: string; displayName?: string; role: AdminRole; permissions: AdminPermission[]; active: boolean; lastLoginAt?: unknown; createdAt?: unknown; [key: string]: unknown }
 
-function requireAdminSession() {
-  if (typeof window === 'undefined' || window.localStorage.getItem(ADMIN_SESSION_KEY) !== 'true') {
-    throw new Error('Admin session required.');
-  }
-  document.cookie = 'primehub_admin_auth=true; Path=/; Max-Age=604800; SameSite=Lax';
-}
-
 async function adminWrite(action: 'create' | 'update' | 'set' | 'delete', name: string, id?: string, value?: Record<string, any>) {
-  requireAdminSession();
+  // The secure admin session is owned by the server and stored in the
+  // primehub_admin_auth cookie. Do not gate writes on localStorage: the current
+  // secure login flow intentionally does not create that legacy client flag.
   const response = await fetch('/api/admin/firestore', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -40,7 +33,6 @@ async function adminWrite(action: 'create' | 'update' | 'set' | 'delete', name: 
 export async function uploadImageToImgBB(file: File): Promise<string> {
   if (!file.type.startsWith('image/')) throw new Error('Only image files are allowed.');
   if (file.size > 10 * 1024 * 1024) throw new Error('Image must be 10MB or smaller.');
-  requireAdminSession();
   const form = new FormData();
   form.append('image', file, file.name || 'upload');
   const response = await fetch('/api/upload/r2', { method: 'POST', body: form, credentials: 'same-origin', cache: 'no-store' });
@@ -64,6 +56,6 @@ export const createAdminDocument = (name: string, value: Record<string, any>) =>
 export const updateAdminDocument = (name: string, id: string, value: Record<string, any>) => adminWrite('update', name, id, normalizeAdminDocument(name, value));
 export const setAdminDocument = (name: string, id: string, value: Record<string, any>) => adminWrite('set', name, id, normalizeAdminDocument(name, value));
 export const deleteAdminDocument = (name: string, id: string) => adminWrite('delete', name, id);
-export async function writeAdminAuditLog(action: string, entity: string, entityId?: string, metadata: Record<string, unknown> = {}) { requireAdminSession(); await adminWrite('create', 'admin_audit_logs', undefined, { action, entity, entityId: entityId || null, actorUid: 'local-admin', actorEmail: 'primehubpk1@gmail.com', metadata, createdAt: new Date().toISOString() }); }
+export async function writeAdminAuditLog(action: string, entity: string, entityId?: string, metadata: Record<string, unknown> = {}) { await adminWrite('create', 'admin_audit_logs', undefined, { action, entity, entityId: entityId || null, actorUid: 'local-admin', actorEmail: 'primehubpk1@gmail.com', metadata, createdAt: new Date().toISOString() }); }
 export function pakistanDayKey(date = new Date()) { return new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Karachi', weekday: 'long' }).format(date).toLowerCase(); }
 export function isWithinSchedule(startAt?: string, endAt?: string, now = new Date()) { const start = startAt ? new Date(startAt).getTime() : Number.NEGATIVE_INFINITY; const end = endAt ? new Date(endAt).getTime() : Number.POSITIVE_INFINITY; const current = now.getTime(); return Number.isFinite(current) && current >= start && current <= end; }
