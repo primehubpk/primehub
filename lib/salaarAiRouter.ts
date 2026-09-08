@@ -11,7 +11,29 @@ export type SalaarAiRequest = {
   imageUrls?: string[];
 };
 
+type KeyHealth = {
+  failures: number;
+  cooldownUntil: number;
+  lastFailureAt: number;
+};
+
+class SalaarProviderError extends Error {
+  status?: number;
+  constructor(message: string, status?: number) {
+    super(message);
+    this.name = 'SalaarProviderError';
+    this.status = status;
+  }
+}
+
 let rotationCursor = 0;
+const keyHealth = new Map<string, KeyHealth>();
+
+const TEXT_TIMEOUT_MS = Math.max(3000, Number(process.env.SALAAR_AI_TIMEOUT_MS || 9000));
+const VISION_TIMEOUT_MS = Math.max(TEXT_TIMEOUT_MS, Number(process.env.SALAAR_VISION_TIMEOUT_MS || 14000));
+const FAILURE_THRESHOLD = Math.max(1, Number(process.env.SALAAR_AI_FAILURE_THRESHOLD || 2));
+const DEFAULT_COOLDOWN_MS = Math.max(15000, Number(process.env.SALAAR_AI_COOLDOWN_MS || 90_000));
+const LONG_COOLDOWN_MS = Math.max(DEFAULT_COOLDOWN_MS, Number(process.env.SALAAR_AI_LONG_COOLDOWN_MS || 5 * 60_000));
 
 function cleanText(value: unknown, max = 900): string {
   return typeof value === 'string' ? value.trim().slice(0, max) : '';
@@ -28,10 +50,48 @@ function providerKeys(provider: SalaarProvider): string[] {
   return [...splitKeys(process.env.GEMINI_API_KEYS), ...splitKeys(process.env.GEMINI_API_KEY)];
 }
 
+function keyId(provider: SalaarProvider, key: string) {
+  // The full key is used only as an in-memory map key and is never logged or returned.
+  return `${provider}:${key}`;
+}
+
+function healthFor(provider: SalaarProvider, key: string): KeyHealth {
+  return keyHealth.get(keyId(provider, key)) || { failures: 0, cooldownUntil: 0, lastFailureAt: 0 };
+}
+
+function isCooling(provider: SalaarProvider, key: string, now = Date.now()) {
+  return healthFor(provider, key).cooldownUntil > now;
+}
+
+function recordFailure(provider: SalaarProvider, key: string, error: unknown) {
+  const id = keyId(provider, key);
+  const previous = healthFor(provider, key);
+  const failures = previous.failures + 1;
+  const status = error instanceof SalaarProviderError ? error.status : undefined;
+  const hardFailure = status === 401 || status === 403 || status === 429;
+  const shouldCool = hardFailure || failures >= FAILURE_THRESHOLD;
+  keyHealth.set(id, {
+    failures,
+    lastFailureAt: Date.now(),
+    cooldownUntil: shouldCool ? Date.now() + (hardFailure ? LONG_COOLDOWN_MS : DEFAULT_COOLDOWN_MS) : 0,
+  });
+}
+
+function recordSuccess(provider: SalaarProvider, key: string) {
+  keyHealth.delete(keyId(provider, key));
+}
+
 function rotated<T>(items: T[], offset: number): T[] {
   if (!items.length) return items;
   const start = ((offset % items.length) + items.length) % items.length;
   return [...items.slice(start), ...items.slice(0, start)];
+}
+
+function usableKeys(provider: SalaarProvider, offset: number) {
+  const all = rotated(providerKeys(provider), offset);
+  const active = all.filter((key) => !isCooling(provider, key));
+  // If every key is cooling, keep the request fast and move to another provider.
+  return active;
 }
 
 function validImageUrls(value: unknown): string[] {
@@ -71,11 +131,12 @@ async function callOpenAiCompatible(
       ],
     }),
     cache: 'no-store',
+    signal: AbortSignal.timeout(images.length ? VISION_TIMEOUT_MS : TEXT_TIMEOUT_MS),
   });
-  if (!response.ok) throw new Error(`provider ${response.status}`);
+  if (!response.ok) throw new SalaarProviderError(`provider ${response.status}`, response.status);
   const data = await response.json();
   const text = cleanText(data?.choices?.[0]?.message?.content, 900);
-  if (!text) throw new Error('empty provider reply');
+  if (!text) throw new SalaarProviderError('empty provider reply');
   return text;
 }
 
@@ -109,16 +170,40 @@ async function callGemini(
       generationConfig: { temperature: 0.3, maxOutputTokens: images.length ? 260 : 180 },
     }),
     cache: 'no-store',
+    signal: AbortSignal.timeout(images.length ? VISION_TIMEOUT_MS : TEXT_TIMEOUT_MS),
   });
-  if (!response.ok) throw new Error(`gemini ${response.status}`);
+  if (!response.ok) throw new SalaarProviderError(`gemini ${response.status}`, response.status);
   const data = await response.json();
   const text = cleanText(data?.candidates?.[0]?.content?.parts?.map((part: any) => part?.text || '').join('\n'), 900);
-  if (!text) throw new Error('empty Gemini reply');
+  if (!text) throw new SalaarProviderError('empty Gemini reply');
   return text;
 }
 
 export function sanitizeSalaarImageUrls(value: unknown) {
   return validImageUrls(value);
+}
+
+export function getSalaarAiHealthSnapshot() {
+  const now = Date.now();
+  const providers = (['groq', 'openrouter', 'gemini'] as SalaarProvider[]).map((provider) => {
+    const keys = providerKeys(provider);
+    const cooling = keys.filter((key) => isCooling(provider, key, now)).length;
+    return {
+      provider,
+      configuredKeys: keys.length,
+      availableKeys: Math.max(0, keys.length - cooling),
+      coolingKeys: cooling,
+    };
+  });
+  return {
+    providers,
+    totalConfiguredKeys: providers.reduce((sum, item) => sum + item.configuredKeys, 0),
+    totalAvailableKeys: providers.reduce((sum, item) => sum + item.availableKeys, 0),
+    timeoutMs: TEXT_TIMEOUT_MS,
+    visionTimeoutMs: VISION_TIMEOUT_MS,
+    failureThreshold: FAILURE_THRESHOLD,
+    cooldownMs: DEFAULT_COOLDOWN_MS,
+  };
 }
 
 export async function runSalaarAi(request: SalaarAiRequest): Promise<{ text: string; provider: SalaarProvider; vision: boolean }> {
@@ -131,31 +216,33 @@ export async function runSalaarAi(request: SalaarAiRequest): Promise<{ text: str
     : rotated<SalaarProvider>(['groq', 'openrouter', 'gemini'], start);
 
   for (const provider of providers) {
-    const keys = rotated(providerKeys(provider), start);
+    const keys = usableKeys(provider, start);
     for (const key of keys) {
       try {
+        let text = '';
         if (provider === 'groq') {
           const model = vision
             ? process.env.SALAAR_GROQ_VISION_MODEL?.trim()
             : process.env.SALAAR_GROQ_MODEL?.trim() || 'llama-3.3-70b-versatile';
           if (!model) continue;
-          const text = await callOpenAiCompatible('https://api.groq.com/openai/v1', key, model, request, images);
-          return { text, provider, vision };
-        }
-        if (provider === 'openrouter') {
+          text = await callOpenAiCompatible('https://api.groq.com/openai/v1', key, model, request, images);
+        } else if (provider === 'openrouter') {
           const model = vision
             ? process.env.SALAAR_OPENROUTER_VISION_MODEL?.trim() || process.env.SALAAR_OPENROUTER_MODEL?.trim() || 'google/gemini-2.5-flash'
             : process.env.SALAAR_OPENROUTER_MODEL?.trim() || 'google/gemini-2.5-flash';
-          const text = await callOpenAiCompatible('https://openrouter.ai/api/v1', key, model, request, images);
-          return { text, provider, vision };
+          text = await callOpenAiCompatible('https://openrouter.ai/api/v1', key, model, request, images);
+        } else {
+          const model = vision
+            ? process.env.SALAAR_GEMINI_VISION_MODEL?.trim() || process.env.SALAAR_GEMINI_MODEL?.trim() || 'gemini-2.5-flash'
+            : process.env.SALAAR_GEMINI_MODEL?.trim() || 'gemini-2.5-flash';
+          text = await callGemini(key, model, request, images);
         }
-        const model = vision
-          ? process.env.SALAAR_GEMINI_VISION_MODEL?.trim() || process.env.SALAAR_GEMINI_MODEL?.trim() || 'gemini-2.5-flash'
-          : process.env.SALAAR_GEMINI_MODEL?.trim() || 'gemini-2.5-flash';
-        const text = await callGemini(key, model, request, images);
+        recordSuccess(provider, key);
         return { text, provider, vision };
       } catch (error) {
-        console.warn(`Salaar ${provider}${vision ? ' vision' : ''} key failed; rotating`, error);
+        recordFailure(provider, key, error);
+        const status = error instanceof SalaarProviderError && error.status ? ` status=${error.status}` : '';
+        console.warn(`Salaar ${provider}${vision ? ' vision' : ''} key failed; rotating.${status}`);
       }
     }
   }

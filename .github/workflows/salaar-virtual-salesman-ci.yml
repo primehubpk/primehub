@@ -4,6 +4,20 @@ on:
   push:
     branches:
       - feature/salaar-virtual-salesman
+      - feature/salaar-human-avatar-preview
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'app/api/salaar/**'
+      - 'lib/salaar*'
+      - 'components/SalaarNative.tsx'
+      - 'app/globals.css'
+      - 'public/salaar-human-avatar.jpg'
+      - 'scripts/salaar-*'
+      - 'SALAAR-*.md'
+      - '.env.example'
+      - '.github/workflows/salaar-virtual-salesman-ci.yml'
   workflow_dispatch:
 
 permissions:
@@ -52,6 +66,9 @@ jobs:
 
       - name: Phase 9 chat experience smoke
         run: node scripts/salaar-phase9-chat-experience-smoke.mjs
+
+      - name: Phase 10 never-fail smoke
+        run: node scripts/salaar-phase10-never-fail-smoke.mjs
 
       - name: Build
         run: npm run build

@@ -17,9 +17,11 @@ export async function GET(request: Request) {
     const matchingCount = requested
       ? products.filter((product: any) => String(product?.category || '').trim().toLowerCase() === requested).length
       : null;
+    const available = products.length > 0;
 
     return NextResponse.json({
-      ok: true,
+      ok: available,
+      degraded: catalog.degraded === true,
       source: catalog.source,
       productCount: products.length,
       categoryCount: categories.length,
@@ -29,9 +31,9 @@ export async function GET(request: Request) {
       batchSize: SALAAR_CATEGORY_BATCH_SIZE,
       safetyRefreshSeconds: SALAAR_CATALOG_REVALIDATE_SECONDS,
       refreshedAt: catalog.refreshedAt,
-    });
+    }, { status: available ? 200 : 503 });
   } catch (error) {
     console.error('Salaar catalog health failed', error);
-    return NextResponse.json({ ok: false, error: 'Catalog cache unavailable.' }, { status: 503 });
+    return NextResponse.json({ ok: false, degraded: true, error: 'Catalog cache unavailable.' }, { status: 503 });
   }
 }
