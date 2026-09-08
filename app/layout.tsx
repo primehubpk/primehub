@@ -9,7 +9,6 @@ import GlobalFooter from '@/components/GlobalFooter';
 import CartMiniBar from '@/components/CartMiniBar';
 import PWARegister from '@/components/PWARegister';
 import GlobalVariantSelector from '@/components/GlobalVariantSelector';
-import SalaarNative from '@/components/SalaarNative';
 import './globals.css';
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL;
@@ -135,7 +134,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <BottomNav />
         <CartMiniBar />
         <PWARegister />
-        <SalaarNative />
       </body>
     </html>
   );

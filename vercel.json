@@ -5,8 +5,7 @@
   },
   "git": {
     "deploymentEnabled": {
-      "feature/supabase-migration": true,
-      "feature/salaar-virtual-salesman": true
+      "feature/supabase-migration": true
     }
   }
 }
