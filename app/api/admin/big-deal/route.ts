@@ -182,7 +182,7 @@ export async function GET(request: Request) {
 
   const [settingsResult, catalogResult] = await Promise.all([getDualSettings(), getDualCatalog()]);
   let dailyDeal = normalizeDeal(settingsResult.documents?.main?.dailyDeal || {});
-  let source = settingsResult.source;
+  let source: typeof settingsResult.source | 'firebase-migration' = settingsResult.source;
 
   if (completeSlotCount(dailyDeal) < SLOT_COUNT) {
     try {
