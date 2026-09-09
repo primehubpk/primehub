@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState, type MouseEvent } from "react";
 import Header from "@/components/home/HomeHeader";
 import HomeCollections from "@/components/home/HomeCollections";
 import BigDealNextPreviewSync from "@/components/home/BigDealNextPreviewSync";
@@ -22,7 +23,10 @@ import NewArrivalsRail from "@/components/NewArrivalsRail";
 import ProductGridRewards from "@/components/ProductGridRewards";
 import YouTubeGuide from "@/components/YouTubeGuide";
 import Footer from "@/components/Footer";
-import { cacheProductCatalog } from "@/lib/productNavigationCache";
+import {
+  cacheProductCatalog,
+  cacheProductForNavigation,
+} from "@/lib/productNavigationCache";
 import { SettingsProvider } from "@/lib/useSettings";
 import type {
   Category,
@@ -44,6 +48,7 @@ export default function HomePageClient({
   initialCategories,
   initialSettings,
 }: Props) {
+  const router = useRouter();
   const [selectedMaxPrice, setSelectedMaxPrice] = useState<number | null>(null);
   const [wholesaleSelected, setWholesaleSelected] = useState(false);
   const [products, setProducts] = useState<Product[]>(initialProducts);
@@ -107,6 +112,29 @@ export default function HomePageClient({
     cacheProductCatalog(products);
   }, [products]);
 
+  const handleStorefrontClickCapture = (event: MouseEvent<HTMLDivElement>) => {
+    const target = event.target as Element | null;
+    const anchor = target?.closest("a[href]") as HTMLAnchorElement | null;
+    if (!anchor) return;
+
+    const url = new URL(anchor.href, window.location.origin);
+    if (url.origin !== window.location.origin || !url.pathname.startsWith("/product/")) return;
+
+    const encodedProductId = url.pathname.slice("/product/".length).split("/")[0] || "";
+    const productId = decodeURIComponent(encodedProductId);
+    const selectedProduct = products.find((product) => product.id === productId);
+    if (selectedProduct) cacheProductForNavigation(selectedProduct);
+
+    if (anchor.closest(".home-big-deal")) {
+      url.searchParams.set("deal", "big");
+    }
+
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+
+    event.preventDefault();
+    router.push(`${url.pathname}${url.search}${url.hash}`);
+  };
+
   const selectPrice = (amount: number | null) => {
     setSelectedMaxPrice(amount);
     setWholesaleSelected(false);
@@ -119,7 +147,7 @@ export default function HomePageClient({
 
   return (
     <SettingsProvider initialSettings={initialSettings}>
-      <div className="home-storefront">
+      <div className="home-storefront" onClickCapture={handleStorefrontClickCapture}>
         <Header />
         <main className="home-content">
           <h1 className="sr-only">

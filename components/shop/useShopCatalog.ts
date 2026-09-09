@@ -10,6 +10,7 @@ import { isWholesaleProduct } from '@/lib/wholesale';
 import { shuffleProducts } from '@/lib/shuffleProducts';
 import { getEffectivePrice } from '@/lib/dealPricing';
 import { priceBucketRange, saleMelaPriceRange } from '@/lib/priceBucketUtils';
+import { cacheProductCatalog } from '@/lib/productNavigationCache';
 import { Product, Category, ShopCatalogModel, imageOf, priceOf, originalOf, productHasVariants, titleOf } from './ShopTypes';
 
 export function useShopCatalog(initialCategory?: string, initialQuery = '', initialProducts: Product[] = [], initialCategories: Category[] = []): ShopCatalogModel {
@@ -72,6 +73,10 @@ export function useShopCatalog(initialCategory?: string, initialQuery = '', init
       cancelled = true;
     };
   }, [hasServerData]);
+
+  useEffect(() => {
+    cacheProductCatalog(products);
+  }, [products]);
 
   const buckets = useMemo(
     () => [...(settings.priceBuckets || [])].filter((bucket) => bucket.active).sort((a, b) => a.sortOrder - b.sortOrder),

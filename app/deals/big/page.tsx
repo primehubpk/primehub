@@ -44,7 +44,12 @@ export default async function BigDealPage() {
     ? Math.round(((originalPrice - dealPrice) / originalPrice) * 100)
     : 0;
   const imageUrl = resolveDealImage(deal);
-  const productHref = deal?.productId ? `/product/${deal.productId}` : '/shop';
+  const productHref = deal?.productId ? `/product/${deal.productId}?deal=big` : '/shop';
+  const configuredButtonLink = String(deal?.buttonLink || '').trim();
+  const primaryHref =
+    deal?.productId && configuredButtonLink.startsWith(`/product/${deal.productId}`)
+      ? productHref
+      : configuredButtonLink || productHref;
 
   return (
     <main className="min-h-screen bg-[#F4F4F1] pb-28">
@@ -102,7 +107,7 @@ export default async function BigDealPage() {
                     <p className="mt-1 text-black/45">{countdownEnd(deal.endAt)}</p>
                   </div>
                   <div className="mt-6 flex flex-wrap gap-2">
-                    <Link href={deal.buttonLink || productHref} className="inline-flex items-center gap-2 rounded-xl bg-[#14140F] px-5 py-3 text-xs font-black text-white">
+                    <Link href={primaryHref} className="inline-flex items-center gap-2 rounded-xl bg-[#14140F] px-5 py-3 text-xs font-black text-white">
                       <ShoppingBag size={15}/> Shop Big Deal
                     </Link>
                     <Link href={productHref} className="inline-flex rounded-xl border border-black/10 px-5 py-3 text-xs font-black">View Product</Link>
