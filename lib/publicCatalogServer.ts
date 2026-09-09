@@ -1,6 +1,7 @@
 import 'server-only';
 import { unstable_cache } from 'next/cache';
 import { getDualCatalog, getDualProduct, getDualSettings, getDualSkills } from '@/lib/dualReadServer';
+import { getAdminDb } from '@/lib/firebaseAdmin';
 import { getStorefrontSettingsWithBigDealRecovery } from '@/lib/storefrontSettingsServer';
 
 const RETRY_DELAYS_MS = [0, 250, 750];
@@ -79,12 +80,33 @@ export async function getStorefrontSettingsSnapshot() {
   return { ...legacy, ...main };
 }
 
+async function getFreshFirebaseWholesaleVideos() {
+  try {
+    const snapshot = await getAdminDb().collection('settings').doc('main').get();
+    if (!snapshot.exists) return null;
+    const data = snapshot.data() || {};
+    return Array.isArray(data.wholesaleVideos) ? data.wholesaleVideos : null;
+  } catch (error) {
+    console.warn('Fresh Firebase wholesale videos recovery skipped', error);
+    return null;
+  }
+}
+
 export async function getFreshStorefrontSettingsSnapshot() {
-  const result = await getStorefrontSettingsWithBigDealRecovery({ cache: 'no-store' });
+  const [result, firebaseWholesaleVideos] = await Promise.all([
+    getStorefrontSettingsWithBigDealRecovery({ cache: 'no-store' }),
+    getFreshFirebaseWholesaleVideos(),
+  ]);
   const documents = result.documents as Record<string, any>;
   const main = documents.main || {};
   const legacy = documents.general || {};
-  return { ...legacy, ...main };
+  const merged = { ...legacy, ...main };
+
+  if (firebaseWholesaleVideos) {
+    return { ...merged, wholesaleVideos: firebaseWholesaleVideos };
+  }
+
+  return merged;
 }
 
 async function loadPrimeSkills() {
@@ -105,4 +127,3 @@ export const getPrimeSkillsSnapshot = unstable_cache(
   ['primehub-prime-skills-dual-v3'],
   { revalidate: 600, tags: ['prime-skills'] },
 );
-
