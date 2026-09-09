@@ -1,14 +1,17 @@
 import { NextResponse } from 'next/server';
+import { getConfiguredReadMode } from '@/lib/dualReadServer';
 import {
-  getConfiguredReadMode,
-  getDualCatalog,
-  getDualProduct,
-  getDualSkills,
-} from '@/lib/dualReadServer';
-import { getStorefrontSettingsWithBigDealRecovery } from '@/lib/storefrontSettingsServer';
+  getPrimeSkillsSnapshot,
+  getPublicCatalogSnapshot,
+  getPublicProductSnapshot,
+  getStorefrontSettingsResultSnapshot,
+} from '@/lib/publicCatalogServer';
 
 export const runtime = 'nodejs';
-export const dynamic = 'force-dynamic';
+
+const FRESH_BROWSER_HEADERS = {
+  'Cache-Control': 'private, no-store, max-age=0, must-revalidate',
+};
 
 function requestedProductIds(url: URL) {
   try {
@@ -31,25 +34,31 @@ export async function GET(request: Request) {
   const type = String(url.searchParams.get('type') || 'catalog');
   try {
     if (type === 'settings') {
-      const result = await getStorefrontSettingsWithBigDealRecovery();
-      return NextResponse.json({ ...result, mode: getConfiguredReadMode() }, { headers: { 'Cache-Control': 'no-store, max-age=0' } });
+      const result = await getStorefrontSettingsResultSnapshot();
+      return NextResponse.json(
+        { ...result, mode: getConfiguredReadMode() },
+        { headers: FRESH_BROWSER_HEADERS },
+      );
     }
     if (type === 'skills') {
-      const result = await getDualSkills();
-      return NextResponse.json({ ...result, mode: getConfiguredReadMode() }, { headers: { 'Cache-Control': 'private, max-age=60' } });
+      const result = await getPrimeSkillsSnapshot();
+      return NextResponse.json(
+        { skills: result.skills, source: result.source, mode: getConfiguredReadMode() },
+        { headers: FRESH_BROWSER_HEADERS },
+      );
     }
     if (type === 'products') {
       const ids = requestedProductIds(url);
       if (ids.length === 0) {
         return NextResponse.json({ error: 'At least one product id is required.' }, { status: 400 });
       }
-      const results = await Promise.all(ids.map((id) => getDualProduct(id)));
+      const results = await Promise.all(ids.map((id) => getPublicProductSnapshot(id)));
       const products = results
         .map((result) => result.product)
         .filter((product) => Boolean(product));
       return NextResponse.json(
         { products, mode: getConfiguredReadMode() },
-        { headers: { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=120' } },
+        { headers: FRESH_BROWSER_HEADERS },
       );
     }
     if (type === 'product') {
@@ -57,16 +66,28 @@ export async function GET(request: Request) {
       if (!id) {
         return NextResponse.json({ error: 'Product id is required.' }, { status: 400 });
       }
-      const result = await getDualProduct(id);
+      const result = await getPublicProductSnapshot(id);
       if (!result.product) {
-        return NextResponse.json({ error: 'Product not found.', mode: getConfiguredReadMode() }, { status: 404 });
+        return NextResponse.json(
+          { error: 'Product not found.', mode: getConfiguredReadMode() },
+          { status: 404, headers: FRESH_BROWSER_HEADERS },
+        );
       }
-      return NextResponse.json({ ...result, mode: getConfiguredReadMode() }, { headers: { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=120' } });
+      return NextResponse.json(
+        { ...result, mode: getConfiguredReadMode() },
+        { headers: FRESH_BROWSER_HEADERS },
+      );
     }
-    const result = await getDualCatalog();
-    return NextResponse.json({ ...result, mode: getConfiguredReadMode() }, { headers: { 'Cache-Control': 'private, max-age=60' } });
+    const result = await getPublicCatalogSnapshot();
+    return NextResponse.json(
+      { ...result, mode: getConfiguredReadMode() },
+      { headers: FRESH_BROWSER_HEADERS },
+    );
   } catch (error) {
     console.error('storefront dual read failed', error);
-    return NextResponse.json({ error: 'Storefront data unavailable.' }, { status: 503 });
+    return NextResponse.json(
+      { error: 'Storefront data unavailable.' },
+      { status: 503, headers: FRESH_BROWSER_HEADERS },
+    );
   }
 }
