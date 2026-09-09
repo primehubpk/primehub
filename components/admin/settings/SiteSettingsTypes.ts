@@ -1,7 +1,7 @@
 'use client';
 
-import type { ChangeEvent, FormEvent } from 'react';
-import type { DailyDeal, PriceBucket } from '@/lib/types';
+import type { FormEvent } from 'react';
+import type { PriceBucket } from '@/lib/types';
 
 export type Settings = {
   announcementText: string;
@@ -14,7 +14,6 @@ export type Settings = {
   storePolicyInfo: string;
   youtubeGuideUrl: string;
   priceBuckets: PriceBucket[];
-  dailyDeal: DailyDeal;
 };
 
 export type SiteSettingsState = {
@@ -30,10 +29,8 @@ export type SiteSettingsState = {
 };
 
 export type SettingsUpdate = <K extends keyof Settings>(key: K, value: Settings[K]) => void;
-export type DailyDealUpdate = (patch: Partial<DailyDeal>) => void;
 export type BucketUpdate = (index: number, patch: Partial<PriceBucket>) => void;
 export type BucketMove = (index: number, direction: -1 | 1) => void;
-export type UploadBigDeal = (event: ChangeEvent<HTMLInputElement>) => Promise<void>;
 export type SaveSettings = (event: FormEvent<HTMLFormElement>) => Promise<void>;
 export type ChangeAdminPassword = (event: FormEvent<HTMLFormElement>) => Promise<void>;
 
@@ -44,7 +41,6 @@ export const DEFAULT_BUCKETS: PriceBucket[] = [
   { id: 'premium', title: 'Premium', amount: 999999, iconUrl: '', accent: '#14140F', sortOrder: 4, active: true },
 ];
 
-export const DEFAULT_BIG_DEAL: DailyDeal = { productId: '', imageUrl: '', title: '', originalPrice: 0, dealPrice: 0, startAt: '', endAt: '', buttonText: 'Shop Big Deal', buttonLink: '/deals/big', active: false };
 export const DEFAULT_SETTINGS: Settings = {
   announcementText: '',
   whatsappNumber: '',
@@ -56,5 +52,4 @@ export const DEFAULT_SETTINGS: Settings = {
   storePolicyInfo: '',
   youtubeGuideUrl: '',
   priceBuckets: DEFAULT_BUCKETS,
-  dailyDeal: DEFAULT_BIG_DEAL,
 };
