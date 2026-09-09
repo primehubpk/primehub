@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useLayoutEffect, useMemo } from "react";
 import { normalizeImageUrl } from "@/lib/imageUrl";
 import { useSettings } from "@/lib/useSettings";
 import {
@@ -79,11 +79,24 @@ function setImage(image: HTMLImageElement | null, src: string, alt: string) {
   image.removeAttribute("sizes");
 }
 
+function nextSlot(deal: BigDeal, now: Date) {
+  const slotCount = bigDealConfiguredSlotCount(deal);
+  return slotAt(
+    deal,
+    nextBigDealRotationIndex(deal.rotationStartedAt, now, slotCount),
+  );
+}
+
 export default function BigDealNextPreviewSync() {
   const { settings } = useSettings();
   const bigDeal = settings.dailyDeal;
 
-  useEffect(() => {
+  const instantNextDeal = useMemo(() => {
+    if (!bigDeal?.active) return null;
+    return nextSlot(bigDeal, new Date());
+  }, [bigDeal]);
+
+  useLayoutEffect(() => {
     if (!bigDeal?.active) return;
 
     const applyDealCards = () => {
@@ -122,14 +135,16 @@ export default function BigDealNextPreviewSync() {
       }
 
       const nextCard = document.querySelector<HTMLElement>(".home-next-deal");
-      const nextImage = nextCard?.querySelector<HTMLImageElement>(":scope > img") || null;
       const badge = nextCard?.querySelector<HTMLElement>(":scope > span") || null;
       if (!nextCard || !badge) return;
 
-      setImage(nextImage, nextDeal.imageUrl, nextDeal.title);
+      nextCard.style.backgroundImage = nextDeal.imageUrl ? `url(${JSON.stringify(nextDeal.imageUrl)})` : "none";
+      nextCard.style.backgroundSize = "cover";
+      nextCard.style.backgroundPosition = "center";
       nextCard.setAttribute("aria-label", `Next Big Deal locked until tomorrow: ${nextDeal.title}, ${money(nextDeal.dealPrice)}`);
       nextCard.setAttribute("aria-disabled", "true");
       nextCard.dataset.locked = "true";
+      nextCard.dataset.synced = "true";
       if (nextDeal.productId) nextCard.dataset.nextProductId = nextDeal.productId;
 
       const smalls = badge.querySelectorAll<HTMLElement>("small");
@@ -145,9 +160,13 @@ export default function BigDealNextPreviewSync() {
     };
 
     applyDealCards();
-    const timer = window.setInterval(applyDealCards, 250);
+    const timer = window.setInterval(applyDealCards, 1000);
     return () => window.clearInterval(timer);
   }, [bigDeal]);
 
-  return null;
+  if (!instantNextDeal?.imageUrl) return null;
+
+  return (
+    <style>{`.home-storefront .home-next-deal{background-image:url(${JSON.stringify(instantNextDeal.imageUrl)});background-size:cover;background-position:center;}`}</style>
+  );
 }
