@@ -4,10 +4,10 @@ import { getDualCatalog, getDualProduct, getDualSettings, getDualSkills } from '
 import { getStorefrontSettingsWithBigDealRecovery } from '@/lib/storefrontSettingsServer';
 
 const RETRY_DELAYS_MS = [0, 250, 750];
-const CATALOG_READ_CACHE = { cache: 'force-cache' as const, revalidate: 3600, tags: ['public-catalog'] };
-const PRODUCT_READ_CACHE = { cache: 'force-cache' as const, revalidate: 60, tags: ['public-products'] };
-const SETTINGS_READ_CACHE = { cache: 'force-cache' as const, revalidate: 60, tags: ['storefront-settings'] };
-const SKILLS_READ_CACHE = { cache: 'force-cache' as const, revalidate: 600, tags: ['prime-skills', 'storefront-settings'] };
+const CATALOG_READ_CACHE = { revalidate: 3600, tags: ['public-catalog'] };
+const PRODUCT_READ_CACHE = { revalidate: 60, tags: ['public-products'] };
+const SETTINGS_READ_CACHE = { revalidate: 60, tags: ['storefront-settings'] };
+const SKILLS_READ_CACHE = { revalidate: 600, tags: ['prime-skills', 'storefront-settings'] };
 
 async function wait(ms: number) {
   if (ms <= 0) return;
