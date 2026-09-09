@@ -4,6 +4,6 @@
     "PRIMEHUB_DATA_READ_MODE": "supabase-primary"
   },
   "git": {
-    "deploymentEnabled": false
+    "deploymentEnabled": true
   }
 }
