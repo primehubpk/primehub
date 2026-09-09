@@ -115,7 +115,7 @@ export default function BigDealNextPreviewSync() {
         const info = currentCard.querySelector<HTMLElement>(".home-big-info");
         const titleLink = info?.querySelector<HTMLAnchorElement>(":scope > a") || null;
         const prices = info?.querySelector<HTMLElement>(".home-big-prices") || null;
-        const href = currentDeal.productId ? `/product/${currentDeal.productId}` : "/deals/big";
+        const href = currentDeal.productId ? `/product/${currentDeal.productId}?deal=big` : "/deals/big";
 
         if (imageLink) imageLink.href = href;
         if (titleLink) {
