@@ -2,6 +2,8 @@ import 'server-only';
 import { getAdminDb } from '@/lib/firebaseAdmin';
 
 type ReadMode = 'firebase-primary' | 'supabase-primary' | 'firebase-only' | 'supabase-only';
+export type DualReadCacheOptions = { cache?: RequestCache; revalidate?: number; tags?: string[] };
+type NextFetchInit = RequestInit & { next?: { revalidate?: number; tags?: string[] } };
 
 type CatalogSnapshot = { products: any[]; categories: any[]; source: 'firebase' | 'supabase' | 'empty' };
 type ProductSnapshot = { product: any | null; source: 'firebase' | 'supabase' | 'empty' };
@@ -31,8 +33,6 @@ function mode(): ReadMode {
     value === 'supabase-only'
   ) return value;
 
-  // Supabase is the canonical read backend. A missing/typoed mode must never
-  // silently switch the storefront back to Firebase.
   return 'supabase-primary';
 }
 
@@ -50,10 +50,7 @@ function serial(value: any): any {
 }
 
 function supabaseUrl() {
-  return envValue(
-    'SUPABASE_URL',
-    'NEXT_PUBLIC_SUPABASE_URL',
-  ).replace(/\/+$/, '');
+  return envValue('SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_URL').replace(/\/+$/, '');
 }
 
 function supabasePublicKey() {
@@ -67,11 +64,7 @@ function supabasePublicKey() {
 }
 
 function supabaseServiceKey() {
-  return envValue(
-    'SUPABASE_SERVICE_ROLE_KEY',
-    'SUPABASE_SECRET_KEY',
-    'SUPABASE_SERVICE_KEY',
-  );
+  return envValue('SUPABASE_SERVICE_ROLE_KEY', 'SUPABASE_SECRET_KEY', 'SUPABASE_SERVICE_KEY');
 }
 
 function supabaseConfigError(kind: 'public' | 'server', url: string, key: string) {
@@ -94,10 +87,6 @@ function shouldProtectPreviewFirebase(error: unknown) {
 
 function supabaseConfig() {
   const url = supabaseUrl();
-  // This module is server-only. Prefer the public/publishable key for public
-  // tables, but allow the server secret as a safe server-side fallback so a
-  // correctly configured Supabase project does not fall through to Firebase
-  // just because Vercel uses the newer secret-key variable naming.
   const key = supabasePublicKey() || supabaseServiceKey();
   if (!url || !key) throw supabaseConfigError('public', url, key);
   return { url, key };
@@ -110,11 +99,22 @@ function supabaseServiceConfig() {
   return { url, key };
 }
 
-async function sbRows(table: string, select = '*', useServiceRole = false) {
+function readFetchInit(options?: DualReadCacheOptions): NextFetchInit {
+  if (!options) return { cache: 'no-store' };
+  const next: NextFetchInit['next'] = {};
+  if (typeof options.revalidate === 'number') next.revalidate = options.revalidate;
+  if (options.tags?.length) next.tags = options.tags;
+  return {
+    cache: options.cache || 'force-cache',
+    ...(Object.keys(next).length ? { next } : {}),
+  };
+}
+
+async function sbRows(table: string, select = '*', useServiceRole = false, options?: DualReadCacheOptions) {
   const { url, key } = useServiceRole ? supabaseServiceConfig() : supabaseConfig();
   const response = await fetch(`${url}/rest/v1/${table}?select=${encodeURIComponent(select)}`, {
     headers: { apikey: key, Authorization: `Bearer ${key}` },
-    cache: 'no-store',
+    ...readFetchInit(options),
   });
   if (!response.ok) throw new Error(`Supabase ${table} read failed ${response.status}`);
   return await response.json() as any[];
@@ -181,10 +181,10 @@ async function firebaseCatalog(): Promise<CatalogSnapshot> {
   };
 }
 
-async function supabaseCatalog(): Promise<CatalogSnapshot> {
+async function supabaseCatalog(options?: DualReadCacheOptions): Promise<CatalogSnapshot> {
   const [products, categories] = await Promise.all([
-    sbRows('products'),
-    sbRows('categories'),
+    sbRows('products', '*', false, options),
+    sbRows('categories', '*', false, options),
   ]);
   return {
     products: products.map(productFromSupabase),
@@ -196,46 +196,35 @@ async function supabaseCatalog(): Promise<CatalogSnapshot> {
 async function firebaseProduct(id: string): Promise<ProductSnapshot> {
   const snapshot = await getAdminDb().collection('products').doc(id).get();
   if (!snapshot.exists) throw new Error(`Firebase product ${id} was not found.`);
-  return {
-    product: { id: snapshot.id, ...serial(snapshot.data()) },
-    source: 'firebase',
-  };
+  return { product: { id: snapshot.id, ...serial(snapshot.data()) }, source: 'firebase' };
 }
 
-async function supabaseProduct(id: string): Promise<ProductSnapshot> {
+async function supabaseProduct(id: string, options?: DualReadCacheOptions): Promise<ProductSnapshot> {
   const { url, key } = supabaseConfig();
   const response = await fetch(
     `${url}/rest/v1/products?select=*&id=eq.${encodeURIComponent(id)}&limit=1`,
     {
       headers: { apikey: key, Authorization: `Bearer ${key}` },
-      cache: 'no-store',
+      ...readFetchInit(options),
     },
   );
   if (!response.ok) throw new Error(`Supabase product read failed ${response.status}`);
   const rows = await response.json() as any[];
-  if (!Array.isArray(rows) || rows.length === 0) {
-    throw new Error(`Supabase product ${id} was not found.`);
-  }
+  if (!Array.isArray(rows) || rows.length === 0) throw new Error(`Supabase product ${id} was not found.`);
   return { product: productFromSupabase(rows[0]), source: 'supabase' };
 }
 
 async function firebaseCategories(): Promise<CategoriesSnapshot> {
   const snap = await getAdminDb().collection('categories').get();
-  return {
-    categories: snap.docs.map((doc) => ({ id: doc.id, ...serial(doc.data()) })),
-    source: 'firebase',
-  };
+  return { categories: snap.docs.map((doc) => ({ id: doc.id, ...serial(doc.data()) })), source: 'firebase' };
 }
 
-async function supabaseCategories(): Promise<CategoriesSnapshot> {
-  const rows = await sbRows('categories');
+async function supabaseCategories(options?: DualReadCacheOptions): Promise<CategoriesSnapshot> {
+  const rows = await sbRows('categories', '*', false, options);
   return { categories: rows.map(categoryFromSupabase), source: 'supabase' };
 }
 
 async function firebaseSettings(): Promise<SettingsSnapshot> {
-  // Read the collection rather than a fixed document-id list. This is server-side
-  // and lets future admin-created settings documents become available to safe
-  // consumers (such as Salaar Store Knowledge) without another code deployment.
   const snap = await getAdminDb().collection('settings').get();
   const documents: Record<string, any> = {};
   for (const doc of snap.docs) documents[doc.id] = serial(doc.data());
@@ -243,13 +232,9 @@ async function firebaseSettings(): Promise<SettingsSnapshot> {
   return { documents, source: 'firebase' };
 }
 
-async function supabaseSettings(): Promise<SettingsSnapshot> {
-  // Settings intentionally have no public RLS policy. Read them only server-side
-  // with the service-role/secret key so private configuration never has to be opened to anon.
-  const rows = await sbRows('settings', '*', true);
-  if (!Array.isArray(rows) || rows.length === 0) {
-    throw new Error('Supabase settings read returned no rows.');
-  }
+async function supabaseSettings(options?: DualReadCacheOptions): Promise<SettingsSnapshot> {
+  const rows = await sbRows('settings', '*', true, options);
+  if (!Array.isArray(rows) || rows.length === 0) throw new Error('Supabase settings read returned no rows.');
   const documents: Record<string, any> = {};
   for (const row of rows) documents[String(row.id)] = row?.payload && typeof row.payload === 'object' ? row.payload : {};
   return { documents, source: 'supabase' };
@@ -260,8 +245,8 @@ async function firebaseSkills(): Promise<SkillsSnapshot> {
   return { skills: snap.docs.map((doc) => ({ id: doc.id, ...serial(doc.data()) })), source: 'firebase' };
 }
 
-async function supabaseSkills(): Promise<SkillsSnapshot> {
-  const rows = await sbRows('prime_skills');
+async function supabaseSkills(options?: DualReadCacheOptions): Promise<SkillsSnapshot> {
+  const rows = await sbRows('prime_skills', '*', false, options);
   return { skills: rows.map(skillFromSupabase), source: 'supabase' };
 }
 
@@ -282,11 +267,6 @@ async function withFallback<T>(firebaseRead: () => Promise<T>, supabaseRead: () 
     catch (error) {
       lastError = error;
       console.warn('PrimeHub dual-read attempt failed', error);
-
-      // A Preview deployment with no Supabase credentials is a deployment
-      // configuration problem, not a Supabase outage. Do not burn Firestore
-      // fallback quota on every preview page request / settings poll. Production
-      // keeps the normal Supabase -> Firebase fallback for genuine read failures.
       if (readMode === 'supabase-primary' && index === 0 && shouldProtectPreviewFirebase(error)) {
         console.error('PrimeHub Preview is missing Supabase credentials; Firebase fallback skipped to protect quota.');
         return empty;
@@ -297,32 +277,46 @@ async function withFallback<T>(firebaseRead: () => Promise<T>, supabaseRead: () 
   return empty;
 }
 
-export function getDualCatalog() {
-  return withFallback(firebaseCatalog, supabaseCatalog, { products: [], categories: [], source: 'empty' as const });
+export function getDualCatalog(options?: DualReadCacheOptions) {
+  return withFallback(
+    firebaseCatalog,
+    () => supabaseCatalog(options),
+    { products: [], categories: [], source: 'empty' as const },
+  );
 }
 
-export function getDualProduct(id: string) {
+export function getDualProduct(id: string, options?: DualReadCacheOptions) {
   const productId = String(id || '').trim();
-  if (!productId) {
-    return Promise.resolve({ product: null, source: 'empty' as const });
-  }
+  if (!productId) return Promise.resolve({ product: null, source: 'empty' as const });
   return withFallback(
     () => firebaseProduct(productId),
-    () => supabaseProduct(productId),
+    () => supabaseProduct(productId, options),
     { product: null, source: 'empty' as const },
   );
 }
 
-export function getDualCategories() {
-  return withFallback(firebaseCategories, supabaseCategories, { categories: [], source: 'empty' as const });
+export function getDualCategories(options?: DualReadCacheOptions) {
+  return withFallback(
+    firebaseCategories,
+    () => supabaseCategories(options),
+    { categories: [], source: 'empty' as const },
+  );
 }
 
-export function getDualSettings() {
-  return withFallback(firebaseSettings, supabaseSettings, { documents: {}, source: 'empty' as const });
+export function getDualSettings(options?: DualReadCacheOptions) {
+  return withFallback(
+    firebaseSettings,
+    () => supabaseSettings(options),
+    { documents: {}, source: 'empty' as const },
+  );
 }
 
-export function getDualSkills() {
-  return withFallback(firebaseSkills, supabaseSkills, { skills: [], source: 'empty' as const });
+export function getDualSkills(options?: DualReadCacheOptions) {
+  return withFallback(
+    firebaseSkills,
+    () => supabaseSkills(options),
+    { skills: [], source: 'empty' as const },
+  );
 }
 
 export function getConfiguredReadMode() {
