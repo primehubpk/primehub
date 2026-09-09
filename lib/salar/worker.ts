@@ -81,9 +81,12 @@ async function catalogue(payload: Record<string, any>) {
       );
       if (s > 0) list(p.collection_ids).forEach((id) => matchingProductCollectionIds.add(String(id)));
     }
+    const directIds = new Set(collections.filter((c) => Math.max(scoreText(c.name, qTerms), scoreText(c.slug, qTerms)) > 0).map((c) => String(c.id)));
+    const childIds = new Set(collections.filter((c) => directIds.has(String(c.parent || ''))).map((c) => String(c.id)));
     const matched = collections
       .map((c) => {
-        const score = Math.max(scoreText(c.name, qTerms), scoreText(c.slug, qTerms), scoreText(c.parent, qTerms), matchingProductCollectionIds.has(String(c.id)) ? 20 : 0);
+        const structural = directIds.has(String(c.id)) ? 80 : childIds.has(String(c.id)) ? 50 : matchingProductCollectionIds.has(String(c.id)) ? 20 : 0;
+        const score = Math.max(scoreText(c.name, qTerms), scoreText(c.slug, qTerms), structural);
         const productCount = products.filter((p) => list(p.collection_ids).map(String).includes(String(c.id)) || list(p.collection_names).some((name) => norm(name) === norm(c.name))).length;
         return { id: String(c.id), name: String(c.name || c.slug || c.id), productCount, score };
       })
@@ -97,11 +100,11 @@ async function catalogue(payload: Record<string, any>) {
   if (requestedId) collection = collections.find((c) => String(c.id) === requestedId || String(c.source_id || '') === requestedId) || null;
   if (!collection && requestedCollection) {
     const wanted = norm(requestedCollection);
-    collection = collections.find((c) => norm(c.name) === wanted || norm(c.slug) === wanted) || collections.sort((a,b)=>scoreText(b.name,[wanted])-scoreText(a.name,[wanted])).find((c)=>scoreText(c.name,[wanted])>0) || null;
+    collection = collections.find((c) => norm(c.name) === wanted || norm(c.slug) === wanted) || [...collections].sort((a,b)=>scoreText(b.name,[wanted])-scoreText(a.name,[wanted])).find((c)=>scoreText(c.name,[wanted])>0) || null;
   }
   if (!collection) return { found: false, reason: 'Requested collection was not found in the index.' };
 
-  const key = `cat:${String(collection.id)}|${norm(q)}`;
+  const key = `cat:${String(collection.id)}|${norm(q)}|${limit}`;
   const cached = await readFreshCache(key);
   if (cached) return { ...cached, cached: true };
   const rows = products.filter((p) => list(p.collection_ids).map(String).includes(String(collection.id)) || list(p.collection_names).some((name) => norm(name) === norm(collection.name))).slice(0, limit);
@@ -127,6 +130,9 @@ const TOPIC_ALIASES: Record<string, string[]> = {
 async function knowledge(payload: Record<string, any>) {
   const topic = String(payload.topic || '').trim();
   if (!topic) return { found: false, reason: 'Provide a knowledge topic.' };
+  const key = `know:${norm(topic)}`;
+  const cached = await readFreshCache(key);
+  if (cached) return { ...cached, cached: true };
   const snap = await getAdminDb().collection('salar_index_pages').get();
   const pages = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() } as any));
   if (!pages.length) return { found: false, reason: 'Knowledge index is empty. Run Catalogue Refresh first.' };
@@ -135,7 +141,9 @@ async function knowledge(payload: Record<string, any>) {
   const ranked = pages.map((p) => ({ p, score: Math.max(scoreText(p.key, qTerms) * 2, scoreText(p.title, qTerms) * 2, scoreText(p.text_excerpt, qTerms)) })).filter((x) => x.score > 0).sort((a,b)=>b.score-a.score);
   if (!ranked.length) return { found: false, reason: `No indexed page matched "${topic}".` };
   const best = ranked[0].p;
-  return { title: String(best.title || best.key || topic), url: String(best.url || ''), text: String(best.text_excerpt || '') };
+  const value = { title: String(best.title || best.key || topic), url: String(best.url || ''), text: String(best.text_excerpt || ''), cached: false };
+  await writeCache(key, value);
+  return value;
 }
 
 export async function runWorker({ job, payload = {}, conversationId = null }: SalarWorkerInput) {
