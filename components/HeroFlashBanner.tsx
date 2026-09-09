@@ -102,7 +102,7 @@ export default function HeroFlashBanner({
   homeLayout?: boolean;
 }) {
   const { settings } = useSettings();
-  const [nowTick, setNowTick] = useState<number | null>(null);
+  const [nowTick, setNowTick] = useState<number | null>(() => Date.now());
   const [products, setProducts] = useState<Record<string, Product>>(() =>
     productMap(initialProducts),
   );
@@ -112,7 +112,6 @@ export default function HeroFlashBanner({
   const openVariantModal = useCartStore((state) => state.openVariantModal);
 
   useEffect(() => {
-    setNowTick(Date.now());
     const timer = window.setInterval(() => setNowTick(Date.now()), 1000);
     return () => window.clearInterval(timer);
   }, []);
@@ -307,7 +306,7 @@ export default function HeroFlashBanner({
         <section className="home-weekly" id="weekly-deals">
           <HomeHeading>PrimeHubMall Weekly Deals</HomeHeading>
           <div className="home-week-grid">
-            {DAYS.map(({ key, Icon }) => {
+            {orderedDays.map(({ key, Icon }) => {
               const deal = weeklyDeals.find(
                 (d) =>
                   d.day === key &&
