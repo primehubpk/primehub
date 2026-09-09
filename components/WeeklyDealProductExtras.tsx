@@ -2,11 +2,10 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { collection, onSnapshot } from 'firebase/firestore';
 import { ShoppingCart } from 'lucide-react';
-import { db } from '@/lib/firebase';
 import { useCartStore } from '@/lib/cartStore';
 import { useSettings } from '@/lib/useSettings';
+import { loadProductsForNavigation } from '@/lib/productNavigationCache';
 import type { Product, WeeklyDeal } from '@/lib/types';
 import { WEEKDAY_LABELS, WEEKDAY_ORDER, dealTiming } from '@/lib/weeklyDealUtils';
 
@@ -22,15 +21,23 @@ export default function WeeklyDealProductExtras({ productId }: { productId: stri
     return () => window.clearInterval(timer);
   }, []);
 
-  useEffect(() => onSnapshot(collection(db, 'products'), (snapshot) => {
-    const next: Record<string, Product> = {};
-    snapshot.forEach((doc) => { next[doc.id] = { id: doc.id, ...doc.data() } as Product; });
-    setProducts(next);
-  }, () => setProducts({})), []);
-
   const deals = settings.weeklyDeals || [];
   const currentDeal = deals.find((deal) => deal.productId === productId && deal.active !== false && Number(deal.dealPrice) > 0);
   const otherDeals = useMemo(() => deals.filter((deal) => deal.active !== false && deal.productId && deal.productId !== productId).sort((a, b) => WEEKDAY_ORDER.indexOf(a.day) - WEEKDAY_ORDER.indexOf(b.day)), [deals, productId]);
+  const productIdsKey = useMemo(() => Array.from(new Set(otherDeals.map((deal) => deal.productId).filter(Boolean))).sort().join('\u0001'), [otherDeals]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const ids = productIdsKey ? productIdsKey.split('\u0001') : [];
+    if (ids.length === 0) {
+      setProducts({});
+      return () => { cancelled = true; };
+    }
+    loadProductsForNavigation<Product>(ids)
+      .then((next) => { if (!cancelled) setProducts(next); })
+      .catch(() => { if (!cancelled) setProducts({}); });
+    return () => { cancelled = true; };
+  }, [productIdsKey]);
 
   if (!currentDeal || nowTick === null || otherDeals.length === 0) return null;
 
