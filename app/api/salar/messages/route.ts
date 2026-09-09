@@ -30,6 +30,10 @@ export async function POST(request: Request) {
   try {
     const customerUid = await verifiedCustomerUid(request);
     const conversation = await ensureSalarConversation(sid, customerUid);
+    const beforeWrite = await conversation.ref.get();
+    if (beforeWrite.data()?.blocked === true) {
+      return NextResponse.json({ error: 'blocked', unblockEmail: SALAR_UNBLOCK_EMAIL }, { status: 403 });
+    }
     if (!consumeSalarRateLimit(conversation.id)) return NextResponse.json({ error: 'rate_limited' }, { status: 429 });
 
     const db = getAdminDb();
