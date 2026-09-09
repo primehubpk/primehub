@@ -5,7 +5,7 @@
   },
   "git": {
     "deploymentEnabled": {
-      "fix/home-weekly-deals-live-first": false,
+      "fix/home-weekly-deals-live-first": true,
       "feature/supabase-migration": true,
       "feature/salaar-virtual-salesman": true
     }
