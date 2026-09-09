@@ -115,9 +115,12 @@ export function ProductNavigationIntentBridge() {
       const anchor = target?.closest('a[href]');
       const rawHref = anchor?.getAttribute('href') || '';
       const routeHref = productRouteHref(rawHref);
-      if (!routeHref || warmedRoutes.has(routeHref)) return;
-      warmedRoutes.add(routeHref);
-      router.prefetch(routeHref);
+      if (!routeHref) return;
+
+      if (!warmedRoutes.has(routeHref)) {
+        warmedRoutes.add(routeHref);
+        router.prefetch(routeHref);
+      }
 
       const id = productRouteId(routeHref);
       if (!id) return;
