@@ -11,11 +11,9 @@ import {
   Truck,
 } from 'lucide-react';
 
-import RecentlyViewed from '@/components/RecentlyViewed';
-import ReviewsSection from '@/components/ReviewsSection';
 import ProductShareButton from '@/components/ProductShareButton';
-import WeeklyDealCalendar from '@/components/WeeklyDealCalendar';
 import DealConfetti from '@/components/product-detail/DealConfetti';
+import ProductBelowFold from '@/components/product-detail/ProductBelowFold';
 import ProductHero from '@/components/product-detail/ProductHero';
 import ProductPricing from '@/components/product-detail/ProductPricing';
 import ProductPurchasePanel from '@/components/product-detail/ProductPurchasePanel';
@@ -235,13 +233,12 @@ export default function ProductDetailPage() {
         </div>
       </div>
 
-      <WeeklyDealCalendar
+      <ProductBelowFold
+        productId={product.id}
         weeklyDeals={weeklyDeals}
         weeklyProducts={weeklyProducts}
         nowTick={nowTick}
       />
-      <RecentlyViewed excludeId={product.id} />
-      <ReviewsSection productId={product.id} />
       <ProductVideoModal
         product={product}
         open={videoOpen}
