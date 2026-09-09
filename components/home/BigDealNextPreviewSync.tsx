@@ -5,6 +5,7 @@ import { normalizeImageUrl } from "@/lib/imageUrl";
 import { useSettings } from "@/lib/useSettings";
 import {
   bigDealConfiguredSlotCount,
+  bigDealRotationIndex,
   nextBigDealRotationIndex,
 } from "@/lib/bigDealRotation";
 import "./BigDealRotationFix.css";
@@ -92,15 +93,39 @@ export default function BigDealNextPreviewSync() {
 
     const applyDealCards = () => {
       const now = new Date();
-      const nextDeal = nextSlot(bigDeal, now);
+      const slotCount = bigDealConfiguredSlotCount(bigDeal);
+      const currentIndex = bigDealRotationIndex(bigDeal.rotationStartedAt, now, slotCount);
+      const nextIndex = nextBigDealRotationIndex(bigDeal.rotationStartedAt, now, slotCount);
+      const currentDeal = slotAt(bigDeal, currentIndex);
+      const nextDeal = slotAt(bigDeal, nextIndex);
       const countdown = pakistanMidnightCountdown(now);
 
-      // The current Big Deal is already resolved by useSettings and rendered by
-      // HeroFlashBanner. Do not rewrite its Next/Image DOM node here: replacing
-      // the optimized image URL after hydration caused the visible second image
-      // load/flicker on the homepage.
-      const currentInfo = document.querySelector<HTMLElement>(".home-big-info");
-      if (currentInfo) currentInfo.dataset.countdown = `Ends in ${countdown}`;
+      const currentCard = document.querySelector<HTMLElement>(".home-big-card");
+      if (currentCard) {
+        const imageLink = currentCard.querySelector<HTMLAnchorElement>(".home-big-image");
+        const info = currentCard.querySelector<HTMLElement>(".home-big-info");
+        const titleLink = info?.querySelector<HTMLAnchorElement>(":scope > a") || null;
+        const prices = info?.querySelector<HTMLElement>(".home-big-prices") || null;
+        const href = currentDeal.productId ? `/product/${currentDeal.productId}?deal=big` : "/deals/big";
+
+        // Preserve scoped Big Deal navigation and rotating text/prices, but do
+        // not replace the Next/Image src/srcset after hydration. That rewrite
+        // was forcing the live watch image to load a second time.
+        if (imageLink) imageLink.href = href;
+        if (titleLink) {
+          titleLink.href = href;
+          titleLink.textContent = currentDeal.title;
+        }
+
+        const currentPrice = prices?.querySelector<HTMLElement>("strong") || null;
+        const regularPrice = prices?.querySelector<HTMLElement>("s") || null;
+        const saving = prices?.querySelector<HTMLElement>("em") || null;
+        const saved = Math.max(0, currentDeal.originalPrice - currentDeal.dealPrice);
+        if (currentPrice) currentPrice.textContent = money(currentDeal.dealPrice);
+        if (regularPrice) regularPrice.textContent = money(currentDeal.originalPrice);
+        if (saving) saving.textContent = saved > 0 ? `Save ${money(saved)}` : "";
+        if (info) info.dataset.countdown = `Ends in ${countdown}`;
+      }
 
       const nextCard = document.querySelector<HTMLElement>(".home-next-deal");
       const badge = nextCard?.querySelector<HTMLElement>(":scope > span") || null;
