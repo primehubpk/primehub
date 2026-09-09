@@ -1,7 +1,7 @@
 import SkillsShowcase from '@/components/SkillsShowcase';
 import { getPrimeSkillsSnapshot } from '@/lib/publicCatalogServer';
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 600;
 
 export default async function SkillsPage() {
   const snapshot = await getPrimeSkillsSnapshot();
