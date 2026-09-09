@@ -1,0 +1,96 @@
+.home-storefront .home-big-info::after {
+  content: attr(data-countdown);
+  grid-column: 1 / -1;
+  display: block;
+  margin-top: 2px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: #064d40;
+}
+
+.home-storefront .home-next-deal > span {
+  width: 150px;
+  height: 150px;
+  gap: 4px;
+  padding: 11px;
+  text-align: center;
+}
+
+.home-storefront .home-next-deal > span > small:first-of-type {
+  display: -webkit-box;
+  max-width: 118px;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-height: 1.15;
+}
+
+.home-storefront .home-next-deal > span > strong {
+  color: #d60707;
+  font-size: 16px;
+  line-height: 1.05;
+}
+
+.home-storefront .home-next-deal > span > strong:not([data-regular=""])::after {
+  content: attr(data-regular);
+  display: block;
+  margin-top: 3px;
+  color: #8a8175;
+  font-size: 9px;
+  font-weight: 600;
+  text-decoration: line-through;
+}
+
+.home-storefront .home-next-deal > span::after {
+  content: attr(data-countdown);
+  display: block;
+  max-width: 128px;
+  color: #064d40;
+  font-size: 9px;
+  font-weight: 850;
+  line-height: 1.15;
+}
+
+@media (max-width: 600px) {
+  .home-storefront .home-big-info::after {
+    font-size: 7px;
+  }
+
+  .home-storefront .home-next-deal > span {
+    width: 112px;
+    height: 112px;
+    gap: 2px;
+    padding: 7px;
+    font-size: 10px;
+  }
+
+  .home-storefront .home-next-deal > span > svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .home-storefront .home-next-deal > span > small:first-of-type {
+    max-width: 92px;
+    font-size: 7px;
+    -webkit-line-clamp: 1;
+  }
+
+  .home-storefront .home-next-deal > span > strong {
+    font-size: 12px;
+  }
+
+  .home-storefront .home-next-deal > span > strong:not([data-regular=""])::after {
+    margin-top: 1px;
+    font-size: 7px;
+  }
+
+  .home-storefront .home-next-deal > span > small:nth-of-type(2) {
+    font-size: 7px;
+  }
+
+  .home-storefront .home-next-deal > span::after {
+    max-width: 96px;
+    font-size: 7px;
+  }
+}
