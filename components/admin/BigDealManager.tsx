@@ -2,11 +2,25 @@
 
 import { ChangeEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { CheckCircle2, ImagePlus, Loader2, Save, Sparkles } from 'lucide-react';
-import { getAdminDocument, setAdminDocument, uploadImageToImgBB, createAdminDocument } from './shared';
+import { uploadImageToImgBB } from './shared';
 import type { DailyDeal } from '@/lib/types';
 
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-const EMPTY_DEAL: DailyDeal = { productId: '', imageUrl: '', imageUrls: [], originalPrices: [], dealPrices: [], title: '', originalPrice: 0, dealPrice: 0, startAt: '', endAt: '', buttonText: 'Shop Big Deal', buttonLink: '/deals/big', active: false };
+const EMPTY_DEAL: DailyDeal = {
+  productId: '',
+  imageUrl: '',
+  imageUrls: [],
+  originalPrices: [],
+  dealPrices: [],
+  title: '',
+  originalPrice: 0,
+  dealPrice: 0,
+  startAt: '',
+  endAt: '',
+  buttonText: 'Shop Big Deal',
+  buttonLink: '/deals/big',
+  active: false,
+};
 
 export default function BigDealManager() {
   const [deal, setDeal] = useState<DailyDeal>(EMPTY_DEAL);
@@ -17,18 +31,20 @@ export default function BigDealManager() {
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    getAdminDocument('settings', 'main')
-      .then((snapshot) => {
-        const current = snapshot.exists() ? snapshot.data()?.dailyDeal : null;
-        const next = { ...EMPTY_DEAL, ...(current || {}) } as DailyDeal;
+    fetch('/api/admin/big-deal', { cache: 'no-store', credentials: 'same-origin' })
+      .then(async (response) => {
+        const result = await response.json().catch(() => null);
+        if (!response.ok || !result?.success) throw new Error(result?.error || 'Unable to load Big Deal settings.');
+        const current = result.dailyDeal || {};
+        const next = { ...EMPTY_DEAL, ...current } as DailyDeal;
         setDeal({
           ...next,
-          imageUrls: Array.isArray(current?.imageUrls) ? current.imageUrls.slice(0, 7) : [],
-          originalPrices: Array.from({ length: 7 }, (_, index) => Number(current?.originalPrices?.[index] ?? current?.originalPrice ?? 0)),
-          dealPrices: Array.from({ length: 7 }, (_, index) => Number(current?.dealPrices?.[index] ?? current?.dealPrice ?? 0)),
+          imageUrls: Array.isArray(current.imageUrls) ? current.imageUrls.slice(0, 7) : [],
+          originalPrices: Array.from({ length: 7 }, (_, index) => Number(current.originalPrices?.[index] ?? current.originalPrice ?? 0)),
+          dealPrices: Array.from({ length: 7 }, (_, index) => Number(current.dealPrices?.[index] ?? current.dealPrice ?? 0)),
         });
       })
-      .catch(() => setToast('Unable to load Big Deal settings.'))
+      .catch((error) => setToast(error instanceof Error ? error.message : 'Unable to load Big Deal settings.'))
       .finally(() => setLoading(false));
   }, []);
 
@@ -73,14 +89,9 @@ export default function BigDealManager() {
         }
         if (!url) throw lastError instanceof Error ? lastError : new Error(`Picture ${index + 1} upload failed.`);
         urls.push(url);
-        try {
-          await createAdminDocument('media_assets', { name: file.name, url, type: file.type, size: file.size, createdAt: new Date().toISOString(), source: 'big-deal-rotation' });
-        } catch {
-          // Media library is optional; do not fail the Big Deal upload when its record cannot be created.
-        }
       }
       setDeal((current) => ({ ...current, imageUrls: urls, imageUrl: urls[0] || current.imageUrl }));
-      setToast('7 Big Deal pictures uploaded. Add prices below and click Save Rotation.');
+      setToast('7 Big Deal pictures uploaded. Add each day’s prices and save.');
     } catch (error) {
       setToast(error instanceof Error ? error.message : 'Big Deal upload failed.');
     } finally {
@@ -89,29 +100,55 @@ export default function BigDealManager() {
   }
 
   async function saveRotation() {
+    if (deal.active && !deal.title.trim()) {
+      setToast('Big Deal title is required.');
+      return;
+    }
+    if (deal.active && !deal.productId.trim()) {
+      setToast('Big Deal product ID is required.');
+      return;
+    }
     if (images.filter(Boolean).length !== 7) {
       setToast('All 7 Big Deal pictures are required before saving.');
       return;
     }
-    const invalidPrice = dealPrices.findIndex((price, index) => price > 0 && originalPrices[index] > 0 && price >= originalPrices[index]);
+    const missingPrice = dealPrices.findIndex((price, index) => price <= 0 || originalPrices[index] <= 0);
+    if (missingPrice >= 0) {
+      setToast(`${DAYS[missingPrice]} needs both original and deal price.`);
+      return;
+    }
+    const invalidPrice = dealPrices.findIndex((price, index) => price >= originalPrices[index]);
     if (invalidPrice >= 0) {
       setToast(`${DAYS[invalidPrice]} deal price must be lower than its original price.`);
       return;
     }
+
     setSaving(true);
     try {
-      await setAdminDocument('settings', 'main', {
-        dailyDeal: {
-          ...deal,
-          imageUrls: images,
-          imageUrl: images[0],
-          originalPrices,
-          dealPrices,
-          originalPrice: originalPrices[0] || deal.originalPrice || 0,
-          dealPrice: dealPrices[0] || deal.dealPrice || 0,
-        },
+      const nextDeal: DailyDeal = {
+        ...deal,
+        title: deal.title.trim(),
+        productId: deal.productId.trim(),
+        imageUrls: images,
+        imageUrl: images[0],
+        originalPrices,
+        dealPrices,
+        originalPrice: originalPrices[0] || deal.originalPrice || 0,
+        dealPrice: dealPrices[0] || deal.dealPrice || 0,
+        buttonText: deal.buttonText.trim() || 'Shop Big Deal',
+        buttonLink: deal.buttonLink.trim() || '/deals/big',
+      };
+      const response = await fetch('/api/admin/big-deal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        cache: 'no-store',
+        body: JSON.stringify({ dailyDeal: nextDeal }),
       });
-      setToast('Big Deal rotation and daily prices saved.');
+      const result = await response.json().catch(() => null);
+      if (!response.ok || !result?.success) throw new Error(result?.error || 'Unable to save Big Deal rotation.');
+      setDeal(nextDeal);
+      setToast(result.warning || 'Big Deal saved to Supabase primary.');
     } catch (error) {
       setToast(error instanceof Error ? error.message : 'Unable to save Big Deal rotation.');
     } finally {
@@ -126,20 +163,30 @@ export default function BigDealManager() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <div className="flex items-center gap-2 text-[#E1352B]"><Sparkles size={15}/><span className="text-[10px] font-black uppercase tracking-[.16em]">Home Big Deal</span></div>
-          <h2 className="mt-1 text-2xl font-black">Big Deal Pictures</h2>
-          <p className="mt-1 max-w-2xl text-sm text-black/50">Upload exactly 7 pictures. Sunday uses picture 1, Monday picture 2, and so on. Add each day&apos;s original and deal price below its picture.</p>
+          <h2 className="mt-1 text-2xl font-black">Big Deal Manager</h2>
+          <p className="mt-1 max-w-2xl text-sm text-black/50">This is now the only Big Deal control. It saves to Supabase primary and powers the homepage Big Deal card.</p>
         </div>
         <div className="flex gap-2">
           <button type="button" onClick={() => inputRef.current?.click()} disabled={uploading || saving} className="inline-flex items-center gap-2 rounded-xl bg-[#14140F] px-4 py-3 text-xs font-black text-white disabled:opacity-50">
             {uploading ? <Loader2 size={15} className="animate-spin"/> : <ImagePlus size={15}/>} {uploading ? 'Uploading...' : 'Upload 7 Pictures'}
           </button>
           <button type="button" onClick={saveRotation} disabled={uploading || saving} className="inline-flex items-center gap-2 rounded-xl bg-[#E1352B] px-4 py-3 text-xs font-black text-white disabled:opacity-50">
-            {saving ? <Loader2 size={15} className="animate-spin"/> : <Save size={15}/>} {saving ? 'Saving...' : 'Save Rotation'}
+            {saving ? <Loader2 size={15} className="animate-spin"/> : <Save size={15}/>} {saving ? 'Saving...' : 'Save Big Deal'}
           </button>
         </div>
       </div>
 
       <input ref={inputRef} type="file" accept="image/*" multiple onChange={uploadSeven} className="hidden" />
+
+      <div className="mt-5 grid gap-3 rounded-2xl border border-black/10 bg-white p-4 md:grid-cols-2">
+        <label className="grid gap-1 text-xs font-semibold md:col-span-2">
+          <span className="flex items-center justify-between gap-3"><span>Publish Big Deal</span><input type="checkbox" checked={deal.active} onChange={(event) => setDeal((current) => ({ ...current, active: event.target.checked }))}/></span>
+        </label>
+        <label className="grid gap-1 text-xs font-semibold">Title<input value={deal.title} onChange={(event) => setDeal((current) => ({ ...current, title: event.target.value }))} placeholder="Big Deal title" className="rounded-lg border border-black/15 px-3 py-2 text-sm" /></label>
+        <label className="grid gap-1 text-xs font-semibold">Product ID<input value={deal.productId} onChange={(event) => setDeal((current) => ({ ...current, productId: event.target.value }))} placeholder="Product ID" className="rounded-lg border border-black/15 px-3 py-2 text-sm" /></label>
+        <label className="grid gap-1 text-xs font-semibold">Button text<input value={deal.buttonText} onChange={(event) => setDeal((current) => ({ ...current, buttonText: event.target.value }))} className="rounded-lg border border-black/15 px-3 py-2 text-sm" /></label>
+        <label className="grid gap-1 text-xs font-semibold">Button link<input value={deal.buttonLink} onChange={(event) => setDeal((current) => ({ ...current, buttonLink: event.target.value }))} className="rounded-lg border border-black/15 px-3 py-2 text-sm" /></label>
+      </div>
 
       <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
         {DAYS.map((day, index) => (
@@ -156,7 +203,7 @@ export default function BigDealManager() {
         ))}
       </div>
 
-      <div className="mt-4 rounded-2xl border border-[#0F6A5F]/15 bg-[#0F6A5F]/5 px-4 py-3 text-xs font-semibold text-[#0F6A5F]">Each day now keeps its own picture, original price and deal price. Existing product/title/link settings stay unchanged.</div>
+      <div className="mt-4 rounded-2xl border border-[#0F6A5F]/15 bg-[#0F6A5F]/5 px-4 py-3 text-xs font-semibold text-[#0F6A5F]">Sunday uses picture/price 1, Monday 2, through Saturday 7. The homepage automatically uses today’s matching picture and price.</div>
 
       {toast && <div role="status" className="fixed bottom-5 right-5 z-50 max-w-sm rounded-xl bg-[#14140F] px-4 py-3 text-sm font-semibold text-white shadow-xl">{toast}</div>}
     </section>
