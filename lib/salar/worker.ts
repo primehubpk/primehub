@@ -147,10 +147,12 @@ async function knowledge(payload: Record<string, any>) {
 }
 
 export async function runWorker({ job, payload = {}, conversationId = null }: SalarWorkerInput) {
-  void conversationId;
+  let result: any;
   switch (job) {
-    case 'catalogue': return catalogue(payload);
-    case 'knowledge': return knowledge(payload);
-    default: return { found: false, reason: `Unsupported worker job: ${String(job || '')}` };
+    case 'catalogue': result = await catalogue(payload); break;
+    case 'knowledge': result = await knowledge(payload); break;
+    default: result = { found: false, reason: `Unsupported worker job: ${String(job || '')}` };
   }
+  console.info('[salar-worker]', { job, conversationId: conversationId || null, type: result?.type || null, found: result?.found !== false, cached: result?.cached === true });
+  return result;
 }
