@@ -58,6 +58,16 @@ function normalizedToolCalls(raw: any): SalarLlmToolCall[] {
     return { id: String(call?.id || `tool-${index + 1}`), name: String(call?.function?.name || ''), arguments: safeJsonObject(rawArguments), rawArguments };
   }).filter((call) => call.name);
 }
+function geminiSchema(value: unknown): any {
+  if (Array.isArray(value)) return value.map(geminiSchema);
+  if (!value || typeof value !== 'object') return value;
+  const output: Record<string, any> = {};
+  for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
+    if (key === 'additionalProperties') continue;
+    output[key] = geminiSchema(item);
+  }
+  return output;
+}
 function shouldRotate(status: number, payload: string): boolean {
   if ([401, 403, 429].includes(status)) return true;
   return /quota|billing|resource[_\s-]?exhausted|rate[_\s-]?limit|too many requests|api.?key|unauthorized|forbidden|authentication/i.test(payload);
@@ -107,7 +117,7 @@ async function callGemini(key: string, model: string, messages: SalarLlmMessage[
   const body: Record<string, any> = { contents: geminiContents(messages), generationConfig: { maxOutputTokens: maxTokens, temperature: 0 } };
   if (!body.contents.length) body.contents = [{ role: 'user', parts: [{ text: 'ping' }] }];
   if (systemText) body.systemInstruction = { parts: [{ text: systemText }] };
-  if (tools.length) body.tools = [{ functionDeclarations: tools.map((tool) => ({ name: tool.name, description: tool.description, parameters: tool.parameters })) }];
+  if (tools.length) body.tools = [{ functionDeclarations: tools.map((tool) => ({ name: tool.name, description: tool.description, parameters: geminiSchema(tool.parameters) })) }];
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`;
   const { response, text, json } = await requestJson(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   if (!response.ok) {
