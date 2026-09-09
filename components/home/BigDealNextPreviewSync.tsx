@@ -1,6 +1,6 @@
 "use client";
 
-import { useLayoutEffect, useMemo } from "react";
+import { useLayoutEffect } from "react";
 import { normalizeImageUrl } from "@/lib/imageUrl";
 import { useSettings } from "@/lib/useSettings";
 import {
@@ -71,22 +71,11 @@ function pakistanMidnightCountdown(now: Date) {
   return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
 }
 
-function nextSlot(deal: BigDeal, now: Date) {
-  const slotCount = bigDealConfiguredSlotCount(deal);
-  return slotAt(
-    deal,
-    nextBigDealRotationIndex(deal.rotationStartedAt, now, slotCount),
-  );
-}
 
 export default function BigDealNextPreviewSync() {
   const { settings } = useSettings();
   const bigDeal = settings.dailyDeal;
 
-  const instantNextDeal = useMemo(() => {
-    if (!bigDeal?.active) return null;
-    return nextSlot(bigDeal, new Date());
-  }, [bigDeal]);
 
   useLayoutEffect(() => {
     if (!bigDeal?.active) return;
@@ -100,45 +89,13 @@ export default function BigDealNextPreviewSync() {
       const nextDeal = slotAt(bigDeal, nextIndex);
       const countdown = pakistanMidnightCountdown(now);
 
-      const currentCard = document.querySelector<HTMLElement>(".home-big-card");
-      if (currentCard) {
-        const imageLink = currentCard.querySelector<HTMLAnchorElement>(".home-big-image");
-        const info = currentCard.querySelector<HTMLElement>(".home-big-info");
-        const titleLink = info?.querySelector<HTMLAnchorElement>(":scope > a") || null;
-        const prices = info?.querySelector<HTMLElement>(".home-big-prices") || null;
-        const href = currentDeal.productId ? `/product/${currentDeal.productId}?deal=big` : "/deals/big";
-
-        // Preserve scoped Big Deal navigation and rotating text/prices, but do
-        // not replace the Next/Image src/srcset after hydration. That rewrite
-        // was forcing the live watch image to load a second time.
-        if (imageLink) imageLink.href = href;
-        if (titleLink) {
-          titleLink.href = href;
-          titleLink.textContent = currentDeal.title;
-        }
-
-        const currentPrice = prices?.querySelector<HTMLElement>("strong") || null;
-        const regularPrice = prices?.querySelector<HTMLElement>("s") || null;
-        const saving = prices?.querySelector<HTMLElement>("em") || null;
-        const saved = Math.max(0, currentDeal.originalPrice - currentDeal.dealPrice);
-        if (currentPrice) currentPrice.textContent = money(currentDeal.dealPrice);
-        if (regularPrice) regularPrice.textContent = money(currentDeal.originalPrice);
-        if (saving) saving.textContent = saved > 0 ? `Save ${money(saved)}` : "";
-        if (info) info.dataset.countdown = `Ends in ${countdown}`;
-      }
+      const info = document.querySelector<HTMLElement>(".home-big-info");
+      if (info) info.dataset.countdown = `Ends in ${countdown}`;
 
       const nextCard = document.querySelector<HTMLElement>(".home-next-deal");
       const badge = nextCard?.querySelector<HTMLElement>(":scope > span") || null;
       if (!nextCard || !badge) return;
 
-      const nextBackground = nextDeal.imageUrl
-        ? `url(${JSON.stringify(nextDeal.imageUrl)})`
-        : "none";
-      if (nextCard.style.backgroundImage !== nextBackground) {
-        nextCard.style.backgroundImage = nextBackground;
-      }
-      nextCard.style.backgroundSize = "cover";
-      nextCard.style.backgroundPosition = "center";
       nextCard.setAttribute("aria-label", `Next Big Deal locked until tomorrow: ${nextDeal.title}, ${money(nextDeal.dealPrice)}`);
       nextCard.setAttribute("aria-disabled", "true");
       nextCard.dataset.locked = "true";
@@ -162,12 +119,6 @@ export default function BigDealNextPreviewSync() {
     return () => window.clearInterval(timer);
   }, [bigDeal]);
 
-  if (!instantNextDeal?.imageUrl) return null;
-
-  return (
-    <>
-      <link rel="preload" as="image" href={instantNextDeal.imageUrl} />
-      <style>{`.home-storefront .home-next-deal{background-image:url(${JSON.stringify(instantNextDeal.imageUrl)});background-size:cover;background-position:center;}`}</style>
-    </>
-  );
+  return null;
 }
+

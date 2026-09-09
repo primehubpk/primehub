@@ -75,6 +75,8 @@ type Reward = {
 type Sort = "featured" | "low" | "high" | "discount";
 
 const GUEST_KEY = "phdeals-guest-rewards";
+const INITIAL_PRODUCT_COUNT = 24;
+const PRODUCT_BATCH_SIZE = 24;
 
 const title = (p: Product) => p.title || p.name || "Untitled Product";
 
@@ -170,6 +172,7 @@ export default function ProductGridRewards({
   const [added, setAdded] = useState<string | null>(null);
   const [redeeming, setRedeeming] = useState<string | null>(null);
   const [notice, setNotice] = useState("");
+  const [visibleCount, setVisibleCount] = useState(INITIAL_PRODUCT_COUNT);
 
   const addItem = useCartStore((s) => s.addItem);
   const openVariantModal = useCartStore((s) => s.openVariantModal);
@@ -306,6 +309,12 @@ export default function ProductGridRewards({
     }
     return filtered;
   }, [products, selectedMaxPrice, wholesaleSelected, sort]);
+
+  useEffect(() => {
+    setVisibleCount(INITIAL_PRODUCT_COUNT);
+  }, [selectedMaxPrice, wholesaleSelected, sort]);
+
+  const renderedProducts = visible.slice(0, visibleCount);
 
   function add(p: Product) {
     const img = image(p);
@@ -467,7 +476,7 @@ export default function ProductGridRewards({
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-2 md:grid-cols-3 md:gap-3 lg:grid-cols-4 xl:grid-cols-5">
-          {visible.map((p, index) => {
+          {renderedProducts.map((p, index) => {
             const r = rewards[p.id];
             const pts = points;
             const need = r ? Math.max(0, r.points - pts) : 0;
@@ -668,6 +677,16 @@ export default function ProductGridRewards({
         </div>
       )}
 
+      {visibleCount < visible.length && (
+        <button
+          type="button"
+          onClick={() => setVisibleCount((count) => Math.min(visible.length, count + PRODUCT_BATCH_SIZE))}
+          className="mx-auto mt-5 flex min-h-11 items-center justify-center rounded-full bg-[#0F6A5F] px-6 text-xs font-black text-white"
+        >
+          Show more products ({Math.min(PRODUCT_BATCH_SIZE, visible.length - visibleCount)})
+        </button>
+      )}
+
       <div className="mt-6 flex items-center justify-center text-[9px] font-bold text-black/35">
         Reward badges appear on products linked to a reward image or product in
         the admin Reward Store.
@@ -702,3 +721,4 @@ export default function ProductGridRewards({
     </section>
   );
 }
+

@@ -222,7 +222,7 @@ export default function HomeCollections({
                   aria-label={`${bucket.title} products`}
                 >
                   {matches.length ? (
-                    matches.map((product) => (
+                    matches.slice(0, 18).map((product) => (
                       <div
                         key={product.id}
                         style={{
@@ -254,3 +254,4 @@ export default function HomeCollections({
     </>
   );
 }
+

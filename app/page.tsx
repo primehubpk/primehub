@@ -1,9 +1,7 @@
 import HomePageClient from '@/components/HomePageClient';
-import { getPublicCatalogSnapshot, getStorefrontSettingsSnapshot } from '@/lib/publicCatalogServer';
+import { getStorefrontSettingsSnapshot, getPublicCatalogSnapshot } from '@/lib/publicCatalogServer';
 import type { Category, SiteSettings } from '@/lib/types';
 import type { Product } from '@/components/shop/ShopTypes';
-
-export const revalidate = 60;
 
 export default async function HomePage() {
   const [catalogResult, settingsResult] = await Promise.allSettled([
@@ -26,3 +24,4 @@ export default async function HomePage() {
     />
   );
 }
+

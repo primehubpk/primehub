@@ -29,6 +29,10 @@ import {
   countdownParts,
   weeklyDealSavings,
 } from "@/lib/weeklyDealUtils";
+import {
+  bigDealConfiguredSlotCount,
+  nextBigDealRotationIndex,
+} from "@/lib/bigDealRotation";
 
 const DAYS: Array<{ key: Weekday; label: string; Icon: typeof Gift }> = [
   { key: "sunday", label: "Sunday Deal", Icon: Gift },
@@ -86,10 +90,52 @@ type BigDealFields = NonNullable<
   normalPrice?: number | string;
   originalPrice?: number | string;
   stock?: number | string;
+  imageUrls?: unknown[];
+  productIds?: unknown[];
+  titles?: unknown[];
+  originalPrices?: unknown[];
+  dealPrices?: unknown[];
+  rotationStartedAt?: string;
 };
 
 function productMap(list: Product[]) {
   return Object.fromEntries(list.map((product) => [product.id, product]));
+}
+
+function cleanBigDealTitle(value: unknown) {
+  const title = String(value || "Big Deal").trim() || "Big Deal";
+  return (
+    title
+      .replace(/\b(?:rs\.?\s*)?\d{3,6}\b/gi, " ")
+      .replace(/\s{2,}/g, " ")
+      .replace(/\s+([,.:;-])/g, "$1")
+      .trim() || "Big Deal"
+  );
+}
+
+function bigDealSlotAt(deal: BigDealFields | undefined, index: number) {
+  if (!deal) return null;
+  const images = Array.isArray(deal.imageUrls) ? deal.imageUrls : [];
+  const productIds = Array.isArray(deal.productIds) ? deal.productIds : [];
+  const titles = Array.isArray(deal.titles) ? deal.titles : [];
+  const originalPrices = Array.isArray(deal.originalPrices)
+    ? deal.originalPrices
+    : [];
+  const dealPrices = Array.isArray(deal.dealPrices) ? deal.dealPrices : [];
+  const dealPrice = Number(dealPrices[index] ?? deal.dealPrice ?? 0);
+  const originalPrice = Number(originalPrices[index] ?? deal.originalPrice ?? 0);
+
+  return {
+    imageUrl: normalizeImageUrl(
+      String(images[index] || deal.imageUrl || images[0] || ""),
+    ),
+    productId: String(
+      productIds[index] || deal.productId || productIds[0] || "",
+    ).trim(),
+    title: cleanBigDealTitle(titles[index] || deal.title || titles[0]),
+    originalPrice: Math.max(0, Number.isFinite(originalPrice) ? originalPrice : 0),
+    dealPrice: Math.max(0, Number.isFinite(dealPrice) ? dealPrice : 0),
+  };
 }
 
 export default function HeroFlashBanner({
@@ -135,19 +181,6 @@ export default function HeroFlashBanner({
     );
   }, [liveUpdates]);
 
-  useEffect(() => {
-    const urls = [
-      bigDeal?.imageUrl,
-      ...weeklyDeals.map((deal) => deal.imageUrl),
-    ]
-      .filter(Boolean)
-      .map((url) => normalizeImageUrl(String(url)));
-    urls.forEach((src) => {
-      const image = new window.Image();
-      image.decoding = "async";
-      image.src = src;
-    });
-  }, [bigDeal?.imageUrl, weeklyDeals]);
 
   const todayKey =
     nowTick === null ? null : pakistanNowWeekday(new Date(nowTick));
@@ -295,6 +328,19 @@ export default function HeroFlashBanner({
       product?.stock ?? product?.quantity ?? bigDeal?.stock ?? 0,
     );
     const src = normalizeImageUrl(bigDeal?.imageUrl || product?.imageUrl || "");
+    const slotCount = bigDealConfiguredSlotCount(bigDeal);
+    const nextDeal = bigDealSlotAt(
+      bigDeal,
+      nextBigDealRotationIndex(
+        bigDeal?.rotationStartedAt,
+        new Date(nowTick || Date.now()),
+        slotCount,
+      ),
+    );
+    const nextSrc = normalizeImageUrl(nextDeal?.imageUrl || "");
+    const nextPrice = Number(nextDeal?.dealPrice || 0);
+    const nextRegularPrice = Number(nextDeal?.originalPrice || nextPrice || 0);
+    const nextSaved = Math.max(0, nextRegularPrice - nextPrice);
     const end = bigDeal?.endAt ? new Date(bigDeal.endAt).getTime() : null;
     const start = bigDeal?.startAt ? new Date(bigDeal.startAt).getTime() : null;
     const live =
@@ -424,6 +470,9 @@ export default function HeroFlashBanner({
                       alt={bigDeal.title}
                       fill
                       priority
+                      loading="eager"
+                      fetchPriority="high"
+                      unoptimized
                       sizes="(max-width: 600px) 50vw, 600px"
                       className="object-cover"
                     />
@@ -478,11 +527,15 @@ export default function HeroFlashBanner({
                 className="home-next-deal"
                 aria-label="Next big deal is locked"
               >
-                {src && (
+                {nextSrc && (
                   <Image
-                    src={src}
+                    src={nextSrc}
                     alt=""
                     fill
+                    priority
+                    loading="eager"
+                    fetchPriority="high"
+                    unoptimized
                     sizes="(max-width: 600px) 50vw, 600px"
                     className="object-cover"
                   />
@@ -490,10 +543,13 @@ export default function HeroFlashBanner({
                 <span>
                   <LockKeyhole size={36} />
                   <b>LOCKED</b>
-                  <small>Next big deal</small>
-                  <strong>Rs. {price.toLocaleString("en-PK")}</strong>
-                  {saved > 0 ? (
-                    <small>Save Rs. {saved.toLocaleString("en-PK")}</small>
+                  <small>{nextDeal?.title || "Next big deal"}</small>
+                  <strong>Rs. {nextPrice.toLocaleString("en-PK")}</strong>
+                  {nextRegularPrice > nextPrice ? (
+                    <small>Was Rs. {nextRegularPrice.toLocaleString("en-PK")}</small>
+                  ) : null}
+                  {nextSaved > 0 ? (
+                    <small>Save Rs. {nextSaved.toLocaleString("en-PK")}</small>
                   ) : null}
                 </span>
               </div>
@@ -781,3 +837,4 @@ export default function HeroFlashBanner({
     </>
   );
 }
+

@@ -127,6 +127,7 @@ export function SettingsProvider({ initialSettings, children }: { initialSetting
   const [loading, setLoading] = useState(!hasInitialSettings);
   const [hasData, setHasData] = useState(hasInitialSettings);
   const requestRef = useRef<Promise<void> | null>(null);
+  const lastRefreshRef = useRef(hasInitialSettings ? Date.now() : 0);
 
   const seedSettings = useCallback((nextSettings: SiteSettings) => {
     setSettings(nextSettings);
@@ -146,6 +147,7 @@ export function SettingsProvider({ initialSettings, children }: { initialSetting
         if (Object.keys(documents).length > 0) {
           setSettings(buildSettings(documents));
           setHasData(true);
+          lastRefreshRef.current = Date.now();
         }
       } catch (error) {
         // Keep the server-provided last good settings instead of flashing blank weekly deals.
@@ -179,12 +181,14 @@ export function SettingsProvider({ initialSettings, children }: { initialSetting
   useEffect(() => {
     if (parent) return;
 
-    void refreshSettings();
+    if (!hasInitialSettings) void refreshSettings();
     const timer = window.setInterval(() => { void refreshSettings(); }, 60_000);
     const refreshWhenVisible = () => {
-      if (document.visibilityState === 'visible') void refreshSettings();
+      if (document.visibilityState === 'visible' && Date.now() - lastRefreshRef.current >= 60_000) void refreshSettings();
     };
-    const refreshOnFocus = () => { void refreshSettings(); };
+    const refreshOnFocus = () => {
+      if (Date.now() - lastRefreshRef.current >= 60_000) void refreshSettings();
+    };
 
     document.addEventListener('visibilitychange', refreshWhenVisible);
     window.addEventListener('focus', refreshOnFocus);
@@ -193,7 +197,7 @@ export function SettingsProvider({ initialSettings, children }: { initialSetting
       document.removeEventListener('visibilitychange', refreshWhenVisible);
       window.removeEventListener('focus', refreshOnFocus);
     };
-  }, [parent, refreshSettings]);
+  }, [parent, hasInitialSettings, refreshSettings]);
 
   const contextValue = useMemo<SettingsContextValue>(() => {
     if (!parent) return localValue;
@@ -213,3 +217,4 @@ export function useSettings() {
   const loading = shared?.loading ?? false;
   return { settings: resolvedSettings, loading, policy: resolvedSettings.policies, contact: resolvedSettings.contact };
 }
+

@@ -657,6 +657,19 @@ export default function HomeResellerTasksDirect() {
               <p>
                 7-Day Check-in · {Math.min(7, Number(wallet.streak || 0))}/7
               </p>
+              <div className="home-mini-checkin" aria-label="7-day check-in progress">
+                {Array.from({ length: 7 }, (_, index) => {
+                  const complete = index < Number(wallet.streak || 0);
+                  return (
+                    <span key={index} className={complete ? "is-complete" : ""}>
+                      <b>D{index + 1}</b>
+                      <small>
+                        +{Number(rewardSettings.checkInRewards?.[index] ?? 0)}
+                      </small>
+                    </span>
+                  );
+                })}
+              </div>
               <strong>
                 {wallet.lastCheckIn === rewardDayKey()
                   ? "Today’s points collected"
@@ -683,6 +696,13 @@ export default function HomeResellerTasksDirect() {
             <div>
               <h3>Spin & Win</h3>
               <p>Use today’s reward spin directly from the home page.</p>
+              <div className="home-mini-wheel" aria-hidden="true">
+                <span>🎁</span>
+                <span>📦</span>
+                <span>Rs</span>
+                <span>⭐</span>
+                <b>WIN</b>
+              </div>
               <strong>
                 {wallet.lastSpin === rewardDayKey()
                   ? "Today’s spin used"
@@ -707,6 +727,11 @@ export default function HomeResellerTasksDirect() {
             <div>
               <h3>Points wallet</h3>
               <p>Your collected reward balance.</p>
+              <div className="home-wallet-chip">
+                <Coins size={13} />
+                <b>{Number(wallet.points || 0).toLocaleString()}</b>
+                <span>reward points</span>
+              </div>
               <strong>{Number(wallet.points || 0).toLocaleString()} points</strong>
               <Link className="home-task-button" href="/rewards">
                 Open rewards <ArrowRight size={13} />
@@ -721,6 +746,11 @@ export default function HomeResellerTasksDirect() {
             <div>
               <h3>Cash wallet</h3>
               <p>Available reseller cash plus pending earnings.</p>
+              <div className="home-wallet-chip cash">
+                <WalletCards size={13} />
+                <b>Rs. {cashAvailable.toLocaleString()}</b>
+                <span>{cashPending.toLocaleString()} pending</span>
+              </div>
               <strong>
                 {profile
                   ? `Rs. ${cashAvailable.toLocaleString()} · ${cashPending.toLocaleString()} pending`
@@ -739,6 +769,7 @@ export default function HomeResellerTasksDirect() {
             <div>
               <h3>Reseller tier</h3>
               <p>{profile ? `${monthlyOrders} orders this month.` : "Tier unlocks after joining."}</p>
+              <div className="home-tier-meter"><span style={{ width: `${Math.min(100, (monthlyOrders / Math.max(1, Number(currentTier?.minMonthlyOrders || 1))) * 100)}%` }} /></div>
               <strong>{profile ? `${currentTier?.name || "Starter"} tier` : "Starter → Premium"}</strong>
               <Link className="home-task-button" href={profile ? "/reseller/dashboard" : "/reseller/join"}>
                 View tiers <ArrowRight size={13} />
@@ -925,3 +956,4 @@ export default function HomeResellerTasksDirect() {
     </section>
   );
 }
+

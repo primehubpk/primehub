@@ -79,6 +79,14 @@ export async function getStorefrontSettingsSnapshot() {
   return { ...legacy, ...main };
 }
 
+export async function getFreshStorefrontSettingsSnapshot() {
+  const result = await getStorefrontSettingsWithBigDealRecovery({ cache: 'no-store' });
+  const documents = result.documents as Record<string, any>;
+  const main = documents.main || {};
+  const legacy = documents.general || {};
+  return { ...legacy, ...main };
+}
+
 async function loadPrimeSkills() {
   const [skillsResult, settingsResult] = await Promise.all([
     getDualSkills(SKILLS_READ_CACHE),
@@ -97,3 +105,4 @@ export const getPrimeSkillsSnapshot = unstable_cache(
   ['primehub-prime-skills-dual-v3'],
   { revalidate: 600, tags: ['prime-skills'] },
 );
+
