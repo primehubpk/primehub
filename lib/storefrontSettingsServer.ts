@@ -64,19 +64,27 @@ function withStorefrontBigDeal(result: Awaited<ReturnType<typeof getDualSettings
   };
 }
 
-const getFirebaseBigDealCandidates = unstable_cache(
-  async () => {
-    const snapshot = await getAdminDb().collection('settings').doc('main').get();
-    if (!snapshot.exists) return { dedicated: null, legacyRotation: null };
-    const data = serial(snapshot.data() || {});
-    return {
-      dedicated: dedicatedDeal(data),
-      legacyRotation: legacyManagerRotation(data),
-    };
-  },
+async function readFirebaseBigDealCandidates() {
+  const snapshot = await getAdminDb().collection('settings').doc('main').get();
+  if (!snapshot.exists) return { dedicated: null, legacyRotation: null };
+  const data = serial(snapshot.data() || {});
+  return {
+    dedicated: dedicatedDeal(data),
+    legacyRotation: legacyManagerRotation(data),
+  };
+}
+
+const getCachedFirebaseBigDealCandidates = unstable_cache(
+  readFirebaseBigDealCandidates,
   ['primehub-storefront-big-deal-dedicated-recovery-v1'],
   { revalidate: 60, tags: ['storefront-settings'] },
 );
+
+async function getFirebaseBigDealCandidates(cacheOptions?: DualReadCacheOptions) {
+  return cacheOptions?.cache === 'no-store'
+    ? readFirebaseBigDealCandidates()
+    : getCachedFirebaseBigDealCandidates();
+}
 
 export async function getStorefrontSettingsWithBigDealRecovery(cacheOptions?: DualReadCacheOptions) {
   const result = await getDualSettings(cacheOptions);
@@ -87,12 +95,13 @@ export async function getStorefrontSettingsWithBigDealRecovery(cacheOptions?: Du
   const primaryDedicated = dedicatedDeal(main);
   if (primaryDedicated) return withStorefrontBigDeal(result, primaryDedicated);
 
+  let firebaseCandidates: Awaited<ReturnType<typeof readFirebaseBigDealCandidates>> | null = null;
   if (result.source === 'supabase') {
     try {
-      const firebase = await getFirebaseBigDealCandidates();
-      if (firebase.dedicated) {
+      firebaseCandidates = await getFirebaseBigDealCandidates(cacheOptions);
+      if (firebaseCandidates.dedicated) {
         console.warn('PrimeHub Big Deal storefront recovered the dedicated Firebase copy while Supabase catches up.');
-        return withStorefrontBigDeal(result, firebase.dedicated);
+        return withStorefrontBigDeal(result, firebaseCandidates.dedicated);
       }
     } catch (error) {
       console.warn('PrimeHub dedicated Big Deal Firebase recovery lookup skipped', error);
@@ -104,10 +113,10 @@ export async function getStorefrontSettingsWithBigDealRecovery(cacheOptions?: Du
 
   if (result.source === 'supabase') {
     try {
-      const firebase = await getFirebaseBigDealCandidates();
-      if (firebase.legacyRotation) {
+      firebaseCandidates = firebaseCandidates || await getFirebaseBigDealCandidates(cacheOptions);
+      if (firebaseCandidates.legacyRotation) {
         console.warn('PrimeHub Big Deal storefront recovered a legacy 7-slot manager rotation for migration.');
-        return withStorefrontBigDeal(result, firebase.legacyRotation);
+        return withStorefrontBigDeal(result, firebaseCandidates.legacyRotation);
       }
     } catch (error) {
       console.warn('PrimeHub legacy Big Deal migration lookup skipped', error);

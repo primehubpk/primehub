@@ -1,3 +1,3 @@
 "use client";
 
-export { default } from "./HomeResellerTasksDirect";
+export { default } from "./HomeResellerClubRail";
