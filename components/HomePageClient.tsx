@@ -5,15 +5,16 @@ import { useEffect, useState } from "react";
 import Header from "@/components/home/HomeHeader";
 import HomeCollections from "@/components/home/HomeCollections";
 import BigDealNextPreviewSync from "@/components/home/BigDealNextPreviewSync";
+import { HomeResellerTasks } from "@/components/home/HomeFeatureRails";
 import {
   HomePrimeSkills,
-  HomeResellerTasks,
   HomeWholesaleVideos,
-} from "@/components/home/HomeFeatureRails";
+} from "@/components/home/HomeCommerceRails";
 import "./home/home.css";
 import "./home/WeeklyDealsHomeFix.css";
 import "./home/HomeFeatureRails.css";
 import "./home/HomeResellerRewards.css";
+import "./home/HomeCommerceRails.css";
 import HeroFlashBanner from "@/components/HeroFlashBanner";
 import CategorySwiper from "@/components/CategorySwiper";
 import NewArrivalsRail from "@/components/NewArrivalsRail";
