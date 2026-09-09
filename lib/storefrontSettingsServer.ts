@@ -39,51 +39,92 @@ function completeBigDealSlotCount(raw: any) {
   }).filter(Boolean).length;
 }
 
-const getFirebasePublishedBigDeal = unstable_cache(
+function dedicatedDeal(main: any) {
+  return main?.bigDeal && typeof main.bigDeal === 'object' ? main.bigDeal : null;
+}
+
+function legacyManagerRotation(main: any) {
+  const legacy = main?.dailyDeal && typeof main.dailyDeal === 'object' ? main.dailyDeal : null;
+  // The old Store Settings Big Deal was a single deal. The dedicated Big Deal
+  // manager saves a complete 7-slot rotation, so only that shape is accepted as
+  // a temporary migration fallback.
+  return legacy && completeBigDealSlotCount(legacy) >= SLOT_COUNT ? legacy : null;
+}
+
+function withStorefrontBigDeal(result: Awaited<ReturnType<typeof getDualSettings>>, deal: any) {
+  const main = result.documents?.main && typeof result.documents.main === 'object'
+    ? result.documents.main
+    : {};
+  return {
+    ...result,
+    documents: {
+      ...result.documents,
+      main: {
+        ...main,
+        // Storefront consumers continue using `dailyDeal`, but the value now
+        // comes only from the dedicated admin Big Deal field.
+        dailyDeal: deal || null,
+      },
+    },
+  };
+}
+
+const getFirebaseBigDealCandidates = unstable_cache(
   async () => {
     const snapshot = await getAdminDb().collection('settings').doc('main').get();
-    if (!snapshot.exists) return null;
-    const deal = serial(snapshot.data()?.dailyDeal || null);
-    return deal && typeof deal === 'object' ? deal : null;
+    if (!snapshot.exists) return { dedicated: null, legacyRotation: null };
+    const data = serial(snapshot.data() || {});
+    return {
+      dedicated: dedicatedDeal(data),
+      legacyRotation: legacyManagerRotation(data),
+    };
   },
-  ['primehub-storefront-big-deal-firebase-recovery-v1'],
+  ['primehub-storefront-big-deal-dedicated-recovery-v1'],
   { revalidate: 60, tags: ['storefront-settings'] },
 );
 
 export async function getStorefrontSettingsWithBigDealRecovery() {
   const result = await getDualSettings();
-  if (result.source !== 'supabase') return result;
-
   const main = result.documents?.main && typeof result.documents.main === 'object'
     ? result.documents.main
     : {};
-  const primaryDeal = main.dailyDeal && typeof main.dailyDeal === 'object'
-    ? main.dailyDeal
-    : {};
-  const primaryCompleteSlots = completeBigDealSlotCount(primaryDeal);
 
-  if (primaryCompleteSlots >= SLOT_COUNT) return result;
+  const primaryDedicated = dedicatedDeal(main);
+  if (primaryDedicated) return withStorefrontBigDeal(result, primaryDedicated);
 
-  try {
-    const firebaseDeal = await getFirebasePublishedBigDeal();
-    if (!firebaseDeal || firebaseDeal.active !== true) return result;
-
-    const firebaseCompleteSlots = completeBigDealSlotCount(firebaseDeal);
-    if (firebaseCompleteSlots <= primaryCompleteSlots) return result;
-
-    console.warn('PrimeHub Big Deal storefront recovered the published Firebase rotation while Supabase settings catch up.');
-    return {
-      ...result,
-      documents: {
-        ...result.documents,
-        main: {
-          ...main,
-          dailyDeal: firebaseDeal,
-        },
-      },
-    };
-  } catch (error) {
-    console.warn('PrimeHub Big Deal Firebase recovery lookup skipped', error);
-    return result;
+  // If Supabase has not received the new dedicated field yet, prefer a Firebase
+  // dedicated copy before considering any legacy data.
+  if (result.source === 'supabase') {
+    try {
+      const firebase = await getFirebaseBigDealCandidates();
+      if (firebase.dedicated) {
+        console.warn('PrimeHub Big Deal storefront recovered the dedicated Firebase copy while Supabase catches up.');
+        return withStorefrontBigDeal(result, firebase.dedicated);
+      }
+    } catch (error) {
+      console.warn('PrimeHub dedicated Big Deal Firebase recovery lookup skipped', error);
+    }
   }
+
+  // One-time compatibility for rotations that were already saved by the
+  // dedicated 7-Day Big Deal manager before this ownership split. A legacy
+  // single Store Settings deal is deliberately ignored.
+  const primaryLegacyRotation = legacyManagerRotation(main);
+  if (primaryLegacyRotation) return withStorefrontBigDeal(result, primaryLegacyRotation);
+
+  if (result.source === 'supabase') {
+    try {
+      const firebase = await getFirebaseBigDealCandidates();
+      if (firebase.legacyRotation) {
+        console.warn('PrimeHub Big Deal storefront recovered a legacy 7-slot manager rotation for migration.');
+        return withStorefrontBigDeal(result, firebase.legacyRotation);
+      }
+    } catch (error) {
+      console.warn('PrimeHub legacy Big Deal migration lookup skipped', error);
+    }
+  }
+
+  // No dedicated icon data exists. Explicitly suppress any old single Big Deal
+  // left behind by Store Settings so it cannot appear on the homepage.
+  return withStorefrontBigDeal(result, null);
 }
