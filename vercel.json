@@ -5,9 +5,9 @@
   },
   "git": {
     "deploymentEnabled": {
-      "fix/big-deal-initial-render": true,
       "fix/home-weekly-deals-live-first": true,
       "fix/weekly-deals-live-first": false,
+      "fix/big-deal-initial-render": true,
       "feature/supabase-migration": true,
       "feature/salaar-virtual-salesman": true
     }
