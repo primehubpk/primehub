@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import Header from "@/components/home/HomeHeader";
 import HomeCollections from "@/components/home/HomeCollections";
 import BigDealNextPreviewSync from "@/components/home/BigDealNextPreviewSync";
-import { HomeResellerTasks } from "@/components/home/HomeFeatureRails";
+import HomeResellerTasksDirect from "@/components/home/HomeResellerTasksDirect";
 import {
   HomePrimeSkills,
   HomeWholesaleVideos,
@@ -14,6 +14,7 @@ import "./home/home.css";
 import "./home/WeeklyDealsHomeFix.css";
 import "./home/HomeFeatureRails.css";
 import "./home/HomeResellerRewards.css";
+import "./home/HomeResellerTasksDirect.css";
 import "./home/HomeCommerceRails.css";
 import HeroFlashBanner from "@/components/HeroFlashBanner";
 import CategorySwiper from "@/components/CategorySwiper";
@@ -141,7 +142,7 @@ export default function HomePageClient({
             onSelect={selectPrice}
             onWholesaleSelect={selectWholesale}
           />
-          <HomeResellerTasks />
+          <HomeResellerTasksDirect />
           <HomeWholesaleVideos />
           <HomePrimeSkills />
           <div id="discover-deals-section">
