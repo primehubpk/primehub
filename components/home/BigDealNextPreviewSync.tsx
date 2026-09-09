@@ -5,7 +5,6 @@ import { normalizeImageUrl } from "@/lib/imageUrl";
 import { useSettings } from "@/lib/useSettings";
 import {
   bigDealConfiguredSlotCount,
-  bigDealRotationIndex,
   nextBigDealRotationIndex,
 } from "@/lib/bigDealRotation";
 import "./BigDealRotationFix.css";
@@ -71,14 +70,6 @@ function pakistanMidnightCountdown(now: Date) {
   return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
 }
 
-function setImage(image: HTMLImageElement | null, src: string, alt: string) {
-  if (!image || !src) return;
-  image.src = src;
-  image.alt = alt;
-  image.removeAttribute("srcset");
-  image.removeAttribute("sizes");
-}
-
 function nextSlot(deal: BigDeal, now: Date) {
   const slotCount = bigDealConfiguredSlotCount(deal);
   return slotAt(
@@ -101,44 +92,26 @@ export default function BigDealNextPreviewSync() {
 
     const applyDealCards = () => {
       const now = new Date();
-      const slotCount = bigDealConfiguredSlotCount(bigDeal);
-      const currentIndex = bigDealRotationIndex(bigDeal.rotationStartedAt, now, slotCount);
-      const nextIndex = nextBigDealRotationIndex(bigDeal.rotationStartedAt, now, slotCount);
-      const currentDeal = slotAt(bigDeal, currentIndex);
-      const nextDeal = slotAt(bigDeal, nextIndex);
+      const nextDeal = nextSlot(bigDeal, now);
       const countdown = pakistanMidnightCountdown(now);
 
-      const currentCard = document.querySelector<HTMLElement>(".home-big-card");
-      if (currentCard) {
-        const imageLink = currentCard.querySelector<HTMLAnchorElement>(".home-big-image");
-        const image = imageLink?.querySelector<HTMLImageElement>("img") || null;
-        const info = currentCard.querySelector<HTMLElement>(".home-big-info");
-        const titleLink = info?.querySelector<HTMLAnchorElement>(":scope > a") || null;
-        const prices = info?.querySelector<HTMLElement>(".home-big-prices") || null;
-        const href = currentDeal.productId ? `/product/${currentDeal.productId}?deal=big` : "/deals/big";
-
-        if (imageLink) imageLink.href = href;
-        if (titleLink) {
-          titleLink.href = href;
-          titleLink.textContent = currentDeal.title;
-        }
-        setImage(image, currentDeal.imageUrl, currentDeal.title);
-
-        const currentPrice = prices?.querySelector<HTMLElement>("strong") || null;
-        const regularPrice = prices?.querySelector<HTMLElement>("s") || null;
-        const saving = prices?.querySelector<HTMLElement>("em") || null;
-        const saved = Math.max(0, currentDeal.originalPrice - currentDeal.dealPrice);
-        if (currentPrice) currentPrice.textContent = money(currentDeal.dealPrice);
-        if (regularPrice) regularPrice.textContent = money(currentDeal.originalPrice);
-        if (saving) saving.textContent = saved > 0 ? `Save ${money(saved)}` : "";
-        if (info) info.dataset.countdown = `Ends in ${countdown}`;
-      }
+      // The current Big Deal is already resolved by useSettings and rendered by
+      // HeroFlashBanner. Do not rewrite its Next/Image DOM node here: replacing
+      // the optimized image URL after hydration caused the visible second image
+      // load/flicker on the homepage.
+      const currentInfo = document.querySelector<HTMLElement>(".home-big-info");
+      if (currentInfo) currentInfo.dataset.countdown = `Ends in ${countdown}`;
 
       const nextCard = document.querySelector<HTMLElement>(".home-next-deal");
       const badge = nextCard?.querySelector<HTMLElement>(":scope > span") || null;
       if (!nextCard || !badge) return;
 
-      nextCard.style.backgroundImage = nextDeal.imageUrl ? `url(${JSON.stringify(nextDeal.imageUrl)})` : "none";
+      const nextBackground = nextDeal.imageUrl
+        ? `url(${JSON.stringify(nextDeal.imageUrl)})`
+        : "none";
+      if (nextCard.style.backgroundImage !== nextBackground) {
+        nextCard.style.backgroundImage = nextBackground;
+      }
       nextCard.style.backgroundSize = "cover";
       nextCard.style.backgroundPosition = "center";
       nextCard.setAttribute("aria-label", `Next Big Deal locked until tomorrow: ${nextDeal.title}, ${money(nextDeal.dealPrice)}`);
@@ -167,6 +140,9 @@ export default function BigDealNextPreviewSync() {
   if (!instantNextDeal?.imageUrl) return null;
 
   return (
-    <style>{`.home-storefront .home-next-deal{background-image:url(${JSON.stringify(instantNextDeal.imageUrl)});background-size:cover;background-position:center;}`}</style>
+    <>
+      <link rel="preload" as="image" href={instantNextDeal.imageUrl} />
+      <style>{`.home-storefront .home-next-deal{background-image:url(${JSON.stringify(instantNextDeal.imageUrl)});background-size:cover;background-position:center;}`}</style>
+    </>
   );
 }
