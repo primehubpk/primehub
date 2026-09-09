@@ -15,7 +15,7 @@ import './globals.css';
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL;
 const BRAND_NAME = 'PrimeHubMall';
-const BRAND_ALIASES = ['Prime Hub Mall', 'PrimeHub Mall', 'Prime Hub', 'Prime Hub Deals', 'PrimeHub Deals'];
+const BRAND_ALIASES = ['Prime Hub Mall', 'PrimeHub Mall', 'Prime Hub', 'PrimeHub Deals', 'Prime Hub Deals'];
 const SITE_DESCRIPTION =
   'Shop bangles, jewellery, watches, retail and wholesale deals at PrimeHubMall Pakistan. Discover new arrivals, special offers and nationwide delivery.';
 const SOCIAL_IMAGE = 'https://images.primehubmall.com/products/1766930358870-fbc575bb0ca3.webp';
@@ -101,7 +101,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     potentialAction: {
       '@type': 'SearchAction',
       target: `${SITE_URL || ''}/shop?q={search_term_string}`,
-      'query-input': 'required name=query-input',
+      'query-input': 'required name=search_term_string',
     },
   };
 
