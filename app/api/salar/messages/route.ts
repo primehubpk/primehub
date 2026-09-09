@@ -103,6 +103,7 @@ export async function POST(request: Request) {
     try {
       const brain = await buildSalarBrainPrompt();
       const stored = await listConversationMessages(conversation.id) as StoredMessage[];
+      const isCollectionFollowUp = collectionFollowUp(stored);
       const systemPrompt = `${brain}\n\n# Live tool rules\nYou may call tools. Never invent catalogue, stock, prices, collections, delivery, payment, or website facts. Phone ${PHONE} if tools fail or return nothing. There is ONE Worker only: catalogue and knowledge.\nFor a broad shopping need such as bangles: call catalogue with q only, then list EVERY collection returned and ask which collection to show. Do not request products until the visitor chooses a collection.\nWhen the visitor chooses a collection, call catalogue with collection (and q when useful). Product photos/cards come from the Worker result; do not fabricate products.\nFor website facts use knowledge. Keep replies short, warm, Roman Urdu/Urdu/English to match the visitor. Do not place orders, use WhatsApp, or use vision in this phase.`;
       const llmMessages: SalarLlmMessage[] = [{ role: 'system', content: systemPrompt }, ...historyForModel(stored)];
       let toolRounds = 0;
@@ -132,8 +133,8 @@ export async function POST(request: Request) {
         }
       }
 
-      if (!usedTool && shoppingLike(text)) {
-        const fallback = await runWorker({ job: 'catalogue', payload: collectionFollowUp(stored) ? { collection: text } : { q: text }, conversationId: conversation.id });
+      if (!usedTool && (shoppingLike(text) || isCollectionFollowUp)) {
+        const fallback = await runWorker({ job: 'catalogue', payload: isCollectionFollowUp ? { collection: text } : { q: text }, conversationId: conversation.id });
         usedTool = true;
         if ((fallback as any)?.found === false) failedTool = true; else successfulTool = true;
         if ((fallback as any)?.type === 'collections') lastCollections = Array.isArray((fallback as any).collections) ? (fallback as any).collections : [];
