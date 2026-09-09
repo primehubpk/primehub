@@ -38,6 +38,20 @@ export async function listBrainFiles() {
   return snap.docs.map((doc) => ({ id: doc.id, ...doc.data(), updated_at: serial(doc.data().updated_at) })).sort((a:any,b:any)=>String(a.filename).localeCompare(String(b.filename)));
 }
 
+export async function buildSalarBrainPrompt(maxChars = 100000) {
+  const files: any[] = await listBrainFiles();
+  const brain01 = files.find((file:any) => String(file.filename) === 'brain-01.md') || files[0];
+  const selected: any[] = brain01 ? [brain01] : [];
+  let used = brain01 ? String(brain01.body || '').length : 0;
+  const newest = files.filter((file:any) => file !== brain01).sort((a:any,b:any) => String(b.updated_at || '').localeCompare(String(a.updated_at || '')));
+  for (const file of newest) {
+    const body = String(file.body || '');
+    if (used + body.length > maxChars) continue;
+    selected.push(file); used += body.length;
+  }
+  return selected.sort((a:any,b:any)=>String(a.filename).localeCompare(String(b.filename))).map((file:any)=>`# ${String(file.filename)}\n${String(file.body || '')}`).join('\n\n');
+}
+
 export async function createBrainFile() {
   await ensureBrainSeed();
   const files = await listBrainFiles();
