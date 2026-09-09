@@ -2,6 +2,11 @@ import type { PriceBucket } from './types';
 
 const CANONICAL_PRICE_BUCKETS = [99, 299, 999];
 
+export type SaleMelaPriceRange = {
+  minInclusive: number;
+  maxExclusive: number | null;
+};
+
 export function isWholesalePriceBucket(bucket: PriceBucket) {
   return bucket.title.toLowerCase().includes('wholesale') || !bucket.amount;
 }
@@ -75,6 +80,33 @@ export function matchesPriceBucket(
   const range = priceBucketRange(buckets, amount);
   if (!range || price <= 0) return false;
   return price > range.minExclusive && price <= range.maxInclusive;
+}
+
+// Sale Mela deliberately uses non-overlapping customer-facing bands so the
+// exact Rs. 299 and Rs. 999 products start the next rail instead of appearing
+// twice. The icon labels stay 99 / 299 / 999, while the product progression is
+// cheapest -> expensive inside each rail.
+export function saleMelaPriceRange(amount: number): SaleMelaPriceRange | null {
+  if (amount === 99) return { minInclusive: 1, maxExclusive: 299 };
+  if (amount === 299) return { minInclusive: 299, maxExclusive: 999 };
+  if (amount === 999) return { minInclusive: 999, maxExclusive: null };
+  return null;
+}
+
+export function matchesSaleMelaBucket(price: number, amount: number) {
+  const range = saleMelaPriceRange(amount);
+  if (!range || !Number.isFinite(price) || price <= 0) return false;
+  return (
+    price >= range.minInclusive &&
+    (range.maxExclusive === null || price < range.maxExclusive)
+  );
+}
+
+export function saleMelaBucketLabel(amount: number) {
+  if (amount === 99) return 'Rs. 1–298';
+  if (amount === 299) return 'Rs. 299–998';
+  if (amount === 999) return 'Rs. 999+';
+  return `Up to Rs. ${Math.max(0, amount).toLocaleString('en-PK')}`;
 }
 
 export function normalizePriceBuckets(buckets: PriceBucket[]) {

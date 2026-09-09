@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 import { ChevronRight, Package, ShoppingCart } from "lucide-react";
+import HomeHeading from "@/components/home/HomeHeading";
 import { useSettings } from "@/lib/useSettings";
 import { useCartStore } from "@/lib/cartStore";
 import {
@@ -19,6 +20,8 @@ import { isWholesaleProduct } from "@/lib/wholesale";
 import {
   isWholesalePriceBucket,
   matchesPriceBucket,
+  matchesSaleMelaBucket,
+  saleMelaPriceRange,
   sortPriceBuckets,
 } from "@/lib/priceBucketUtils";
 
@@ -123,16 +126,22 @@ export function HomeProductCard({
 
 function bucketHref(amount: number | null, wholesale: boolean) {
   return wholesale
-    ? "/shop?bucket=wholesale&wholesale=true"
-    : `/shop?bucket=${Number(amount)}&max=${Number(amount)}`;
+    ? "/shop?bucket=wholesale&sale=1&wholesale=true"
+    : `/shop?bucket=${Number(amount)}&sale=1`;
+}
+
+function sortBySalePrice(products: Product[]) {
+  return [...products].sort(
+    (a, b) => homePrice(a) - homePrice(b) || a.id.localeCompare(b.id),
+  );
 }
 
 export default function HomeCollections({
   products,
 }: {
   products: Product[];
-  onSelect: (amount: number | null) => void;
-  onWholesaleSelect: () => void;
+  onSelect?: (amount: number | null) => void;
+  onWholesaleSelect?: () => void;
 }) {
   const { settings } = useSettings();
   const catalog = products.filter((p) => p.published !== false);
@@ -144,25 +153,34 @@ export default function HomeCollections({
   return (
     <>
       {buckets.length > 0 && (
-        <section className="home-sale" aria-labelledby="home-sale-title">
-          <h2 id="home-sale-title">
-            PrimeHubMall <span>Sale Mela</span>
-          </h2>
+        <section className="home-sale" aria-label="PrimeHubMall Sale Mela">
+          <div>
+            <HomeHeading>
+              <Link
+                href="/sale-mela"
+                prefetch={true}
+                aria-label="Open PrimeHubMall Sale Mela"
+              >
+                PrimeHubMall <span className="text-[#d60707]">Sale Mela</span>
+              </Link>
+            </HomeHeading>
+          </div>
 
           {buckets.map((bucket) => {
             const wholesale = isWholesalePriceBucket(bucket);
             const amount = Number(bucket.amount || 0);
             const href = bucketHref(bucket.amount ?? null, wholesale);
+            const saleRange = saleMelaPriceRange(amount);
             const matches = wholesale
-              ? packs
-              : catalog.filter(
-                  (product) =>
-                    !isWholesaleProduct(product) &&
-                    matchesPriceBucket(
-                      homePrice(product),
-                      buckets,
-                      amount,
-                    ),
+              ? sortBySalePrice(packs)
+              : sortBySalePrice(
+                  catalog.filter((product) => {
+                    if (isWholesaleProduct(product)) return false;
+                    const price = homePrice(product);
+                    return saleRange
+                      ? matchesSaleMelaBucket(price, amount)
+                      : matchesPriceBucket(price, buckets, amount);
+                  }),
                 );
 
             return (
@@ -173,6 +191,7 @@ export default function HomeCollections({
                 <Link
                   className="home-budget"
                   href={href}
+                  prefetch={true}
                   aria-label={`Browse ${bucket.title}`}
                 >
                   <span className="home-budget-medallion">
@@ -220,7 +239,7 @@ export default function HomeCollections({
                   ) : (
                     <p className="home-empty">
                       New offers are on their way.{" "}
-                      <Link href={href}>
+                      <Link href={href} prefetch={true}>
                         Browse collection <ChevronRight size={14} />
                       </Link>
                     </p>

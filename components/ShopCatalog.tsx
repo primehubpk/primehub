@@ -11,10 +11,20 @@ import CatalogProductGrid from './shop/CatalogProductGrid';
 import CompactCategoryStrip from './shop/CompactCategoryStrip';
 import { productMatchesCategory } from '@/lib/categoryUtils';
 import { cacheProductCatalog } from '@/lib/productNavigationCache';
+import { getEffectivePrice } from '@/lib/dealPricing';
+import { saleMelaBucketLabel } from '@/lib/priceBucketUtils';
 import type { Product, Category } from './shop/ShopTypes';
 
 function score(id: string) {
   return Array.from(id).reduce((n, c) => ((n * 31 + c.charCodeAt(0)) >>> 0), 7);
+}
+
+function salePrice(product: Product) {
+  return getEffectivePrice({
+    price: Number(product.normalPrice || product.price || 0),
+    dealPrice: Number(product.dealPrice || 0),
+    dealDay: String(product.dealDay || ''),
+  });
 }
 
 type Props = {
@@ -39,14 +49,20 @@ export default function ShopCatalog({
   const searchParams = useSearchParams();
   const bucketParam = searchParams.get('bucket') || '';
   const numericBucket = Number(bucketParam);
+  const saleMelaView = searchParams.get('sale') === '1';
   const categoryView = Boolean(initialCategory);
   const searchView = Boolean(shop.search.trim());
+  const activeSaleAmount = [99, 299, 999].includes(Number(shop.maxPrice))
+    ? Number(shop.maxPrice)
+    : numericBucket;
   const budgetView =
     !categoryView &&
     !searchView &&
     (bucketParam === 'wholesale'
       ? shop.wholesaleOnly
-      : numericBucket > 0 && shop.maxPrice === String(numericBucket));
+      : saleMelaView
+        ? shop.wholesaleOnly || [99, 299, 999].includes(activeSaleAmount)
+        : numericBucket > 0 && shop.maxPrice === String(numericBucket));
 
   useEffect(() => {
     cacheProductCatalog(shop.products);
@@ -54,6 +70,11 @@ export default function ShopCatalog({
 
   const picks = useMemo(
     () => [...shop.filtered].sort((a, b) => score(a.id) - score(b.id)),
+    [shop.filtered],
+  );
+
+  const saleSorted = useMemo(
+    () => [...shop.filtered].sort((a, b) => salePrice(a) - salePrice(b) || a.id.localeCompare(b.id)),
     [shop.filtered],
   );
 
@@ -102,14 +123,22 @@ export default function ShopCatalog({
   };
 
   const primaryProducts =
-    categoryView || searchView || budgetView ? shop.filtered : picks;
+    categoryView || searchView
+      ? shop.filtered
+      : budgetView && saleMelaView
+        ? saleSorted
+        : budgetView
+          ? shop.filtered
+          : picks;
 
   const selectedBucketTitle =
-    bucketParam === 'wholesale'
+    shop.wholesaleOnly || bucketParam === 'wholesale'
       ? 'Wholesale Deals'
-      : shop.buckets.find(
-          (bucket) => Number(bucket.amount) === numericBucket,
-        )?.title || `Under Rs. ${numericBucket.toLocaleString()}`;
+      : saleMelaView && [99, 299, 999].includes(activeSaleAmount)
+        ? `Sale Mela · ${saleMelaBucketLabel(activeSaleAmount)}`
+        : shop.buckets.find(
+            (bucket) => Number(bucket.amount) === numericBucket,
+          )?.title || `Under Rs. ${numericBucket.toLocaleString()}`;
 
   const eyebrow = categoryView
     ? 'Category products'
