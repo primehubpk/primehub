@@ -5,7 +5,7 @@ import { EmailAuthProvider, reauthenticateWithCredential, updatePassword } from 
 import { getAdminDocument, setAdminDocument } from '../shared';
 import { auth } from '@/lib/firebase';
 import type { PriceBucket } from '@/lib/types';
-import { DEFAULT_BIG_DEAL, DEFAULT_BUCKETS, DEFAULT_SETTINGS, Settings } from './SiteSettingsTypes';
+import { DEFAULT_BUCKETS, DEFAULT_SETTINGS, Settings } from './SiteSettingsTypes';
 
 function normalizeWhatsAppNumber(value: string): string {
   const digits = value.replace(/\D/g, '');
@@ -31,24 +31,27 @@ export default function useSiteSettings() {
       getAdminDocument('settings', 'policy'),
       getAdminDocument('settings', 'contact'),
     ]).then(([mainSnap, policySnap, contactSnap]) => {
-      const main = mainSnap.exists() ? (mainSnap.data() as Partial<Settings>) : {};
+      const rawMain = mainSnap.exists() ? (mainSnap.data() as Record<string, any>) : {};
       const policy = policySnap.exists() ? policySnap.data() : {};
       const contact = contactSnap.exists() ? contactSnap.data() : {};
-      const mainWhatsApp = typeof main.whatsappNumber === 'string' ? main.whatsappNumber : '';
+      const mainWhatsApp = typeof rawMain.whatsappNumber === 'string' ? rawMain.whatsappNumber : '';
       const contactWhatsApp = typeof contact.whatsappNumber === 'string' ? contact.whatsappNumber : '';
-      setSettings((current) => ({
-        ...current,
-        ...main,
+      const deliveryThreshold = Number(
+        rawMain.freeShippingCount ?? rawMain.freeDelivery?.itemThreshold ?? DEFAULT_SETTINGS.freeDeliveryThreshold,
+      );
+
+      setSettings({
+        announcementText: typeof rawMain.announcementText === 'string' ? rawMain.announcementText : '',
         whatsappNumber: contactWhatsApp || mainWhatsApp,
         contactEmail: typeof contact.email === 'string' ? contact.email : '',
         physicalAddress: typeof contact.physicalAddress === 'string' ? contact.physicalAddress : '',
         privacyPolicy: typeof policy.privacyPolicy === 'string' ? policy.privacyPolicy : '',
         returnPolicy: typeof policy.returnPolicy === 'string' ? policy.returnPolicy : '',
-        // Kept in state for compatibility only. Store Settings no longer edits or writes Big Deal.
-        dailyDeal: { ...DEFAULT_BIG_DEAL, ...(main.dailyDeal || {}) },
-        priceBuckets: Array.isArray(main.priceBuckets) && main.priceBuckets.length ? main.priceBuckets : DEFAULT_BUCKETS,
-        youtubeGuideUrl: typeof main.youtubeGuideUrl === 'string' ? main.youtubeGuideUrl : '',
-      }));
+        freeDeliveryThreshold: Number.isFinite(deliveryThreshold) ? deliveryThreshold : DEFAULT_SETTINGS.freeDeliveryThreshold,
+        storePolicyInfo: typeof rawMain.storePolicyInfo === 'string' ? rawMain.storePolicyInfo : '',
+        youtubeGuideUrl: typeof rawMain.youtubeGuideUrl === 'string' ? rawMain.youtubeGuideUrl : '',
+        priceBuckets: Array.isArray(rawMain.priceBuckets) && rawMain.priceBuckets.length ? rawMain.priceBuckets : DEFAULT_BUCKETS,
+      });
     }).catch(() => setToast('Unable to load site settings.')).finally(() => setLoading(false));
   }, []);
 
@@ -78,7 +81,7 @@ export default function useSiteSettings() {
           freeDelivery: { enabled: true, itemThreshold: Number(settings.freeDeliveryThreshold || 0), message: 'Add {remaining} more item{plural} to unlock FREE DELIVERY', unlockedMessage: 'FREE DELIVERY UNLOCKED 🎉' },
           storePolicyInfo: settings.storePolicyInfo.trim(),
           priceBuckets: settings.priceBuckets.map((bucket, index) => ({ ...bucket, sortOrder: index + 1, amount: Number(bucket.amount) || 0 })),
-          // dailyDeal is intentionally omitted. The dedicated Big Deal icon is the only owner.
+          // Big Deal is intentionally not part of Store Settings. Only the dedicated Big Deal manager owns it.
         }),
         setAdminDocument('settings', 'policy', {
           privacyPolicy: settings.privacyPolicy.trim(),
