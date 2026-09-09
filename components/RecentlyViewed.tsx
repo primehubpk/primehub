@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
 import { Plus } from 'lucide-react';
+import FastProductLink from '@/components/FastProductLink';
 import { useCartStore } from '@/lib/cartStore';
 import {
   loadProductsForNavigation,
@@ -14,10 +14,77 @@ type Product = { id: string; title?: string; name?: string; price?: number; comp
 export function rememberProduct(id: string) { try { const ids = JSON.parse(localStorage.getItem('phdeals-recent') || '[]').filter((value: string) => value !== id); localStorage.setItem('phdeals-recent', JSON.stringify([id, ...ids].slice(0, 12))); } catch {} }
 function titleOf(p: Product) { return p.title || p.name || 'PrimeHub Deal'; }
 function imageOf(p: Product) { const first = p.images?.[0]; return typeof first === 'string' ? first : first?.url || p.imageUrl || p.image || ''; }
-function priceOf(p: Product) { return Number(p.price || 0); } function originalOf(p: Product) { return Number(p.compareAtPrice ?? p.originalPrice ?? 0); } function discountOf(p: Product) { const original = originalOf(p), price = priceOf(p); return original > price && price > 0 ? Math.round(((original - price) / original) * 100) : 0; }
+function priceOf(p: Product) { return Number(p.price || 0); }
+function originalOf(p: Product) { return Number(p.compareAtPrice ?? p.originalPrice ?? 0); }
+function discountOf(p: Product) { const original = originalOf(p), price = priceOf(p); return original > price && price > 0 ? Math.round(((original - price) / original) * 100) : 0; }
 function addableItem(product: Product) { const image = imageOf(product); return { id: product.id, name: titleOf(product), price: priceOf(product), originalPrice: originalOf(product) || priceOf(product), image, imageUrl: image }; }
-function ProductCard({ product, compact = false }: { product: Product; compact?: boolean }) { const addItem = useCartStore((state) => state.addItem); const image = imageOf(product); const discount = discountOf(product); return <article className={`${compact ? 'w-[154px] shrink-0' : 'w-full'} overflow-hidden rounded-[20px] border border-black/7 bg-white shadow-[0_8px_25px_rgba(20,20,15,0.06)]`}><Link href={`/product/${product.id}`} className="block"><div className={`${compact ? 'aspect-square' : 'aspect-[4/3]'} relative overflow-hidden bg-[#F4F4F1]`}>{image ? <img src={image} alt={titleOf(product)} loading="lazy" draggable={false} className="h-full w-full object-cover transition duration-300 hover:scale-[1.02]" onError={(e) => { e.currentTarget.src = '/placeholder.png'; }} /> : <div className="flex h-full items-center justify-center text-[9px] font-bold text-black/25">No image</div>}{discount > 0 && <span className="pointer-events-none absolute left-2 top-2 rounded-full bg-[#E1352B] px-2 py-1 text-[8px] font-black text-white">-{discount}%</span>}</div></Link><div className={compact ? 'p-2.5' : 'p-3'}><Link href={`/product/${product.id}`} className="block"><p className="line-clamp-2 min-h-[28px] text-[10px] font-black leading-3.5 text-[#14140F]">{titleOf(product)}</p><p className="mt-1.5 font-[family-name:var(--font-mono)] text-[12px] font-black text-[#E1352B]">Rs. {priceOf(product).toLocaleString()}</p></Link><button type="button" onClick={() => addItem(addableItem(product))} className="mt-2 flex w-full items-center justify-center gap-1 rounded-xl bg-[#14140F] py-2 text-[9px] font-black text-white transition hover:bg-[#E1352B]"><Plus size={11}/> Add to Cart</button></div></article>; }
+
+function ProductCard({ product, compact = false }: { product: Product; compact?: boolean }) {
+  const addItem = useCartStore((state) => state.addItem);
+  const image = imageOf(product);
+  const discount = discountOf(product);
+  return (
+    <article className={`${compact ? 'w-[154px] shrink-0' : 'w-full'} overflow-hidden rounded-[20px] border border-black/7 bg-white shadow-[0_8px_25px_rgba(20,20,15,0.06)]`}>
+      <FastProductLink product={product} className="block">
+        <div className={`${compact ? 'aspect-square' : 'aspect-[4/3]'} relative overflow-hidden bg-[#F4F4F1]`}>
+          {image ? <img src={image} alt={titleOf(product)} loading="lazy" draggable={false} className="h-full w-full object-cover transition duration-300 hover:scale-[1.02]" onError={(e) => { e.currentTarget.src = '/placeholder.png'; }} /> : <div className="flex h-full items-center justify-center text-[9px] font-bold text-black/25">No image</div>}
+          {discount > 0 && <span className="pointer-events-none absolute left-2 top-2 rounded-full bg-[#E1352B] px-2 py-1 text-[8px] font-black text-white">-{discount}%</span>}
+        </div>
+      </FastProductLink>
+      <div className={compact ? 'p-2.5' : 'p-3'}>
+        <FastProductLink product={product} className="block">
+          <p className="line-clamp-2 min-h-[28px] text-[10px] font-black leading-3.5 text-[#14140F]">{titleOf(product)}</p>
+          <p className="mt-1.5 font-[family-name:var(--font-mono)] text-[12px] font-black text-[#E1352B]">Rs. {priceOf(product).toLocaleString()}</p>
+        </FastProductLink>
+        <button type="button" onClick={() => addItem(addableItem(product))} className="mt-2 flex w-full items-center justify-center gap-1 rounded-xl bg-[#14140F] py-2 text-[9px] font-black text-white transition hover:bg-[#E1352B]"><Plus size={11}/> Add to Cart</button>
+      </div>
+    </article>
+  );
+}
+
 function SimilarRail({ products }: { products: Product[] }) { if (!products.length) return null; return <section className="mx-auto mt-8 max-w-6xl px-4"><div className="mb-3 flex items-end justify-between gap-3"><div><p className="text-[9px] font-black uppercase tracking-[0.2em] text-[#E1352B]">More like this</p><h2 className="mt-1 text-lg font-black tracking-tight text-[#14140F]">Similar Items</h2></div><span className="text-[9px] font-bold text-black/35">Swipe to explore</span></div><div className="flex gap-3 overflow-x-auto overflow-y-visible touch-pan-x touch-pan-y cursor-grab active:cursor-grabbing snap-x snap-mandatory overscroll-x-contain scroll-smooth pb-3 [scrollbar-width:none]">{products.map((product) => <ProductCard key={product.id} product={product} compact />)}</div></section>; }
 function DiscoveryFeed({ products }: { products: Product[] }) { if (!products.length) return null; return <section className="mx-auto mt-9 max-w-6xl px-4"><div className="mb-4"><p className="text-[9px] font-black uppercase tracking-[0.2em] text-[#E1352B]">Picked for your next find</p><h2 className="mt-1 text-xl font-black tracking-tight text-[#14140F]">Selected Just For You</h2><p className="mt-1 text-[10px] font-medium text-black/35">Keep scrolling — more deals from the catalogue are waiting.</p></div><div className="grid grid-cols-2 gap-3 md:grid-cols-4">{products.map((product) => <ProductCard key={product.id} product={product} />)}</div></section>; }
 function RecentRail({ products }: { products: Product[] }) { if (!products.length) return null; return <section className="mx-auto mt-9 max-w-6xl px-4"><div className="mb-3 flex items-end justify-between gap-3"><div><p className="text-[9px] font-black uppercase tracking-[0.2em] text-[#E1352B]">Keep shopping</p><h2 className="mt-1 text-lg font-black tracking-tight text-[#14140F]">Recently Viewed</h2></div></div><div className="flex gap-3 overflow-x-auto overflow-y-visible touch-pan-x touch-pan-y cursor-grab active:cursor-grabbing snap-x snap-mandatory overscroll-x-contain scroll-smooth pb-3 [scrollbar-width:none]">{products.map((product) => <ProductCard key={product.id} product={product} compact />)}</div></section>; }
-export default function RecentlyViewed({ excludeId }: { excludeId?: string }) { const [recent, setRecent] = useState<Product[]>([]); const [allProducts, setAllProducts] = useState<Product[]>([]); const [current, setCurrent] = useState<Product | null>(null); useEffect(() => { let cancelled = false; async function load() { try { const ids: string[] = JSON.parse(localStorage.getItem('phdeals-recent') || '[]').filter((id: string) => id !== excludeId).slice(0, 12); const requestedIds = [...(excludeId ? [excludeId] : []), ...ids]; const loaded = await loadProductsForNavigation<Product>(requestedIds); if (cancelled) return; setCurrent(excludeId ? loaded[excludeId] || readCachedProduct<Product>(excludeId) : null); setAllProducts(readCachedProducts<Product>()); setRecent(ids.map((id) => loaded[id] || readCachedProduct<Product>(id)).filter(Boolean) as Product[]); } catch { if (!cancelled) { setRecent([]); setAllProducts(readCachedProducts<Product>()); } } } load(); return () => { cancelled = true; }; }, [excludeId]); const similar = useMemo(() => { if (!current) return []; const category = String(current.categoryId || current.category || '').toLowerCase(); const price = priceOf(current); return allProducts.filter((p) => { if (p.id === current.id) return false; const pCategory = String(p.categoryId || p.category || '').toLowerCase(); return category && pCategory === category; }).sort((a, b) => Math.abs(priceOf(a) - price) - Math.abs(priceOf(b) - price)); }, [allProducts, current]); const selected = useMemo(() => { const used = new Set([current?.id, ...similar.map((p) => p.id)].filter(Boolean)); const pool = allProducts.filter((p) => !used.has(p.id)); return [...pool].sort(() => Math.random() - 0.5); }, [allProducts, current, similar]); return <><SimilarRail products={similar} /><DiscoveryFeed products={selected} /><RecentRail products={recent.slice(0, 12)} /></>; }
+
+export default function RecentlyViewed({ excludeId }: { excludeId?: string }) {
+  const [recent, setRecent] = useState<Product[]>([]);
+  const [allProducts, setAllProducts] = useState<Product[]>([]);
+  const [current, setCurrent] = useState<Product | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      try {
+        const ids: string[] = JSON.parse(localStorage.getItem('phdeals-recent') || '[]').filter((id: string) => id !== excludeId).slice(0, 12);
+        const requestedIds = [...(excludeId ? [excludeId] : []), ...ids];
+        const loaded = await loadProductsForNavigation<Product>(requestedIds);
+        if (cancelled) return;
+        setCurrent(excludeId ? loaded[excludeId] || readCachedProduct<Product>(excludeId) : null);
+        setAllProducts(readCachedProducts<Product>());
+        setRecent(ids.map((id) => loaded[id] || readCachedProduct<Product>(id)).filter(Boolean) as Product[]);
+      } catch {
+        if (!cancelled) {
+          setRecent([]);
+          setAllProducts(readCachedProducts<Product>());
+        }
+      }
+    }
+    load();
+    return () => { cancelled = true; };
+  }, [excludeId]);
+  const similar = useMemo(() => {
+    if (!current) return [];
+    const category = String(current.categoryId || current.category || '').toLowerCase();
+    const price = priceOf(current);
+    return allProducts.filter((p) => {
+      if (p.id === current.id) return false;
+      const pCategory = String(p.categoryId || p.category || '').toLowerCase();
+      return category && pCategory === category;
+    }).sort((a, b) => Math.abs(priceOf(a) - price) - Math.abs(priceOf(b) - price));
+  }, [allProducts, current]);
+  const selected = useMemo(() => {
+    const used = new Set([current?.id, ...similar.map((p) => p.id)].filter(Boolean));
+    const pool = allProducts.filter((p) => !used.has(p.id));
+    return [...pool].sort(() => Math.random() - 0.5);
+  }, [allProducts, current, similar]);
+  return <><SimilarRail products={similar} /><DiscoveryFeed products={selected} /><RecentRail products={recent.slice(0, 12)} /></>;
+}
