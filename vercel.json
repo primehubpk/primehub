@@ -4,12 +4,6 @@
     "PRIMEHUB_DATA_READ_MODE": "supabase-primary"
   },
   "git": {
-    "deploymentEnabled": {
-      "fix/home-weekly-deals-live-first": true,
-      "fix/weekly-deals-live-first": false,
-      "fix/big-deal-initial-render": true,
-      "feature/supabase-migration": true,
-      "feature/salaar-virtual-salesman": true
-    }
+    "deploymentEnabled": false
   }
 }
