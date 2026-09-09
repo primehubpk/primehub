@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import Header from "@/components/home/HomeHeader";
 import HomeCollections from "@/components/home/HomeCollections";
 import BigDealNextPreviewSync from "@/components/home/BigDealNextPreviewSync";
-import HomeResellerTasksDirect from "@/components/home/HomeResellerTasksDirect";
+import HomeResellerClubFull from "@/components/home/HomeResellerClubFull";
 import {
   HomePrimeSkills,
   HomeWholesaleVideos,
@@ -142,7 +142,7 @@ export default function HomePageClient({
             onSelect={selectPrice}
             onWholesaleSelect={selectWholesale}
           />
-          <HomeResellerTasksDirect />
+          <HomeResellerClubFull />
           <HomeWholesaleVideos />
           <HomePrimeSkills />
           <div id="discover-deals-section">
