@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { normalizeImageUrl } from "@/lib/imageUrl";
 import { useSettings } from "@/lib/useSettings";
 import {
+  bigDealConfiguredSlotCount,
   bigDealRotationIndex,
   nextBigDealRotationIndex,
 } from "@/lib/bigDealRotation";
@@ -27,23 +28,14 @@ function slotAt(deal: BigDeal, index: number): DealSlot {
   const images = Array.isArray(deal.imageUrls) ? deal.imageUrls : [];
   const productIds = Array.isArray(deal.productIds) ? deal.productIds : [];
   const titles = Array.isArray(deal.titles) ? deal.titles : [];
-  const originalPrices = Array.isArray(deal.originalPrices)
-    ? deal.originalPrices
-    : [];
+  const originalPrices = Array.isArray(deal.originalPrices) ? deal.originalPrices : [];
   const dealPrices = Array.isArray(deal.dealPrices) ? deal.dealPrices : [];
 
   return {
-    imageUrl: normalizeImageUrl(
-      String(images[index] || deal.imageUrl || images[0] || ""),
-    ),
+    imageUrl: normalizeImageUrl(String(images[index] || deal.imageUrl || images[0] || "")),
     productId: String(productIds[index] || deal.productId || productIds[0] || "").trim(),
-    title:
-      String(titles[index] || deal.title || titles[0] || "Big Deal").trim() ||
-      "Big Deal",
-    originalPrice: Math.max(
-      0,
-      Number(originalPrices[index] ?? deal.originalPrice ?? 0) || 0,
-    ),
+    title: String(titles[index] || deal.title || titles[0] || "Big Deal").trim() || "Big Deal",
+    originalPrice: Math.max(0, Number(originalPrices[index] ?? deal.originalPrice ?? 0) || 0),
     dealPrice: Math.max(0, Number(dealPrices[index] ?? deal.dealPrice ?? 0) || 0),
   };
 }
@@ -84,8 +76,9 @@ export default function BigDealNextPreviewSync() {
 
     const applyDealCards = () => {
       const now = new Date();
-      const currentIndex = bigDealRotationIndex(bigDeal.rotationStartedAt, now);
-      const nextIndex = nextBigDealRotationIndex(bigDeal.rotationStartedAt, now);
+      const slotCount = bigDealConfiguredSlotCount(bigDeal);
+      const currentIndex = bigDealRotationIndex(bigDeal.rotationStartedAt, now, slotCount);
+      const nextIndex = nextBigDealRotationIndex(bigDeal.rotationStartedAt, now, slotCount);
       const currentDeal = slotAt(bigDeal, currentIndex);
       const nextDeal = slotAt(bigDeal, nextIndex);
       const countdown = pakistanMidnightCountdown(now);
@@ -97,9 +90,7 @@ export default function BigDealNextPreviewSync() {
         const info = currentCard.querySelector<HTMLElement>(".home-big-info");
         const titleLink = info?.querySelector<HTMLAnchorElement>(":scope > a") || null;
         const prices = info?.querySelector<HTMLElement>(".home-big-prices") || null;
-        const href = currentDeal.productId
-          ? `/product/${currentDeal.productId}`
-          : "/deals/big";
+        const href = currentDeal.productId ? `/product/${currentDeal.productId}` : "/deals/big";
 
         if (imageLink) imageLink.href = href;
         if (titleLink) {
@@ -124,10 +115,7 @@ export default function BigDealNextPreviewSync() {
       if (!nextCard || !badge) return;
 
       setImage(nextImage, nextDeal.imageUrl, nextDeal.title);
-      nextCard.setAttribute(
-        "aria-label",
-        `Next Big Deal locked: ${nextDeal.title}, ${money(nextDeal.dealPrice)}`,
-      );
+      nextCard.setAttribute("aria-label", `Next Big Deal locked: ${nextDeal.title}, ${money(nextDeal.dealPrice)}`);
       if (nextDeal.productId) nextCard.dataset.nextProductId = nextDeal.productId;
 
       const smalls = badge.querySelectorAll<HTMLElement>("small");
@@ -135,15 +123,10 @@ export default function BigDealNextPreviewSync() {
       if (smalls[0]) smalls[0].textContent = nextDeal.title;
       if (price) {
         price.textContent = money(nextDeal.dealPrice);
-        price.dataset.regular =
-          nextDeal.originalPrice > nextDeal.dealPrice
-            ? money(nextDeal.originalPrice)
-            : "";
+        price.dataset.regular = nextDeal.originalPrice > nextDeal.dealPrice ? money(nextDeal.originalPrice) : "";
       }
       const saved = Math.max(0, nextDeal.originalPrice - nextDeal.dealPrice);
-      if (smalls[1]) {
-        smalls[1].textContent = saved > 0 ? `Save ${money(saved)}` : "Tomorrow's deal";
-      }
+      if (smalls[1]) smalls[1].textContent = saved > 0 ? `Save ${money(saved)}` : "Tomorrow's deal";
       badge.dataset.countdown = `Unlocks in ${countdown}`;
     };
 
