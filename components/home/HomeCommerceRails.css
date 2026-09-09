@@ -156,9 +156,6 @@
     padding-bottom: 36px;
   }
 
-  /* Wholesale packages stay in the existing two-row swipe rail, but each
-     column is half-width so mobile shows 2 cards across + 2 directly below.
-     More packages continue horizontally with the same swipe behavior. */
   .home-video-packages .home-commerce-rail {
     grid-auto-columns: calc(50% - 5px);
   }
