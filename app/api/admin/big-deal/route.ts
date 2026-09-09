@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { revalidateTag } from 'next/cache';
+import { FieldValue } from 'firebase-admin/firestore';
 import { getDualCatalog, getDualSettings } from '@/lib/dualReadServer';
 import { getAdminDb } from '@/lib/firebaseAdmin';
 import type { DailyDeal } from '@/lib/types';
@@ -85,6 +86,10 @@ function normalizeDeal(raw: any): DailyDeal {
     buttonLink: String(raw?.buttonLink || '/deals/big').trim() || '/deals/big',
     active: raw?.active === true,
   };
+}
+
+function hasRawDeal(raw: any) {
+  return Boolean(raw && typeof raw === 'object' && Object.keys(raw).length > 0);
 }
 
 function slotHasAny(deal: DailyDeal, index: number) {
@@ -177,32 +182,65 @@ async function writeSupabaseMain(payload: Record<string, any>) {
   }
 }
 
+async function firebaseBigDealCandidate() {
+  const snapshot = await getAdminDb().collection('settings').doc('main').get();
+  if (!snapshot.exists) return { dedicated: null as any, legacy: null as any };
+  const data = snapshot.data() || {};
+  return {
+    dedicated: hasRawDeal(data.bigDeal) ? data.bigDeal : null,
+    legacy: hasRawDeal(data.dailyDeal) ? data.dailyDeal : null,
+  };
+}
+
 export async function GET(request: Request) {
   if (!isAuthorized(request)) return NextResponse.json({ error: 'Authentication required.' }, { status: 401 });
 
   const [settingsResult, catalogResult] = await Promise.all([getDualSettings(), getDualCatalog()]);
-  let dailyDeal = normalizeDeal(settingsResult.documents?.main?.dailyDeal || {});
-  let source: typeof settingsResult.source | 'firebase-migration' = settingsResult.source;
+  const main = settingsResult.documents?.main && typeof settingsResult.documents.main === 'object'
+    ? settingsResult.documents.main
+    : {};
 
-  if (completeSlotCount(dailyDeal) < SLOT_COUNT) {
+  let rawDeal = hasRawDeal(main.bigDeal) ? main.bigDeal : null;
+  let source: typeof settingsResult.source | 'firebase-migration' = settingsResult.source;
+  let migratedFromLegacy = false;
+
+  if (!rawDeal) {
     try {
-      const snapshot = await getAdminDb().collection('settings').doc('main').get();
-      if (snapshot.exists) {
-        const firebaseDeal = normalizeDeal(snapshot.data()?.dailyDeal || {});
-        if (completeSlotCount(firebaseDeal) > completeSlotCount(dailyDeal)) {
-          dailyDeal = firebaseDeal;
-          source = 'firebase-migration';
-        }
+      const firebase = await firebaseBigDealCandidate();
+      if (firebase.dedicated) {
+        rawDeal = firebase.dedicated;
+        source = 'firebase-migration';
       }
     } catch (error) {
-      console.warn('Big Deal legacy Firebase rotation lookup skipped', error);
+      console.warn('Big Deal dedicated Firebase lookup skipped', error);
     }
   }
+
+  if (!rawDeal && hasRawDeal(main.dailyDeal)) {
+    rawDeal = main.dailyDeal;
+    migratedFromLegacy = true;
+  }
+
+  if (!rawDeal) {
+    try {
+      const firebase = await firebaseBigDealCandidate();
+      if (firebase.legacy) {
+        rawDeal = firebase.legacy;
+        source = 'firebase-migration';
+        migratedFromLegacy = true;
+      }
+    } catch (error) {
+      console.warn('Big Deal legacy Firebase lookup skipped', error);
+    }
+  }
+
+  const dailyDeal = normalizeDeal(rawDeal || {});
 
   return NextResponse.json({
     success: true,
     source,
     catalogSource: catalogResult.source,
+    migratedFromLegacy,
     dailyDeal,
     products: catalogResult.products.map(compactProduct).filter((product) => product.id),
     categories: catalogResult.categories.map(compactCategory).filter((category) => category.id),
@@ -220,7 +258,7 @@ export async function POST(request: Request) {
 
     const current = await getDualSettings();
     const main = current.documents?.main && typeof current.documents.main === 'object' ? current.documents.main : {};
-    const existing = normalizeDeal(main.dailyDeal || {});
+    const existing = normalizeDeal(main.bigDeal || main.dailyDeal || {});
     if (dailyDeal.active && !dailyDeal.rotationStartedAt) {
       dailyDeal = {
         ...dailyDeal,
@@ -228,13 +266,19 @@ export async function POST(request: Request) {
       };
     }
 
-    const nextMain = { ...main, dailyDeal };
+    // The dedicated Big Deal icon owns `bigDeal`. Legacy Store Settings `dailyDeal`
+    // is removed from the primary payload whenever the dedicated manager saves.
+    const { dailyDeal: _legacyStoreSettingsDeal, ...mainWithoutLegacyDeal } = main;
+    const nextMain = { ...mainWithoutLegacyDeal, bigDeal: dailyDeal };
     const primary = await writeSupabaseMain(nextMain);
 
     if (primary.ok) {
       let warning = '';
       try {
-        await getAdminDb().collection('settings').doc('main').set({ dailyDeal }, { merge: true });
+        await getAdminDb().collection('settings').doc('main').set(
+          { bigDeal: dailyDeal, dailyDeal: FieldValue.delete() },
+          { merge: true },
+        );
       } catch (mirrorError) {
         console.warn('Big Deal Firebase fallback mirror skipped', mirrorError);
         warning = 'Big Deal saved to Supabase primary. Firebase fallback mirror could not be refreshed.';
@@ -250,7 +294,10 @@ export async function POST(request: Request) {
     }
 
     try {
-      await getAdminDb().collection('settings').doc('main').set({ dailyDeal }, { merge: true });
+      await getAdminDb().collection('settings').doc('main').set(
+        { bigDeal: dailyDeal, dailyDeal: FieldValue.delete() },
+        { merge: true },
+      );
       revalidateTag('storefront-settings');
       return NextResponse.json({
         success: true,
