@@ -1,6 +1,7 @@
 import 'server-only';
 import { unstable_cache } from 'next/cache';
 import { getDualCatalog, getDualSettings, getDualSkills } from '@/lib/dualReadServer';
+import { getStorefrontSettingsWithBigDealRecovery } from '@/lib/storefrontSettingsServer';
 
 const RETRY_DELAYS_MS = [0, 250, 750];
 
@@ -35,7 +36,7 @@ export const getPublicCatalogSnapshot = unstable_cache(
 async function loadStorefrontSettings() {
   for (const delay of RETRY_DELAYS_MS) {
     await wait(delay);
-    const result = await getDualSettings();
+    const result = await getStorefrontSettingsWithBigDealRecovery();
 
     // Do not cache DEFAULT/blank settings caused by a transient backend failure.
     if (result.source !== 'empty' && Object.keys(result.documents).length > 0) {
@@ -50,8 +51,8 @@ async function loadStorefrontSettings() {
 
 export const getStorefrontSettingsSnapshot = unstable_cache(
   loadStorefrontSettings,
-  ['primehub-storefront-settings-dual-v2'],
-  { revalidate: 300, tags: ['storefront-settings'] },
+  ['primehub-storefront-settings-dual-v3'],
+  { revalidate: 60, tags: ['storefront-settings'] },
 );
 
 async function loadPrimeSkills() {
