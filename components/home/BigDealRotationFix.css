@@ -9,7 +9,27 @@
   color: #064d40;
 }
 
+.home-storefront .home-next-deal {
+  cursor: not-allowed;
+}
+
+.home-storefront .home-next-deal > img {
+  filter: none;
+  opacity: 0.58;
+  transform: scale(1.02);
+}
+
+.home-storefront .home-next-deal::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: rgba(255, 253, 249, 0.16);
+  pointer-events: none;
+}
+
 .home-storefront .home-next-deal > span {
+  z-index: 2;
   width: 150px;
   height: 150px;
   gap: 4px;
