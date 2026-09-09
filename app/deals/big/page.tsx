@@ -1,6 +1,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { ArrowLeft, Clock3, ShoppingBag, Sparkles } from 'lucide-react';
+import FastProductLink from '@/components/FastProductLink';
 import { getStorefrontSettingsSnapshot } from '@/lib/publicCatalogServer';
 import { normalizeImageUrl } from '@/lib/imageUrl';
 
@@ -50,6 +51,7 @@ export default async function BigDealPage() {
     deal?.productId && configuredButtonLink.startsWith(`/product/${deal.productId}`)
       ? productHref
       : configuredButtonLink || productHref;
+  const primaryIsProduct = Boolean(deal?.productId && primaryHref === productHref);
 
   return (
     <main className="min-h-screen bg-[#F4F4F1] pb-28">
@@ -107,10 +109,20 @@ export default async function BigDealPage() {
                     <p className="mt-1 text-black/45">{countdownEnd(deal.endAt)}</p>
                   </div>
                   <div className="mt-6 flex flex-wrap gap-2">
-                    <Link href={primaryHref} className="inline-flex items-center gap-2 rounded-xl bg-[#14140F] px-5 py-3 text-xs font-black text-white">
-                      <ShoppingBag size={15}/> Shop Big Deal
-                    </Link>
-                    <Link href={productHref} className="inline-flex rounded-xl border border-black/10 px-5 py-3 text-xs font-black">View Product</Link>
+                    {primaryIsProduct ? (
+                      <FastProductLink productId={deal.productId} href={productHref} dealContext="big" className="inline-flex items-center gap-2 rounded-xl bg-[#14140F] px-5 py-3 text-xs font-black text-white">
+                        <ShoppingBag size={15}/> Shop Big Deal
+                      </FastProductLink>
+                    ) : (
+                      <Link href={primaryHref} className="inline-flex items-center gap-2 rounded-xl bg-[#14140F] px-5 py-3 text-xs font-black text-white">
+                        <ShoppingBag size={15}/> Shop Big Deal
+                      </Link>
+                    )}
+                    {deal.productId ? (
+                      <FastProductLink productId={deal.productId} href={productHref} dealContext="big" className="inline-flex rounded-xl border border-black/10 px-5 py-3 text-xs font-black">View Product</FastProductLink>
+                    ) : (
+                      <Link href={productHref} className="inline-flex rounded-xl border border-black/10 px-5 py-3 text-xs font-black">View Product</Link>
+                    )}
                   </div>
                 </div>
               </div>
