@@ -173,13 +173,12 @@ export function SettingsProvider({ initialSettings, children }: { initialSetting
     refreshSettings,
   }), [settings, loading, hasData, seedSettings, refreshSettings]);
 
-  useEffect(() => {
-    if (!parent || !hasInitialSettings || parent.hasData) return;
-    parent.seedSettings(seed);
-  }, [parent, hasInitialSettings, seed]);
+  // A nested provider with server-provided settings owns its subtree. This prevents
+  // the blank root provider from replacing fresh homepage settings after hydration.
+  const ownsContext = !parent || hasInitialSettings;
 
   useEffect(() => {
-    if (parent) return;
+    if (!ownsContext) return;
 
     if (!hasInitialSettings) void refreshSettings();
     const timer = window.setInterval(() => { void refreshSettings(); }, 60_000);
@@ -197,15 +196,13 @@ export function SettingsProvider({ initialSettings, children }: { initialSetting
       document.removeEventListener('visibilitychange', refreshWhenVisible);
       window.removeEventListener('focus', refreshOnFocus);
     };
-  }, [parent, hasInitialSettings, refreshSettings]);
+  }, [ownsContext, hasInitialSettings, refreshSettings]);
 
   const contextValue = useMemo<SettingsContextValue>(() => {
-    if (!parent) return localValue;
-    if (hasInitialSettings && !parent.hasData) {
-      return { ...parent, settings: seed, loading: false };
-    }
-    return parent;
-  }, [parent, localValue, hasInitialSettings, seed]);
+    if (hasInitialSettings) return localValue;
+    if (parent) return parent;
+    return localValue;
+  }, [parent, localValue, hasInitialSettings]);
 
   return createElement(SettingsContext.Provider, { value: contextValue }, children);
 }
@@ -217,4 +214,3 @@ export function useSettings() {
   const loading = shared?.loading ?? false;
   return { settings: resolvedSettings, loading, policy: resolvedSettings.policies, contact: resolvedSettings.contact };
 }
-
