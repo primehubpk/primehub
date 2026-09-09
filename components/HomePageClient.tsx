@@ -13,6 +13,7 @@ import {
 import "./home/home.css";
 import "./home/WeeklyDealsHomeFix.css";
 import "./home/HomeFeatureRails.css";
+import "./home/HomeResellerRewards.css";
 import HeroFlashBanner from "@/components/HeroFlashBanner";
 import CategorySwiper from "@/components/CategorySwiper";
 import NewArrivalsRail from "@/components/NewArrivalsRail";
