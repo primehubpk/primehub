@@ -1,13 +1,14 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import HomeCollections from '@/components/home/HomeCollections';
+import ProductNavigationSeed from '@/components/ProductNavigationSeed';
 import { SettingsProvider } from '@/lib/useSettings';
 import { getPublicCatalogSnapshot, getStorefrontSettingsSnapshot } from '@/lib/publicCatalogServer';
 import type { SiteSettings } from '@/lib/types';
 import type { Product } from '@/components/shop/ShopTypes';
 import '@/components/home/home.css';
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 60;
 
 export const metadata: Metadata = {
   title: 'PrimeHubMall Sale Mela',
@@ -31,6 +32,7 @@ export default async function SaleMelaPage() {
   return (
     <SettingsProvider initialSettings={initialSettings as Partial<SiteSettings>}>
       <div className="home-storefront min-h-screen">
+        <ProductNavigationSeed products={catalog.products} />
         <main className="home-content pb-20 pt-4">
           <div className="flex items-center justify-between gap-3">
             <Link

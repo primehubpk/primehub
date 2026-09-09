@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 import { ChevronRight, Package, ShoppingCart } from "lucide-react";
+import FastProductLink from "@/components/FastProductLink";
 import HomeHeading from "@/components/home/HomeHeading";
 import { useSettings } from "@/lib/useSettings";
 import { useCartStore } from "@/lib/cartStore";
@@ -73,8 +74,8 @@ export function HomeProductCard({
     <article
       className={`home-product ${horizontal ? "home-product-horizontal" : ""}`}
     >
-      <Link
-        href={`/product/${product.id}`}
+      <FastProductLink
+        product={product}
         className="home-product-image"
         aria-label={`View ${titleOf(product)}`}
       >
@@ -89,11 +90,11 @@ export function HomeProductCard({
         ) : (
           <Package aria-label="Image unavailable" />
         )}
-      </Link>
+      </FastProductLink>
       <div className="home-product-info">
-        <Link href={`/product/${product.id}`} className="home-product-title">
+        <FastProductLink product={product} className="home-product-title">
           {titleOf(product)}
-        </Link>
+        </FastProductLink>
         {pack && (
           <span className="home-pack-description">
             {product.packDescription || "Wholesale collection"}
@@ -103,9 +104,9 @@ export function HomeProductCard({
           Rs. {price.toLocaleString("en-PK")}
         </strong>
         {pack ? (
-          <Link href={`/product/${product.id}`} className="home-add">
+          <FastProductLink product={product} className="home-add">
             View Pack
-          </Link>
+          </FastProductLink>
         ) : (
           <button
             className="home-add"

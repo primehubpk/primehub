@@ -7,13 +7,33 @@
 }
 
 .home-club .home-reseller-reward-rail {
-  padding-bottom: 38px;
+  padding-bottom: 40px;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: thin;
+  scrollbar-color: #c3964c transparent;
+}
+
+.home-club .home-reseller-reward-rail > * {
+  scroll-snap-stop: always;
+}
+
+.home-club .home-reseller-reward-rail::-webkit-scrollbar {
+  height: 4px;
+}
+
+.home-club .home-reseller-reward-rail::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.home-club .home-reseller-reward-rail::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: #c3964c;
 }
 
 .home-club-view-all {
   position: absolute;
   right: 7px;
-  bottom: 14px;
+  bottom: 10px;
   z-index: 3;
   margin: 0;
   min-height: 24px;
@@ -70,12 +90,12 @@
 
 @media (max-width: 600px) {
   .home-club .home-reseller-reward-rail {
-    padding-bottom: 36px;
+    padding-bottom: 40px;
   }
 
   .home-club-view-all {
     right: 4px;
-    bottom: 13px;
+    bottom: 10px;
     font-size: 9px;
   }
 

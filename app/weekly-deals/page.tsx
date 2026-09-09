@@ -3,10 +3,10 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, CalendarDays, ShoppingCart, Sparkles, LockKeyhole } from 'lucide-react';
-import { collection, onSnapshot } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import FastProductLink from '@/components/FastProductLink';
 import { useCartStore } from '@/lib/cartStore';
 import { useSettings } from '@/lib/useSettings';
+import { loadProductsForNavigation } from '@/lib/productNavigationCache';
 import type { Product, Weekday, WeeklyDeal } from '@/lib/types';
 
 const DAYS: Weekday[] = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
@@ -61,6 +61,7 @@ export default function WeeklyDealsPage() {
   const [nowTick, setNowTick] = useState(Date.now());
   const nowState = pakistanParts();
   const today = nowState.weekday;
+  const productIdsKey = useMemo(() => Array.from(new Set((settings.weeklyDeals || []).map((deal) => deal.productId).filter(Boolean))).sort().join('\u0001'), [settings.weeklyDeals]);
 
   useEffect(() => {
     const timer = window.setInterval(() => setNowTick(Date.now()), 1000);
@@ -68,12 +69,17 @@ export default function WeeklyDealsPage() {
   }, []);
 
   useEffect(() => {
-    return onSnapshot(collection(db, 'products'), (snapshot) => {
-      const next: Record<string, Product> = {};
-      snapshot.forEach((doc) => { next[doc.id] = { id: doc.id, ...doc.data() } as Product; });
-      setProducts(next);
-    }, () => setProducts({}));
-  }, []);
+    let cancelled = false;
+    const ids = productIdsKey ? productIdsKey.split('\u0001') : [];
+    if (ids.length === 0) {
+      setProducts({});
+      return () => { cancelled = true; };
+    }
+    loadProductsForNavigation<Product>(ids)
+      .then((next) => { if (!cancelled) setProducts(next); })
+      .catch(() => { if (!cancelled) setProducts({}); });
+    return () => { cancelled = true; };
+  }, [productIdsKey]);
 
   const deals = useMemo(() => {
     const source = (settings.weeklyDeals || []).filter((deal) => deal.productId);
@@ -139,12 +145,12 @@ export default function WeeklyDealsPage() {
               const unlockCountdown = countdownParts(countdownToNextUnlock(deal.day, new Date(nowTick)));
               return (
                 <article key={deal.id} className={`overflow-hidden rounded-[28px] border bg-white shadow-[0_12px_40px_rgba(0,0,0,0.06)] ${isLiveToday ? 'border-emerald-300 ring-2 ring-emerald-100' : 'border-black/5'}`}>
-                  <Link href={`/product/${deal.productId}`} aria-label={`View ${title}`} className="group block">
+                  <FastProductLink productId={deal.productId} product={product} aria-label={`View ${title}`} className="group block">
                     <div className="relative aspect-square overflow-hidden bg-[#F4F4F1]">
                       {image ? <img src={image} alt={title} className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]" /> : <div className="flex h-full items-center justify-center text-xs font-bold text-black/25">No product image</div>}
                       <div className="absolute left-3 right-3 top-3 flex items-center justify-between gap-2"><span className={`rounded-full px-2.5 py-1.5 text-[8px] font-black uppercase tracking-wide ${isLiveToday ? 'bg-emerald-500 text-white' : 'bg-white/95 text-black/70'}`}>{isLiveToday ? "LIVE TODAY" : `${LABELS[deal.day]} DEAL`}</span>{discount > 0 && <span className="rounded-full bg-[#E1352B] px-2.5 py-1.5 text-[9px] font-black text-white">-{discount}% OFF</span>}</div>
                     </div>
-                  </Link>
+                  </FastProductLink>
                   <div className="p-4">
                     <p className="text-[9px] font-black uppercase tracking-[0.2em] text-[#E1352B]">{LABELS[deal.day]} Deal</p>
                     <h2 className="mt-1.5 line-clamp-2 min-h-[44px] text-lg font-black">{title}</h2>

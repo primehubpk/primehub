@@ -3,6 +3,7 @@
 import Image from 'next/image';
 import HomeHeading from '@/components/home/HomeHeading';
 import { HomeProductCard } from '@/components/home/HomeCollections';
+import FastProductLink from '@/components/FastProductLink';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowRight, ShoppingCart, Sparkles } from 'lucide-react';
@@ -111,7 +112,7 @@ export default function NewArrivalsRail({
           const src = normalizeImageUrl(imageOf(p));
           return (
             <article key={p.id} className="w-[132px] shrink-0 snap-start overflow-hidden rounded-[18px] bg-white shadow-sm ring-1 ring-black/5 sm:w-[160px]">
-              <Link href={`/product/${p.id}`} className="block">
+              <FastProductLink product={p} className="block">
                 <div className="relative aspect-square overflow-hidden bg-white">
                   {src ? (
                     <Image
@@ -130,9 +131,9 @@ export default function NewArrivalsRail({
                   )}
                   <span className="absolute left-1.5 top-1.5 rounded-full bg-gradient-to-r from-[#A66A00] to-[#F6C453] px-2 py-1 text-[7px] font-black uppercase tracking-wider text-white shadow">New Arrival</span>
                 </div>
-              </Link>
+              </FastProductLink>
               <div className="p-2.5">
-                <Link href={`/product/${p.id}`} className="block"><p className="line-clamp-2 min-h-[28px] text-[10px] font-black leading-[14px]">{titleOf(p)}</p></Link>
+                <FastProductLink product={p} className="block"><p className="line-clamp-2 min-h-[28px] text-[10px] font-black leading-[14px]">{titleOf(p)}</p></FastProductLink>
                 <p className="mt-1 text-[11px] font-black text-[#E1352B]">Rs. {priceOf(p).toLocaleString()}</p>
                 <button type="button" onClick={() => addProduct(p)} className="mt-2 flex w-full items-center justify-center gap-1 rounded-lg bg-[#14140F] px-2 py-2 text-[9px] font-black text-white">{addedId === p.id ? 'Added ✓' : <><ShoppingCart size={12}/>Add to cart</>}</button>
               </div>

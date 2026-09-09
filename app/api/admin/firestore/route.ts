@@ -23,7 +23,11 @@ function refreshCachesForCollection(name: string) {
     revalidateTag('public-catalog');
     revalidateTag('salaar-catalog');
   }
-  if (name === 'settings') revalidateTag('storefront-settings');
+  if (name === 'products') revalidateTag('public-products');
+  if (name === 'settings') {
+    revalidateTag('storefront-settings');
+    revalidateTag('prime-skills');
+  }
   if (name === 'prime_skills') revalidateTag('prime-skills');
   if (name === 'settings' || name === 'categories' || name === 'prime_skills' || name === 'products') {
     revalidateTag('salaar-store-knowledge');

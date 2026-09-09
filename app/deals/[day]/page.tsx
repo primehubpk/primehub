@@ -3,11 +3,10 @@
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
-import { collection, doc, getDoc, onSnapshot } from 'firebase/firestore';
 import { ArrowLeft, ChevronRight, ShoppingBag, Tag } from 'lucide-react';
-import { db } from '@/lib/firebase';
 import { useCartStore } from '@/lib/cartStore';
 import { useSettings } from '@/lib/useSettings';
+import { loadProductsForNavigation } from '@/lib/productNavigationCache';
 import type { Product, Weekday, WeeklyDeal } from '@/lib/types';
 
 const DAYS: Array<{ key: Weekday; label: string }> = [
@@ -42,17 +41,12 @@ function pakistanTimeParts() {
   const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Karachi', hour12: false, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }).formatToParts(new Date());
   return Object.fromEntries(parts.filter((part) => part.type !== 'literal').map((part) => [part.type, Number(part.value)])) as Record<string, number>;
 }
-function pakistanDateParts() {
-  const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Karachi', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date());
-  return Object.fromEntries(parts.filter((part) => part.type !== 'literal').map((part) => [part.type, Number(part.value)])) as Record<string, number>;
-}
 function dayStartDeltaDays(target: Weekday, today: Weekday) {
   const delta = (DAY_ORDER.indexOf(target) - DAY_ORDER.indexOf(today) + DAY_ORDER.length) % DAY_ORDER.length;
   return delta === 0 ? 7 : delta;
 }
 function secondsUntilDayStart(target: Weekday, today: Weekday) {
   const now = pakistanTimeParts();
-  const date = pakistanDateParts();
   const deltaDays = dayStartDeltaDays(target, today);
   const nowSeconds = now.hour * 3600 + now.minute * 60 + now.second;
   const secondsTodayRemaining = 24 * 3600 - nowSeconds;
@@ -80,35 +74,34 @@ export default function DayDealPage() {
   const day = String(params?.day || '').toLowerCase() as Weekday;
   const valid = Boolean(DAYS.find((item) => item.key === day));
   const status = valid ? statusForDay(day, today) : 'next-week';
-  const deal = useMemo(() => (settings.weeklyDeals || []).find((item) => item.day === day && item.productId), [settings.weeklyDeals, day]);
-  const [product, setProduct] = useState<DealProduct | null>(null);
-  const [products, setProducts] = useState<Record<string, DealProduct | null>>({});
+  const weeklyDeals = useMemo(() => (settings.weeklyDeals || []).filter((item) => item.productId), [settings.weeklyDeals]);
+  const deal = useMemo(() => weeklyDeals.find((item) => item.day === day && item.productId), [weeklyDeals, day]);
+  const productIdsKey = useMemo(() => Array.from(new Set(weeklyDeals.map((item) => item.productId).filter(Boolean))).sort().join('\u0001'), [weeklyDeals]);
+  const [products, setProducts] = useState<Record<string, DealProduct>>({});
   const [addingId, setAddingId] = useState<string | null>(null);
   const [productFailed, setProductFailed] = useState(false);
   const [countdown, setCountdown] = useState(0);
+  const product = deal?.productId ? products[deal.productId] || null : null;
 
   useEffect(() => {
     let cancelled = false;
-    async function loadProduct() {
-      if (!deal?.productId) { setProduct(null); return; }
-      try {
-        const snap = await getDoc(doc(db, 'products', deal.productId));
-        if (cancelled) return;
-        if (!snap.exists()) { setProduct(null); setProductFailed(true); return; }
-        setProduct({ id: snap.id, ...snap.data() } as DealProduct); setProductFailed(false);
-      } catch { if (!cancelled) setProductFailed(true); }
+    const ids = productIdsKey ? productIdsKey.split('\u0001') : [];
+    if (ids.length === 0) {
+      setProducts({});
+      setProductFailed(Boolean(deal?.productId));
+      return () => { cancelled = true; };
     }
-    loadProduct(); return () => { cancelled = true; };
-  }, [deal?.productId]);
-
-  useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, 'products'), (snapshot) => {
-      const mapped: Record<string, DealProduct | null> = {};
-      snapshot.forEach((item) => { mapped[item.id] = { id: item.id, ...item.data() } as DealProduct; });
-      setProducts(mapped);
-    }, () => setProducts({}));
-    return () => unsubscribe();
-  }, []);
+    loadProductsForNavigation<DealProduct>(ids)
+      .then((next) => {
+        if (cancelled) return;
+        setProducts(next);
+        setProductFailed(Boolean(deal?.productId && !next[deal.productId]));
+      })
+      .catch(() => {
+        if (!cancelled) setProductFailed(Boolean(deal?.productId));
+      });
+    return () => { cancelled = true; };
+  }, [productIdsKey, deal?.productId]);
 
   useEffect(() => {
     const update = () => setCountdown(status === 'live' ? secondsUntilPakistanMidnight() : secondsUntilDayStart(day, today));
@@ -142,8 +135,6 @@ export default function DayDealPage() {
 
   if (!valid) return <main className="min-h-screen bg-neutral-50 px-4 py-10 pb-28"><div className="mx-auto max-w-2xl rounded-[30px] bg-white p-10 text-center shadow-sm"><Tag className="mx-auto h-10 w-10 text-black/20" /><h1 className="mt-4 text-2xl font-black">Deal day not found</h1><Link href="/deals" className="mt-5 inline-flex rounded-full bg-[#14140F] px-5 py-3 text-xs font-black text-white">Back to Deals</Link></div></main>;
   if (loading) return <main className="min-h-screen bg-neutral-50 px-4 py-5 pb-28"><div className="mx-auto max-w-6xl"><div className="h-10 w-28 animate-pulse rounded-full bg-white" /><div className="mt-5 h-16 animate-pulse rounded-[24px] bg-white" /><div className="mt-5 grid gap-4 lg:grid-cols-[1.05fr_.95fr]"><div className="aspect-square animate-pulse rounded-[30px] bg-white" /><div className="min-h-[420px] animate-pulse rounded-[30px] bg-white" /></div></div></main>;
-
-  const weeklyDeals = (settings.weeklyDeals || []).filter((item) => item.productId);
 
   return <main className="min-h-screen bg-neutral-50 pb-28">
     <div className="mx-auto max-w-6xl px-4 py-5 md:px-6 md:py-7">

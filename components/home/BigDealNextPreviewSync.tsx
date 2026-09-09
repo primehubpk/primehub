@@ -71,14 +71,6 @@ function pakistanMidnightCountdown(now: Date) {
   return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
 }
 
-function setImage(image: HTMLImageElement | null, src: string, alt: string) {
-  if (!image || !src) return;
-  image.src = src;
-  image.alt = alt;
-  image.removeAttribute("srcset");
-  image.removeAttribute("sizes");
-}
-
 function nextSlot(deal: BigDeal, now: Date) {
   const slotCount = bigDealConfiguredSlotCount(deal);
   return slotAt(
@@ -111,18 +103,19 @@ export default function BigDealNextPreviewSync() {
       const currentCard = document.querySelector<HTMLElement>(".home-big-card");
       if (currentCard) {
         const imageLink = currentCard.querySelector<HTMLAnchorElement>(".home-big-image");
-        const image = imageLink?.querySelector<HTMLImageElement>("img") || null;
         const info = currentCard.querySelector<HTMLElement>(".home-big-info");
         const titleLink = info?.querySelector<HTMLAnchorElement>(":scope > a") || null;
         const prices = info?.querySelector<HTMLElement>(".home-big-prices") || null;
         const href = currentDeal.productId ? `/product/${currentDeal.productId}?deal=big` : "/deals/big";
 
+        // Preserve scoped Big Deal navigation and rotating text/prices, but do
+        // not replace the Next/Image src/srcset after hydration. That rewrite
+        // was forcing the live watch image to load a second time.
         if (imageLink) imageLink.href = href;
         if (titleLink) {
           titleLink.href = href;
           titleLink.textContent = currentDeal.title;
         }
-        setImage(image, currentDeal.imageUrl, currentDeal.title);
 
         const currentPrice = prices?.querySelector<HTMLElement>("strong") || null;
         const regularPrice = prices?.querySelector<HTMLElement>("s") || null;
@@ -138,7 +131,12 @@ export default function BigDealNextPreviewSync() {
       const badge = nextCard?.querySelector<HTMLElement>(":scope > span") || null;
       if (!nextCard || !badge) return;
 
-      nextCard.style.backgroundImage = nextDeal.imageUrl ? `url(${JSON.stringify(nextDeal.imageUrl)})` : "none";
+      const nextBackground = nextDeal.imageUrl
+        ? `url(${JSON.stringify(nextDeal.imageUrl)})`
+        : "none";
+      if (nextCard.style.backgroundImage !== nextBackground) {
+        nextCard.style.backgroundImage = nextBackground;
+      }
       nextCard.style.backgroundSize = "cover";
       nextCard.style.backgroundPosition = "center";
       nextCard.setAttribute("aria-label", `Next Big Deal locked until tomorrow: ${nextDeal.title}, ${money(nextDeal.dealPrice)}`);
@@ -167,6 +165,9 @@ export default function BigDealNextPreviewSync() {
   if (!instantNextDeal?.imageUrl) return null;
 
   return (
-    <style>{`.home-storefront .home-next-deal{background-image:url(${JSON.stringify(instantNextDeal.imageUrl)});background-size:cover;background-position:center;}`}</style>
+    <>
+      <link rel="preload" as="image" href={instantNextDeal.imageUrl} />
+      <style>{`.home-storefront .home-next-deal{background-image:url(${JSON.stringify(instantNextDeal.imageUrl)});background-size:cover;background-position:center;}`}</style>
+    </>
   );
 }

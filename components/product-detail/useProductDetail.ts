@@ -5,8 +5,8 @@ import { useSettings } from '@/lib/useSettings';
 import { WEEKDAY_LABELS, WEEKDAY_ORDER, countdownParts, dealTiming } from '@/lib/weeklyDealUtils';
 import { bigDealConfiguredSlotCount, bigDealRotationIndex } from '@/lib/bigDealRotation';
 import { cacheProductForNavigation, readCachedProduct } from '@/lib/productNavigationCache';
+import { rememberProduct } from '@/lib/recentlyViewedHistory';
 import type { ProductVariantSelection, WeeklyDeal } from '@/lib/types';
-import { rememberProduct } from '@/components/RecentlyViewed';
 import { dealDiscount, imagesOf, originalPriceOf, regularPriceOf, titleOf, type Product, type ProductDetailModel, money } from './ProductDetailTypes';
 
 function dealIsActive(deal: any, now: number): boolean {
@@ -94,7 +94,7 @@ export function useProductDetail(): ProductDetailModel {
       }
       try {
         const response = await fetch(`/api/storefront/read?type=product&id=${encodeURIComponent(id)}`, {
-          cache: 'default',
+          cache: 'no-store',
         });
         if (!response.ok) throw new Error(`product read ${response.status}`);
         const data = await response.json();

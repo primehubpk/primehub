@@ -3,18 +3,21 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
-import { collection, doc, getDoc, onSnapshot } from 'firebase/firestore';
+import { collection, doc, onSnapshot } from 'firebase/firestore';
 import { Gift, LogIn, Sparkles } from 'lucide-react';
 import { auth, db } from '@/lib/firebase';
+import { loadProductsForNavigation } from '@/lib/productNavigationCache';
 
 type Reward={productId?:string;pointsCost?:number;active?:boolean;stock?:number;imageUrl?:string};
-type Product={imageUrl?:string;image?:string;images?:string[]};
+type Product={id:string;imageUrl?:string;image?:string;images?:Array<string|{url?:string}>};
 const GUEST_KEY='phdeals-guest-rewards';
+const EMPTY_IMAGES:string[]=[];
 const same=(a:string,b?:string)=>Boolean(a&&b&&a.trim()===b.trim());
+function imagesOfProduct(product?:Product){return [...(Array.isArray(product?.images)?product.images.map((image)=>typeof image==='string'?image:image?.url||''):[]),product?.imageUrl||'',product?.image||''].filter(Boolean)}
 
-export default function ProductRewardInfo({productId,productImages=[]}:{productId:string;productImages?:string[]}){
+export default function ProductRewardInfo({productId,productImages=EMPTY_IMAGES}:{productId:string;productImages?:string[]}){
  const [required,setRequired]=useState<number|null>(null);const [stock,setStock]=useState(0);const [points,setPoints]=useState(0);const [uid,setUid]=useState<string|null>(null);const [images,setImages]=useState(productImages);
- useEffect(()=>{let cancelled=false; if(productImages.length){setImages(productImages);return()=>{cancelled=true}} getDoc(doc(db,'products',productId)).then(s=>{if(cancelled||!s.exists())return;const p=s.data() as Product;setImages([...(Array.isArray(p.images)?p.images:[]),p.imageUrl,p.image].filter(Boolean) as string[])}).catch(()=>{});return()=>{cancelled=true}},[productId,productImages]);
+ useEffect(()=>{let cancelled=false;if(productImages.length){setImages(productImages);return()=>{cancelled=true}}loadProductsForNavigation<Product>([productId]).then(products=>{if(cancelled)return;setImages(imagesOfProduct(products[productId]))}).catch(()=>{});return()=>{cancelled=true}},[productId,productImages]);
  useEffect(()=>{const r=onSnapshot(collection(db,'reward_gifts'),s=>{const found=s.docs.map(d=>d.data() as Reward).find(x=>x.active!==false&&Number(x.pointsCost)>0&&(x.productId===productId||(x.imageUrl&&images.some(img=>same(img,x.imageUrl)))));setRequired(found?Number(found.pointsCost):null);setStock(Number(found?.stock??1))});return()=>r()},[productId,images]);
  useEffect(()=>{let stop=()=>{};const a=onAuthStateChanged(auth,u=>{stop();setUid(u?.uid||null);if(u)stop=onSnapshot(doc(db,'user_rewards',u.uid),s=>setPoints(Number(s.data()?.points||0)));else{try{setPoints(Number(JSON.parse(localStorage.getItem(GUEST_KEY)||'{}')?.points||0))}catch{setPoints(0)}}});return()=>{a();stop()}},[]);
  if(!required)return null;

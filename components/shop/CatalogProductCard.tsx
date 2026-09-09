@@ -1,8 +1,8 @@
 'use client';
 
 import Image from 'next/image';
-import Link from 'next/link';
 import { Check, ShoppingBag } from 'lucide-react';
+import FastProductLink from '@/components/FastProductLink';
 import WholesaleBadge from '@/components/WholesaleBadge';
 import { useCartStore } from '@/lib/cartStore';
 import { isWholesaleProduct } from '@/lib/wholesale';
@@ -36,7 +36,7 @@ export default function CatalogProductCard({ product, addedId, addProduct, compa
 
   return (
     <article className={`group overflow-hidden ${dense ? 'rounded-[16px] sm:rounded-[22px]' : 'rounded-[22px]'} border border-black/6 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg ${compact ? 'w-[168px] shrink-0 snap-start sm:w-[186px]' : 'w-full'}`}>
-      <Link href={`/product/${product.id}`} className="block">
+      <FastProductLink product={product} className="block">
         <div className="relative aspect-square overflow-hidden bg-[#F4F4F1]">
           {image ? (
             <Image
@@ -63,7 +63,7 @@ export default function CatalogProductCard({ product, addedId, addProduct, compa
             {original > price && <span className="text-[9px] text-black/30 line-through">Rs. {original.toLocaleString()}</span>}
           </div>
         </div>
-      </Link>
+      </FastProductLink>
       <div className={dense ? "px-2 pb-2 pt-1.5 sm:px-3 sm:pb-3" : "px-3 pb-3 pt-2"}>
         <button
           type="button"

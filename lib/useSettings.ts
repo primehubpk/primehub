@@ -1,8 +1,18 @@
 // lib/useSettings.ts
-// Shared storefront settings reader. Phase 4 routes reads through the server-side dual backend layer.
+// Shared storefront settings reader backed by one app-wide provider.
 'use client';
 
-import { createContext, createElement, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import {
+  createContext,
+  createElement,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import { SiteSettings } from '@/lib/types';
 import { bigDealConfiguredSlotCount, bigDealRotationIndex } from '@/lib/bigDealRotation';
 
@@ -27,6 +37,14 @@ const DEFAULT_SETTINGS: SiteSettings = {
 type RawSettings = Partial<SiteSettings> & Record<string, any>;
 type RawPolicy = { privacyPolicy?: string; returnPolicy?: string; terms?: string } & Record<string, any>;
 type RawContact = { whatsappNumber?: string; email?: string; physicalAddress?: string } & Record<string, any>;
+
+type SettingsContextValue = {
+  settings: SiteSettings;
+  loading: boolean;
+  hasData: boolean;
+  seedSettings: (settings: SiteSettings) => void;
+  refreshSettings: () => Promise<void>;
+};
 
 function resolveAnnouncement(mainData: RawSettings, legacyData?: RawSettings): string {
   const candidates = [mainData.announcementText, mainData.topAnnouncement, mainData.topAnnouncementText, mainData.announcement, mainData.announcementBarText, legacyData?.announcementText, legacyData?.topAnnouncement, legacyData?.topAnnouncementText, legacyData?.announcement, legacyData?.announcementBarText];
@@ -95,45 +113,103 @@ function buildSettings(documents: Record<string, any>): SiteSettings {
   } as SiteSettings;
 }
 
-const SettingsSeedContext = createContext<SiteSettings | null>(null);
+const SettingsContext = createContext<SettingsContextValue | null>(null);
 
 export function SettingsProvider({ initialSettings, children }: { initialSettings?: Partial<SiteSettings>; children: ReactNode }) {
+  const parent = useContext(SettingsContext);
+  const hasInitialSettings = Boolean(initialSettings && Object.keys(initialSettings).length > 0);
   const seed = useMemo(
-    () => buildSettings(initialSettings && Object.keys(initialSettings).length > 0 ? { main: initialSettings } : {}),
-    [initialSettings],
+    () => buildSettings(hasInitialSettings ? { main: initialSettings } : {}),
+    [hasInitialSettings, initialSettings],
   );
 
-  return createElement(SettingsSeedContext.Provider, { value: seed }, children);
-}
+  const [settings, setSettings] = useState<SiteSettings>(() => hasInitialSettings ? seed : DEFAULT_SETTINGS);
+  const [loading, setLoading] = useState(!hasInitialSettings);
+  const [hasData, setHasData] = useState(hasInitialSettings);
+  const requestRef = useRef<Promise<void> | null>(null);
 
-export function useSettings() {
-  const seededSettings = useContext(SettingsSeedContext);
-  const [settings, setSettings] = useState<SiteSettings>(() => seededSettings || DEFAULT_SETTINGS);
-  const [loading, setLoading] = useState(!seededSettings);
+  const seedSettings = useCallback((nextSettings: SiteSettings) => {
+    setSettings(nextSettings);
+    setHasData(true);
+    setLoading(false);
+  }, []);
 
-  useEffect(() => {
-    let cancelled = false;
+  const refreshSettings = useCallback(async () => {
+    if (requestRef.current) return requestRef.current;
 
-    const load = async () => {
+    const request = (async () => {
       try {
         const response = await fetch('/api/storefront/read?type=settings', { cache: 'no-store' });
         if (!response.ok) throw new Error(`settings read ${response.status}`);
         const data = await response.json();
         const documents = data?.documents || {};
-        if (!cancelled && Object.keys(documents).length > 0) setSettings(buildSettings(documents));
+        if (Object.keys(documents).length > 0) {
+          setSettings(buildSettings(documents));
+          setHasData(true);
+        }
       } catch (error) {
         // Keep the server-provided last good settings instead of flashing blank weekly deals.
         console.warn('storefront settings dual read unavailable', error);
       } finally {
-        if (!cancelled) setLoading(false);
+        setLoading(false);
       }
-    };
+    })();
 
-    load();
-    const timer = window.setInterval(load, 60_000);
-    return () => { cancelled = true; window.clearInterval(timer); };
+    requestRef.current = request;
+    try {
+      await request;
+    } finally {
+      if (requestRef.current === request) requestRef.current = null;
+    }
   }, []);
 
+  const localValue = useMemo<SettingsContextValue>(() => ({
+    settings,
+    loading,
+    hasData,
+    seedSettings,
+    refreshSettings,
+  }), [settings, loading, hasData, seedSettings, refreshSettings]);
+
+  useEffect(() => {
+    if (!parent || !hasInitialSettings || parent.hasData) return;
+    parent.seedSettings(seed);
+  }, [parent, hasInitialSettings, seed]);
+
+  useEffect(() => {
+    if (parent) return;
+
+    void refreshSettings();
+    const timer = window.setInterval(() => { void refreshSettings(); }, 60_000);
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') void refreshSettings();
+    };
+    const refreshOnFocus = () => { void refreshSettings(); };
+
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+    window.addEventListener('focus', refreshOnFocus);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
+      window.removeEventListener('focus', refreshOnFocus);
+    };
+  }, [parent, refreshSettings]);
+
+  const contextValue = useMemo<SettingsContextValue>(() => {
+    if (!parent) return localValue;
+    if (hasInitialSettings && !parent.hasData) {
+      return { ...parent, settings: seed, loading: false };
+    }
+    return parent;
+  }, [parent, localValue, hasInitialSettings, seed]);
+
+  return createElement(SettingsContext.Provider, { value: contextValue }, children);
+}
+
+export function useSettings() {
+  const shared = useContext(SettingsContext);
+  const settings = shared?.settings || DEFAULT_SETTINGS;
   const resolvedSettings = resolveRotatingBigDeal(settings) as SiteSettings;
+  const loading = shared?.loading ?? false;
   return { settings: resolvedSettings, loading, policy: resolvedSettings.policies, contact: resolvedSettings.contact };
 }

@@ -8,9 +8,13 @@
 
 .home-commerce-rail {
   grid-auto-columns: minmax(220px, 34%);
-  padding-bottom: 38px;
+  padding-bottom: 40px;
   scrollbar-width: thin;
   scrollbar-color: #c3964c transparent;
+}
+
+.home-commerce-rail > * {
+  scroll-snap-stop: always;
 }
 
 .home-commerce-rail::-webkit-scrollbar {
@@ -29,7 +33,7 @@
 .home-commerce-view-all {
   position: absolute;
   right: 6px;
-  bottom: 14px;
+  bottom: 10px;
   z-index: 3;
   margin: 0;
   min-height: 24px;
@@ -153,16 +157,19 @@
   .home-commerce-rail {
     grid-auto-columns: calc(76% - 20px);
     gap: 7px;
-    padding-bottom: 36px;
+    padding-bottom: 40px;
   }
 
   .home-video-packages .home-commerce-rail {
-    grid-auto-columns: calc(50% - 5px);
+    grid-template-rows: repeat(2, minmax(0, 1fr));
+    grid-auto-flow: column;
+    grid-auto-columns: calc(50% - 4px);
+    gap: 7px;
   }
 
   .home-commerce-view-all {
     right: 4px;
-    bottom: 13px;
+    bottom: 10px;
     max-width: calc(100% - 8px);
     font-size: 9px;
   }
