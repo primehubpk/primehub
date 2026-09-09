@@ -9,7 +9,8 @@
       "fix/weekly-deals-live-first": false,
       "fix/big-deal-initial-render": true,
       "feature/supabase-migration": true,
-      "feature/salaar-virtual-salesman": true
+      "feature/salaar-virtual-salesman": true,
+      "feature/salar": false
     }
   }
 }

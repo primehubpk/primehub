@@ -1,4 +1,5 @@
 import HomePageClient from '@/components/HomePageClient';
+import SalarWidget from '@/components/salar/SalarWidget';
 import { getStorefrontSettingsSnapshot, getPublicCatalogSnapshot } from '@/lib/publicCatalogServer';
 import type { Category, SiteSettings } from '@/lib/types';
 import type { Product } from '@/components/shop/ShopTypes';
@@ -17,11 +18,13 @@ export default async function HomePage() {
     : {};
 
   return (
-    <HomePageClient
-      initialProducts={snapshot.products as Product[]}
-      initialCategories={snapshot.categories as Category[]}
-      initialSettings={initialSettings as Partial<SiteSettings>}
-    />
+    <>
+      <HomePageClient
+        initialProducts={snapshot.products as Product[]}
+        initialCategories={snapshot.categories as Category[]}
+        initialSettings={initialSettings as Partial<SiteSettings>}
+      />
+      <SalarWidget />
+    </>
   );
 }
-
