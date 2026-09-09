@@ -24,6 +24,18 @@ function money(value: number) {
   return `Rs. ${Math.max(0, Math.round(value)).toLocaleString("en-PK")}`;
 }
 
+function cleanDealTitle(value: unknown) {
+  const title = String(value || "Big Deal").trim() || "Big Deal";
+  return (
+    title
+      .replace(/\b(?:rs\.?\s*)?\d{3,6}\b/gi, " ")
+      .replace(/\s{2,}/g, " ")
+      .replace(/\s+([,.:;-])/g, "$1")
+      .replace(/-\s*-/g, "-")
+      .trim() || "Big Deal"
+  );
+}
+
 function slotAt(deal: BigDeal, index: number): DealSlot {
   const images = Array.isArray(deal.imageUrls) ? deal.imageUrls : [];
   const productIds = Array.isArray(deal.productIds) ? deal.productIds : [];
@@ -34,7 +46,7 @@ function slotAt(deal: BigDeal, index: number): DealSlot {
   return {
     imageUrl: normalizeImageUrl(String(images[index] || deal.imageUrl || images[0] || "")),
     productId: String(productIds[index] || deal.productId || productIds[0] || "").trim(),
-    title: String(titles[index] || deal.title || titles[0] || "Big Deal").trim() || "Big Deal",
+    title: cleanDealTitle(titles[index] || deal.title || titles[0] || "Big Deal"),
     originalPrice: Math.max(0, Number(originalPrices[index] ?? deal.originalPrice ?? 0) || 0),
     dealPrice: Math.max(0, Number(dealPrices[index] ?? deal.dealPrice ?? 0) || 0),
   };
@@ -115,7 +127,9 @@ export default function BigDealNextPreviewSync() {
       if (!nextCard || !badge) return;
 
       setImage(nextImage, nextDeal.imageUrl, nextDeal.title);
-      nextCard.setAttribute("aria-label", `Next Big Deal locked: ${nextDeal.title}, ${money(nextDeal.dealPrice)}`);
+      nextCard.setAttribute("aria-label", `Next Big Deal locked until tomorrow: ${nextDeal.title}, ${money(nextDeal.dealPrice)}`);
+      nextCard.setAttribute("aria-disabled", "true");
+      nextCard.dataset.locked = "true";
       if (nextDeal.productId) nextCard.dataset.nextProductId = nextDeal.productId;
 
       const smalls = badge.querySelectorAll<HTMLElement>("small");
