@@ -37,6 +37,7 @@ function cleanNumbers(value: unknown) {
 
 function normalizeDeal(raw: any): DailyDeal {
   const imageUrls = cleanStrings(raw?.imageUrls);
+  const galleryImagesRaw = cleanStrings(raw?.galleryImages);
   const productIdsRaw = cleanStrings(raw?.productIds);
   const titlesRaw = cleanStrings(raw?.titles);
   const categoryIds = cleanStrings(raw?.categoryIds);
@@ -60,6 +61,7 @@ function normalizeDeal(raw: any): DailyDeal {
   const images = Array.from({ length: SLOT_COUNT }, (_, index) =>
     imageUrls[index] || (index === 0 ? String(raw?.imageUrl || '').trim() : ''),
   );
+  const galleryImages = Array.from({ length: SLOT_COUNT }, (_, index) => galleryImagesRaw[index] || '');
   const originalPrices = Array.from({ length: SLOT_COUNT }, (_, index) =>
     originalPricesRaw[index] || (index < legacyLength ? Math.max(0, Number(raw?.originalPrice || 0)) : 0),
   );
@@ -75,6 +77,7 @@ function normalizeDeal(raw: any): DailyDeal {
     categoryIds: Array.from({ length: SLOT_COUNT }, (_, index) => categoryIds[index] || ''),
     imageUrl: images[0] || String(raw?.imageUrl || '').trim(),
     imageUrls: images,
+    galleryImages,
     originalPrices,
     dealPrices,
     originalPrice: originalPrices[0] || Math.max(0, Number(raw?.originalPrice || 0)),
@@ -113,14 +116,21 @@ function completeSlotCount(deal: DailyDeal) {
 }
 
 function validateDeal(deal: DailyDeal) {
+  let foundGap = false;
   for (let index = 0; index < SLOT_COUNT; index += 1) {
-    if (slotHasAny(deal, index) && !slotComplete(deal, index)) {
-      return `Deal ${index + 1} needs an image, product, original price and a lower Big Deal price.`;
+    const hasAny = slotHasAny(deal, index);
+    if (!hasAny) {
+      if (completeSlotCount(deal) > 0) foundGap = true;
+      continue;
     }
+    if (!slotComplete(deal, index)) {
+      return `Deal ${index + 1} needs a product, display image, original price and a lower Big Deal price.`;
+    }
+    if (foundGap) return 'Big Deals must be saved in order without an empty slot between them.';
   }
-  if (deal.active && completeSlotCount(deal) !== SLOT_COUNT) {
-    return 'All 7 Big Deals must be complete before publishing the cycle.';
-  }
+  const count = completeSlotCount(deal);
+  if (deal.active && count < 1) return 'Add at least one complete Big Deal before publishing.';
+  if (count > SLOT_COUNT) return `A maximum of ${SLOT_COUNT} Big Deals can be saved.`;
   return '';
 }
 
@@ -266,8 +276,6 @@ export async function POST(request: Request) {
       };
     }
 
-    // The dedicated Big Deal icon owns `bigDeal`. Legacy Store Settings `dailyDeal`
-    // is removed from the primary payload whenever the dedicated manager saves.
     const { dailyDeal: _legacyStoreSettingsDeal, ...mainWithoutLegacyDeal } = main;
     const nextMain = { ...mainWithoutLegacyDeal, bigDeal: dailyDeal };
     const primary = await writeSupabaseMain(nextMain);
