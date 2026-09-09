@@ -2,6 +2,7 @@ import 'server-only';
 import { getAdminDb } from '@/lib/firebaseAdmin';
 import { getDualCatalog, getDualSettings, getDualSkills } from '@/lib/dualReadServer';
 import { BASE_DELIVERY_CHARGE, WHOLESALE_ITEM_DELIVERY_CHARGE } from '@/lib/deliveryCharges';
+import { clearSalarCache } from '@/lib/salar/worker';
 
 const PAGE_ROUTES = [
   ['shopping','Shopping','/shop'],['reseller_club','Reseller Club','/reseller'],['prime_skill','Prime Skill','/skills'],['checkout','Checkout / Payment','/checkout'],['contact','Contact','/contact'],['privacy','Privacy Policy','/privacy-policy'],['returns','Return Policy','/return-policy'],['terms','Terms','/terms'],
@@ -34,6 +35,7 @@ export async function refreshSalarCatalogue(request: Request) {
     pageRows.push({id:'policy_settings',key:'policy_settings',title:'Store Policies',url:'/privacy-policy',text_excerpt:text(`${policy.privacyPolicy||''} ${policy.returnPolicy||''}`)});
     pageRows.push({id:'prime_skill_data',key:'prime_skill_data',title:'Prime Skill Catalogue',url:'/skills',text_excerpt:text(arr((skills as any).skills).map((s:any)=>`${s.title||s.name||''}: ${s.description||''} Price ${s.price??''}`).join(' | '),20000)});
     await Promise.all([replaceCollection('salar_index_collections',collections),replaceCollection('salar_index_products',products),replaceCollection('salar_index_pages',pageRows)]);
+    await clearSalarCache();
     const refreshedAt=new Date().toISOString(); const stats={collections:collections.length,products:products.length,pages:pageRows.length}; await meta.set({status:'done',refreshed_at:refreshedAt,stats,error:null,source:{catalog:(catalog as any).source,skills:(skills as any).source}}, {merge:true}); return {status:'done',refreshed_at:refreshedAt,stats};
   } catch(error) { const message=error instanceof Error?error.message:'Catalogue refresh failed.'; await meta.set({status:'error',error:message,finished_at:new Date().toISOString()},{merge:true}); throw error; }
 }
