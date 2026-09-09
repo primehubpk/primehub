@@ -8,7 +8,7 @@ import type { SiteSettings } from '@/lib/types';
 import type { Product } from '@/components/shop/ShopTypes';
 import '@/components/home/home.css';
 
-export const dynamic = 'force-dynamic';
+export const revalidate = 60;
 
 export const metadata: Metadata = {
   title: 'PrimeHubMall Sale Mela',
