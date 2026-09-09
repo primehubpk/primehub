@@ -4,13 +4,14 @@
 
 import { createContext, createElement, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { SiteSettings } from '@/lib/types';
+import { bigDealRotationIndex } from '@/lib/bigDealRotation';
 
 const DEFAULT_SETTINGS: SiteSettings = {
   announcementText: 'PrimeHub Deals', whatsappNumber: '', freeShippingCount: 5,
   heroTitle: 'Flash Sale', heroDiscountText: 'Up to 70% Off', heroCountdownEndTime: new Date(Date.now() + 2 * 3600 * 1000).toISOString(),
   heroImageUrl: '', heroButtonText: "Shop Today's Deal", heroButtonLink: '#',
-  dailyDeal: { productId: '', imageUrl: '', imageUrls: [], originalPrices: [], dealPrices: [], title: '', originalPrice: 0, dealPrice: 0, startAt: '', endAt: '', buttonText: 'View Big Deal', buttonLink: '/deals/big', active: false },
-  youtubeGuide: { enabled: true, title: 'How To Order & List Products on PrimeHub Deals', videoId: 'dQw4w9WgXcQ', description: 'Watch this quick guide to learn how to order and list products on PrimeHub Deals.' },
+  dailyDeal: { productId: '', productIds: [], imageUrl: '', imageUrls: [], titles: [], categoryIds: [], originalPrices: [], dealPrices: [], rotationStartedAt: '', title: '', originalPrice: 0, dealPrice: 0, startAt: '', endAt: '', buttonText: 'View Big Deal', buttonLink: '/deals/big', active: false },
+  youtubeGuide: { enabled: true, title: 'How To Order & List Products on PrimeHub Deals', videoId: 'dQw4w9WgXcQ', description: 'Watch this quick guide to order and list products on PrimeHub Deals.' },
   policies: { privacyPolicy: { title: 'Privacy Policy', content: '' }, terms: { title: 'Terms of Service', content: '' }, returnPolicy: { title: 'Return Policy', content: '' } },
   contact: { whatsappNumber: '', email: '', physicalAddress: '' },
   weeklyDeals: [],
@@ -37,25 +38,27 @@ function resolveRotatingBigDeal(settings: RawSettings): RawSettings {
   const dailyDeal = settings.dailyDeal;
   if (!dailyDeal) return settings;
 
-  const images = Array.isArray(dailyDeal.imageUrls)
-    ? dailyDeal.imageUrls.filter((value: unknown): value is string => typeof value === 'string' && Boolean(value.trim()))
-    : [];
-  const originalPrices = Array.isArray(dailyDeal.originalPrices) ? dailyDeal.originalPrices : [];
-  const dealPrices = Array.isArray(dailyDeal.dealPrices) ? dailyDeal.dealPrices : [];
-  if (!images.length && !originalPrices.length && !dealPrices.length) return settings;
+  const images = Array.isArray(dailyDeal.imageUrls) ? dailyDeal.imageUrls.map((value: unknown) => String(value || '').trim()).slice(0, 7) : [];
+  const productIds = Array.isArray(dailyDeal.productIds) ? dailyDeal.productIds.map((value: unknown) => String(value || '').trim()).slice(0, 7) : [];
+  const titles = Array.isArray(dailyDeal.titles) ? dailyDeal.titles.map((value: unknown) => String(value || '').trim()).slice(0, 7) : [];
+  const originalPrices = Array.isArray(dailyDeal.originalPrices) ? dailyDeal.originalPrices.slice(0, 7) : [];
+  const dealPrices = Array.isArray(dailyDeal.dealPrices) ? dailyDeal.dealPrices.slice(0, 7) : [];
+  if (!images.length && !productIds.length && !titles.length && !originalPrices.length && !dealPrices.length) return settings;
 
-  const weekday = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Karachi', weekday: 'long' }).format(new Date()).toLowerCase();
-  const index = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'].indexOf(weekday);
-  const dayIndex = index >= 0 ? index : 0;
-  const imageUrl = images[dayIndex] || dailyDeal.imageUrl || images[0] || '';
-  const originalPrice = Number(originalPrices[dayIndex] ?? dailyDeal.originalPrice ?? 0);
-  const dealPrice = Number(dealPrices[dayIndex] ?? dailyDeal.dealPrice ?? 0);
+  const index = bigDealRotationIndex(String(dailyDeal.rotationStartedAt || ''), new Date());
+  const imageUrl = images[index] || dailyDeal.imageUrl || images[0] || '';
+  const productId = productIds[index] || dailyDeal.productId || productIds[0] || '';
+  const title = titles[index] || dailyDeal.title || titles[0] || '';
+  const originalPrice = Number(originalPrices[index] ?? dailyDeal.originalPrice ?? 0);
+  const dealPrice = Number(dealPrices[index] ?? dailyDeal.dealPrice ?? 0);
 
   return {
     ...settings,
     dailyDeal: {
       ...dailyDeal,
       imageUrl,
+      productId,
+      title,
       originalPrice: Number.isFinite(originalPrice) ? originalPrice : Number(dailyDeal.originalPrice || 0),
       dealPrice: Number.isFinite(dealPrice) ? dealPrice : Number(dailyDeal.dealPrice || 0),
     },

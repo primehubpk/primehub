@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
 import { revalidateTag } from 'next/cache';
-import { getDualSettings } from '@/lib/dualReadServer';
+import { getDualCatalog, getDualSettings } from '@/lib/dualReadServer';
 import { getAdminDb } from '@/lib/firebaseAdmin';
 import type { DailyDeal } from '@/lib/types';
 
 export const runtime = 'nodejs';
+const SLOT_COUNT = 7;
 
 function isAuthorized(request: Request) {
   const cookie = request.headers.get('cookie') || '';
@@ -25,26 +26,59 @@ function supabaseWriteConfig() {
   return { url, key, configured: Boolean(url && key) };
 }
 
+function cleanStrings(value: unknown) {
+  return Array.isArray(value) ? value.map((item) => String(item || '').trim()).slice(0, SLOT_COUNT) : [];
+}
+
+function cleanNumbers(value: unknown) {
+  return Array.isArray(value) ? value.map((item) => Math.max(0, Number(item || 0))).slice(0, SLOT_COUNT) : [];
+}
+
 function normalizeDeal(raw: any): DailyDeal {
-  const imageUrls = Array.isArray(raw?.imageUrls)
-    ? raw.imageUrls.map((value: unknown) => String(value || '').trim()).slice(0, 7)
-    : [];
-  const originalPrices = Array.isArray(raw?.originalPrices)
-    ? raw.originalPrices.map((value: unknown) => Math.max(0, Number(value || 0))).slice(0, 7)
-    : [];
-  const dealPrices = Array.isArray(raw?.dealPrices)
-    ? raw.dealPrices.map((value: unknown) => Math.max(0, Number(value || 0))).slice(0, 7)
-    : [];
+  const imageUrls = cleanStrings(raw?.imageUrls);
+  const productIdsRaw = cleanStrings(raw?.productIds);
+  const titlesRaw = cleanStrings(raw?.titles);
+  const categoryIds = cleanStrings(raw?.categoryIds);
+  const originalPricesRaw = cleanNumbers(raw?.originalPrices);
+  const dealPricesRaw = cleanNumbers(raw?.dealPrices);
+  const legacyLength = Math.min(
+    SLOT_COUNT,
+    Math.max(
+      imageUrls.filter(Boolean).length,
+      originalPricesRaw.filter((value) => value > 0).length,
+      dealPricesRaw.filter((value) => value > 0).length,
+      raw?.imageUrl || raw?.productId || raw?.title ? 1 : 0,
+    ),
+  );
+  const productIds = Array.from({ length: SLOT_COUNT }, (_, index) =>
+    productIdsRaw[index] || (index < legacyLength ? String(raw?.productId || '').trim() : ''),
+  );
+  const titles = Array.from({ length: SLOT_COUNT }, (_, index) =>
+    titlesRaw[index] || (index < legacyLength ? String(raw?.title || '').trim() : ''),
+  );
+  const images = Array.from({ length: SLOT_COUNT }, (_, index) =>
+    imageUrls[index] || (index === 0 ? String(raw?.imageUrl || '').trim() : ''),
+  );
+  const originalPrices = Array.from({ length: SLOT_COUNT }, (_, index) =>
+    originalPricesRaw[index] || (index < legacyLength ? Math.max(0, Number(raw?.originalPrice || 0)) : 0),
+  );
+  const dealPrices = Array.from({ length: SLOT_COUNT }, (_, index) =>
+    dealPricesRaw[index] || (index < legacyLength ? Math.max(0, Number(raw?.dealPrice || 0)) : 0),
+  );
 
   return {
-    productId: String(raw?.productId || '').trim(),
-    imageUrl: String(raw?.imageUrl || imageUrls[0] || '').trim(),
-    imageUrls,
+    productId: productIds[0] || String(raw?.productId || '').trim(),
+    productIds,
+    title: titles[0] || String(raw?.title || '').trim(),
+    titles,
+    categoryIds: Array.from({ length: SLOT_COUNT }, (_, index) => categoryIds[index] || ''),
+    imageUrl: images[0] || String(raw?.imageUrl || '').trim(),
+    imageUrls: images,
     originalPrices,
     dealPrices,
-    title: String(raw?.title || '').trim(),
-    originalPrice: Math.max(0, Number(raw?.originalPrice || originalPrices[0] || 0)),
-    dealPrice: Math.max(0, Number(raw?.dealPrice || dealPrices[0] || 0)),
+    originalPrice: originalPrices[0] || Math.max(0, Number(raw?.originalPrice || 0)),
+    dealPrice: dealPrices[0] || Math.max(0, Number(raw?.dealPrice || 0)),
+    rotationStartedAt: String(raw?.rotationStartedAt || '').trim(),
     startAt: String(raw?.startAt || ''),
     endAt: String(raw?.endAt || ''),
     buttonText: String(raw?.buttonText || 'Shop Big Deal').trim() || 'Shop Big Deal',
@@ -53,28 +87,74 @@ function normalizeDeal(raw: any): DailyDeal {
   };
 }
 
+function slotHasAny(deal: DailyDeal, index: number) {
+  return Boolean(
+    deal.imageUrls?.[index] || deal.productIds?.[index] || deal.titles?.[index] ||
+    Number(deal.originalPrices?.[index] || 0) > 0 || Number(deal.dealPrices?.[index] || 0) > 0,
+  );
+}
+
+function slotComplete(deal: DailyDeal, index: number) {
+  const regular = Number(deal.originalPrices?.[index] || 0);
+  const special = Number(deal.dealPrices?.[index] || 0);
+  return Boolean(
+    deal.imageUrls?.[index] && deal.productIds?.[index] && deal.titles?.[index] &&
+    regular > 0 && special > 0 && special < regular,
+  );
+}
+
+function completeSlotCount(deal: DailyDeal) {
+  return Array.from({ length: SLOT_COUNT }, (_, index) => slotComplete(deal, index)).filter(Boolean).length;
+}
+
 function validateDeal(deal: DailyDeal) {
-  if (!deal.active) return '';
-  if (!deal.title) return 'Big Deal title is required.';
-  if (!deal.productId) return 'Big Deal product ID is required.';
-  if ((deal.imageUrls || []).filter(Boolean).length !== 7) return 'All 7 Big Deal pictures are required.';
-  const originals = deal.originalPrices || [];
-  const specials = deal.dealPrices || [];
-  for (let index = 0; index < 7; index += 1) {
-    const regular = Number(originals[index] || 0);
-    const special = Number(specials[index] || 0);
-    if (regular <= 0 || special <= 0) return 'Each day needs an original price and deal price.';
-    if (special >= regular) return 'Each daily deal price must be lower than its original price.';
+  for (let index = 0; index < SLOT_COUNT; index += 1) {
+    if (slotHasAny(deal, index) && !slotComplete(deal, index)) {
+      return `Deal ${index + 1} needs an image, product, original price and a lower Big Deal price.`;
+    }
+  }
+  if (deal.active && completeSlotCount(deal) !== SLOT_COUNT) {
+    return 'All 7 Big Deals must be complete before publishing the cycle.';
   }
   return '';
 }
 
+function productImage(product: any) {
+  if (typeof product?.imageUrl === 'string' && product.imageUrl) return product.imageUrl;
+  if (typeof product?.image === 'string' && product.image) return product.image;
+  const first = Array.isArray(product?.images) ? product.images[0] : null;
+  return typeof first === 'string' ? first : String(first?.url || '');
+}
+
+function compactProduct(product: any) {
+  return {
+    id: String(product?.id || ''),
+    title: String(product?.title || product?.name || ''),
+    name: String(product?.name || product?.title || ''),
+    imageUrl: productImage(product),
+    price: Number(product?.price || 0),
+    originalPrice: Number(product?.originalPrice || product?.normalPrice || product?.price || 0),
+    normalPrice: Number(product?.normalPrice || product?.originalPrice || product?.price || 0),
+    categoryId: String(product?.categoryId || ''),
+    category: String(product?.category || ''),
+    active: product?.active !== false,
+    published: product?.published !== false,
+  };
+}
+
+function compactCategory(category: any) {
+  return {
+    id: String(category?.id || ''),
+    title: String(category?.title || category?.name || category?.slug || category?.id || ''),
+    name: String(category?.name || category?.title || ''),
+    slug: String(category?.slug || ''),
+    active: category?.active !== false,
+  };
+}
+
 async function writeSupabaseMain(payload: Record<string, any>) {
   const { url, key, configured } = supabaseWriteConfig();
-  if (!configured) {
-    return { ok: false, attempted: false, retryable: false, error: 'Supabase write credentials are not configured.' };
-  }
-
+  if (!configured) return { ok: false, attempted: false, retryable: false, error: 'Supabase write credentials are not configured.' };
   try {
     const response = await fetch(`${url}/rest/v1/settings?on_conflict=id`, {
       method: 'POST',
@@ -85,57 +165,48 @@ async function writeSupabaseMain(payload: Record<string, any>) {
         Prefer: 'resolution=merge-duplicates,return=minimal',
       },
       body: JSON.stringify({
-        id: 'main',
-        payload,
-        authoritative_source: 'supabase',
-        mirror_status: 'synced',
-        mirror_error: null,
+        id: 'main', payload, authoritative_source: 'supabase', mirror_status: 'synced', mirror_error: null,
         updated_at: new Date().toISOString(),
       }),
       cache: 'no-store',
     });
-
-    if (!response.ok) {
-      const error = `Supabase settings write failed ${response.status}.`;
-      return { ok: false, attempted: true, retryable: response.status >= 500, error };
-    }
+    if (!response.ok) return { ok: false, attempted: true, retryable: response.status >= 500, error: `Supabase settings write failed ${response.status}.` };
     return { ok: true, attempted: true, retryable: false, error: '' };
   } catch (error) {
-    return {
-      ok: false,
-      attempted: true,
-      retryable: true,
-      error: error instanceof Error ? error.message : 'Supabase settings write failed.',
-    };
+    return { ok: false, attempted: true, retryable: true, error: error instanceof Error ? error.message : 'Supabase settings write failed.' };
   }
 }
 
 export async function GET(request: Request) {
   if (!isAuthorized(request)) return NextResponse.json({ error: 'Authentication required.' }, { status: 401 });
 
-  const result = await getDualSettings();
-  const dailyDeal = normalizeDeal(result.documents?.main?.dailyDeal || {});
-  const hasPrimaryRotation = (dailyDeal.imageUrls || []).filter(Boolean).length === 7;
-  if (hasPrimaryRotation) {
-    return NextResponse.json({ success: true, source: result.source, dailyDeal });
-  }
+  const [settingsResult, catalogResult] = await Promise.all([getDualSettings(), getDualCatalog()]);
+  let dailyDeal = normalizeDeal(settingsResult.documents?.main?.dailyDeal || {});
+  let source = settingsResult.source;
 
-  // One-time compatibility fallback: older Big Deal icon saves may exist only
-  // in Firestore because the previous mirror silently skipped Supabase. Prefer
-  // that richer 7-day rotation only when Supabase does not have it yet.
-  try {
-    const snapshot = await getAdminDb().collection('settings').doc('main').get();
-    if (snapshot.exists) {
-      const firebaseDeal = normalizeDeal(snapshot.data()?.dailyDeal || {});
-      if ((firebaseDeal.imageUrls || []).filter(Boolean).length === 7) {
-        return NextResponse.json({ success: true, source: 'firebase-migration', dailyDeal: firebaseDeal });
+  if (completeSlotCount(dailyDeal) < SLOT_COUNT) {
+    try {
+      const snapshot = await getAdminDb().collection('settings').doc('main').get();
+      if (snapshot.exists) {
+        const firebaseDeal = normalizeDeal(snapshot.data()?.dailyDeal || {});
+        if (completeSlotCount(firebaseDeal) > completeSlotCount(dailyDeal)) {
+          dailyDeal = firebaseDeal;
+          source = 'firebase-migration';
+        }
       }
+    } catch (error) {
+      console.warn('Big Deal legacy Firebase rotation lookup skipped', error);
     }
-  } catch (error) {
-    console.warn('Big Deal legacy Firebase rotation lookup skipped', error);
   }
 
-  return NextResponse.json({ success: true, source: result.source, dailyDeal });
+  return NextResponse.json({
+    success: true,
+    source,
+    catalogSource: catalogResult.source,
+    dailyDeal,
+    products: catalogResult.products.map(compactProduct).filter((product) => product.id),
+    categories: catalogResult.categories.map(compactCategory).filter((category) => category.id),
+  });
 }
 
 export async function POST(request: Request) {
@@ -143,19 +214,34 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const dailyDeal = normalizeDeal(body?.dailyDeal || {});
+    let dailyDeal = normalizeDeal(body?.dailyDeal || {});
     const validationError = validateDeal(dailyDeal);
     if (validationError) return NextResponse.json({ error: validationError }, { status: 400 });
 
     const current = await getDualSettings();
     const main = current.documents?.main && typeof current.documents.main === 'object' ? current.documents.main : {};
+    const existing = normalizeDeal(main.dailyDeal || {});
+    if (dailyDeal.active && !dailyDeal.rotationStartedAt) {
+      dailyDeal = {
+        ...dailyDeal,
+        rotationStartedAt: existing.active && existing.rotationStartedAt ? existing.rotationStartedAt : new Date().toISOString(),
+      };
+    }
+
     const nextMain = { ...main, dailyDeal };
     const primary = await writeSupabaseMain(nextMain);
 
     if (primary.ok) {
+      let warning = '';
+      try {
+        await getAdminDb().collection('settings').doc('main').set({ dailyDeal }, { merge: true });
+      } catch (mirrorError) {
+        console.warn('Big Deal Firebase fallback mirror skipped', mirrorError);
+        warning = 'Big Deal saved to Supabase primary. Firebase fallback mirror could not be refreshed.';
+      }
       revalidateTag('storefront-settings');
       revalidateTag('salaar-store-knowledge');
-      return NextResponse.json({ success: true, source: 'supabase' });
+      return NextResponse.json({ success: true, source: 'supabase', dailyDeal, warning });
     }
 
     if (!primary.attempted || !primary.retryable) {
@@ -169,6 +255,7 @@ export async function POST(request: Request) {
       return NextResponse.json({
         success: true,
         source: 'firebase-fallback',
+        dailyDeal,
         warning: 'Supabase was temporarily unavailable, so the Big Deal was saved to Firebase fallback only.',
       });
     } catch (fallbackError) {

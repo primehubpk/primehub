@@ -3,7 +3,7 @@
 import { useEffect, useMemo } from "react";
 import { normalizeImageUrl } from "@/lib/imageUrl";
 import { useSettings } from "@/lib/useSettings";
-import { WEEKDAY_ORDER, pakistanNowWeekday } from "@/lib/weeklyDealUtils";
+import { nextBigDealRotationIndex } from "@/lib/bigDealRotation";
 
 function money(value: number) {
   return `Rs. ${Math.max(0, Math.round(value)).toLocaleString("en-PK")}`;
@@ -15,22 +15,25 @@ export default function BigDealNextPreviewSync() {
 
   const nextDeal = useMemo(() => {
     const images = Array.isArray(bigDeal?.imageUrls) ? bigDeal.imageUrls : [];
+    const titles = Array.isArray(bigDeal?.titles) ? bigDeal.titles : [];
+    const productIds = Array.isArray(bigDeal?.productIds) ? bigDeal.productIds : [];
     const originalPrices = Array.isArray(bigDeal?.originalPrices) ? bigDeal.originalPrices : [];
     const dealPrices = Array.isArray(bigDeal?.dealPrices) ? bigDeal.dealPrices : [];
-    if (!images.length && !dealPrices.length && !originalPrices.length) return null;
+    if (!images.length && !titles.length && !productIds.length && !dealPrices.length && !originalPrices.length) return null;
 
-    const today = pakistanNowWeekday(new Date());
-    const todayIndex = WEEKDAY_ORDER.indexOf(today);
-    const nextIndex = todayIndex >= 0 ? (todayIndex + 1) % WEEKDAY_ORDER.length : 0;
+    const nextIndex = nextBigDealRotationIndex(bigDeal?.rotationStartedAt, new Date());
     const imageUrl = normalizeImageUrl(images[nextIndex] || bigDeal?.imageUrl || "");
     const price = Number(dealPrices[nextIndex] ?? bigDeal?.dealPrice ?? 0);
     const originalPrice = Number(originalPrices[nextIndex] ?? bigDeal?.originalPrice ?? price);
+    const title = String(titles[nextIndex] || bigDeal?.title || "Next Big Deal").trim() || "Next Big Deal";
+    const productId = String(productIds[nextIndex] || "").trim();
 
     return {
       imageUrl,
       price: Number.isFinite(price) ? price : 0,
       originalPrice: Number.isFinite(originalPrice) ? originalPrice : 0,
-      title: String(bigDeal?.title || "Next Big Deal").trim() || "Next Big Deal",
+      title,
+      productId,
     };
   }, [bigDeal]);
 
@@ -43,8 +46,12 @@ export default function BigDealNextPreviewSync() {
       const badge = card?.querySelector<HTMLElement>(":scope > span");
       if (!card || !badge) return false;
 
+      card.setAttribute("aria-label", `Next Big Deal locked: ${nextDeal.title}, ${money(nextDeal.price)}`);
+      if (nextDeal.productId) card.dataset.nextProductId = nextDeal.productId;
+
       if (image && nextDeal.imageUrl) {
         image.src = nextDeal.imageUrl;
+        image.alt = nextDeal.title;
         image.removeAttribute("srcset");
         image.removeAttribute("sizes");
         image.style.filter = "none";
