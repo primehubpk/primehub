@@ -1,6 +1,5 @@
 import type { Metadata } from 'next';
 import ProductRewardInfo from '@/components/ProductRewardInfo';
-import WeeklyDealProductExtras from '@/components/WeeklyDealProductExtras';
 
 function siteUrl() {
   const configured = process.env.NEXT_PUBLIC_SITE_URL || 'https://primehubmall.com';
@@ -54,7 +53,6 @@ export default async function ProductLayout({
     <>
       <ProductRewardInfo productId={id} />
       {children}
-      <WeeklyDealProductExtras productId={id} />
     </>
   );
 }
