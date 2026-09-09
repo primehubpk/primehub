@@ -133,5 +133,6 @@ export function useSettings() {
     return () => { cancelled = true; window.clearInterval(timer); };
   }, []);
 
-  return { settings, loading, policy: settings.policies, contact: settings.contact };
+  const resolvedSettings = resolveRotatingBigDeal(settings) as SiteSettings;
+  return { settings: resolvedSettings, loading, policy: resolvedSettings.policies, contact: resolvedSettings.contact };
 }
