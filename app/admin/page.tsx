@@ -1,4 +1,5 @@
 'use client';
+
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { onSnapshot } from 'firebase/firestore';
@@ -6,24 +7,55 @@ import { signOut } from 'firebase/auth';
 import AdminAuthGuard from '@/components/AdminAuthGuard';
 import AdminHeader, { type AdminTab } from '@/components/admin/AdminHeader';
 import DashboardStats from '@/components/admin/DashboardStats';
-import ProductsManager from '@/components/admin/ProductsManager';
-import BulkProductEditor from '@/components/admin/BulkProductEditor';
-import CategoriesManager from '@/components/admin/CategoriesManager';
-import DealScheduleManager from '@/components/admin/DealScheduleManager';
-import BigDealManager from '@/components/admin/BigDealManager';
-import SkillsManager from '@/components/admin/SkillsManager';
-import OrdersManager from '@/components/admin/OrdersManager';
-import VendorRequests from '@/components/admin/VendorRequests';
-import SiteSettingsManager from '@/components/admin/SiteSettingsManager';
-import RewardsManager from '@/components/admin/RewardsManager';
-import RewardsTermsManager from '@/components/admin/RewardsTermsManager';
-import ResellerWhatsAppRequests from '@/components/admin/ResellerWhatsAppRequests';
-import WhatsAppCoexistenceSetup from '@/components/admin/WhatsAppCoexistenceSetup';
-import SalaarInbox from '@/components/admin/SalaarInbox';
-import AdminResellersPage from './resellers/page';
-import ResellerTasksAdminPage from './reseller-tasks/page';
-import WholesaleVideoManager from '@/components/admin/WholesaleVideoManager';
 import { adminCollection, type Order, type Product, type VendorRequest } from '@/components/admin/shared';
 import { auth } from '@/lib/firebase';
-export default function AdminPage(){return <AdminAuthGuard><AdminPanel/></AdminAuthGuard>}
-function AdminPanel(){const router=useRouter();const [activeTab,setActiveTab]=useState<AdminTab>('dashboard');const [search,setSearch]=useState('');const [products,setProducts]=useState<Product[]>([]);const [orders,setOrders]=useState<Order[]>([]);const [vendorRequests,setVendorRequests]=useState<VendorRequest[]>([]);useEffect(()=>{const a=onSnapshot(adminCollection('products'),s=>setProducts(s.docs.map(d=>({id:d.id,...d.data()}) as Product)));const b=onSnapshot(adminCollection('orders'),s=>setOrders(s.docs.map(d=>({id:d.id,...d.data()}) as Order)));const c=onSnapshot(adminCollection('vendor_submissions'),s=>setVendorRequests(s.docs.map(d=>({id:d.id,...d.data()}) as VendorRequest)));return()=>{a();b();c()}},[]);async function logout(){await fetch('/api/admin/session',{method:'DELETE',cache:'no-store'}).catch(()=>undefined);await signOut(auth).catch(()=>undefined);router.replace('/admin');router.refresh()}function render(){switch(activeTab){case'dashboard':return <DashboardStats products={products} orders={orders} vendorRequests={vendorRequests}/>;case'products':return <ProductsManager/>;case'product-editor':return <BulkProductEditor/>;case'categories':return <CategoriesManager/>;case'deals':return <DealScheduleManager/>;case'big-deal':return <BigDealManager/>;case'skills':return <SkillsManager/>;case'rewards':return <><RewardsManager/><RewardsTermsManager/></>;case'video-hub':return <WholesaleVideoManager/>;case'orders':return <OrdersManager/>;case'salaar-inbox':return <SalaarInbox/>;case'reseller-whatsapp':return <ResellerWhatsAppRequests/>;case'whatsapp-bot':return <WhatsAppCoexistenceSetup/>;case'resellers':return <AdminResellersPage/>;case'reseller-tasks':return <ResellerTasksAdminPage/>;case'suppliers':return <VendorRequests/>;case'settings':return <SiteSettingsManager/>}}return <main className="min-h-screen bg-[#F4F4F1]"><AdminHeader activeTab={activeTab} onTabChange={setActiveTab} onLogout={()=>void logout()} search={search} onSearchChange={setSearch} stats={{totalProducts:products.length,totalOrders:orders.length}}/>{render()}</main>}
+
+export default function AdminPage() {
+  return <AdminAuthGuard><AdminPanel /></AdminAuthGuard>;
+}
+
+function AdminPanel() {
+  const router = useRouter();
+  const [products, setProducts] = useState<Product[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [vendorRequests, setVendorRequests] = useState<VendorRequest[]>([]);
+
+  useEffect(() => {
+    const stopProducts = onSnapshot(adminCollection('products'), (snapshot) => setProducts(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Product)));
+    const stopOrders = onSnapshot(adminCollection('orders'), (snapshot) => setOrders(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Order)));
+    const stopVendors = onSnapshot(adminCollection('vendor_submissions'), (snapshot) => setVendorRequests(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as VendorRequest)));
+    return () => { stopProducts(); stopOrders(); stopVendors(); };
+  }, []);
+
+  async function logout() {
+    await fetch('/api/admin/session', { method: 'DELETE', cache: 'no-store' }).catch(() => undefined);
+    await signOut(auth).catch(() => undefined);
+    router.replace('/admin');
+    router.refresh();
+  }
+
+  function openSection(tab: AdminTab) {
+    if (tab === 'dashboard') return;
+    if (tab === 'resellers') {
+      router.push('/admin/resellers');
+      return;
+    }
+    if (tab === 'reseller-tasks') {
+      router.push('/admin/reseller-tasks');
+      return;
+    }
+    router.push(`/admin/${tab}`);
+  }
+
+  return (
+    <main className="min-h-screen bg-[#F4F4F1]">
+      <AdminHeader
+        activeTab="dashboard"
+        onTabChange={openSection}
+        onLogout={() => void logout()}
+        stats={{ totalProducts: products.length, totalOrders: orders.length }}
+      />
+      <DashboardStats products={products} orders={orders} vendorRequests={vendorRequests} />
+    </main>
+  );
+}
