@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Search } from 'lucide-react';
 import { collection, onSnapshot } from 'firebase/firestore';
+import FastProductLink from '@/components/FastProductLink';
 import { db } from '@/lib/firebase';
 import { smartSearchProducts } from '@/lib/smartSearch';
 import VoiceSearchButton from '@/components/VoiceSearchButton';
@@ -70,7 +71,7 @@ export default function LiveSearchBar({ value, onChange, className = '', placeho
             <>
               <div className="border-b border-black/5 px-3 py-2 text-[9px] font-black uppercase tracking-[0.16em] text-black/40">Suggestions</div>
               {results.map((product) => (
-                <Link key={product.id} href={`/product/${product.id}`} className="flex items-center gap-3 px-3 py-2.5 transition hover:bg-black/[0.04]">
+                <FastProductLink key={product.id} product={product} className="flex items-center gap-3 px-3 py-2.5 transition hover:bg-black/[0.04]">
                   <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-[#F4F4F1]">
                     {product.imageUrl || product.image ? <img src={product.imageUrl || product.image || ''} alt="" className="h-full w-full object-cover" /> : <Search size={15} className="text-black/25" />}
                   </div>
@@ -79,7 +80,7 @@ export default function LiveSearchBar({ value, onChange, className = '', placeho
                     {product.category && <span className="mt-0.5 block truncate text-[9px] font-bold text-black/40">{product.category}</span>}
                   </span>
                   <b className="shrink-0 text-xs text-[#E1352B]">Rs. {Number(product.price || 0).toLocaleString()}</b>
-                </Link>
+                </FastProductLink>
               ))}
               <Link href={`/shop?q=${encodeURIComponent(value.trim())}`} className="flex items-center justify-center gap-2 border-t border-black/5 bg-[#FAF9F6] px-3 py-3 text-[10px] font-black uppercase tracking-[0.09em] text-[#0F6A5F]">
                 <Search size={13} /> View all results
