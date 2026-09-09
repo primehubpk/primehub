@@ -40,8 +40,9 @@ async function loadStorefrontSettings() {
 
     // Do not cache DEFAULT/blank settings caused by a transient backend failure.
     if (result.source !== 'empty' && Object.keys(result.documents).length > 0) {
-      const main = result.documents.main || {};
-      const legacy = result.documents.general || {};
+      const documents = result.documents as Record<string, any>;
+      const main = documents.main || {};
+      const legacy = documents.general || {};
       return { ...legacy, ...main };
     }
   }
