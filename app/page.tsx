@@ -1,12 +1,12 @@
 import HomePageClient from '@/components/HomePageClient';
-import { getStorefrontSettingsSnapshot, getPublicCatalogSnapshot } from '@/lib/publicCatalogServer';
+import { getFreshStorefrontSettingsSnapshot, getPublicCatalogSnapshot } from '@/lib/publicCatalogServer';
 import type { Category, SiteSettings } from '@/lib/types';
 import type { Product } from '@/components/shop/ShopTypes';
 
 export default async function HomePage() {
   const [catalogResult, settingsResult] = await Promise.allSettled([
     getPublicCatalogSnapshot(),
-    getStorefrontSettingsSnapshot(),
+    getFreshStorefrontSettingsSnapshot(),
   ]);
 
   const snapshot = catalogResult.status === 'fulfilled'
@@ -24,4 +24,3 @@ export default async function HomePage() {
     />
   );
 }
-
