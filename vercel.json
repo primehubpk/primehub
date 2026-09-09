@@ -5,6 +5,7 @@
   },
   "git": {
     "deploymentEnabled": {
+      "fix/big-deal-initial-render": false,
       "fix/home-weekly-deals-live-first": true,
       "fix/weekly-deals-live-first": false,
       "feature/supabase-migration": true,
