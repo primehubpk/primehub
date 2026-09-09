@@ -4,7 +4,7 @@
 
 import { createContext, createElement, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { SiteSettings } from '@/lib/types';
-import { bigDealRotationIndex } from '@/lib/bigDealRotation';
+import { bigDealConfiguredSlotCount, bigDealRotationIndex } from '@/lib/bigDealRotation';
 
 const DEFAULT_SETTINGS: SiteSettings = {
   announcementText: 'PrimeHub Deals', whatsappNumber: '', freeShippingCount: 5,
@@ -45,7 +45,8 @@ function resolveRotatingBigDeal(settings: RawSettings): RawSettings {
   const dealPrices = Array.isArray(dailyDeal.dealPrices) ? dailyDeal.dealPrices.slice(0, 7) : [];
   if (!images.length && !productIds.length && !titles.length && !originalPrices.length && !dealPrices.length) return settings;
 
-  const index = bigDealRotationIndex(String(dailyDeal.rotationStartedAt || ''), new Date());
+  const slotCount = bigDealConfiguredSlotCount(dailyDeal);
+  const index = bigDealRotationIndex(String(dailyDeal.rotationStartedAt || ''), new Date(), slotCount);
   const imageUrl = images[index] || dailyDeal.imageUrl || images[0] || '';
   const productId = productIds[index] || dailyDeal.productId || productIds[0] || '';
   const title = titles[index] || dailyDeal.title || titles[0] || '';
