@@ -73,9 +73,26 @@ function productImage(product?: CatalogProduct) {
   return typeof first === 'string' ? first : first?.url || '';
 }
 
-function productRegularPrice(product: CatalogProduct) {
-  const value = Number(product.originalPrice || product.normalPrice || product.price || 0);
-  return Number.isFinite(value) ? Math.max(0, value) : 0;
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function dealTitleForProduct(product: CatalogProduct) {
+  const fallback = productTitle(product);
+  const price = Math.round(Number(product.price || product.originalPrice || product.normalPrice || 0));
+  if (!Number.isFinite(price) || price <= 0) return fallback;
+
+  let title = fallback;
+  const candidates = Array.from(new Set([String(price), price.toLocaleString('en-PK')]));
+  for (const candidate of candidates) {
+    title = title.replace(new RegExp(`\\b(?:Rs\\.?\\s*)?${escapeRegExp(candidate)}\\b`, 'gi'), ' ');
+  }
+
+  return title
+    .replace(/\s{2,}/g, ' ')
+    .replace(/\s+([,.:;-])/g, '$1')
+    .replace(/-\s*-/g, '-')
+    .trim() || fallback;
 }
 
 function productMatchesCategory(product: CatalogProduct, category?: CatalogCategory) {
@@ -143,16 +160,21 @@ export default function BigDealManager() {
               if (!catalogImage || clean(savedImage) !== clean(catalogImage)) return savedImage;
               return '';
             });
+        const cleanedTitles = arrays.titles.map((savedTitle, index) => {
+          const selected = productList.find((item) => item.id === arrays.productIds[index]);
+          return selected ? dealTitleForProduct(selected) : savedTitle;
+        });
 
         setDeal({
           ...current,
           imageUrls: arrays.images,
           galleryImages: inferredSpecialImages,
           productIds: arrays.productIds,
-          titles: arrays.titles,
+          titles: cleanedTitles,
           categoryIds: arrays.categoryIds,
           originalPrices: arrays.originalPrices,
           dealPrices: arrays.dealPrices,
+          title: cleanedTitles[0] || current.title || '',
         });
         setProducts(productList);
         setCategories(Array.isArray(result.categories) ? result.categories : []);
@@ -162,6 +184,12 @@ export default function BigDealManager() {
       .catch((error) => setToast(error instanceof Error ? error.message : 'Unable to load Big Deal settings.'))
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = window.setTimeout(() => setToast(''), 3200);
+    return () => window.clearTimeout(timer);
+  }, [toast]);
 
   const arrays = useMemo(() => normalizeArrays(deal), [deal]);
   const { images, productIds, titles, categoryIds, originalPrices, dealPrices } = arrays;
@@ -234,9 +262,9 @@ export default function BigDealManager() {
   function selectProduct(index: number, product: CatalogProduct) {
     updateSlot(index, {
       productId: product.id,
-      title: productTitle(product),
+      title: dealTitleForProduct(product),
       categoryId: categoryIds[index] || String(product.categoryId || product.category || ''),
-      originalPrice: productRegularPrice(product),
+      originalPrice: 0,
       dealPrice: 0,
     });
     setOpenPickerIndex(null);
@@ -467,7 +495,7 @@ export default function BigDealManager() {
         <div className="mb-3">
           <p className="text-sm font-black">2. Choose products & prices</p>
           <p className="mt-1 text-[10px] leading-4 text-black/45">
-            Select a category, choose one product, then set its prices. After selection only the chosen product stays visible; use Change if you want another design.
+            Select a category and one product, then enter the Original Price and Big Deal Price yourself. Catalog price is not used in the Big Deal.
           </p>
         </div>
 
@@ -523,12 +551,12 @@ export default function BigDealManager() {
                 {selected && !showPicker ? (
                   <div className="mt-4 flex items-center gap-3 rounded-2xl border border-[#0F6A5F]/20 bg-[#0F6A5F]/5 p-3">
                     <div className="h-20 w-20 shrink-0 overflow-hidden rounded-2xl bg-white">
-                      {selectedImage ? <img src={selectedImage} alt={productTitle(selected)} className="h-full w-full object-cover" /> : null}
+                      {selectedImage ? <img src={selectedImage} alt={titles[index] || productTitle(selected)} className="h-full w-full object-cover" /> : null}
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="text-[9px] font-black uppercase tracking-wider text-[#0F6A5F]">Selected product</p>
-                      <p className="mt-1 line-clamp-2 text-sm font-black">{productTitle(selected)}</p>
-                      <p className="mt-1 text-[10px] font-black text-[#E1352B]">Rs. {Number(selected.price || 0).toLocaleString('en-PK')}</p>
+                      <p className="mt-1 line-clamp-2 text-sm font-black">{titles[index] || dealTitleForProduct(selected)}</p>
+                      <p className="mt-1 text-[9px] font-semibold text-black/40">Use only the manual prices below for this Big Deal.</p>
                     </div>
                     <button
                       type="button"
@@ -557,10 +585,9 @@ export default function BigDealManager() {
                             className="overflow-hidden rounded-2xl border border-black/8 bg-white p-2 text-left transition hover:border-[#0F6A5F]"
                           >
                             <div className="aspect-square overflow-hidden rounded-xl bg-[#EEEDEA]">
-                              {image ? <img src={image} alt={productTitle(product)} className="h-full w-full object-cover" /> : null}
+                              {image ? <img src={image} alt={dealTitleForProduct(product)} className="h-full w-full object-cover" /> : null}
                             </div>
-                            <p className="mt-2 line-clamp-2 text-[10px] font-black leading-4">{productTitle(product)}</p>
-                            <p className="mt-1 text-[10px] font-black text-[#E1352B]">Rs. {Number(product.price || 0).toLocaleString('en-PK')}</p>
+                            <p className="mt-2 line-clamp-2 text-[10px] font-black leading-4">{dealTitleForProduct(product)}</p>
                           </button>
                         );
                       })}
@@ -584,7 +611,7 @@ export default function BigDealManager() {
                         value={originalPrices[index] || ''}
                         onChange={(event) => updateSlot(index, { originalPrice: Number(event.target.value || 0) })}
                         className="rounded-2xl bg-[#F4F4F1] px-3 py-3 text-sm font-black normal-case tracking-normal text-black outline-none"
-                        placeholder="e.g. 6000"
+                        placeholder="e.g. 3000"
                       />
                     </label>
                     <label className="grid gap-1.5 text-[9px] font-black uppercase tracking-wider text-[#E1352B]">
@@ -596,7 +623,7 @@ export default function BigDealManager() {
                         value={dealPrices[index] || ''}
                         onChange={(event) => updateSlot(index, { dealPrice: Number(event.target.value || 0) })}
                         className="rounded-2xl bg-[#E1352B]/5 px-3 py-3 text-sm font-black normal-case tracking-normal text-[#E1352B] outline-none"
-                        placeholder="e.g. 2999"
+                        placeholder="e.g. 999"
                       />
                     </label>
                   </div>
