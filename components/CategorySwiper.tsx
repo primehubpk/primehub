@@ -63,9 +63,9 @@ export default function CategorySwiper({
                   src={normalizeImageUrl(category.iconUrl)}
                   alt={category.title}
                   fill
-                  priority={index < 6}
-                  loading={index < 6 ? 'eager' : 'lazy'}
-                  fetchPriority={index < 6 ? 'high' : 'auto'}
+                  priority={index < 2}
+                  loading={index < 2 ? 'eager' : 'lazy'}
+                  fetchPriority={index < 2 ? 'high' : 'auto'}
                   sizes="(max-width: 600px) 22vw, 195px"
                   quality={72}
                   className="object-cover"
@@ -81,3 +81,4 @@ export default function CategorySwiper({
     </section>
   );
 }
+

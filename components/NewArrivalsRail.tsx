@@ -51,7 +51,7 @@ export default function NewArrivalsRail({
     return () => stop();
   }, [liveUpdates]);
 
-  const newest = useMemo(() => newestFirst(products), [products]);
+  const newest = useMemo(() => newestFirst(products).slice(0, homeLayout ? 20 : products.length), [products, homeLayout]);
 
   const addProduct = (product: Product) => {
     const image = imageOf(product);
@@ -144,3 +144,4 @@ export default function NewArrivalsRail({
     </section>
   );
 }
+
