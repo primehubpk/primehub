@@ -3,9 +3,9 @@ import {
   getConfiguredReadMode,
   getDualCatalog,
   getDualProduct,
-  getDualSettings,
   getDualSkills,
 } from '@/lib/dualReadServer';
+import { getStorefrontSettingsWithBigDealRecovery } from '@/lib/storefrontSettingsServer';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -15,8 +15,8 @@ export async function GET(request: Request) {
   const type = String(url.searchParams.get('type') || 'catalog');
   try {
     if (type === 'settings') {
-      const result = await getDualSettings();
-      return NextResponse.json({ ...result, mode: getConfiguredReadMode() }, { headers: { 'Cache-Control': 'private, max-age=30' } });
+      const result = await getStorefrontSettingsWithBigDealRecovery();
+      return NextResponse.json({ ...result, mode: getConfiguredReadMode() }, { headers: { 'Cache-Control': 'no-store, max-age=0' } });
     }
     if (type === 'skills') {
       const result = await getDualSkills();
