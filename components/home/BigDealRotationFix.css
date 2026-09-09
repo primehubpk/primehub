@@ -13,10 +13,13 @@
   cursor: not-allowed;
   background-size: cover;
   background-position: center;
+  overflow: hidden;
 }
 
 .home-storefront .home-next-deal > img {
-  display: none !important;
+  display: block !important;
+  opacity: 0.68;
+  filter: saturate(0.82) brightness(0.82);
 }
 
 .home-storefront .home-next-deal::before {
@@ -24,7 +27,7 @@
   position: absolute;
   inset: 0;
   z-index: 1;
-  background: rgba(255, 253, 249, 0.34);
+  background: rgba(255, 253, 249, 0.2);
   pointer-events: none;
 }
 
@@ -35,6 +38,10 @@
   gap: 4px;
   padding: 11px;
   text-align: center;
+  background: rgba(255, 253, 249, 0.9);
+  box-shadow: 0 8px 28px rgba(20, 20, 15, 0.16);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
 }
 
 .home-storefront .home-next-deal > span > small:first-of-type {
