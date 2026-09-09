@@ -105,7 +105,7 @@ function readFetchInit(options?: DualReadCacheOptions): NextFetchInit {
   if (typeof options.revalidate === 'number') next.revalidate = options.revalidate;
   if (options.tags?.length) next.tags = options.tags;
   return {
-    cache: options.cache || 'force-cache',
+    ...(options.cache ? { cache: options.cache } : {}),
     ...(Object.keys(next).length ? { next } : {}),
   };
 }
