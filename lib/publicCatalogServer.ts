@@ -4,6 +4,10 @@ import { getDualCatalog, getDualProduct, getDualSettings, getDualSkills } from '
 import { getStorefrontSettingsWithBigDealRecovery } from '@/lib/storefrontSettingsServer';
 
 const RETRY_DELAYS_MS = [0, 250, 750];
+const CATALOG_READ_CACHE = { cache: 'force-cache' as const, revalidate: 3600, tags: ['public-catalog'] };
+const PRODUCT_READ_CACHE = { cache: 'force-cache' as const, revalidate: 60, tags: ['public-products'] };
+const SETTINGS_READ_CACHE = { cache: 'force-cache' as const, revalidate: 60, tags: ['storefront-settings'] };
+const SKILLS_READ_CACHE = { cache: 'force-cache' as const, revalidate: 600, tags: ['prime-skills', 'storefront-settings'] };
 
 async function wait(ms: number) {
   if (ms <= 0) return;
@@ -15,10 +19,9 @@ async function loadPublicCatalog() {
 
   for (const delay of RETRY_DELAYS_MS) {
     await wait(delay);
-    const result = await getDualCatalog();
+    const result = await getDualCatalog(CATALOG_READ_CACHE);
     lastSource = result.source;
 
-    // Never put a temporary outage/empty fallback into Next's long-lived data cache.
     if (result.source !== 'empty' && result.products.length > 0) {
       return {
         products: result.products,
@@ -33,32 +36,27 @@ async function loadPublicCatalog() {
 
 export const getPublicCatalogSnapshot = unstable_cache(
   loadPublicCatalog,
-  ['primehub-public-catalog-dual-v3'],
+  ['primehub-public-catalog-dual-v4'],
   { revalidate: 3600, tags: ['public-catalog'] },
 );
 
 async function loadPublicProduct(productId: string) {
   const id = String(productId || '').trim();
   if (!id) return { product: null, source: 'empty' as const };
-  return getDualProduct(id);
+  return getDualProduct(id, PRODUCT_READ_CACHE);
 }
 
-// Product snapshots are cached on the server only. Customer browsers are told
-// not to cache price-bearing API responses, while Admin product writes purge
-// this tag immediately so a saved price/stock change cannot be hidden behind
-// the performance cache.
 export const getPublicProductSnapshot = unstable_cache(
   loadPublicProduct,
-  ['primehub-public-product-dual-v1'],
+  ['primehub-public-product-dual-v2'],
   { revalidate: 60, tags: ['public-products'] },
 );
 
 async function loadStorefrontSettingsResult() {
   for (const delay of RETRY_DELAYS_MS) {
     await wait(delay);
-    const result = await getStorefrontSettingsWithBigDealRecovery();
+    const result = await getStorefrontSettingsWithBigDealRecovery(SETTINGS_READ_CACHE);
 
-    // Do not cache DEFAULT/blank settings caused by a transient backend failure.
     if (result.source !== 'empty' && Object.keys(result.documents).length > 0) {
       return result;
     }
@@ -69,7 +67,7 @@ async function loadStorefrontSettingsResult() {
 
 export const getStorefrontSettingsResultSnapshot = unstable_cache(
   loadStorefrontSettingsResult,
-  ['primehub-storefront-settings-dual-v4'],
+  ['primehub-storefront-settings-dual-v5'],
   { revalidate: 60, tags: ['storefront-settings'] },
 );
 
@@ -82,7 +80,10 @@ export async function getStorefrontSettingsSnapshot() {
 }
 
 async function loadPrimeSkills() {
-  const [skillsResult, settingsResult] = await Promise.all([getDualSkills(), getDualSettings()]);
+  const [skillsResult, settingsResult] = await Promise.all([
+    getDualSkills(SKILLS_READ_CACHE),
+    getDualSettings(SKILLS_READ_CACHE),
+  ]);
   const main = settingsResult.documents.main || {};
   return {
     skills: skillsResult.skills,
@@ -93,6 +94,6 @@ async function loadPrimeSkills() {
 
 export const getPrimeSkillsSnapshot = unstable_cache(
   loadPrimeSkills,
-  ['primehub-prime-skills-dual-v2'],
+  ['primehub-prime-skills-dual-v3'],
   { revalidate: 600, tags: ['prime-skills'] },
 );
