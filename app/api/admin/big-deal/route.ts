@@ -37,6 +37,7 @@ function cleanNumbers(value: unknown) {
 
 function normalizeDeal(raw: any): DailyDeal {
   const imageUrls = cleanStrings(raw?.imageUrls);
+  const galleryImagesRaw = cleanStrings(raw?.galleryImages);
   const productIdsRaw = cleanStrings(raw?.productIds);
   const titlesRaw = cleanStrings(raw?.titles);
   const categoryIds = cleanStrings(raw?.categoryIds);
@@ -60,6 +61,7 @@ function normalizeDeal(raw: any): DailyDeal {
   const images = Array.from({ length: SLOT_COUNT }, (_, index) =>
     imageUrls[index] || (index === 0 ? String(raw?.imageUrl || '').trim() : ''),
   );
+  const galleryImages = Array.from({ length: SLOT_COUNT }, (_, index) => galleryImagesRaw[index] || '');
   const originalPrices = Array.from({ length: SLOT_COUNT }, (_, index) =>
     originalPricesRaw[index] || (index < legacyLength ? Math.max(0, Number(raw?.originalPrice || 0)) : 0),
   );
@@ -75,6 +77,7 @@ function normalizeDeal(raw: any): DailyDeal {
     categoryIds: Array.from({ length: SLOT_COUNT }, (_, index) => categoryIds[index] || ''),
     imageUrl: images[0] || String(raw?.imageUrl || '').trim(),
     imageUrls: images,
+    galleryImages,
     originalPrices,
     dealPrices,
     originalPrice: originalPrices[0] || Math.max(0, Number(raw?.originalPrice || 0)),
@@ -121,7 +124,7 @@ function validateDeal(deal: DailyDeal) {
       continue;
     }
     if (!slotComplete(deal, index)) {
-      return `Deal ${index + 1} needs an image, product, original price and a lower Big Deal price.`;
+      return `Deal ${index + 1} needs a product, display image, original price and a lower Big Deal price.`;
     }
     if (foundGap) return 'Big Deals must be saved in order without an empty slot between them.';
   }
