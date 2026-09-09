@@ -59,7 +59,7 @@ export function readCachedProducts<T extends CacheableProduct = CacheableProduct
 async function fetchProductBatch(ids: string[]) {
   const response = await fetch(
     `/api/storefront/read?type=products&ids=${encodeURIComponent(JSON.stringify(ids))}`,
-    { cache: 'default' },
+    { cache: 'no-store' },
   );
   if (!response.ok) return {} as Record<string, CacheableProduct>;
 
