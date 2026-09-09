@@ -3,10 +3,9 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, CalendarDays, ShoppingCart, Sparkles, LockKeyhole } from 'lucide-react';
-import { collection, onSnapshot } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
 import { useCartStore } from '@/lib/cartStore';
 import { useSettings } from '@/lib/useSettings';
+import { loadProductsForNavigation } from '@/lib/productNavigationCache';
 import type { Product, Weekday, WeeklyDeal } from '@/lib/types';
 
 const DAYS: Weekday[] = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
@@ -61,6 +60,7 @@ export default function WeeklyDealsPage() {
   const [nowTick, setNowTick] = useState(Date.now());
   const nowState = pakistanParts();
   const today = nowState.weekday;
+  const productIdsKey = useMemo(() => Array.from(new Set((settings.weeklyDeals || []).map((deal) => deal.productId).filter(Boolean))).sort().join('\u0001'), [settings.weeklyDeals]);
 
   useEffect(() => {
     const timer = window.setInterval(() => setNowTick(Date.now()), 1000);
@@ -68,12 +68,17 @@ export default function WeeklyDealsPage() {
   }, []);
 
   useEffect(() => {
-    return onSnapshot(collection(db, 'products'), (snapshot) => {
-      const next: Record<string, Product> = {};
-      snapshot.forEach((doc) => { next[doc.id] = { id: doc.id, ...doc.data() } as Product; });
-      setProducts(next);
-    }, () => setProducts({}));
-  }, []);
+    let cancelled = false;
+    const ids = productIdsKey ? productIdsKey.split('\u0001') : [];
+    if (ids.length === 0) {
+      setProducts({});
+      return () => { cancelled = true; };
+    }
+    loadProductsForNavigation<Product>(ids)
+      .then((next) => { if (!cancelled) setProducts(next); })
+      .catch(() => { if (!cancelled) setProducts({}); });
+    return () => { cancelled = true; };
+  }, [productIdsKey]);
 
   const deals = useMemo(() => {
     const source = (settings.weeklyDeals || []).filter((deal) => deal.productId);
