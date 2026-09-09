@@ -1,7 +1,7 @@
 import 'server-only';
 import { unstable_cache } from 'next/cache';
 import { getAdminDb } from '@/lib/firebaseAdmin';
-import { getDualSettings } from '@/lib/dualReadServer';
+import { getDualSettings, type DualReadCacheOptions } from '@/lib/dualReadServer';
 
 const SLOT_COUNT = 7;
 
@@ -45,9 +45,6 @@ function dedicatedDeal(main: any) {
 
 function legacyManagerRotation(main: any) {
   const legacy = main?.dailyDeal && typeof main.dailyDeal === 'object' ? main.dailyDeal : null;
-  // The old Store Settings Big Deal was a single deal. The dedicated Big Deal
-  // manager saves a complete 7-slot rotation, so only that shape is accepted as
-  // a temporary migration fallback.
   return legacy && completeBigDealSlotCount(legacy) >= SLOT_COUNT ? legacy : null;
 }
 
@@ -61,8 +58,6 @@ function withStorefrontBigDeal(result: Awaited<ReturnType<typeof getDualSettings
       ...result.documents,
       main: {
         ...main,
-        // Storefront consumers continue using `dailyDeal`, but the value now
-        // comes only from the dedicated admin Big Deal field.
         dailyDeal: deal || null,
       },
     },
@@ -83,8 +78,8 @@ const getFirebaseBigDealCandidates = unstable_cache(
   { revalidate: 60, tags: ['storefront-settings'] },
 );
 
-export async function getStorefrontSettingsWithBigDealRecovery() {
-  const result = await getDualSettings();
+export async function getStorefrontSettingsWithBigDealRecovery(cacheOptions?: DualReadCacheOptions) {
+  const result = await getDualSettings(cacheOptions);
   const main = result.documents?.main && typeof result.documents.main === 'object'
     ? result.documents.main
     : {};
@@ -92,8 +87,6 @@ export async function getStorefrontSettingsWithBigDealRecovery() {
   const primaryDedicated = dedicatedDeal(main);
   if (primaryDedicated) return withStorefrontBigDeal(result, primaryDedicated);
 
-  // If Supabase has not received the new dedicated field yet, prefer a Firebase
-  // dedicated copy before considering any legacy data.
   if (result.source === 'supabase') {
     try {
       const firebase = await getFirebaseBigDealCandidates();
@@ -106,9 +99,6 @@ export async function getStorefrontSettingsWithBigDealRecovery() {
     }
   }
 
-  // One-time compatibility for rotations that were already saved by the
-  // dedicated 7-Day Big Deal manager before this ownership split. A legacy
-  // single Store Settings deal is deliberately ignored.
   const primaryLegacyRotation = legacyManagerRotation(main);
   if (primaryLegacyRotation) return withStorefrontBigDeal(result, primaryLegacyRotation);
 
@@ -124,7 +114,5 @@ export async function getStorefrontSettingsWithBigDealRecovery() {
     }
   }
 
-  // No dedicated icon data exists. Explicitly suppress any old single Big Deal
-  // left behind by Store Settings so it cannot appear on the homepage.
   return withStorefrontBigDeal(result, null);
 }
