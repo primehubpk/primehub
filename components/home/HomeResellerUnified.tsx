@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { collection, doc, onSnapshot } from "firebase/firestore";
-import { ArrowRight, CheckCircle2, ChevronRight, Gift, History, Instagram, Music2, PlayCircle, Sparkles, WalletCards } from "lucide-react";
+import { ArrowRight, CheckCircle2, ChevronRight, Gift, History, Instagram, Music2, PlayCircle, Share2, Sparkles, WalletCards } from "lucide-react";
 import { auth, db } from "@/lib/firebase";
 import { normalizeImageUrl } from "@/lib/imageUrl";
 import { DEFAULT_MONTHLY_CHALLENGE, DEFAULT_RESELLER_TASKS, type MonthlyChallengeSettings, type ResellerTask } from "@/lib/resellerTasks";
@@ -14,6 +14,10 @@ import { useSettings } from "@/lib/useSettings";
 import HomeHeading from "./HomeHeading";
 
 const GUEST_KEY = "phdeals-guest-rewards";
+const GUEST_ID_KEY = "primehub_reseller_guest_id_v1";
+const ORDER_PROGRESS_KEY = "primehub_reseller_order_progress_v1";
+const TASK_EVENT_KEY = "primehub_reseller_task_events_v1";
+const PENDING_GUEST_PRIZE_KEY = "primehub_reseller_pending_prize_v1";
 const SOCIAL_TASK_IDS = new Set(["youtube", "instagram", "tiktok"]);
 const CASH_TASK_IDS = new Set(["weekly-orders", "monthly-orders"]);
 const EMPTY_WALLET: RewardWallet = { points: 0, streak: 0, coupons: [] };
@@ -25,13 +29,33 @@ type RewardSettings = { guestMode?: boolean; checkInRewards?: number[]; spinWhee
 type RewardGift = { id: string; productId?: string; pointsCost: number; active?: boolean; stock?: number; imageUrl?: string; title?: string };
 type HomeSettings = { resellerHomeEnabled?: boolean; resellerTasks?: ResellerTask[]; resellerTiers?: ResellerTier[]; resellerMonthlyChallenge?: Partial<MonthlyChallengeSettings>; resellerVoucherImages?: Record<string, string> };
 type Voucher = { id: string; title: string; description: string; requirement: string; art: string; icon: string; minOrders: number; imageUrl?: string };
+type OrderProgress = { orderId: string; createdAt: string; wholesale?: boolean };
 
 function dayKey() { return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Karachi" }).format(new Date()); }
+function sleep(ms: number) { return new Promise(resolve => window.setTimeout(resolve, ms)); }
 function readGuestWallet(): RewardWallet { try { const raw = window.localStorage.getItem(GUEST_KEY); return raw ? { ...EMPTY_WALLET, ...JSON.parse(raw) } : EMPTY_WALLET; } catch { return EMPTY_WALLET; } }
 function saveGuestWallet(wallet: RewardWallet) { try { window.localStorage.setItem(GUEST_KEY, JSON.stringify(wallet)); } catch {} }
-function taskIcon(id: string) { if (id === "youtube") return PlayCircle; if (id === "instagram") return Instagram; if (id === "tiktok") return Music2; return CheckCircle2; }
+function guestId() { try { let id = window.localStorage.getItem(GUEST_ID_KEY) || ""; if (!id) { id = `g_${crypto.randomUUID().replace(/-/g, "")}`; window.localStorage.setItem(GUEST_ID_KEY, id); } return id; } catch { return ""; } }
+function readOrders(): OrderProgress[] { try { const parsed = JSON.parse(window.localStorage.getItem(ORDER_PROGRESS_KEY) || "[]"); return Array.isArray(parsed) ? parsed : []; } catch { return []; } }
+function readTaskEvents(): string[] { try { const parsed = JSON.parse(window.localStorage.getItem(TASK_EVENT_KEY) || "[]"); return Array.isArray(parsed) ? parsed.map(String) : []; } catch { return []; } }
+function saveTaskEvent(taskId: string) { try { const list = readTaskEvents(); if (!list.includes(taskId)) window.localStorage.setItem(TASK_EVENT_KEY, JSON.stringify([...list, taskId])); window.dispatchEvent(new Event("primehub:reseller-progress")); } catch {} }
+function taskIcon(id: string) { if (id === "youtube") return PlayCircle; if (id === "instagram") return Instagram; if (id === "tiktok") return Music2; if (id === "whatsapp-share" || id === "refer-reseller") return Share2; return CheckCircle2; }
 function taskRewardLabel(task: ResellerTask) { return CASH_TASK_IDS.has(task.id) ? `Rs. ${Number(task.reward || 0).toLocaleString()}` : `+${Number(task.reward || 0)}`; }
 function premiumVoucherImage(title: string, art: string, icon: string) { const safe = title.replace(/[<>&]/g, ""); const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='640' height='360'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop stop-color='${art}'/><stop offset='1' stop-color='#14140F'/></linearGradient></defs><rect width='640' height='360' rx='36' fill='url(#g)'/><text x='52' y='142' font-size='78'>${icon}</text><text x='52' y='230' fill='white' font-size='34' font-weight='800'>${safe}</text><text x='52' y='276' fill='white' opacity='.72' font-size='18'>PRIMEHUB PREMIUM REWARD</text></svg>`; return `data:image/svg+xml,${encodeURIComponent(svg)}`; }
+function localProgress(orders: OrderProgress[]) {
+  const now = new Date();
+  const startMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+  const startWeekDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const day = startWeekDate.getDay();
+  startWeekDate.setDate(startWeekDate.getDate() - ((day + 6) % 7));
+  const startWeek = startWeekDate.getTime();
+  const valid = orders.filter(order => Number.isFinite(new Date(order.createdAt).getTime()));
+  return {
+    weekly: valid.filter(order => new Date(order.createdAt).getTime() >= startWeek).length,
+    monthly: valid.filter(order => new Date(order.createdAt).getTime() >= startMonth).length,
+    wholesale: valid.some(order => order.wholesale === true) ? 1 : 0,
+  };
+}
 
 const tabs = [["Home", "#reseller-home"], ["Rewards", "#reseller-rewards"], ["Tasks", "#reseller-tasks"], ["Wallet", "#reseller-wallet"], ["Tiers", "#reseller-tiers"], ["Vouchers", "#reseller-vouchers"], ["Gifts", "#reseller-gifts"]] as const;
 
@@ -48,8 +72,19 @@ export default function HomeResellerUnified() {
   const [rewardSettings, setRewardSettings] = useState<RewardSettings>(DEFAULT_REWARD_SETTINGS);
   const [gifts, setGifts] = useState<RewardGift[]>([]);
   const [busy, setBusy] = useState(false);
+  const [spinning, setSpinning] = useState(false);
   const [message, setMessage] = useState("");
   const [spinPrize, setSpinPrize] = useState<RewardPrize | null>(null);
+  const [orders, setOrders] = useState<OrderProgress[]>([]);
+  const [taskEvents, setTaskEvents] = useState<string[]>([]);
+  const [pendingGuestPrize, setPendingGuestPrize] = useState<RewardPrize | null>(null);
+
+  useEffect(() => {
+    const refreshLocal = () => { setOrders(readOrders()); setTaskEvents(readTaskEvents()); try { const raw = localStorage.getItem(PENDING_GUEST_PRIZE_KEY); setPendingGuestPrize(raw ? JSON.parse(raw) : null); } catch {} };
+    refreshLocal();
+    window.addEventListener("primehub:reseller-progress", refreshLocal);
+    return () => window.removeEventListener("primehub:reseller-progress", refreshLocal);
+  }, []);
 
   useEffect(() => {
     let stopWallet: (() => void) | undefined;
@@ -76,7 +111,10 @@ export default function HomeResellerUnified() {
 
   const today = dayKey();
   const streak = Math.min(7, Math.max(0, Number(wallet.streak || 0)));
-  const monthlyOrders = Math.max(0, Number(profile?.monthlyOrders || 0));
+  const storedProgress = localProgress(orders);
+  const profileMonthlyOrders = Math.max(0, Number(profile?.monthlyOrders || 0));
+  const monthlyOrders = Math.max(profileMonthlyOrders, storedProgress.monthly);
+  const weeklyOrders = storedProgress.weekly;
   const cashAvailable = Math.max(0, Number(profile?.walletAvailable || 0));
   const cashPending = Math.max(0, Number(profile?.walletPending || 0));
   const wheelSlots = (rewardSettings.spinWheelSlots || []).filter((slot) => slot.active !== false && Number(slot.stock ?? 1) > 0).slice(0, 5);
@@ -104,10 +142,13 @@ export default function HomeResellerUnified() {
   async function rewardAction(action: "checkin" | "spin") {
     if (busy) return;
     setBusy(true); setMessage(""); setSpinPrize(null);
+    if (action === "spin") setSpinning(true);
     try {
       if (user) {
         const token = await user.getIdToken();
-        const response = await fetch("/api/reseller/reward-action", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ action }) });
+        const responsePromise = fetch("/api/reseller/reward-action", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ action }) });
+        if (action === "spin") await sleep(850);
+        const response = await responsePromise;
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || "Reward action failed.");
         if (data.wallet) setWallet({ ...EMPTY_WALLET, ...data.wallet });
@@ -119,22 +160,63 @@ export default function HomeResellerUnified() {
         const points = Math.max(0, Number(rewardSettings.checkInRewards?.[nextStreak - 1] ?? 10));
         const next = { ...wallet, points: Number(wallet.points || 0) + points, streak: nextStreak, lastCheckIn: today };
         setWallet(next); saveGuestWallet(next);
+      } else if (action === "spin" && rewardSettings.guestMode !== false) {
+        const responsePromise = fetch("/api/reseller/guest-reward", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "spin", guestId: guestId() }) });
+        await sleep(850);
+        const response = await responsePromise;
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Spin failed.");
+        const next = { ...wallet, lastSpin: data.wallet?.lastSpin || today };
+        setWallet(next); saveGuestWallet(next); setSpinPrize(data.prize || null);
+        if (data.prize && data.prize.type !== "try-again") { setPendingGuestPrize(data.prize); try { localStorage.setItem(PENDING_GUEST_PRIZE_KEY, JSON.stringify(data.prize)); } catch {} }
       } else window.location.href = "/reseller/join?redirect=/";
     } catch (error) { setMessage(error instanceof Error ? error.message : "Reward action failed."); }
+    finally { setSpinning(false); setBusy(false); }
+  }
+
+  async function claimGuestPrize() {
+    if (!pendingGuestPrize) return;
+    if (!user) { window.location.href = "/login?redirect=/#reseller-rewards"; return; }
+    setBusy(true); setMessage("");
+    try {
+      const token = await user.getIdToken();
+      const response = await fetch("/api/reseller/guest-reward", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ action: "claim", guestId: guestId() }) });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Reward claim failed.");
+      if (data.wallet) setWallet({ ...EMPTY_WALLET, ...data.wallet });
+      setPendingGuestPrize(null); try { localStorage.removeItem(PENDING_GUEST_PRIZE_KEY); } catch {}
+      setMessage("Reward claimed successfully.");
+    } catch (error) { setMessage(error instanceof Error ? error.message : "Reward claim failed."); }
     finally { setBusy(false); }
   }
 
-  async function openTask(task: ResellerTask) {
-    const current = auth.currentUser;
-    if (!current) { window.location.href = "/login?redirect=/#reseller-tasks"; return; }
+  function taskProgress(task: ResellerTask) {
+    if (task.id === "weekly-orders") return { value: weeklyOrders, target: 3 };
+    if (task.id === "monthly-orders") return { value: monthlyOrders, target };
+    if (task.id === "wholesale-order") return { value: storedProgress.wholesale, target: 1 };
+    return { value: taskEvents.includes(task.id) ? 1 : 0, target: 1 };
+  }
+
+  async function startTask(task: ResellerTask) {
     setMessage("");
-    try {
-      const token = await current.getIdToken();
-      const response = await fetch("/api/reseller/task-claims", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ taskId: task.id, action: "open" }) });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Task open failed.");
-      if (task.url) window.open(task.url, "_blank", "noopener,noreferrer"); else setMessage("Admin panel se is task ka platform link add karein.");
-    } catch (error) { setMessage(error instanceof Error ? error.message : "Task open nahi hua."); }
+    if (task.id === "weekly-orders" || task.id === "monthly-orders" || task.id === "wholesale-order") { window.location.href = "/shop"; return; }
+    const shareUrl = String(task.url || (typeof window !== "undefined" ? `${window.location.origin}/reseller/join?ref=${encodeURIComponent(user?.uid || guestId())}` : "")).trim();
+    const shareText = String(task.shareText || task.description || task.title).trim();
+    if (task.id === "whatsapp-share") {
+      const text = `${shareText}\n${shareUrl || window.location.origin}`.trim();
+      saveTaskEvent(task.id); setTaskEvents(readTaskEvents());
+      window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer"); return;
+    }
+    if (task.id === "refer-reseller") {
+      const url = shareUrl || `${window.location.origin}/reseller/join?ref=${encodeURIComponent(user?.uid || guestId())}`;
+      try { if (navigator.share) await navigator.share({ title: "PrimeHub Reseller Club", text: shareText, url }); else { await navigator.clipboard.writeText(`${shareText}\n${url}`); setMessage("Referral link copied — ab share karein."); } saveTaskEvent(task.id); setTaskEvents(readTaskEvents()); } catch {}
+      return;
+    }
+    if (SOCIAL_TASK_IDS.has(task.id)) {
+      if (user) { try { const token = await user.getIdToken(); await fetch("/api/reseller/task-claims", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ taskId: task.id, action: "open" }) }); } catch {} }
+      if (task.url) window.open(task.url, "_blank", "noopener,noreferrer"); else setMessage("Admin panel se is task ka platform link add karein."); return;
+    }
+    if (task.url) window.open(task.url, "_blank", "noopener,noreferrer"); else window.location.href = "/shop";
   }
 
   const renderGift = (gift: RewardGift, index: number, first = false) => <Link id={first ? "reseller-gifts" : undefined} href="/rewards#redeem-rewards" className="hru-rail-card hru-gift" key={`${gift.id}-${index}`}>{gift.imageUrl ? <img src={normalizeImageUrl(gift.imageUrl)} alt={gift.title || "Reward gift"} /> : <Gift size={30} />}<h4>{gift.title || "PrimeHub Reward Gift"}</h4><strong>{Number(gift.pointsCost || 0).toLocaleString()} points</strong></Link>;
@@ -157,7 +239,7 @@ export default function HomeResellerUnified() {
             <article className="hru-rail-card hru-wheel-card">
               <div className="hru-card-kicker">Spin & Win</div>
               <h3>Your reward wheel</h3>
-              <div className={`hru-wheel ${busy ? "spinning" : ""}`}>
+              <div className={`hru-wheel ${spinning ? "spinning" : ""}`}>
                 <div className="hru-wheel-pointer" />
                 {(wheelSlots.length ? wheelSlots : [{ id: "empty", name: "Admin reward", type: "try-again" }]).map((slot, index) => {
                   const angle = index * 72 + 36;
@@ -166,11 +248,12 @@ export default function HomeResellerUnified() {
                 <button type="button" onClick={() => void rewardAction("spin")} disabled={busy || wallet.lastSpin === today}>WIN</button>
               </div>
               {spinPrize ? <div className="hru-spin-result">{spinPrize.imageUrl ? <img src={normalizeImageUrl(spinPrize.imageUrl)} alt={spinPrize.name} /> : null}<span>{spinPrize.name}</span></div> : <div className="hru-wheel-status">{wallet.lastSpin === today ? "Come tomorrow" : "1 spin today"}</div>}
+              {pendingGuestPrize ? <button className="hru-claim-button" type="button" onClick={() => void claimGuestPrize()}>{user ? "Claim reward" : "Login to claim"}</button> : null}
             </article>
 
             {tasks.map((task, index) => {
-              const Icon = taskIcon(task.id); const social = SOCIAL_TASK_IDS.has(task.id); const isMonthly = task.id.includes("monthly"); const isWeekly = task.id.includes("weekly"); const autoTarget = isMonthly ? target : isWeekly ? 3 : 1;
-              return <article className="hru-rail-card hru-task" id={index === 0 ? "reseller-tasks" : undefined} key={task.id}><div className="hru-task-top"><div className="hru-task-icon"><Icon size={18} /></div><span>{taskRewardLabel(task)}</span></div><h4>{task.title}</h4><p>{task.description}</p>{social ? <button className="hru-task-open" type="button" onClick={() => void openTask(task)}>Open {task.id}<ChevronRight size={12} /></button> : <b className="hru-auto-task"><CheckCircle2 size={12} />{Math.min(monthlyOrders, autoTarget)}/{autoTarget} completed</b>}</article>;
+              const Icon = taskIcon(task.id); const progress = taskProgress(task); const complete = progress.value >= progress.target;
+              return <article className="hru-rail-card hru-task" id={index === 0 ? "reseller-tasks" : undefined} key={task.id}><div className="hru-task-top"><div className="hru-task-icon"><Icon size={18} /></div><span>{taskRewardLabel(task)}</span></div><h4>{task.title}</h4><p>{task.description}</p><b className={`hru-auto-task ${complete ? "complete" : ""}`}><CheckCircle2 size={12} />{Math.min(progress.value, progress.target)}/{progress.target} {complete ? "— reward unlocked" : "completed"}</b><button className="hru-task-open" type="button" onClick={() => void startTask(task)}>{complete && CASH_TASK_IDS.has(task.id) ? (user ? "Reward unlocked" : "Login to claim") : task.id === "whatsapp-share" ? "Share now" : task.id === "refer-reseller" ? "Share referral" : "Start task"}<ChevronRight size={12} /></button></article>;
             })}
 
             <article className="hru-rail-card hru-wallet-card" id="reseller-wallet">
@@ -185,7 +268,7 @@ export default function HomeResellerUnified() {
           <div className="hru-master-row hru-bottom-row">
             {tiers.map((tier, index) => { const current = monthlyOrders >= Number(tier.minMonthlyOrders || 0) && (index === tiers.length - 1 || monthlyOrders < Number(tiers[index + 1]?.minMonthlyOrders || Infinity)); return <article className={`hru-rail-card hru-tier ${current ? "current" : ""}`} id={index === 0 ? "reseller-tiers" : undefined} key={tier.id || tier.name}><span className="hru-tier-number">{index + 1}</span><small>{current ? "CURRENT" : `${Number(tier.minMonthlyOrders || 0)}+ orders`}</small><h4>{tier.name}</h4><strong>{Number(tier.discountPercent || 0)}% <em>OFF</em></strong></article>; })}
 
-            {vouchers.map((voucher, index) => <article className="hru-rail-card hru-voucher" id={index === 0 ? "reseller-vouchers" : undefined} key={voucher.id}><img src={voucher.imageUrl ? normalizeImageUrl(voucher.imageUrl) : premiumVoucherImage(voucher.title, voucher.art, voucher.icon)} alt={voucher.title} /><small>{monthlyOrders < voucher.minOrders ? "Locked" : "Available"}</small><h4>{voucher.title}</h4><p>{voucher.requirement}</p></article>)}
+            {vouchers.map((voucher, index) => <article className="hru-rail-card hru-voucher" id={index === 0 ? "reseller-vouchers" : undefined} key={voucher.id}><img src={voucher.imageUrl ? normalizeImageUrl(voucher.imageUrl) : premiumVoucherImage(voucher.title, voucher.art, voucher.icon)} alt={voucher.title} /><small>{monthlyOrders < voucher.minOrders ? "Locked" : user ? "Available" : "Login to claim"}</small><h4>{voucher.title}</h4><p>{voucher.requirement}</p></article>)}
 
             {bottomGifts.map((gift, index) => renderGift(gift, index, topGifts.length === 0 && index === 0))}
             {!gifts.length ? <Link id="reseller-gifts" href="/rewards#redeem-rewards" className="hru-rail-card hru-gift"><Gift size={30} /><h4>Reward gifts</h4><strong>Admin-controlled products</strong></Link> : null}
