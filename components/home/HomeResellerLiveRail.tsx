@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { collection, doc, onSnapshot } from "firebase/firestore";
-import { CheckCircle2, ChevronRight, Gift } from "lucide-react";
+import { CheckCircle2, ChevronRight, Gift, History, Users } from "lucide-react";
 import { auth, db } from "@/lib/firebase";
 import { DEFAULT_MONTHLY_CHALLENGE, DEFAULT_RESELLER_TASKS, type ResellerTask } from "@/lib/resellerTasks";
 import { getResellerTiers } from "@/lib/resellerTiers";
@@ -69,6 +69,8 @@ export default function HomeResellerLiveRail(){
   const today=dayKey(); const guestWallet=typeof window!=="undefined"?readGuestWallet():{}; const usedSpin=wallet.lastSpin===today||guestWallet.lastSpin===today;
   const streak=Math.max(0,Math.min(7,Number(wallet.streak||0))); const monthlyOrders=Math.max(0,Number(profile?.monthlyOrders||0));
   const cashAvailable=Math.max(0,Number(profile?.walletAvailable||0)); const cashPending=Math.max(0,Number(profile?.walletPending||0));
+  const currentTier=tiers.reduce((selected,tier)=>monthlyOrders>=Number(tier.minMonthlyOrders||0)?tier:selected,tiers[0]);
+  const nextTier=tiers.find(tier=>Number(tier.minMonthlyOrders||0)>monthlyOrders);
   const challenge={...DEFAULT_MONTHLY_CHALLENGE,...(source.resellerMonthlyChallenge||{})}; const target=Math.max(1,Number(challenge.targetOrders||10)); const vi=source.resellerVoucherImages||{};
   const vouchers:Voucher[]=[
     {id:"cash-500",title:"Rs. 500 Cash",description:"Credit to wallet",requirement:"5 orders",icon:"₨",art:"#0E7C6F",minOrders:5,imageUrl:vi["cash-500"]},
@@ -96,6 +98,16 @@ export default function HomeResellerLiveRail(){
 
   return <section className="ph-live-rail" id="reseller-home">
     <HomeHeading>Reseller Club</HomeHeading>
+    <div className="ph-reseller-profile">
+      <div className="ph-reseller-profile-icon"><Users size={19}/></div>
+      {user ? <>
+        <div className="ph-reseller-profile-copy"><small>RESELLER PROFILE</small><strong>{profile?.displayName||user.displayName||user.email||"PrimeHub Reseller"}</strong><span>{currentTier?.name||"Starter"} tier · {monthlyOrders} monthly orders{nextTier?` · ${Math.max(0,nextTier.minMonthlyOrders-monthlyOrders)} to ${nextTier.name}`:" · Top tier"}</span></div>
+        <Link className="ph-reseller-profile-action" href="/reseller/wallet"><History size={13}/> History</Link>
+      </> : <>
+        <div className="ph-reseller-profile-copy"><small>RESELLER PROFILE</small><strong>Login to your Reseller Club</strong><span>See your tier, wallet, points and order progress.</span></div>
+        <Link className="ph-reseller-profile-action" href="/login?redirect=/#reseller-home">Login</Link>
+      </>}
+    </div>
     <div className="ph-live-tabs"><a href="#reseller-rewards">Rewards</a><a href="#reseller-tasks">Tasks</a><a href="#reseller-wallet">Wallet</a><a href="#reseller-tiers">Tiers</a><Link href="/reseller/dashboard">Open Club</Link></div>
     <div className="ph-live-hint">Swipe → all tasks, wallet, tiers, vouchers & gifts</div>
     <div className="ph-live-scroll"><div className="ph-live-grid">
