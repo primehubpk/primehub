@@ -59,6 +59,38 @@ async function firebaseAction(uid: string, action: string, guestId = '') {
   return { wallet: result, prize };
 }
 
+export async function GET(request: Request) {
+  const header = request.headers.get('authorization') || '';
+  if (!header.startsWith('Bearer ')) return NextResponse.json({ error: 'Authentication required.' }, { status: 401 });
+  try {
+    const user = await getAdminAuth().verifyIdToken(header.slice(7));
+    const url = new URL(request.url);
+    const guestId = validGuestId(url.searchParams.get('guestId'));
+    const today = dayKey();
+    if (isSupabaseWriteConfigured()) {
+      const [savedWallet, guest, settings] = await Promise.all([readSupabaseWallet(user.uid), readSupabaseGuest(guestId), readSupabaseRewardSettings()]);
+      let wallet = { points: 0, streak: 0, coupons: [], freeDeliveryCredits: 0, history: [], ...savedWallet } as Wallet;
+      if (guest.lastSpin === today && wallet.lastSpin !== today) {
+        wallet = { ...wallet, lastSpin: today };
+        await writeSupabaseWallet(user.uid, wallet);
+        await mirrorFirebaseWallet(user.uid, wallet);
+      }
+      return NextResponse.json({ ok: true, source: 'supabase', wallet, settings, guest: { lastSpin: guest.lastSpin, hasPendingPrize: Boolean(guest.pendingPrize && guest.pendingPrizeToken) }, spinUsedToday: wallet.lastSpin === today || guest.lastSpin === today });
+    }
+    const db = getAdminDb();
+    const [walletSnap, settingsSnap, guestSnap] = await Promise.all([
+      db.collection('user_rewards').doc(user.uid).get(),
+      db.collection('settings').doc('rewards').get(),
+      guestId ? db.collection('user_rewards').doc(`guest_${guestId}`).get() : Promise.resolve(null),
+    ]);
+    const wallet = { points: 0, streak: 0, ...(walletSnap.data() || {}) } as Wallet;
+    const guest = (guestSnap?.data() || {}) as GuestWallet;
+    return NextResponse.json({ ok: true, source: 'firebase-fallback', wallet, settings: settingsSnap.data() || {}, guest: { lastSpin: guest.lastSpin, hasPendingPrize: Boolean(guest.pendingPrize && guest.pendingPrizeToken) }, spinUsedToday: wallet.lastSpin === today || guest.lastSpin === today });
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Reward state unavailable.' }, { status: 400 });
+  }
+}
+
 export async function POST(request: Request) {
   const header = request.headers.get('authorization') || '';
   if (!header.startsWith('Bearer ')) return NextResponse.json({ error: 'Authentication required.' }, { status: 401 });
