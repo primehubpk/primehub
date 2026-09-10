@@ -92,6 +92,17 @@ async function getFreshFirebaseWholesaleVideos() {
   }
 }
 
+export async function getFreshRewardSettingsSnapshot() {
+  try {
+    const snapshot = await getAdminDb().collection('settings').doc('rewards').get();
+    if (!snapshot.exists) return {};
+    return snapshot.data() || {};
+  } catch (error) {
+    console.warn('Fresh Firebase reward settings recovery skipped', error);
+    return {};
+  }
+}
+
 export async function getFreshStorefrontSettingsSnapshot() {
   const [result, firebaseWholesaleVideos] = await Promise.all([
     getStorefrontSettingsWithBigDealRecovery({ cache: 'no-store' }),

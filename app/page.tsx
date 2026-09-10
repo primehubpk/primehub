@@ -1,5 +1,5 @@
 import HomePageClient from '@/components/HomePageClient';
-import { getFreshStorefrontSettingsSnapshot, getPublicCatalogSnapshot } from '@/lib/publicCatalogServer';
+import { getFreshRewardSettingsSnapshot, getFreshStorefrontSettingsSnapshot, getPublicCatalogSnapshot } from '@/lib/publicCatalogServer';
 import type { Category, SiteSettings } from '@/lib/types';
 import type { Product } from '@/components/shop/ShopTypes';
 
@@ -42,9 +42,10 @@ function hydrateBigDealImages(settings: Record<string, any>, products: any[]) {
 }
 
 export default async function HomePage() {
-  const [catalogResult, settingsResult] = await Promise.allSettled([
+  const [catalogResult, settingsResult, rewardsResult] = await Promise.allSettled([
     getPublicCatalogSnapshot(),
     getFreshStorefrontSettingsSnapshot(),
+    getFreshRewardSettingsSnapshot(),
   ]);
 
   const snapshot = catalogResult.status === 'fulfilled'
@@ -53,7 +54,13 @@ export default async function HomePage() {
   const rawSettings = settingsResult.status === 'fulfilled'
     ? settingsResult.value
     : {};
-  const initialSettings = hydrateBigDealImages(rawSettings as Record<string, any>, snapshot.products as any[]);
+  const rewardSettings = rewardsResult.status === 'fulfilled'
+    ? rewardsResult.value
+    : {};
+  const initialSettings = {
+    ...hydrateBigDealImages(rawSettings as Record<string, any>, snapshot.products as any[]),
+    homeRewardSettings: rewardSettings,
+  };
 
   return (
     <HomePageClient
