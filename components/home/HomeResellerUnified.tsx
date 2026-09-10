@@ -15,6 +15,7 @@ import HomeHeading from "./HomeHeading";
 
 const GUEST_KEY = "phdeals-guest-rewards";
 const SOCIAL_TASK_IDS = new Set(["youtube", "instagram", "tiktok"]);
+const CASH_TASK_IDS = new Set(["weekly-orders", "monthly-orders"]);
 const EMPTY_WALLET: RewardWallet = { points: 0, streak: 0, coupons: [] };
 const DEFAULT_REWARD_SETTINGS: RewardSettings = { guestMode: true, checkInRewards: [10, 15, 20, 25, 30, 50, 100], spinWheelSlots: [] };
 
@@ -29,6 +30,7 @@ function dayKey() { return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Ka
 function readGuestWallet(): RewardWallet { try { const raw = window.localStorage.getItem(GUEST_KEY); return raw ? { ...EMPTY_WALLET, ...JSON.parse(raw) } : EMPTY_WALLET; } catch { return EMPTY_WALLET; } }
 function saveGuestWallet(wallet: RewardWallet) { try { window.localStorage.setItem(GUEST_KEY, JSON.stringify(wallet)); } catch {} }
 function taskIcon(id: string) { if (id === "youtube") return PlayCircle; if (id === "instagram") return Instagram; if (id === "tiktok") return Music2; return CheckCircle2; }
+function taskRewardLabel(task: ResellerTask) { return CASH_TASK_IDS.has(task.id) ? `Rs. ${Number(task.reward || 0).toLocaleString()}` : `+${Number(task.reward || 0)}`; }
 function premiumVoucherImage(title: string, art: string, icon: string) { const safe = title.replace(/[<>&]/g, ""); const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='640' height='360'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop stop-color='${art}'/><stop offset='1' stop-color='#14140F'/></linearGradient></defs><rect width='640' height='360' rx='36' fill='url(#g)'/><text x='52' y='142' font-size='78'>${icon}</text><text x='52' y='230' fill='white' font-size='34' font-weight='800'>${safe}</text><text x='52' y='276' fill='white' opacity='.72' font-size='18'>PRIMEHUB PREMIUM REWARD</text></svg>`; return `data:image/svg+xml,${encodeURIComponent(svg)}`; }
 
 const tabs = [["Home", "#reseller-home"], ["Rewards", "#reseller-rewards"], ["Tasks", "#reseller-tasks"], ["Wallet", "#reseller-wallet"], ["Tiers", "#reseller-tiers"], ["Vouchers", "#reseller-vouchers"], ["Gifts", "#reseller-gifts"]] as const;
@@ -93,9 +95,15 @@ export default function HomeResellerUnified() {
     { id: "elite-cash", title: "Rs. 2,000 Elite", description: "Elite members only", requirement: "Elite 40+", icon: "👑", art: "#C9A227", minOrders: 40, imageUrl: voucherImages["elite-cash"] },
   ];
 
+  const topBaseCount = 3 + tasks.length;
+  const bottomBaseCount = tiers.length + vouchers.length;
+  const topGiftCount = Math.max(0, Math.min(gifts.length, Math.round((bottomBaseCount + gifts.length - topBaseCount) / 2)));
+  const topGifts = gifts.slice(0, topGiftCount);
+  const bottomGifts = gifts.slice(topGiftCount);
+
   async function rewardAction(action: "checkin" | "spin") {
     if (busy) return;
-    setBusy(true); setMessage(action === "spin" ? "Spinning…" : ""); setSpinPrize(null);
+    setBusy(true); setMessage(""); setSpinPrize(null);
     try {
       if (user) {
         const token = await user.getIdToken();
@@ -104,14 +112,13 @@ export default function HomeResellerUnified() {
         if (!response.ok) throw new Error(data.error || "Reward action failed.");
         if (data.wallet) setWallet({ ...EMPTY_WALLET, ...data.wallet });
         if (data.prize) setSpinPrize(data.prize);
-        setMessage(action === "spin" ? (data.prize?.name || "Spin complete") : "Check-in complete.");
       } else if (rewardSettings.guestMode !== false && action === "checkin") {
         if (wallet.lastCheckIn === today) return;
         const yesterday = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Karachi" }).format(new Date(Date.now() - 86400000));
         const nextStreak = wallet.lastCheckIn === yesterday ? Math.min(7, Math.max(1, Number(wallet.streak || 0)) + 1) : 1;
         const points = Math.max(0, Number(rewardSettings.checkInRewards?.[nextStreak - 1] ?? 10));
         const next = { ...wallet, points: Number(wallet.points || 0) + points, streak: nextStreak, lastCheckIn: today };
-        setWallet(next); saveGuestWallet(next); setMessage(`+${points} points collected.`);
+        setWallet(next); saveGuestWallet(next);
       } else window.location.href = "/reseller/join?redirect=/";
     } catch (error) { setMessage(error instanceof Error ? error.message : "Reward action failed."); }
     finally { setBusy(false); }
@@ -120,6 +127,7 @@ export default function HomeResellerUnified() {
   async function openTask(task: ResellerTask) {
     const current = auth.currentUser;
     if (!current) { window.location.href = "/login?redirect=/#reseller-tasks"; return; }
+    setMessage("");
     try {
       const token = await current.getIdToken();
       const response = await fetch("/api/reseller/task-claims", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ taskId: task.id, action: "open" }) });
@@ -128,6 +136,8 @@ export default function HomeResellerUnified() {
       if (task.url) window.open(task.url, "_blank", "noopener,noreferrer"); else setMessage("Admin panel se is task ka platform link add karein.");
     } catch (error) { setMessage(error instanceof Error ? error.message : "Task open nahi hua."); }
   }
+
+  const renderGift = (gift: RewardGift, index: number, first = false) => <Link id={first ? "reseller-gifts" : undefined} href="/rewards#redeem-rewards" className="hru-rail-card hru-gift" key={`${gift.id}-${index}`}>{gift.imageUrl ? <img src={normalizeImageUrl(gift.imageUrl)} alt={gift.title || "Reward gift"} /> : <Gift size={30} />}<h4>{gift.title || "PrimeHub Reward Gift"}</h4><strong>{Number(gift.pointsCost || 0).toLocaleString()} points</strong></Link>;
 
   return (
     <section className="home-reseller-unified" id="reseller-home">
@@ -160,7 +170,7 @@ export default function HomeResellerUnified() {
 
             {tasks.map((task, index) => {
               const Icon = taskIcon(task.id); const social = SOCIAL_TASK_IDS.has(task.id); const isMonthly = task.id.includes("monthly"); const isWeekly = task.id.includes("weekly"); const autoTarget = isMonthly ? target : isWeekly ? 3 : 1;
-              return <article className="hru-rail-card hru-task" id={index === 0 ? "reseller-tasks" : undefined} key={task.id}><div className="hru-task-top"><div className="hru-task-icon"><Icon size={18} /></div><span>+{Number(task.reward || 0)}</span></div><h4>{task.title}</h4><p>{task.description}</p>{social ? <button className="hru-task-open" type="button" onClick={() => void openTask(task)}>Open {task.id}<ChevronRight size={12} /></button> : <b className="hru-auto-task"><CheckCircle2 size={12} />{Math.min(monthlyOrders, autoTarget)}/{autoTarget} completed</b>}</article>;
+              return <article className="hru-rail-card hru-task" id={index === 0 ? "reseller-tasks" : undefined} key={task.id}><div className="hru-task-top"><div className="hru-task-icon"><Icon size={18} /></div><span>{taskRewardLabel(task)}</span></div><h4>{task.title}</h4><p>{task.description}</p>{social ? <button className="hru-task-open" type="button" onClick={() => void openTask(task)}>Open {task.id}<ChevronRight size={12} /></button> : <b className="hru-auto-task"><CheckCircle2 size={12} />{Math.min(monthlyOrders, autoTarget)}/{autoTarget} completed</b>}</article>;
             })}
 
             <article className="hru-rail-card hru-wallet-card" id="reseller-wallet">
@@ -168,6 +178,8 @@ export default function HomeResellerUnified() {
               <div className="hru-wallet-stats"><span>Pending <b>Rs. {cashPending.toLocaleString()}</b></span><span>Points <b>{Number(wallet.points || 0).toLocaleString()}</b></span></div>
               <div className="hru-wallet-actions"><Link href="/reseller/wallet"><History size={13} /> History</Link><Link href="/reseller/wallet">Withdraw <ArrowRight size={13} /></Link></div>
             </article>
+
+            {topGifts.map((gift, index) => renderGift(gift, index, index === 0))}
           </div>
 
           <div className="hru-master-row hru-bottom-row">
@@ -175,7 +187,8 @@ export default function HomeResellerUnified() {
 
             {vouchers.map((voucher, index) => <article className="hru-rail-card hru-voucher" id={index === 0 ? "reseller-vouchers" : undefined} key={voucher.id}><img src={voucher.imageUrl ? normalizeImageUrl(voucher.imageUrl) : premiumVoucherImage(voucher.title, voucher.art, voucher.icon)} alt={voucher.title} /><small>{monthlyOrders < voucher.minOrders ? "Locked" : "Available"}</small><h4>{voucher.title}</h4><p>{voucher.requirement}</p></article>)}
 
-            {gifts.length ? gifts.map((gift, index) => <Link id={index === 0 ? "reseller-gifts" : undefined} href="/rewards#redeem-rewards" className="hru-rail-card hru-gift" key={gift.id}>{gift.imageUrl ? <img src={normalizeImageUrl(gift.imageUrl)} alt={gift.title || "Reward gift"} /> : <Gift size={30} />}<h4>{gift.title || "PrimeHub Reward Gift"}</h4><strong>{Number(gift.pointsCost || 0).toLocaleString()} points</strong></Link>) : <Link id="reseller-gifts" href="/rewards#redeem-rewards" className="hru-rail-card hru-gift"><Gift size={30} /><h4>Reward gifts</h4><strong>Admin-controlled products</strong></Link>}
+            {bottomGifts.map((gift, index) => renderGift(gift, index, topGifts.length === 0 && index === 0))}
+            {!gifts.length ? <Link id="reseller-gifts" href="/rewards#redeem-rewards" className="hru-rail-card hru-gift"><Gift size={30} /><h4>Reward gifts</h4><strong>Admin-controlled products</strong></Link> : null}
           </div>
         </div>
       </div>
