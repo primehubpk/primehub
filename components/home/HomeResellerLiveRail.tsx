@@ -12,6 +12,7 @@ import type { ResellerProfile, ResellerTier } from "@/lib/resellerTypes";
 import { useSettings } from "@/lib/useSettings";
 import HomeHeading from "./HomeHeading";
 import "./HomeResellerLiveRail.css";
+import "./HomeResellerWheelInstant.css";
 
 const GUEST_WALLET_KEY = "phdeals-guest-rewards";
 const GUEST_ID_KEY = "primehub_reseller_guest_id_v1";
@@ -23,7 +24,7 @@ type RewardSettings = { guestMode?:boolean; checkInRewards?:number[]; spinWheelS
 type RewardWallet = { points?:number; streak?:number; lastCheckIn?:string; lastSpin?:string };
 type RewardGift = { id:string; title?:string; imageUrl?:string; productId?:string; pointsCost?:number; stock?:number; active?:boolean };
 type RewardProduct = { id:string; title?:string; name?:string; imageUrl?:string; image?:string; images?:Array<string|{url?:string}> };
-type LiveSettings = { resellerHomeEnabled?:boolean; resellerTasks?:ResellerTask[]; resellerTiers?:ResellerTier[]; resellerVoucherImages?:Record<string,string>; resellerMonthlyChallenge?:{targetOrders?:number;cashReward?:number;giftTitle?:string;active?:boolean} };
+type LiveSettings = { resellerHomeEnabled?:boolean; resellerTasks?:ResellerTask[]; resellerTiers?:ResellerTier[]; resellerVoucherImages?:Record<string,string>; resellerMonthlyChallenge?:{targetOrders?:number;cashReward?:number;giftTitle?:string;active?:boolean}; homeRewardSettings?:RewardSettings };
 type Voucher = { id:string; title:string; description:string; requirement:string; icon:string; art:string; minOrders:number; imageUrl?:string };
 
 function dayKey(){ return new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Karachi"}).format(new Date()); }
@@ -38,8 +39,14 @@ function premiumVoucherImage(title:string,art:string,icon:string){const safe=tit
 export default function HomeResellerLiveRail(){
   const {settings}=useSettings();
   const fallback=settings as typeof settings & LiveSettings;
+  const initialRewards=fallback.homeRewardSettings||{};
   const [live,setLive]=useState<LiveSettings>({});
-  const [rewardSettings,setRewardSettings]=useState<RewardSettings>({checkInRewards:[10,15,20,25,30,50,100],spinWheelSlots:[],guestMode:true});
+  const [rewardSettings,setRewardSettings]=useState<RewardSettings>({
+    ...initialRewards,
+    checkInRewards:Array.isArray(initialRewards.checkInRewards)?initialRewards.checkInRewards:[10,15,20,25,30,50,100],
+    spinWheelSlots:Array.isArray(initialRewards.spinWheelSlots)?initialRewards.spinWheelSlots:[],
+    guestMode:initialRewards.guestMode!==false,
+  });
   const [gifts,setGifts]=useState<RewardGift[]>([]);
   const [products,setProducts]=useState<Record<string,RewardProduct>>({});
   const [user,setUser]=useState<User|null>(null);
@@ -82,7 +89,8 @@ export default function HomeResellerLiveRail(){
   function openTask(task:ResellerTask){if(events.includes(task.id)&&!user){location.href="/login?redirect=/#reseller-tasks";return;}if(["weekly-orders","monthly-orders","wholesale-order"].includes(task.id)){location.href="/shop";return;}const url=task.url||(task.id==="refer-reseller"?`${location.origin}/reseller/join?ref=${encodeURIComponent(user?.uid||guestId())}`:"");saveTaskEvent(task.id);setEvents(readTaskEvents());if(task.id==="whatsapp-share"||task.id==="refer-reseller"){window.open(`https://wa.me/?text=${encodeURIComponent(`${task.shareText||task.description}\n${url||location.origin}`)}`,"_blank","noopener,noreferrer");return;}if(url)window.open(url,"_blank","noopener,noreferrer");}
 
   const count=Math.max(1,prizes.length);
-  const sliceWidth=Math.min(98,Math.max(30,Math.tan(Math.PI/count)*104));
+  const imageSize=count<=2?58:count===3?52:count===4?46:count===5?42:count<=7?36:30;
+  const radius=count<=3?39:count<=5?43:count<=7?46:48;
   const topBase=2+tasks.length; const bottomBase=1+tiers.length+vouchers.length; const topGiftCount=Math.max(0,Math.min(gifts.length,Math.round((bottomBase+gifts.length-topBase)/2))); const topGifts=gifts.slice(0,topGiftCount); const bottomGifts=gifts.slice(topGiftCount);
   const GiftCard=({gift}:{gift:RewardGift})=>{const image=gift.imageUrl||productImage(gift.productId?products[gift.productId]:undefined);return <article className="ph-card ph-gift"><div className="ph-gift-art">{image?<img src={image} alt={gift.title||"Gift"}/>:<Gift size={30}/>}</div><small>POINT STORE</small><h4>{gift.title||products[gift.productId||""]?.title||products[gift.productId||""]?.name||"PrimeHub Gift"}</h4><p>{Number(gift.pointsCost||0).toLocaleString()} points</p></article>;};
 
@@ -93,7 +101,7 @@ export default function HomeResellerLiveRail(){
     <div className="ph-live-scroll"><div className="ph-live-grid">
       <div className="ph-live-row">
         <article className="ph-card ph-check" id="reseller-rewards"><small>WEEKLY STREAK</small><div className="ph-title"><h3>7-Day Check-in</h3><b>{streak}/7</b></div><div className="ph-days">{Array.from({length:7},(_,i)=><span key={i} className={i<streak?"done":""}>D{i+1}<b>+{rewardSettings.checkInRewards?.[i]||0}</b></span>)}</div><button onClick={()=>void checkIn()} disabled={busy||wallet.lastCheckIn===today}><CheckCircle2 size={14}/>{wallet.lastCheckIn===today?"Done today":"Check in"}</button></article>
-        <article className="ph-card ph-wheel"><small>SPIN & WIN</small><h3>Your reward wheel</h3><div className="ph-wheel-wrap"><i></i><div className="ph-wheel-disc" style={{transform:`rotate(${rotation}deg)`}}>{prizes.map((p,i)=><div className="ph-prize" key={p.id} style={{width:`${sliceWidth}%`,transform:`translate(-50%,-100%) rotate(${i*(360/count)}deg)`}}>{p.imageUrl?<img src={p.imageUrl} alt={p.name}/>:<span>🎁</span>}</div>)}<em>WIN</em></div></div><button onClick={()=>void spin()} disabled={busy||usedSpin||!prizes.length}>{usedSpin?"Come tomorrow":busy?"Spinning…":"Spin the wheel"}</button></article>
+        <article className="ph-card ph-wheel"><div className="ph-wheel-wrap"><i></i><div className="ph-wheel-disc" style={{transform:`rotate(${rotation}deg)`}}>{prizes.map((p,i)=>{const angle=i*(360/count);return <div className="ph-prize" key={p.id} style={{width:imageSize,height:imageSize,transform:`translate(-50%,-50%) rotate(${angle}deg) translateY(-${radius}px) rotate(${-angle}deg)`}}>{p.imageUrl?<img src={p.imageUrl} alt={p.name}/>:<span>🎁</span>}</div>})}<em>WIN</em></div></div><button onClick={()=>void spin()} disabled={busy||usedSpin||!prizes.length}>{usedSpin?"Come tomorrow":busy?"Spinning…":"Spin the wheel"}</button></article>
         {tasks.map((task,index)=><article className="ph-card ph-task" id={index===0?"reseller-tasks":undefined} key={task.id}><div className="ph-task-head"><span>{task.icon||"✓"}</span><b>+{Number(task.reward||0)}</b></div><h4>{task.title}</h4><p>{task.description}</p><div className="ph-task-state">{events.includes(task.id)?"Completed — login to claim":"Admin task"}</div><button onClick={()=>openTask(task)}>{events.includes(task.id)&&!user?"Login to claim":"Start task"}<ChevronRight size={12}/></button></article>)}
         {topGifts.map(g=><GiftCard key={g.id} gift={g}/>) }
       </div>
