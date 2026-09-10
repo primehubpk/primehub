@@ -10,12 +10,20 @@ type Wallet = { points?: number; streak?: number; lastCheckIn?: string; lastSpin
 type Prize = { id: string; name: string; type: string; points?: number; probability?: number; active?: boolean; stock?: number; productId?: string; voucherCode?: string; voucherAmount?: number; imageUrl?: string };
 
 function dayKey() { return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Karachi' }).format(new Date()); }
+function validGuestId(value: unknown) { const id = String(value || '').trim(); return /^g_[a-zA-Z0-9]{12,80}$/.test(id) ? id : ''; }
 function cfg() { const url = String(process.env.SUPABASE_URL || '').replace(/\/+$/, ''); const key = String(process.env.SUPABASE_SERVICE_ROLE_KEY || ''); return { url, key }; }
 async function sb(path: string, init: RequestInit = {}) { const { url, key } = cfg(); if (!url || !key) throw new Error('Supabase is not configured.'); const r = await fetch(`${url}/rest/v1/${path}`, { ...init, headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', ...(init.headers || {}) }, cache: 'no-store' }); if (!r.ok) throw new Error(`Supabase ${r.status}: ${await r.text()}`); return r; }
 async function readSupabaseWallet(uid: string): Promise<Wallet> { const r = await sb(`user_rewards?id=eq.${encodeURIComponent(uid)}&select=payload&limit=1`); const rows = await r.json(); return (rows?.[0]?.payload || {}) as Wallet; }
 async function readSupabaseRewardSettings() { const r = await sb('settings?id=eq.rewards&select=payload&limit=1'); const rows = await r.json(); return rows?.[0]?.payload || {}; }
 async function writeSupabaseWallet(uid: string, wallet: Wallet) { await sb('user_rewards?on_conflict=id', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ id: uid, user_id: uid, payload: wallet, authoritative_source: 'supabase', mirror_status: 'pending', updated_at: new Date().toISOString() }) }); }
 async function mirrorFirebaseWallet(uid: string, wallet: Wallet) { try { await getAdminDb().collection('user_rewards').doc(uid).set({ ...wallet, updatedAt: FieldValue.serverTimestamp() }, { merge: true }); } catch {} }
+async function guestLastSpin(guestId: string) {
+  if (!guestId) return '';
+  if (getDualWriteMode() === 'supabase-primary' && isSupabaseWriteConfigured()) {
+    try { const r = await sb(`user_rewards?id=eq.${encodeURIComponent(`guest:${guestId}`)}&select=payload&limit=1`); const rows = await r.json(); return String(rows?.[0]?.payload?.lastSpin || ''); } catch {}
+  }
+  try { const snap = await getAdminDb().collection('user_rewards').doc(`guest_${guestId}`).get(); return String(snap.data()?.lastSpin || ''); } catch { return ''; }
+}
 function choosePrize(prizes: Prize[]) { const active = prizes.filter(p => p.active !== false && Number(p.probability) > 0 && Number(p.stock ?? 1) > 0); const total = active.reduce((s, p) => s + Number(p.probability || 0), 0); if (!active.length || total <= 0) return null; let cursor = Math.random() * total; for (const p of active) { cursor -= Number(p.probability || 0); if (cursor <= 0) return p; } return active[active.length - 1]; }
 function isLogicalRewardError(error: unknown) { const message = error instanceof Error ? error.message : String(error); return /Already checked in today|Come back tomorrow|Spin prizes are being refreshed/i.test(message); }
 function appendHistory(current: Wallet, entry: HistoryEntry) { return [...(current.history || []), entry].slice(-100); }
@@ -24,14 +32,7 @@ function applySpin(current: Wallet, prize: Prize, today: string): Wallet {
   const voucher = prize.type === 'coupon' ? (String(prize.voucherCode || '').trim() || `PH-${Math.random().toString(36).slice(2, 8).toUpperCase()}`) : '';
   const now = new Date().toISOString();
   const history: HistoryEntry = { id: crypto.randomUUID(), action: 'spin', name: prize.name, type: prize.type, status: 'claimed', createdAt: now, source: 'account' };
-  return {
-    ...current,
-    points: Number(current.points || 0) + points,
-    lastSpin: today,
-    coupons: voucher ? [...(current.coupons || []), voucher] : (current.coupons || []),
-    freeDeliveryCredits: Number(current.freeDeliveryCredits || 0) + (prize.type === 'free-delivery' ? 1 : 0),
-    history: appendHistory(current, history),
-  };
+  return { ...current, points: Number(current.points || 0) + points, lastSpin: today, coupons: voucher ? [...(current.coupons || []), voucher] : (current.coupons || []), freeDeliveryCredits: Number(current.freeDeliveryCredits || 0) + (prize.type === 'free-delivery' ? 1 : 0), history: appendHistory(current, history) };
 }
 function applyCheckin(current: Wallet, settings: any, today: string): Wallet {
   if (current.lastCheckIn === today) throw new Error('Already checked in today.');
@@ -68,9 +69,11 @@ export async function POST(request: Request) {
     const user = await getAdminAuth().verifyIdToken(header.slice(7));
     const body = await request.json();
     const action = body?.action === 'checkin' ? 'checkin' : 'spin';
+    const guestId = validGuestId(body?.guestId);
+    const today = dayKey();
+    if (action === 'spin' && guestId && await guestLastSpin(guestId) === today) throw new Error('Come back tomorrow for your next spin.');
     if (getDualWriteMode() === 'supabase-primary' && isSupabaseWriteConfigured()) {
       try {
-        const today = dayKey();
         const current = { points: 0, streak: 0, coupons: [], freeDeliveryCredits: 0, history: [], ...(await readSupabaseWallet(user.uid)) } as Wallet;
         const settings = await readSupabaseRewardSettings();
         let wallet: Wallet; let prize: Prize | null = null;
