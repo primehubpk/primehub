@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { Outfit } from 'next/font/google';
 import { useEffect, useMemo, useState, type ElementType } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
-import { addDoc, collection, doc, onSnapshot, runTransaction, serverTimestamp } from 'firebase/firestore';
+import { addDoc, collection, doc, onSnapshot } from 'firebase/firestore';
 import {
   ArrowLeft,
   Bell,
@@ -35,6 +35,7 @@ import { getResellerTiers } from '@/lib/resellerTiers';
 import type { ResellerProfile, ResellerTier } from '@/lib/resellerTypes';
 
 const outfit = Outfit({ subsets: ['latin'] });
+const GUEST_ID_KEY = 'primehub_reseller_guest_id_v1';
 
 type View = 'home' | 'tiers' | 'tasks' | 'vouchers' | 'rewards' | 'wallet' | 'gifts';
 type VoucherType = 'cash' | 'gift' | 'discount' | 'brand';
@@ -46,8 +47,9 @@ type SettingsSnapshot = {
   resellerVoucherImages?: Record<string, string>;
   resellerTiers?: ResellerTier[];
 };
-type RewardWallet = { points: number; streak: number; lastCheckIn?: string; lastSpin?: string; };
-type RewardSettings = { checkInRewards?: number[]; };
+type RewardPrize = { id: string; name: string; type: string; points?: number; probability?: number; active?: boolean; stock?: number; productId?: string; voucherCode?: string; voucherAmount?: number; imageUrl?: string };
+type RewardWallet = { points: number; streak: number; lastCheckIn?: string; lastSpin?: string; coupons?: string[]; freeDeliveryCredits?: number; history?: unknown[] };
+type RewardSettings = { checkInRewards?: number[]; spinWheelSlots?: RewardPrize[]; guestMode?: boolean };
 type RewardGift = { id: string; productId: string; pointsCost: number; active?: boolean; stock?: number; imageUrl?: string; title?: string; };
 type RewardProduct = { id: string; title?: string; name?: string; imageUrl?: string; image?: string; images?: string[] | { url?: string }[]; };
 
@@ -79,6 +81,9 @@ const taskIcons: Record<string, ElementType> = {
   order: ShoppingBag,
   wholesale: Package,
 };
+function currentGuestId() {
+  try { return String(window.localStorage.getItem(GUEST_ID_KEY) || ''); } catch { return ''; }
+}
 
 export default function ResellerDashboardPage() {
   const router = useRouter();
@@ -91,7 +96,7 @@ export default function ResellerDashboardPage() {
   const [selectedVoucher, setSelectedVoucher] = useState<Voucher | null>(null);
   const [loading, setLoading] = useState(true);
   const [rewardWallet, setRewardWallet] = useState<RewardWallet>({ points: 0, streak: 0 });
-  const [rewardSettings, setRewardSettings] = useState<RewardSettings>({ checkInRewards: [10, 15, 20, 25, 30, 50, 100] });
+  const [rewardSettings, setRewardSettings] = useState<RewardSettings>({ checkInRewards: [10, 15, 20, 25, 30, 50, 100], spinWheelSlots: [] });
   const [rewardGifts, setRewardGifts] = useState<RewardGift[]>([]);
   const [rewardProducts, setRewardProducts] = useState<Record<string, RewardProduct>>({});
   const [rewardBusy, setRewardBusy] = useState(false);
@@ -148,21 +153,34 @@ export default function ResellerDashboardPage() {
     [],
   );
 
+  useEffect(() => {
+    const stopAuth = onAuthStateChanged(auth, user => {
+      if (!user) return;
+      void (async () => {
+        try {
+          const token = await user.getIdToken();
+          const guestId = currentGuestId();
+          const response = await fetch(`/api/reseller/reward-action?guestId=${encodeURIComponent(guestId)}`, { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' });
+          const data = await response.json();
+          if (!response.ok) throw new Error(data.error || 'Reward state unavailable.');
+          setRewardWallet({ points: 0, streak: 0, ...(data.wallet || {}) });
+          setRewardSettings({ checkInRewards: [10, 15, 20, 25, 30, 50, 100], spinWheelSlots: [], ...(data.settings || {}) });
+        } catch (error) {
+          console.warn('Shared reseller reward state unavailable', error);
+        }
+      })();
+    });
+    return stopAuth;
+  }, []);
 
   useEffect(() => {
-    let stopWallet: (() => void) | undefined;
-    const stopAuth = onAuthStateChanged(auth, user => {
-      stopWallet?.();
-      if (user) stopWallet = onSnapshot(doc(db, 'user_rewards', user.uid), snap => setRewardWallet({ points: 0, streak: 0, ...(snap.data() || {}) } as RewardWallet));
-    });
-    const stopSettings = onSnapshot(doc(db, 'settings', 'rewards'), snap => setRewardSettings({ checkInRewards: [10, 15, 20, 25, 30, 50, 100], ...(snap.data() || {}) }));
     const stopGifts = onSnapshot(collection(db, 'reward_gifts'), snap => setRewardGifts(snap.docs.map(row => ({ id: row.id, ...row.data() }) as RewardGift).filter(gift => gift.active !== false)));
     const stopProducts = onSnapshot(collection(db, 'products'), snap => {
       const next: Record<string, RewardProduct> = {};
       snap.docs.forEach(row => { next[row.id] = { id: row.id, ...row.data() } as RewardProduct; });
       setRewardProducts(next);
     });
-    return () => { stopAuth(); stopWallet?.(); stopSettings(); stopGifts(); stopProducts(); };
+    return () => { stopGifts(); stopProducts(); };
   }, []);
 
   async function checkInReward() {
@@ -170,16 +188,13 @@ export default function ResellerDashboardPage() {
     if (!user || rewardBusy || rewardWallet.lastCheckIn === rewardDayKey()) return;
     setRewardBusy(true); setRewardMessage('');
     try {
-      const yesterday = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Karachi' }).format(new Date(Date.now() - 86400000));
-      const streak = rewardWallet.lastCheckIn === yesterday ? Math.min(7, Math.max(1, Number(rewardWallet.streak || 0)) + 1) : 1;
-      const points = Math.max(0, Number(rewardSettings.checkInRewards?.[streak - 1] ?? 10));
-      await runTransaction(db, async tx => {
-        const ref = doc(db, 'user_rewards', user.uid);
-        const snap = await tx.get(ref);
-        const current = { points: 0, streak: 0, ...(snap.data() || {}) } as RewardWallet;
-        if (current.lastCheckIn === rewardDayKey()) throw new Error('Already checked in today.');
-        tx.set(ref, { ...current, points: Number(current.points || 0) + points, streak, lastCheckIn: rewardDayKey(), updatedAt: serverTimestamp() }, { merge: true });
-      });
+      const token = await user.getIdToken();
+      const response = await fetch('/api/reseller/reward-action', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ action: 'checkin', guestId: currentGuestId() }) });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Check-in failed.');
+      setRewardWallet({ points: 0, streak: 0, ...(data.wallet || {}) });
+      const streak = Number(data.wallet?.streak || 0);
+      const points = Number(rewardSettings.checkInRewards?.[Math.max(0, streak - 1)] || 0);
       setRewardMessage(`Day ${streak} complete — +${points} points added.`);
     } catch (error) { setRewardMessage(error instanceof Error ? error.message : 'Check-in failed.'); }
     finally { setRewardBusy(false); }
@@ -350,7 +365,7 @@ export default function ResellerDashboardPage() {
             <button type="button" onClick={checkInReward} disabled={rewardBusy || rewardWallet.lastCheckIn===rewardDayKey()} className="mt-4 w-full rounded-xl bg-[#14140F] py-3.5 text-xs font-extrabold text-white disabled:opacity-45">{rewardWallet.lastCheckIn===rewardDayKey()?'✓ Checked in today':`Check in +${Number(rewardSettings.checkInRewards?.[Math.min(6,Number(rewardWallet.streak||0))]??10)} points`}</button>
           </section>
 
-          {wheel.active && <RewardWheel settings={wheel} />}
+          {wheel.active && <RewardWheel settings={wheel} rewardSettings={rewardSettings} wallet={rewardWallet} onWallet={setRewardWallet} />}
           </>}
 
           {(view === 'home' || view === 'tiers') && <section className="rounded-[28px] border border-black/[.06] bg-[#FFFDF8] p-4 shadow-[0_16px_40px_rgba(20,20,15,.08)]"><div className="flex items-end justify-between gap-3"><div><p className="text-[9px] font-extrabold uppercase tracking-[.2em] text-[#B4871D]">Prime Loyalty Program</p><h2 className="mt-1 text-xl font-extrabold">Your reseller tiers</h2><p className="mt-1 text-[10px] text-black/45">Current tier: <b className="text-[#0E7C6F]">{tier.name}</b></p></div><span className="rounded-full bg-[#14140F] px-3 py-2 text-[9px] font-extrabold text-white">4 TIERS</span></div><div className="mt-4 grid grid-cols-2 gap-2.5 lg:grid-cols-4">{sortedTiers.map((item,index)=>{const active=item.id===tier.id;const colors=[['#7B3F1D','#F6D6B5'],['#59636E','#F1F5F8'],['#8A5A00','#FFE7A3'],['#171B2D','#B8C5FF']][index];const benefits=item.benefits?.length?item.benefits:['Exclusive member pricing','Earn bonus rewards','Special tier offers'];return <article key={item.id} className={`relative overflow-hidden rounded-[20px] border p-3 transition ${active?'border-[#14140F] shadow-[0_12px_26px_rgba(20,20,15,.16)]':'border-black/[.07]'}`} style={{background:'linear-gradient(145deg,#FFFDF8,'+colors[1]+')'}}><div className="absolute -right-7 -top-8 h-24 w-24 rounded-full opacity-20" style={{backgroundColor:colors[1]}}/><div className="relative flex items-center justify-between"><div className="grid h-9 w-9 place-items-center rounded-xl text-xs font-extrabold text-white shadow-md" style={{background:'linear-gradient(145deg,'+colors[0]+','+colors[1]+')'}}>{index+1}</div>{active&&<span className="rounded-full bg-[#14140F] px-2.5 py-1 text-[8px] font-extrabold text-white">CURRENT</span>}</div><h3 className="relative mt-3 text-base font-extrabold">{item.name}</h3><p className="mt-1 text-[10px] font-bold text-black/40">{item.minMonthlyOrders}+ monthly orders</p><p className="mt-2 text-xl font-extrabold" style={{color:colors[0]}}>{Number(item.discountPercent||0)}% <span className="text-[10px] text-black/35">OFF</span></p><div className="mt-3 space-y-1.5">{benefits.slice(0,4).map((benefit,n)=><p key={n} className="flex items-start gap-2 text-[9px] font-bold text-black/55"><span className="mt-0.5 grid h-3.5 w-3.5 shrink-0 place-items-center rounded-full bg-[#0E7C6F] text-[8px] text-white">✓</span>{benefit}</p>)}</div><div className={`mt-3 rounded-xl py-2 text-center text-[9px] font-extrabold ${active?'bg-[#14140F] text-white':'bg-white text-black/45'}`}>{active?'Your current tier':index<=tierIndex?'Unlocked':`Need ${Math.max(0,item.minMonthlyOrders-monthlyOrders)} orders`}</div></article>})}</div></section>}
@@ -374,58 +389,20 @@ export default function ResellerDashboardPage() {
           </section>}
 
           {(view === 'home' || view === 'gifts') && <section className="rounded-[18px] bg-[#FFFDF8] p-4 shadow-[0_8px_24px_rgba(20,20,15,.05)]">
-            <div className="flex items-end justify-between gap-3"><div><p className="text-[10px] font-extrabold uppercase tracking-[.14em] text-[#0E7C6F]">Point store</p><h2 className="mt-1 text-xl font-extrabold">Gifts & Products</h2><p className="mt-1 text-xs text-[#6B6A62]">Admin se add ki gayi reward images yahan automatically show hongi.</p></div><span className="rounded-full bg-[#FFF3E0] px-3 py-1.5 text-[10px] font-extrabold">{Number(rewardWallet.points||0).toLocaleString()} PTS</span></div>
-            <div className="mt-4 grid grid-cols-2 gap-2.5 lg:grid-cols-3">{rewardGifts.length ? rewardGifts.map(gift=>{const product=rewardProducts[gift.productId];const image=gift.imageUrl||rewardProductImage(product);const need=Math.max(0,Number(gift.pointsCost)-Number(rewardWallet.points||0));return <article key={gift.id} className="overflow-hidden rounded-2xl border border-black/[.06] bg-white"><div className="aspect-square bg-[#F1ECE3]">{image?<img src={image} alt={gift.title||'Reward gift'} className="h-full w-full object-cover"/>:<div className="grid h-full place-items-center text-3xl">🎁</div>}</div><div className="p-3"><h3 className="text-sm font-extrabold">{gift.title||product?.title||product?.name||'Reward Gift'}</h3><p className="mt-1 text-xs font-extrabold text-[#E85D04]">{Number(gift.pointsCost).toLocaleString()} points</p><Link href="/rewards#redeem-rewards" className="mt-3 block rounded-xl bg-[#14140F] px-3 py-2.5 text-center text-[10px] font-extrabold text-white">{need?`Need ${need} more points`:'Redeem gift'}</Link></div></article>}) : <div className="col-span-2 rounded-2xl bg-[#F1ECE3] p-6 text-center text-xs text-[#6B6A62] lg:col-span-3">Admin se add kiye gaye active gifts yahan show honge.</div>}</div>
+            <div className="flex items-end justify-between gap-3"><div><p className="text-[10px] font-extrabold uppercase tracking-[.14em] text-[#0E7C6F]">Point store</p><h2 className="mt-1 text-xl font-extrabold">Gifts & Products</h2><p className="mt-1 text-xs text-[#6B6A62]">Rewards added from Admin appear here automatically.</p></div><span className="rounded-full bg-[#FFF3E0] px-3 py-1.5 text-[10px] font-extrabold">{Number(rewardWallet.points||0).toLocaleString()} PTS</span></div>
+            <div className="mt-4 grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">{rewardGifts.length ? rewardGifts.map(gift => { const product=rewardProducts[gift.productId]; const image=gift.imageUrl || rewardProductImage(product); const need=Math.max(0,Number(gift.pointsCost)-Number(rewardWallet.points||0)); return <article key={gift.id} className="overflow-hidden rounded-2xl border border-black/[.06] bg-white"><div className="aspect-[4/3] bg-[#F1ECE3]">{image?<img src={image} alt={gift.title||'Reward gift'} className="h-full w-full object-cover"/>:<div className="grid h-full place-items-center text-3xl">🎁</div>}</div><div className="p-3"><h3 className="text-sm font-extrabold">{gift.title||product?.title||product?.name||'Reward Gift'}</h3><p className="mt-1 text-xs font-extrabold text-[#E85D04]">{Number(gift.pointsCost).toLocaleString()} points</p><p className="mt-1 text-[10px] text-[#0E7C6F]">Free delivery included</p><Link href="/rewards#redeem-rewards" className="mt-3 block rounded-xl bg-[#14140F] px-3 py-2.5 text-center text-[10px] font-extrabold text-white">{need?`Need ${need} more points`:'Redeem gift'}</Link></div></article>; }) : <div className="rounded-2xl bg-[#F1ECE3] p-6 text-center text-xs text-[#6B6A62] sm:col-span-2 lg:col-span-3">Admin se add kiye gaye active gifts yahan show honge.</div>}</div>
           </section>}
-          {rewardMessage && <div className="rounded-xl bg-[#0E7C6F] p-3 text-center text-xs font-extrabold text-white">{rewardMessage}</div>}
-        </section>
 
-        <section className="hidden">
-          {view === 'home' && (
-            <>
-              {challenge.active && (
-                <section className="mb-3 rounded-[18px] bg-[#FFFDF8] p-3.5 shadow-[0_8px_24px_rgba(20,20,15,.05)]">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-[10px] font-extrabold uppercase tracking-[.14em] text-[#E85D04]">Monthly challenge</span>
-                    <span className="rounded-full bg-[#E7F6F3] px-2 py-1 text-[11px] font-extrabold text-[#0E7C6F]">{monthlyOrders}/{target}</span>
-                  </div>
-                  <h2 className="mt-1.5 text-lg font-extrabold">{target} orders = gift or cash</h2>
-                  <p className="mt-1 text-xs leading-relaxed text-[#6B6A62]">Reach the target and choose your favourite reward when the challenge is complete.</p>
-                  <Progress value={challengePercent} />
-                  <div className="mt-2 flex gap-2">
-                    <button type="button" onClick={() => setSelectedVoucher(vouchers.find(v => v.id === 'challenge-gift') || null)} className="flex-1 rounded-xl bg-[#F1ECE3] px-3 py-2.5 text-xs font-extrabold">🎁 Gift box</button>
-                    <button type="button" onClick={() => setSelectedVoucher(vouchers.find(v => v.id === 'challenge-cash') || null)} className="flex-1 rounded-xl bg-[#F1ECE3] px-3 py-2.5 text-xs font-extrabold">₨ {Number(challenge.cashReward || 0).toLocaleString()} cash</button>
-                  </div>
-                  <p className="mt-2.5 text-xs text-[#6B6A62]">
-                    {remaining ? `${remaining} more eligible order${remaining === 1 ? '' : 's'} to unlock.` : 'Challenge complete — pick your reward.'}
-                  </p>
-                </section>
-              )}
-
-              <section className="mb-3 rounded-[18px] bg-[#FFFDF8] p-3.5 shadow-[0_8px_24px_rgba(20,20,15,.05)]">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-[10px] font-extrabold uppercase tracking-[.14em] text-[#E85D04]">Next mission</span>
-                  <button type="button" onClick={() => setView('tasks')} className="rounded-xl bg-[#0E7C6F] px-3 py-2 text-xs font-extrabold text-white">All tasks</button>
-                </div>
-                {nextTask ? <TaskRow task={nextTask} monthlyOrders={monthlyOrders} target={target} /> : <p className="mt-3 text-xs text-[#6B6A62]">No live missions right now.</p>}
-              </section>
-
-              <section>
-                <div className="mb-2.5 flex items-center justify-between px-0.5">
-                  <h2 className="text-lg font-extrabold">Gift vouchers</h2>
-                  <button type="button" onClick={() => setView('vouchers')} className="rounded-xl bg-[#F1ECE3] px-3 py-2 text-xs font-extrabold">See all</button>
-                </div>
-                <div className="grid grid-cols-2 gap-2.5 md:grid-cols-4">
-                  {vouchers.map(voucher => (
-                    <VoucherCard key={voucher.id} voucher={voucher} orders={monthlyOrders} onOpen={setSelectedVoucher} />
-                  ))}
-                </div>
-              </section>
-            </>
+          {view === 'tiers' && (
+            <section className="rounded-[18px] bg-[#FFFDF8] p-3.5 shadow-[0_8px_24px_rgba(20,20,15,.05)]">
+              <div className="flex items-center justify-between"><div><span className="text-[10px] font-extrabold uppercase tracking-[.14em] text-[#B4871D]">Tier progress</span><h2 className="mt-1 text-lg font-extrabold">{tier.name}</h2></div><span className="text-[11px] font-extrabold text-[#0E7C6F]">{monthlyOrders} orders</span></div>
+              <Progress value={tierProgress}/>
+              <p className="text-xs text-[#6B6A62]">{nextTier ? `${Math.max(0,nextTier.minMonthlyOrders-monthlyOrders)} more orders to ${nextTier.name}.` : 'Top tier unlocked.'}</p>
+            </section>
           )}
 
           {view === 'tasks' && (
-            <section className="rounded-[18px] bg-[#FFFDF8] p-3.5 shadow-[0_8px_24px_rgba(20,20,15,.05)]">
+            <section id="club-tasks" className="rounded-[18px] bg-[#FFFDF8] p-3.5 shadow-[0_8px_24px_rgba(20,20,15,.05)]">
               <div className="flex items-center justify-between">
                 <span className="text-[10px] font-extrabold uppercase tracking-[.14em] text-[#E85D04]">Reseller tasks</span>
                 <span className="rounded-full bg-[#E7F6F3] px-2 py-1 text-[11px] font-extrabold text-[#0E7C6F]">{activeTasks.length} live</span>
@@ -460,7 +437,6 @@ export default function ResellerDashboardPage() {
             </>
           )}
 
-
           {view === 'rewards' && (
             <div className="space-y-3">
               <section className="rounded-[18px] bg-[#FFFDF8] p-4 shadow-[0_8px_24px_rgba(20,20,15,.05)]">
@@ -468,7 +444,7 @@ export default function ResellerDashboardPage() {
                 <div className="mt-4 grid grid-cols-7 gap-1.5">{Array.from({ length: 7 }, (_, index) => { const complete=index<Number(rewardWallet.streak||0); return <div key={index} className={`rounded-xl p-2 text-center ${complete?'bg-[#0E7C6F] text-white':'bg-[#F1ECE3] text-[#6B6A62]'}`}><p className="text-[8px] font-extrabold">D{index+1}</p><p className="mt-1 text-[9px] font-extrabold">+{Number(rewardSettings.checkInRewards?.[index]??0)}</p><p className="text-[7px] font-bold">PTS</p></div>; })}</div>
                 <button type="button" onClick={checkInReward} disabled={rewardBusy || rewardWallet.lastCheckIn===rewardDayKey()} className="mt-4 w-full rounded-xl bg-[#14140F] py-3.5 text-xs font-extrabold text-white disabled:opacity-45">{rewardWallet.lastCheckIn===rewardDayKey()?'✓ Checked in today':`Check in +${Number(rewardSettings.checkInRewards?.[Math.min(6,Number(rewardWallet.streak||0))]??10)} points`}</button>
               </section>
-              {wheel.active && <RewardWheel settings={wheel} />}
+              {wheel.active && <RewardWheel settings={wheel} rewardSettings={rewardSettings} wallet={rewardWallet} onWallet={setRewardWallet} />}
               <section className="rounded-[18px] bg-[#FFFDF8] p-4 shadow-[0_8px_24px_rgba(20,20,15,.05)]">
                 <div className="flex items-end justify-between gap-3"><div><p className="text-[10px] font-extrabold uppercase tracking-[.14em] text-[#0E7C6F]">Point store</p><h2 className="mt-1 text-xl font-extrabold">Gifts & Products</h2><p className="mt-1 text-xs text-[#6B6A62]">Rewards added from Admin appear here automatically.</p></div><span className="rounded-full bg-[#FFF3E0] px-3 py-1.5 text-[10px] font-extrabold">{Number(rewardWallet.points||0).toLocaleString()} PTS</span></div>
                 <div className="mt-4 grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">{rewardGifts.length ? rewardGifts.map(gift => { const product=rewardProducts[gift.productId]; const image=gift.imageUrl || rewardProductImage(product); const need=Math.max(0,Number(gift.pointsCost)-Number(rewardWallet.points||0)); return <article key={gift.id} className="overflow-hidden rounded-2xl border border-black/[.06] bg-white"><div className="aspect-[4/3] bg-[#F1ECE3]">{image?<img src={image} alt={gift.title||'Reward gift'} className="h-full w-full object-cover"/>:<div className="grid h-full place-items-center text-3xl">🎁</div>}</div><div className="p-3"><h3 className="text-sm font-extrabold">{gift.title||product?.title||product?.name||'Reward Gift'}</h3><p className="mt-1 text-xs font-extrabold text-[#E85D04]">{Number(gift.pointsCost).toLocaleString()} points</p><p className="mt-1 text-[10px] text-[#0E7C6F]">Free delivery included</p><Link href="/rewards#redeem-rewards" className="mt-3 block rounded-xl bg-[#14140F] px-3 py-2.5 text-center text-[10px] font-extrabold text-white">{need?`Need ${need} more points`:'Redeem gift'}</Link></div></article>; }) : <div className="rounded-2xl bg-[#F1ECE3] p-6 text-center text-xs text-[#6B6A62] sm:col-span-2 lg:col-span-3">Admin se add kiye gaye active gifts yahan show honge.</div>}</div>
@@ -493,7 +469,6 @@ export default function ResellerDashboardPage() {
           )}
         </section>
 
-
         {selectedVoucher && (
           <VoucherSheet voucher={selectedVoucher} orders={monthlyOrders} onClose={() => setSelectedVoucher(null)} />
         )}
@@ -501,7 +476,6 @@ export default function ResellerDashboardPage() {
     </main>
   );
 }
-
 
 function rewardDayKey() {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Karachi' }).format(new Date());
@@ -560,39 +534,66 @@ function TaskRow({ task, monthlyOrders, target }: { task: ResellerTask; monthlyO
   );
 }
 
+function prizeLabel(prize: RewardPrize) {
+  if (prize.type === 'points') return `${Math.max(0, Number(prize.points || 0))} Points`;
+  if (prize.type === 'free-delivery') return 'Free Delivery';
+  if (prize.type === 'coupon') return Number(prize.voucherAmount || 0) > 0 ? `Rs. ${Number(prize.voucherAmount).toLocaleString()} Voucher` : (prize.name || 'Voucher');
+  return prize.name || (prize.type === 'try-again' ? 'Try Again' : 'Reward');
+}
+function prizeIcon(prize: RewardPrize) {
+  if (prize.type === 'points') return '⭐';
+  if (prize.type === 'free-delivery') return '📦';
+  if (prize.type === 'coupon') return '₨';
+  if (prize.type === 'try-again') return '↻';
+  return '🎁';
+}
 
-function RewardWheel({ settings }: { settings: ResellerWheelSettings }) {
-  const prizes = [
-    { title: 'Try Again', icon: '↻' },
-    { title: 'Free Delivery', icon: '📦' },
-    { title: 'Rs. 300 Voucher', icon: '₨' },
-    { title: '20 Points', icon: '⭐' },
-    { title: settings.customPrizeTitle || 'Mystery Gift', icon: settings.customPrizeImage ? '🖼️' : '🎁' },
-  ];
+function RewardWheel({ settings, rewardSettings, wallet, onWallet }: { settings: ResellerWheelSettings; rewardSettings: RewardSettings; wallet: RewardWallet; onWallet: (wallet: RewardWallet) => void }) {
+  const prizes = (rewardSettings.spinWheelSlots || []).filter(prize => prize.active !== false && Number(prize.stock ?? 1) > 0).slice(0, 5);
+  const displayPrizes = prizes.length ? prizes : [{ id: 'loading', name: settings.customPrizeTitle || 'Rewards loading', type: 'try-again' } as RewardPrize];
   const [rotation, setRotation] = useState(0);
   const [spinning, setSpinning] = useState(false);
   const [result, setResult] = useState('');
-  function spin() {
-    if (spinning) return;
-    const winner = Math.floor(Math.random() * prizes.length);
-    setSpinning(true); setResult('');
-    setRotation(current => current + 1440 + (360 - winner * 72));
-    window.setTimeout(() => { setResult(prizes[winner].title); setSpinning(false); }, 3200);
+  const [error, setError] = useState('');
+  const usedToday = wallet.lastSpin === rewardDayKey();
+
+  async function spin() {
+    const user = auth.currentUser;
+    if (!user || spinning || usedToday) return;
+    setSpinning(true); setResult(''); setError('');
+    try {
+      const token = await user.getIdToken();
+      const response = await fetch('/api/reseller/reward-action', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ action: 'spin', guestId: currentGuestId() }) });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Spin failed.');
+      const prize = data.prize as RewardPrize | undefined;
+      if (!prize) throw new Error('Prize result unavailable.');
+      const winner = Math.max(0, prizes.findIndex(item => item.id === prize.id));
+      setRotation(current => current + 1440 + (360 - winner * 72));
+      await new Promise(resolve => window.setTimeout(resolve, 3000));
+      onWallet({ points: 0, streak: 0, ...(data.wallet || {}) });
+      setResult(prizeLabel(prize));
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Spin failed.');
+    } finally {
+      setSpinning(false);
+    }
   }
   return (
     <section className="overflow-hidden rounded-[18px] bg-[linear-gradient(160deg,#16332E,#0C1C19)] p-4 text-white shadow-[0_8px_24px_rgba(20,20,15,.12)]">
       <span className="text-[10px] font-extrabold uppercase tracking-[.14em] text-[#FF9A3C]">Spin & win</span>
       <h2 className="mt-1.5 text-xl font-extrabold">Your reward wheel</h2>
-      <p className="mt-1 text-xs text-white/65">Spin to reveal today’s prize.</p>
+      <p className="mt-1 text-xs text-white/65">Same Admin rewards and same daily count on Home & Reseller Club.</p>
       <div className="relative mx-auto mt-5 aspect-square w-full max-w-[300px] sm:max-w-[360px]">
         <div className="absolute left-1/2 top-[-10px] z-20 h-0 w-0 -translate-x-1/2 border-x-[12px] border-t-[24px] border-x-transparent border-t-[#FF9A3C]" />
         <div className="relative h-full w-full rounded-full border-[8px] border-[#FFFDF8] shadow-2xl transition-transform duration-[3000ms] ease-out" style={{ transform: `rotate(${rotation}deg)`, background: 'conic-gradient(#E85D04 0deg 72deg,#0E7C6F 72deg 144deg,#D94B3D 144deg 216deg,#C9A227 216deg 288deg,#7B4B94 288deg 360deg)' }}>
-          {prizes.map((prize, index) => { const angle=index*72+36; return <div key={prize.title} className="absolute left-1/2 top-1/2 w-[86px] text-center text-[10px] font-extrabold leading-tight" style={{ transform: `translate(-50%,-50%) rotate(${angle}deg) translateY(-105px) rotate(-${angle}deg)` }}><span className="block text-xl">{index===4 && settings.customPrizeImage ? <img src={settings.customPrizeImage} alt="" className="mx-auto h-8 w-8 rounded-full object-cover"/> : prize.icon}</span>{prize.title}</div>; })}
+          {displayPrizes.map((prize, index) => { const angle=index*72+36; return <div key={prize.id || `${prize.name}-${index}`} className="absolute left-1/2 top-1/2 w-[86px] text-center text-[10px] font-extrabold leading-tight" style={{ transform: `translate(-50%,-50%) rotate(${angle}deg) translateY(-105px) rotate(-${angle}deg)` }}><span className="block text-xl">{prize.imageUrl ? <img src={prize.imageUrl} alt="" className="mx-auto h-8 w-8 rounded-full object-cover"/> : prizeIcon(prize)}</span>{prizeLabel(prize)}</div>; })}
           <div className="absolute left-1/2 top-1/2 grid h-14 w-14 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border-4 border-white bg-[#14140F] text-[10px] font-extrabold">WIN</div>
         </div>
       </div>
-      <button type="button" onClick={spin} disabled={spinning} className="mt-5 w-full rounded-xl bg-[#FF9A3C] px-4 py-3 text-sm font-extrabold text-[#14140F] disabled:opacity-60">{spinning ? 'Spinning…' : 'Spin the wheel'}</button>
+      <button type="button" onClick={spin} disabled={spinning || usedToday || !prizes.length} className="mt-5 w-full rounded-xl bg-[#FF9A3C] px-4 py-3 text-sm font-extrabold text-[#14140F] disabled:opacity-60">{spinning ? 'Spinning…' : usedToday ? 'Come tomorrow' : 'Spin the wheel'}</button>
       {result && <p className="mt-3 rounded-xl bg-white/10 p-3 text-center text-sm font-extrabold">You got: {result}</p>}
+      {error && <p className="mt-3 rounded-xl bg-white/10 p-3 text-center text-xs font-extrabold">{error}</p>}
     </section>
   );
 }
@@ -638,4 +639,3 @@ function VoucherSheet({ voucher, orders, onClose }: { voucher: Voucher; orders: 
     </div>
   );
 }
-
