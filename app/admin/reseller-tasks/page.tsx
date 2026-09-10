@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { ArrowLeft, ImagePlus, Plus, Save, Trash2, Upload } from 'lucide-react';
-import RewardsManager from '@/components/admin/RewardsManager';
+import RewardsManager from '@/components/admin/RewardsManagerCatalogBridge';
 import { setAdminDocument, uploadImageToImgBB } from '@/components/admin/shared';
 import { db } from '@/lib/firebase';
 import { DEFAULT_RESELLER_TIERS, type ResellerTier } from '@/lib/resellerTypes';
