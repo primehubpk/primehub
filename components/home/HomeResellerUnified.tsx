@@ -48,9 +48,6 @@ export default function HomeResellerUnified() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [spinPrize, setSpinPrize] = useState<RewardPrize | null>(null);
-  const [taskBusy, setTaskBusy] = useState("");
-  const [proof, setProof] = useState<Record<string, string>>({});
-  const [submitted, setSubmitted] = useState<string[]>([]);
 
   useEffect(() => {
     let stopWallet: (() => void) | undefined;
@@ -80,8 +77,7 @@ export default function HomeResellerUnified() {
   const monthlyOrders = Math.max(0, Number(profile?.monthlyOrders || 0));
   const cashAvailable = Math.max(0, Number(profile?.walletAvailable || 0));
   const cashPending = Math.max(0, Number(profile?.walletPending || 0));
-  const allWheelSlots = (rewardSettings.spinWheelSlots || []).filter((slot) => slot.active !== false && Number(slot.stock ?? 1) > 0);
-  const wheelSlots = allWheelSlots.slice(0, 5);
+  const wheelSlots = (rewardSettings.spinWheelSlots || []).filter((slot) => slot.active !== false && Number(slot.stock ?? 1) > 0).slice(0, 5);
   const target = Math.max(1, Number(challenge.targetOrders || 10));
   const voucherImages = homeSettings.resellerVoucherImages || {};
   const vouchers: Voucher[] = [
@@ -109,46 +105,28 @@ export default function HomeResellerUnified() {
         if (data.wallet) setWallet({ ...EMPTY_WALLET, ...data.wallet });
         if (data.prize) setSpinPrize(data.prize);
         setMessage(action === "spin" ? (data.prize?.name || "Spin complete") : "Check-in complete.");
-      } else if (rewardSettings.guestMode !== false) {
-        if (action === "checkin") {
-          if (wallet.lastCheckIn === today) return;
-          const yesterday = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Karachi" }).format(new Date(Date.now() - 86400000));
-          const nextStreak = wallet.lastCheckIn === yesterday ? Math.min(7, Math.max(1, Number(wallet.streak || 0)) + 1) : 1;
-          const points = Math.max(0, Number(rewardSettings.checkInRewards?.[nextStreak - 1] ?? 10));
-          const next = { ...wallet, points: Number(wallet.points || 0) + points, streak: nextStreak, lastCheckIn: today };
-          setWallet(next); saveGuestWallet(next); setMessage(`+${points} points collected.`);
-        } else {
-          setMessage("Join Reseller Club to save your wheel rewards.");
-          window.location.href = "/reseller/join?redirect=/";
-        }
+      } else if (rewardSettings.guestMode !== false && action === "checkin") {
+        if (wallet.lastCheckIn === today) return;
+        const yesterday = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Karachi" }).format(new Date(Date.now() - 86400000));
+        const nextStreak = wallet.lastCheckIn === yesterday ? Math.min(7, Math.max(1, Number(wallet.streak || 0)) + 1) : 1;
+        const points = Math.max(0, Number(rewardSettings.checkInRewards?.[nextStreak - 1] ?? 10));
+        const next = { ...wallet, points: Number(wallet.points || 0) + points, streak: nextStreak, lastCheckIn: today };
+        setWallet(next); saveGuestWallet(next); setMessage(`+${points} points collected.`);
       } else window.location.href = "/reseller/join?redirect=/";
     } catch (error) { setMessage(error instanceof Error ? error.message : "Reward action failed."); }
     finally { setBusy(false); }
   }
 
-  async function taskCall(taskId: string, action: "open" | "submit") {
-    const current = auth.currentUser;
-    if (!current) { window.location.href = "/login?redirect=/#reseller-tasks"; return false; }
-    const value = String(proof[taskId] || "").trim();
-    if (action === "submit" && value.length < 3) { setMessage("Apna username ya proof link likhein."); return false; }
-    const token = await current.getIdToken();
-    const response = await fetch("/api/reseller/task-claims", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ taskId, action, proof: value }) });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || "Task action failed.");
-    return true;
-  }
-
   async function openTask(task: ResellerTask) {
-    setMessage("");
-    try { if (await taskCall(task.id, "open")) { if (task.url) window.open(task.url, "_blank", "noopener,noreferrer"); else setMessage("Admin panel se is task ka platform link add karein."); } }
-    catch (error) { setMessage(error instanceof Error ? error.message : "Platform open nahi hua."); }
-  }
-
-  async function submitTask(taskId: string) {
-    setTaskBusy(taskId); setMessage("");
-    try { if (await taskCall(taskId, "submit")) { setSubmitted((current) => current.includes(taskId) ? current : [...current, taskId]); setMessage("Proof admin review ke liye submit ho gaya."); } }
-    catch (error) { setMessage(error instanceof Error ? error.message : "Task submit nahi hua."); }
-    finally { setTaskBusy(""); }
+    const current = auth.currentUser;
+    if (!current) { window.location.href = "/login?redirect=/#reseller-tasks"; return; }
+    try {
+      const token = await current.getIdToken();
+      const response = await fetch("/api/reseller/task-claims", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` }, body: JSON.stringify({ taskId: task.id, action: "open" }) });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Task open failed.");
+      if (task.url) window.open(task.url, "_blank", "noopener,noreferrer"); else setMessage("Admin panel se is task ka platform link add karein.");
+    } catch (error) { setMessage(error instanceof Error ? error.message : "Task open nahi hua."); }
   }
 
   return (
@@ -156,58 +134,51 @@ export default function HomeResellerUnified() {
       <HomeHeading>Reseller Club</HomeHeading>
       <div className="hru-tabs">{tabs.map(([label, href], index) => <a key={label} className={index === 0 ? "active" : ""} href={href}>{label}</a>)}</div>
 
-      <div className="hru-feature-row" id="reseller-rewards">
-        <article className="hru-checkin-card">
-          <div className="hru-card-kicker">Weekly streak</div>
-          <div className="hru-card-title-row"><div><h3>7-Day Check-in</h3><p>Check in every day and unlock higher point rewards.</p></div><span>{streak}/7</span></div>
-          <div className="hru-days">{Array.from({ length: 7 }, (_, index) => <div key={index} className={index < streak ? "done" : ""}><b>D{index + 1}</b><strong>+{Number(rewardSettings.checkInRewards?.[index] ?? 0)}</strong><small>PTS</small></div>)}</div>
-          <button className="hru-primary-button" type="button" disabled={busy || wallet.lastCheckIn === today} onClick={() => void rewardAction("checkin")}><CheckCircle2 size={18} />{wallet.lastCheckIn === today ? "Checked in today" : "Check in now"}</button>
-        </article>
+      <div className="hru-master-track" aria-label="Reseller Club swipe trail">
+        <div className="hru-master-inner">
+          <div className="hru-master-row hru-top-row">
+            <article className="hru-rail-card hru-checkin-card" id="reseller-rewards">
+              <div className="hru-card-kicker">Weekly streak</div>
+              <div className="hru-card-title-row"><h3>7-Day Check-in</h3><span>{streak}/7</span></div>
+              <div className="hru-days">{Array.from({ length: 7 }, (_, index) => <div key={index} className={index < streak ? "done" : ""}><b>D{index + 1}</b><strong>+{Number(rewardSettings.checkInRewards?.[index] ?? 0)}</strong></div>)}</div>
+              <button className="hru-primary-button" type="button" disabled={busy || wallet.lastCheckIn === today} onClick={() => void rewardAction("checkin")}><CheckCircle2 size={15} />{wallet.lastCheckIn === today ? "Done today" : "Check in"}</button>
+            </article>
 
-        <article className="hru-wheel-card">
-          <div className="hru-card-kicker">Spin & Win</div>
-          <h3>Your reward wheel</h3>
-          <p>Spin to reveal today’s prize.</p>
-          <div className={`hru-wheel ${busy ? "spinning" : ""}`}>
-            <div className="hru-wheel-pointer" />
-            {(wheelSlots.length ? wheelSlots : [{ id: "empty", name: "Admin reward", type: "try-again" }]).map((slot, index) => {
-              const angle = index * 72 + 36;
-              return <div className="hru-wheel-radial-slot" key={slot.id} style={{ transform: `translate(-50%,-50%) rotate(${angle}deg) translateY(-42%) rotate(-${angle}deg)` }}>{slot.imageUrl ? <img src={normalizeImageUrl(slot.imageUrl)} alt="" /> : <Sparkles size={18} />}<span>{slot.name}</span></div>;
+            <article className="hru-rail-card hru-wheel-card">
+              <div className="hru-card-kicker">Spin & Win</div>
+              <h3>Your reward wheel</h3>
+              <div className={`hru-wheel ${busy ? "spinning" : ""}`}>
+                <div className="hru-wheel-pointer" />
+                {(wheelSlots.length ? wheelSlots : [{ id: "empty", name: "Admin reward", type: "try-again" }]).map((slot, index) => {
+                  const angle = index * 72 + 36;
+                  return <div className="hru-wheel-radial-slot" key={slot.id} style={{ transform: `translate(-50%,-50%) rotate(${angle}deg) translateY(-42%) rotate(-${angle}deg)` }}>{slot.imageUrl ? <img src={normalizeImageUrl(slot.imageUrl)} alt="" /> : <Sparkles size={13} />}<span>{slot.name}</span></div>;
+                })}
+                <button type="button" onClick={() => void rewardAction("spin")} disabled={busy || wallet.lastSpin === today}>WIN</button>
+              </div>
+              {spinPrize ? <div className="hru-spin-result">{spinPrize.imageUrl ? <img src={normalizeImageUrl(spinPrize.imageUrl)} alt={spinPrize.name} /> : null}<span>{spinPrize.name}</span></div> : <div className="hru-wheel-status">{wallet.lastSpin === today ? "Come tomorrow" : "1 spin today"}</div>}
+            </article>
+
+            {tasks.map((task, index) => {
+              const Icon = taskIcon(task.id); const social = SOCIAL_TASK_IDS.has(task.id); const isMonthly = task.id.includes("monthly"); const isWeekly = task.id.includes("weekly"); const autoTarget = isMonthly ? target : isWeekly ? 3 : 1;
+              return <article className="hru-rail-card hru-task" id={index === 0 ? "reseller-tasks" : undefined} key={task.id}><div className="hru-task-top"><div className="hru-task-icon"><Icon size={18} /></div><span>+{Number(task.reward || 0)}</span></div><h4>{task.title}</h4><p>{task.description}</p>{social ? <button className="hru-task-open" type="button" onClick={() => void openTask(task)}>Open {task.id}<ChevronRight size={12} /></button> : <b className="hru-auto-task"><CheckCircle2 size={12} />{Math.min(monthlyOrders, autoTarget)}/{autoTarget} completed</b>}</article>;
             })}
-            <button type="button" onClick={() => void rewardAction("spin")} disabled={busy || wallet.lastSpin === today}>WIN</button>
+
+            <article className="hru-rail-card hru-wallet-card" id="reseller-wallet">
+              <div className="hru-wallet-head"><WalletCards size={20} /><div><small>Reward wallet</small><strong>Rs. {cashAvailable.toLocaleString()}</strong></div></div>
+              <div className="hru-wallet-stats"><span>Pending <b>Rs. {cashPending.toLocaleString()}</b></span><span>Points <b>{Number(wallet.points || 0).toLocaleString()}</b></span></div>
+              <div className="hru-wallet-actions"><Link href="/reseller/wallet"><History size={13} /> History</Link><Link href="/reseller/wallet">Withdraw <ArrowRight size={13} /></Link></div>
+            </article>
           </div>
-          {spinPrize ? <div className="hru-spin-result">{spinPrize.imageUrl ? <img src={normalizeImageUrl(spinPrize.imageUrl)} alt={spinPrize.name} /> : <Sparkles size={22} />}<span>{spinPrize.name}</span></div> : null}
-          <div className="hru-wheel-status">{wallet.lastSpin === today ? "Come back tomorrow" : "1 spin available today"}</div>
-        </article>
+
+          <div className="hru-master-row hru-bottom-row">
+            {tiers.map((tier, index) => { const current = monthlyOrders >= Number(tier.minMonthlyOrders || 0) && (index === tiers.length - 1 || monthlyOrders < Number(tiers[index + 1]?.minMonthlyOrders || Infinity)); return <article className={`hru-rail-card hru-tier ${current ? "current" : ""}`} id={index === 0 ? "reseller-tiers" : undefined} key={tier.id || tier.name}><span className="hru-tier-number">{index + 1}</span><small>{current ? "CURRENT" : `${Number(tier.minMonthlyOrders || 0)}+ orders`}</small><h4>{tier.name}</h4><strong>{Number(tier.discountPercent || 0)}% <em>OFF</em></strong></article>; })}
+
+            {vouchers.map((voucher, index) => <article className="hru-rail-card hru-voucher" id={index === 0 ? "reseller-vouchers" : undefined} key={voucher.id}><img src={voucher.imageUrl ? normalizeImageUrl(voucher.imageUrl) : premiumVoucherImage(voucher.title, voucher.art, voucher.icon)} alt={voucher.title} /><small>{monthlyOrders < voucher.minOrders ? "Locked" : "Available"}</small><h4>{voucher.title}</h4><p>{voucher.requirement}</p></article>)}
+
+            {gifts.length ? gifts.map((gift, index) => <Link id={index === 0 ? "reseller-gifts" : undefined} href="/rewards#redeem-rewards" className="hru-rail-card hru-gift" key={gift.id}>{gift.imageUrl ? <img src={normalizeImageUrl(gift.imageUrl)} alt={gift.title || "Reward gift"} /> : <Gift size={30} />}<h4>{gift.title || "PrimeHub Reward Gift"}</h4><strong>{Number(gift.pointsCost || 0).toLocaleString()} points</strong></Link>) : <Link id="reseller-gifts" href="/rewards#redeem-rewards" className="hru-rail-card hru-gift"><Gift size={30} /><h4>Reward gifts</h4><strong>Admin-controlled products</strong></Link>}
+          </div>
+        </div>
       </div>
-
-      <section className="hru-section" id="reseller-tasks">
-        <div className="hru-section-head"><div><small>Tasks</small><h3>Complete & earn</h3></div></div>
-        <div className="hru-card-grid hru-two-row-track">{tasks.map((task) => {
-          const Icon = taskIcon(task.id); const social = SOCIAL_TASK_IDS.has(task.id); const done = submitted.includes(task.id); const isMonthly = task.id.includes("monthly"); const isWeekly = task.id.includes("weekly"); const autoTarget = isMonthly ? target : isWeekly ? 3 : 1;
-          return <article className="hru-mini-card hru-task" key={task.id}><div className="hru-task-top"><div className="hru-task-icon"><Icon size={20} /></div><span>+{Number(task.reward || 0)}</span></div><h4>{task.title}</h4><p>{task.description}</p>{social ? <><button className="hru-task-open" type="button" onClick={() => void openTask(task)}>Open {task.id}<ChevronRight size={12} /></button><input value={proof[task.id] || ""} disabled={done} onChange={(event) => setProof((current) => ({ ...current, [task.id]: event.target.value }))} placeholder="Username or proof link" /><button className="hru-task-submit" type="button" disabled={done || taskBusy === task.id} onClick={() => void submitTask(task.id)}>{done ? "Submitted" : taskBusy === task.id ? "Submitting…" : "Submit proof"}</button></> : <b className="hru-auto-task"><CheckCircle2 size={12} />{Math.min(monthlyOrders, autoTarget)}/{autoTarget} completed automatically</b>}</article>;
-        })}</div>
-      </section>
-
-      <section className="hru-section" id="reseller-wallet">
-        <div className="hru-section-head"><div><small>Wallet</small><h3>Reward wallet</h3></div></div>
-        <div className="hru-wallet-card"><div className="hru-wallet-tile"><WalletCards size={22} /><small>Cash wallet</small><strong>Rs. {cashAvailable.toLocaleString()}</strong><span>Pending Rs. {cashPending.toLocaleString()}</span></div><div className="hru-wallet-tile hru-wallet-points"><small>Points wallet</small><strong>{Number(wallet.points || 0).toLocaleString()}</strong><span>Reward points</span></div><div className="hru-wallet-actions"><Link href="/reseller/wallet"><History size={15} /> History</Link><Link href="/reseller/wallet">Withdrawal <ArrowRight size={14} /></Link></div></div>
-      </section>
-
-      <section className="hru-section" id="reseller-tiers">
-        <div className="hru-section-head"><div><small>Tiers</small><h3>Your reseller level</h3></div></div>
-        <div className="hru-tier-track">{tiers.map((tier, index) => { const current = monthlyOrders >= Number(tier.minMonthlyOrders || 0) && (index === tiers.length - 1 || monthlyOrders < Number(tiers[index + 1]?.minMonthlyOrders || Infinity)); return <article className={`hru-mini-card hru-tier ${current ? "current" : ""}`} key={tier.id || tier.name}><span className="hru-tier-number">{index + 1}</span><small>{current ? "CURRENT" : `${Number(tier.minMonthlyOrders || 0)}+ monthly orders`}</small><h4>{tier.name}</h4><strong>{Number(tier.discountPercent || 0)}% <em>OFF</em></strong></article>; })}</div>
-      </section>
-
-      <section className="hru-section" id="reseller-vouchers">
-        <div className="hru-section-head"><div><small>Vouchers</small><h3>Unlock your rewards</h3></div><Link href="/reseller/dashboard">View in club <ArrowRight size={14} /></Link></div>
-        <div className="hru-card-grid hru-two-row-track">{vouchers.map((voucher) => <article className="hru-mini-card hru-voucher" key={voucher.id}><img src={voucher.imageUrl ? normalizeImageUrl(voucher.imageUrl) : premiumVoucherImage(voucher.title, voucher.art, voucher.icon)} alt={voucher.title} /><small>{monthlyOrders < voucher.minOrders ? "Locked" : "Available"}</small><h4>{voucher.title}</h4><p>{voucher.description}<br />{voucher.requirement}</p></article>)}</div>
-      </section>
-
-      <section className="hru-section" id="reseller-gifts">
-        <div className="hru-section-head"><div><small>Point store</small><h3>Gifts & Products</h3></div><Link href="/rewards#redeem-rewards">See all <ArrowRight size={14} /></Link></div>
-        <div className="hru-card-grid hru-two-row-track">{gifts.length ? gifts.map((gift) => <Link href="/rewards#redeem-rewards" className="hru-mini-card hru-gift" key={gift.id}>{gift.imageUrl ? <img src={normalizeImageUrl(gift.imageUrl)} alt={gift.title || "Reward gift"} /> : <Gift size={30} />}<h4>{gift.title || "PrimeHub Reward Gift"}</h4><strong>{Number(gift.pointsCost || 0).toLocaleString()} points</strong></Link>) : <Link href="/rewards#redeem-rewards" className="hru-mini-card hru-gift"><Gift size={30} /><h4>Reward gifts</h4><strong>Admin-controlled products</strong></Link>}</div>
-      </section>
 
       {message ? <div className="hru-message" role="status">{message}</div> : null}
     </section>
