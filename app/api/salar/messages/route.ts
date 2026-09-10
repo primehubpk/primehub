@@ -13,294 +13,86 @@ const PHONE = '03238878009';
 const ADVANCE = 300;
 const ALLOWED_TOPICS = new Set(['reseller_club', 'prime_skill', 'shopping']);
 const TOOLS: SalarToolDefinition[] = [
-  {
-    name: 'catalogue',
-    description: 'Search ONLY indexed PrimeHub catalogue. Never guess a product, collection, stock or price.',
-    parameters: { type: 'object', properties: { q: { type: 'string' }, collection: { type: 'string' }, collectionId: { type: 'string' }, productId: { type: 'string' }, limit: { type: 'number' } }, additionalProperties: false },
-  },
-  {
-    name: 'knowledge',
-    description: 'Read indexed PrimeHub website knowledge such as reseller_club, prime_skill, shopping, delivery, payment, about, contact or policies.',
-    parameters: { type: 'object', properties: { topic: { type: 'string' } }, required: ['topic'], additionalProperties: false },
-  },
+  { name: 'catalogue', description: 'Search ONLY indexed PrimeHub catalogue. Never guess a product, collection, stock or price.', parameters: { type: 'object', properties: { q: { type: 'string' }, collection: { type: 'string' }, collectionId: { type: 'string' }, productId: { type: 'string' }, limit: { type: 'number' } }, additionalProperties: false } },
+  { name: 'knowledge', description: 'Read indexed PrimeHub website knowledge such as reseller_club, prime_skill, shopping, delivery, payment, about, contact or policies.', parameters: { type: 'object', properties: { topic: { type: 'string' } }, required: ['topic'], additionalProperties: false } },
 ];
 
 type StoredMessage = { id?: string; role?: string; text?: string; attachments?: any; created_at?: string; type?: string };
 type WorkerProduct = { id: string; name: string; price: number; image_url?: string | null; url?: string; size?: string | null; material?: string | null; collection_names?: string[] };
-type Draft = {
-  stage?: 'awaiting_advance' | 'collecting_details' | 'complete';
-  items?: Array<{ productId: string; quantity: number }>;
-  advance_amount?: number;
-  advance_status?: string;
-  advance_screenshot_url?: string;
-  advance_screenshot_at?: string;
-  next_field?: 'name' | 'city' | 'phone' | 'address' | null;
-  customer?: { name?: string; city?: string; phone?: string; address?: string };
-  order_id?: string;
-  whatsapp_url?: string;
-};
+type Draft = { stage?: 'awaiting_advance'|'collecting_details'|'complete'; items?: Array<{ productId: string; quantity: number }>; advance_amount?: number; advance_status?: string; advance_screenshot_url?: string; advance_screenshot_at?: string; next_field?: 'name'|'city'|'phone'|'address'|null; customer?: { name?: string; city?: string; phone?: string; address?: string }; order_id?: string; whatsapp_url?: string };
 
-function historyForModel(messages: StoredMessage[]): SalarLlmMessage[] {
-  return messages.slice(-20).filter((message) => message.role === 'user' || message.role === 'assistant').map((message) => ({ role: message.role as 'user'|'assistant', content: String(message.text || '') }));
-}
+function historyForModel(messages: StoredMessage[]): SalarLlmMessage[] { return messages.slice(-20).filter((m) => m.role === 'user' || m.role === 'assistant').map((m) => ({ role: m.role as 'user'|'assistant', content: String(m.text || '') })); }
 function safeArgs(value: unknown) { return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, any> : {}; }
 function shoppingLike(text: string) { return /bangle|churi|choori|kangan|jewel|watch|product|item|dikha|show|collection|shop|shopping/i.test(text); }
 function orderIntent(text: string) { return /\b(order|buy|purchase|confirm)\b|mangwa|mangwana|manga do|le(?:na|ni)\s+hai|chahiye|checkout/i.test(text); }
-function collectionFollowUp(messages: StoredMessage[]) {
-  const lastAssistant = [...messages].reverse().find((message) => message.role === 'assistant');
-  return /which collection|kaunsi collection|collection dekh|collections mili/i.test(String(lastAssistant?.text || ''));
-}
-function collectionReply(collections: any[]) {
-  const names = collections.map((item) => String(item?.name || '').trim()).filter(Boolean);
-  return `Assalamualaikum, I am Salar from PrimeHub Mall.\n\nAap ke liye ye collections mili hain:\n${names.map((name) => `• ${name}`).join('\n')}\n\nAap kaunsi collection dekhna chahenge?`;
-}
-function noVerifiedResult() { return `Mujhe website index mein iski verified information nahi mili. PrimeHub se rabta karein: ${PHONE}`; }
-function objectAttachments(attachments: any) { return attachments && !Array.isArray(attachments) ? attachments : {}; }
-function productsFromAttachments(attachments: any): WorkerProduct[] { const value = objectAttachments(attachments); return Array.isArray(value.products) ? value.products : []; }
-function recentProducts(messages: StoredMessage[]): WorkerProduct[] {
-  const assistant = [...messages].reverse().find((message) => message.role === 'assistant' && productsFromAttachments(message.attachments).length);
-  return assistant ? productsFromAttachments(assistant.attachments).slice(0, 30) : [];
-}
-function normalizeHint(value: unknown) { return String(value || '').toLowerCase().replace(/[^a-z0-9\u0600-\u06ff]+/g, ' ').replace(/\s+/g, ' ').trim(); }
+function collectionFollowUp(messages: StoredMessage[]) { const last = [...messages].reverse().find((m) => m.role === 'assistant'); return /which collection|kaunsi collection|collection dekh|collections mili/i.test(String(last?.text || '')); }
+function collectionReply(collections: any[]) { const names = collections.map((x) => String(x?.name || '').trim()).filter(Boolean); return `Assalamualaikum, I am Salar from PrimeHub Mall.\n\nAap ke liye ye collections mili hain:\n${names.map((n) => `• ${n}`).join('\n')}\n\nAap kaunsi collection dekhna chahenge?`; }
+function noVerifiedResult() { return `Mujhe website index mein verified information nahi mili. PrimeHub se rabta karein: ${PHONE}`; }
+function objectAttachments(v: any) { return v && !Array.isArray(v) ? v : {}; }
+function productsFromAttachments(v: any): WorkerProduct[] { const a = objectAttachments(v); return Array.isArray(a.products) ? a.products : []; }
+function recentProducts(messages: StoredMessage[]) { const m = [...messages].reverse().find((x) => x.role === 'assistant' && productsFromAttachments(x.attachments).length); return m ? productsFromAttachments(m.attachments).slice(0, 30) : []; }
+function normalizeHint(v: unknown) { return String(v || '').toLowerCase().replace(/[^a-z0-9\u0600-\u06ff]+/g, ' ').replace(/\s+/g, ' ').trim(); }
 function resolveReferencedProduct(question: string, messages: StoredMessage[]): WorkerProduct | null {
-  const products = recentProducts(messages); if (!products.length) return null;
-  const q = normalizeHint(question);
-  const referenceLike = /(pic|photo|image|tasveer|picture|yeh?\b|\bis\s+(pic|photo|image)|\bthis\b|\bwali\b|size|material|order|buy|purchase|confirm|mangwa|chahiye|1st|2nd|3rd|first|second|third)/i.test(q);
-  if (!referenceLike) return null;
-  const ordinal = q.match(/\b(\d{1,2})(?:st|nd|rd|th)?\b/);
-  if (ordinal) { const index = Number(ordinal[1]) - 1; if (index >= 0 && index < products.length) return products[index]; }
-  const words: Record<string, number> = { first: 0, pehli: 0, second: 1, doosri: 1, dusri: 1, third: 2, teesri: 2 };
-  for (const [word, index] of Object.entries(words)) if (q.includes(word) && products[index]) return products[index];
-  const hinted = products.find((product) => {
-    const candidates = [product.name, product.material, ...(product.collection_names || [])].map(normalizeHint).filter((item) => item.length >= 3);
-    return candidates.some((candidate) => q.includes(candidate) || candidate.split(' ').some((token) => token.length >= 4 && q.includes(token)));
-  });
-  if (hinted) return hinted;
-  return products.length === 1 ? products[0] : null;
+  const products = recentProducts(messages); if (!products.length) return null; const q = normalizeHint(question);
+  if (!/(pic|photo|image|tasveer|picture|yeh?\b|\bthis\b|\bwali\b|size|material|order|buy|purchase|confirm|mangwa|chahiye|1st|2nd|3rd|first|second|third)/i.test(q)) return null;
+  const ordinal = q.match(/\b(\d{1,2})(?:st|nd|rd|th)?\b/); if (ordinal) { const i = Number(ordinal[1]) - 1; if (i >= 0 && i < products.length) return products[i]; }
+  const words: Record<string, number> = { first:0, pehli:0, second:1, doosri:1, dusri:1, third:2, teesri:2 }; for (const [w,i] of Object.entries(words)) if (q.includes(w) && products[i]) return products[i];
+  const hinted = products.find((p) => [p.name,p.material,...(p.collection_names || [])].map(normalizeHint).filter((x) => x.length >= 3).some((x) => q.includes(x) || x.split(' ').some((t) => t.length >= 4 && q.includes(t))));
+  return hinted || (products.length === 1 ? products[0] : null);
 }
-function selectedOrderProducts(text: string, messages: StoredMessage[]) {
-  const products = recentProducts(messages); if (!products.length) return [];
-  if (/\b(all|sab|saray|saare|tamam)\b/i.test(text)) return products;
-  const referenced = resolveReferencedProduct(text, messages); return referenced ? [referenced] : products.length === 1 ? [products[0]] : [];
-}
-function productFactReply(product: WorkerProduct, question: string) {
-  const q = normalizeHint(question);
-  if (/size|measurement|napa|nap/.test(q)) return product.size ? `${product.name} ka website-listed size: ${product.size}.` : `${product.name} ka size website index mein listed nahi hai. Team confirm: ${PHONE}`;
-  if (/material|metal|glass|sheesha|plastic/.test(q)) return product.material ? `${product.name} ka website-listed material: ${product.material}.` : `${product.name} ka material website index mein listed nahi hai. Team confirm: ${PHONE}`;
-  return `${product.name}\nPrice: Rs ${Number(product.price || 0).toLocaleString()}${product.size ? `\nSize: ${product.size}` : ''}${product.material ? `\nMaterial: ${product.material}` : ''}`;
-}
-function cleanVisionText(value: unknown) { return String(value || '').replace(/(?:Rs\.?|PKR|₹|\$)\s*\d[\d,.]*/gi, 'price not verified').trim().slice(0, 1200); }
-function knowledgeReply(result: any) {
-  if (!result || result.found === false || !String(result.text || '').trim()) return noVerifiedResult();
-  const excerpt = String(result.text).trim().slice(0, 1800);
-  return `${String(result.title || 'PrimeHub').trim()}\n\n${excerpt}${result.url ? `\n\nLink: ${result.url}` : ''}`;
-}
-function validPhone(value: string) { const digits = value.replace(/\D/g, ''); return digits.length >= 10 && digits.length <= 15; }
-function fieldPrompt(field: Draft['next_field']) {
-  if (field === 'name') return 'Shukriya ❤️ Screenshot mil gaya. Staff is advance ko verify karegi. Aap apna naam batayein?';
-  if (field === 'city') return 'Shukriya. Aap kis city mein delivery chahte hain?';
-  if (field === 'phone') return 'Aap ka contact phone number batayein?';
-  if (field === 'address') return 'Ab complete delivery address batayein?';
-  return '';
-}
-function orderSummaryAttachment(result: any, draft: Draft) {
-  const customer = draft.customer || {};
-  return {
-    complete: true,
-    orderId: result.orderId,
-    whatsappUrl: result.whatsappUrl || '',
-    items: Array.isArray(result.items) ? result.items : [],
-    subtotal: Number(result.subtotal || 0),
-    advance: ADVANCE,
-    remaining: Number(result.remaining || 0),
-    delivery: Number(result.deliveryCharge || 0),
-    total: Number(result.total || 0),
-    name: String(customer.name || ''), city: String(customer.city || ''), phone: String(customer.phone || ''), address: String(customer.address || ''),
-    paymentNote: 'Advance screenshot received — pending staff verification. Complete order ready karke VIDEO share hoga; remaining payment video ke baad.',
-  };
-}
-function summaryText(summary: any) {
-  const items = (summary.items || []).map((item: any) => `• ${item.title} x${item.quantity} — Rs ${Number(item.lineTotal || item.price || 0).toLocaleString()}`).join('\n');
-  return `Order Summary\n${items}\n\nSubtotal: Rs ${summary.subtotal.toLocaleString()}\nDelivery: Rs ${summary.delivery.toLocaleString()}\nTotal: Rs ${summary.total.toLocaleString()}\nAdvance: Rs ${summary.advance.toLocaleString()} (pending staff verification)\nRemaining after video: Rs ${summary.remaining.toLocaleString()}\n\nName: ${summary.name}\nCity: ${summary.city}\nPhone: ${summary.phone}\nAddress: ${summary.address}\n\nOrder website par save ho gaya. WhatsApp pe bhejne ke liye button daba dein. Video ready karke share karenge; uske baad baqi payment.`;
-}
+function selectedOrderProducts(text: string, messages: StoredMessage[]) { const products = recentProducts(messages); if (!products.length) return []; if (/\b(all|sab|saray|saare|tamam)\b/i.test(text)) return products; const ref = resolveReferencedProduct(text, messages); return ref ? [ref] : products.length === 1 ? [products[0]] : []; }
+function productFactReply(product: WorkerProduct, question: string) { const q = normalizeHint(question); if (/size|measurement|napa|nap/.test(q)) return product.size ? `${product.name} ka website-listed size: ${product.size}.` : `${product.name} ka size website index mein listed nahi hai. Team confirm: ${PHONE}`; if (/material|metal|glass|sheesha|plastic/.test(q)) return product.material ? `${product.name} ka website-listed material: ${product.material}.` : `${product.name} ka material website index mein listed nahi hai. Team confirm: ${PHONE}`; return `${product.name}\nPrice: Rs ${Number(product.price || 0).toLocaleString()}${product.size ? `\nSize: ${product.size}` : ''}${product.material ? `\nMaterial: ${product.material}` : ''}`; }
+function cleanVisionText(v: unknown) { return String(v || '').replace(/(?:Rs\.?|PKR|₹|\$)\s*\d[\d,.]*/gi, 'price not verified').trim().slice(0, 1200); }
+function knowledgeReply(result: any) { if (!result || result.found === false || !String(result.text || '').trim()) return noVerifiedResult(); return `${String(result.title || 'PrimeHub').trim()}\n\n${String(result.text).trim().slice(0, 1800)}${result.url ? `\n\nLink: ${result.url}` : ''}`; }
+function validPhone(v: string) { const d = v.replace(/\D/g, ''); return d.length >= 10 && d.length <= 15; }
+function fieldPrompt(field: Draft['next_field']) { if (field === 'name') return 'Shukriya ❤️ Screenshot mil gaya. Staff is advance ko verify karegi. Aap apna naam batayein?'; if (field === 'city') return 'Shukriya. Aap kis city mein delivery chahte hain?'; if (field === 'phone') return 'Aap ka contact phone number batayein?'; if (field === 'address') return 'Ab complete delivery address batayein?'; return ''; }
+function moderationReply(result: any) { const categories = Array.isArray(result?.categories) ? result.categories : []; if (categories.some((c: string) => ['sexual_minors','attack','illegal_instruction'].includes(c))) return 'Is request mein main madad nahi kar sakta. PrimeHub shopping, products ya order help ke liye main khushi se madad karunga.'; if (categories.includes('spam')) return 'Meherbani karke ek clear message bhej dein. PrimeHub shopping ya order help ke liye main yahan hoon.'; return 'Main adab aur ehtram ke saath madad ke liye hoon. PrimeHub shopping ya order ka sawal batayein.'; }
+function orderSummaryAttachment(result: any, draft: Draft) { const c = draft.customer || {}; return { complete:true, orderId:result.orderId, whatsappUrl:result.whatsappUrl || '', items:Array.isArray(result.items) ? result.items : [], subtotal:Number(result.subtotal || 0), advance:ADVANCE, remaining:Number(result.remaining || 0), delivery:Number(result.deliveryCharge || 0), total:Number(result.total || 0), name:String(c.name || ''), city:String(c.city || ''), phone:String(c.phone || ''), address:String(c.address || ''), paymentNote:'Advance screenshot received — pending staff verification. Complete order ready karke VIDEO share hoga; remaining payment video ke baad.' }; }
+function summaryText(s: any) { const items=(s.items||[]).map((i:any)=>`• ${i.title} x${i.quantity} — Rs ${Number(i.lineTotal || i.price || 0).toLocaleString()}`).join('\n'); return `Order Summary\n${items}\n\nSubtotal: Rs ${s.subtotal.toLocaleString()}\nDelivery: Rs ${s.delivery.toLocaleString()}\nTotal: Rs ${s.total.toLocaleString()}\nAdvance: Rs ${s.advance.toLocaleString()} (pending staff verification)\nRemaining after video: Rs ${s.remaining.toLocaleString()}\n\nName: ${s.name}\nCity: ${s.city}\nPhone: ${s.phone}\nAddress: ${s.address}\n\nOrder website par save ho gaya. WhatsApp pe bhejne ke liye button daba dein. Video ready karke share karenge; uske baad baqi payment.`; }
+async function updateDraft(conversation:any,draft:Draft){const now=new Date().toISOString();await conversation.ref.set({order_draft:{...draft,updated_at:now},updated_at:now},{merge:true});}
+async function saveAssistant(conversation:any,text:string,attachments:any,type='message'){const db=getAdminDb();const ref=db.collection('salar_messages').doc();const createdAt=new Date().toISOString();await db.runTransaction(async tx=>{const snap=await tx.get(conversation.ref);if(!snap.exists||snap.data()?.blocked===true)throw new Error('SALAR_BLOCKED');tx.set(ref,{id:ref.id,conversation_id:conversation.id,role:'assistant',type,text,attachments,created_at:createdAt});tx.set(conversation.ref,{updated_at:createdAt,last_message_at:createdAt,last_message_preview:text.slice(0,160)},{merge:true});});return{id:ref.id,conversation_id:conversation.id,role:'assistant' as const,type,text,attachments,created_at:createdAt};}
 
-async function updateDraft(conversation: any, draft: Draft) {
-  const now = new Date().toISOString();
-  await conversation.ref.set({ order_draft: { ...draft, updated_at: now }, updated_at: now }, { merge: true });
-}
+export async function GET(request:Request){const sid=readSalarSid(request);if(!sid)return NextResponse.json({error:'session_required'},{status:401});try{const customerUid=await verifiedCustomerUid(request);const conversation=await ensureSalarConversation(sid,customerUid);const snap=await conversation.ref.get();const blocked=snap.data()?.blocked===true;const messages=await listConversationMessages(conversation.id);return NextResponse.json({conversationId:conversation.id,blocked,messages,unblockEmail:blocked?SALAR_UNBLOCK_EMAIL:undefined},{headers:{'Cache-Control':'no-store, private'}});}catch{return NextResponse.json({error:'Unable to load Salar messages.'},{status:500});}}
 
-async function saveAssistant(conversation: any, text: string, attachments: any, type = 'message') {
-  const db = getAdminDb(); const ref = db.collection('salar_messages').doc(); const createdAt = new Date().toISOString();
-  await db.runTransaction(async (transaction) => {
-    const snapshot = await transaction.get(conversation.ref);
-    if (!snapshot.exists || snapshot.data()?.blocked === true) throw new Error('SALAR_BLOCKED');
-    transaction.set(ref, { id: ref.id, conversation_id: conversation.id, role: 'assistant', type, text, attachments, created_at: createdAt });
-    transaction.set(conversation.ref, { updated_at: createdAt, last_message_at: createdAt, last_message_preview: text.slice(0, 160) }, { merge: true });
-  });
-  return { id: ref.id, conversation_id: conversation.id, role: 'assistant' as const, type, text, attachments, created_at: createdAt };
-}
+export async function POST(request:Request){
+  const sid=readSalarSid(request);if(!sid)return NextResponse.json({error:'session_required'},{status:401});
+  const body=await request.json().catch(()=>null);const imageUrl=typeof body?.imageUrl==='string'&&isR2PublicUrl(body.imageUrl)?body.imageUrl.trim():'';const topic=typeof body?.topic==='string'&&ALLOWED_TOPICS.has(body.topic)?body.topic:'';const enteredText=normalizeMessageText(body?.text);
+  if(body?.imageUrl&&!imageUrl)return NextResponse.json({error:'Invalid image URL.'},{status:400});if(body?.topic&&!topic)return NextResponse.json({error:'Invalid quick area.'},{status:400});if(!enteredText&&!imageUrl&&!topic)return NextResponse.json({error:'Message text, image, or quick area is required.'},{status:400});const text=enteredText||(imageUrl?'Advance screenshot.':topic.replace('_',' '));
+  try{
+    const customerUid=await verifiedCustomerUid(request);const conversation=await ensureSalarConversation(sid,customerUid);const before=await conversation.ref.get();const beforeData:any=before.data()||{};if(beforeData.blocked===true)return NextResponse.json({error:'blocked',unblockEmail:SALAR_UNBLOCK_EMAIL},{status:403});if(!consumeSalarRateLimit(conversation.id))return NextResponse.json({error:'rate_limited'},{status:429});
+    const db=getAdminDb();const userRef=db.collection('salar_messages').doc();const now=new Date().toISOString();const userAttachments=imageUrl?{images:[{url:imageUrl}]}:[];
+    await db.runTransaction(async tx=>{const snap=await tx.get(conversation.ref);if(!snap.exists||snap.data()?.blocked===true)throw new Error('SALAR_BLOCKED');tx.set(userRef,{id:userRef.id,conversation_id:conversation.id,role:'user',text,attachments:userAttachments,created_at:now});tx.set(conversation.ref,{updated_at:now,last_message_at:now,last_message_preview:text.slice(0,160)},{merge:true});});
+    const userMessage={id:userRef.id,conversation_id:conversation.id,role:'user' as const,text,attachments:userAttachments,created_at:now};
+    const moderation:any=await runWorker({job:'moderate',payload:{text:enteredText || ''},conversationId:conversation.id});
+    if(moderation?.flag===true){await conversation.ref.set({moderation_flagged:true,moderation_last:{categories:moderation.categories||[],severity:moderation.severity||'low',at:now}},{merge:true});const assistant=await saveAssistant(conversation,moderationReply(moderation),[],'moderation');return NextResponse.json({ok:true,messages:[userMessage,assistant]},{headers:{'Cache-Control':'no-store, private'}});}
+    const stored=await listConversationMessages(conversation.id) as StoredMessage[];let draft:Draft=beforeData.order_draft||{};
 
-export async function GET(request: Request) {
-  const sid = readSalarSid(request); if (!sid) return NextResponse.json({ error: 'session_required' }, { status: 401 });
-  try {
-    const customerUid = await verifiedCustomerUid(request); const conversation = await ensureSalarConversation(sid, customerUid); const snapshot = await conversation.ref.get();
-    const blocked = snapshot.data()?.blocked === true; const messages = await listConversationMessages(conversation.id);
-    return NextResponse.json({ conversationId: conversation.id, blocked, messages, unblockEmail: blocked ? SALAR_UNBLOCK_EMAIL : undefined }, { headers: { 'Cache-Control': 'no-store, private' } });
-  } catch { return NextResponse.json({ error: 'Unable to load Salar messages.' }, { status: 500 }); }
-}
-
-export async function POST(request: Request) {
-  const sid = readSalarSid(request); if (!sid) return NextResponse.json({ error: 'session_required' }, { status: 401 });
-  const body = await request.json().catch(() => null);
-  const imageUrl = typeof body?.imageUrl === 'string' && isR2PublicUrl(body.imageUrl) ? body.imageUrl.trim() : '';
-  const topic = typeof body?.topic === 'string' && ALLOWED_TOPICS.has(body.topic) ? body.topic : '';
-  const enteredText = normalizeMessageText(body?.text);
-  if (body?.imageUrl && !imageUrl) return NextResponse.json({ error: 'Invalid image URL.' }, { status: 400 });
-  if (body?.topic && !topic) return NextResponse.json({ error: 'Invalid quick area.' }, { status: 400 });
-  if (!enteredText && !imageUrl && !topic) return NextResponse.json({ error: 'Message text, image, or quick area is required.' }, { status: 400 });
-  const text = enteredText || (imageUrl ? 'Advance screenshot.' : topic.replace('_', ' '));
-
-  try {
-    const customerUid = await verifiedCustomerUid(request); const conversation = await ensureSalarConversation(sid, customerUid);
-    const beforeWrite = await conversation.ref.get(); const beforeData: any = beforeWrite.data() || {};
-    if (beforeData.blocked === true) return NextResponse.json({ error: 'blocked', unblockEmail: SALAR_UNBLOCK_EMAIL }, { status: 403 });
-    if (!consumeSalarRateLimit(conversation.id)) return NextResponse.json({ error: 'rate_limited' }, { status: 429 });
-
-    const db = getAdminDb(); const userRef = db.collection('salar_messages').doc(); const now = new Date().toISOString();
-    const userAttachments = imageUrl ? { images: [{ url: imageUrl }] } : [];
-    await db.runTransaction(async (transaction) => {
-      const snapshot = await transaction.get(conversation.ref); if (!snapshot.exists || snapshot.data()?.blocked === true) throw new Error('SALAR_BLOCKED');
-      transaction.set(userRef, { id: userRef.id, conversation_id: conversation.id, role: 'user', text, attachments: userAttachments, created_at: now });
-      transaction.set(conversation.ref, { updated_at: now, last_message_at: now, last_message_preview: text.slice(0, 160) }, { merge: true });
-    });
-    const userMessage = { id: userRef.id, conversation_id: conversation.id, role: 'user' as const, text, attachments: userAttachments, created_at: now };
-    const stored = await listConversationMessages(conversation.id) as StoredMessage[];
-    let draft: Draft = beforeData.order_draft || {};
-
-    if (draft.stage === 'awaiting_advance') {
-      if (!imageUrl) {
-        const assistantMessage = await saveAssistant(conversation, `Order ready karne ke liye pehle Rs ${ADVANCE} advance ka screenshot bhej dein. Complete order ready karke VIDEO share karenge; baqi payment video ke baad hogi.` , []);
-        return NextResponse.json({ ok: true, messages: [userMessage, assistantMessage] }, { headers: { 'Cache-Control': 'no-store, private' } });
-      }
-      draft = { ...draft, stage: 'collecting_details', advance_amount: ADVANCE, advance_status: 'pending_verify', advance_screenshot_url: imageUrl, advance_screenshot_at: now, next_field: 'name', customer: draft.customer || {} };
-      await updateDraft(conversation, draft);
-      const assistantMessage = await saveAssistant(conversation, fieldPrompt('name'), []);
-      return NextResponse.json({ ok: true, messages: [userMessage, assistantMessage] }, { headers: { 'Cache-Control': 'no-store, private' } });
+    if(draft.stage==='awaiting_advance'){
+      if(!imageUrl){const a=await saveAssistant(conversation,`Order ready karne ke liye pehle Rs ${ADVANCE} advance ka screenshot bhej dein. Complete order ready karke VIDEO share karenge; baqi payment video ke baad hogi.`,[]);return NextResponse.json({ok:true,messages:[userMessage,a]});}
+      draft={...draft,stage:'collecting_details',advance_amount:ADVANCE,advance_status:'pending_verify',advance_screenshot_url:imageUrl,advance_screenshot_at:now,next_field:'name',customer:draft.customer||{}};await updateDraft(conversation,draft);const a=await saveAssistant(conversation,fieldPrompt('name'),[]);return NextResponse.json({ok:true,messages:[userMessage,a]});
     }
-
-    if (draft.stage === 'collecting_details') {
-      if (imageUrl) {
-        const assistantMessage = await saveAssistant(conversation, fieldPrompt(draft.next_field || 'name'), []);
-        return NextResponse.json({ ok: true, messages: [userMessage, assistantMessage] }, { headers: { 'Cache-Control': 'no-store, private' } });
-      }
-      const customer = { ...(draft.customer || {}) };
-      const field = draft.next_field || (!customer.name ? 'name' : !customer.city ? 'city' : !customer.phone ? 'phone' : 'address');
-      if (field === 'phone' && !validPhone(text)) {
-        const assistantMessage = await saveAssistant(conversation, `Phone number clear nahi hua. Meherbani karke 10–15 digits ka contact number bhej dein. Zarurat ho to ${PHONE} par rabta karein.`, []);
-        return NextResponse.json({ ok: true, messages: [userMessage, assistantMessage] }, { headers: { 'Cache-Control': 'no-store, private' } });
-      }
-      if (field === 'address' && text.trim().length < 8) {
-        const assistantMessage = await saveAssistant(conversation, 'Complete delivery address thora detail mein bhej dein — area/street/house ya shop detail ke saath.', []);
-        return NextResponse.json({ ok: true, messages: [userMessage, assistantMessage] }, { headers: { 'Cache-Control': 'no-store, private' } });
-      }
-      customer[field] = text.trim();
-      const next: Draft['next_field'] = field === 'name' ? 'city' : field === 'city' ? 'phone' : field === 'phone' ? 'address' : null;
-      draft = { ...draft, customer, next_field: next };
-      await updateDraft(conversation, draft);
-      if (next) {
-        const assistantMessage = await saveAssistant(conversation, fieldPrompt(next), []);
-        return NextResponse.json({ ok: true, messages: [userMessage, assistantMessage] }, { headers: { 'Cache-Control': 'no-store, private' } });
-      }
-
-      const quote: any = await runWorker({ job: 'order', payload: { conversationId: conversation.id, action: 'quote' }, conversationId: conversation.id });
-      if (quote?.ok !== true) {
-        const assistantMessage = await saveAssistant(conversation, `Order total website se verify nahi ho saka. Team confirm: ${PHONE}`, []);
-        return NextResponse.json({ ok: true, messages: [userMessage, assistantMessage] }, { headers: { 'Cache-Control': 'no-store, private' } });
-      }
-      const committed: any = await runWorker({ job: 'order', payload: { conversationId: conversation.id, action: 'commit' }, conversationId: conversation.id });
-      if (committed?.ok !== true) {
-        const assistantMessage = await saveAssistant(conversation, `Website order save nahi ho saka. Team confirm: ${PHONE}`, []);
-        return NextResponse.json({ ok: true, messages: [userMessage, assistantMessage] }, { headers: { 'Cache-Control': 'no-store, private' } });
-      }
-      draft = { ...draft, stage: 'complete', order_id: committed.orderId, whatsapp_url: committed.whatsappUrl || '' };
-      const summary = orderSummaryAttachment(committed, draft);
-      const assistantMessage = await saveAssistant(conversation, summaryText(summary), { order_summary: summary }, 'order_summary');
-      return NextResponse.json({ ok: true, messages: [userMessage, assistantMessage] }, { headers: { 'Cache-Control': 'no-store, private' } });
+    if(draft.stage==='collecting_details'){
+      if(imageUrl){const a=await saveAssistant(conversation,fieldPrompt(draft.next_field||'name'),[]);return NextResponse.json({ok:true,messages:[userMessage,a]});}
+      const customer={...(draft.customer||{})};const field=draft.next_field||(!customer.name?'name':!customer.city?'city':!customer.phone?'phone':'address');
+      if(field==='phone'&&!validPhone(text)){const a=await saveAssistant(conversation,`Phone number clear nahi hua. Meherbani karke 10–15 digits ka contact number bhej dein. Zarurat ho to ${PHONE} par rabta karein.`,[]);return NextResponse.json({ok:true,messages:[userMessage,a]});}
+      if(field==='address'&&text.trim().length<8){const a=await saveAssistant(conversation,'Complete delivery address thora detail mein bhej dein — area/street/house ya shop detail ke saath.',[]);return NextResponse.json({ok:true,messages:[userMessage,a]});}
+      customer[field]=text.trim();const next:Draft['next_field']=field==='name'?'city':field==='city'?'phone':field==='phone'?'address':null;draft={...draft,customer,next_field:next};await updateDraft(conversation,draft);
+      if(next){const a=await saveAssistant(conversation,fieldPrompt(next),[]);return NextResponse.json({ok:true,messages:[userMessage,a]});}
+      const quote:any=await runWorker({job:'order',payload:{conversationId:conversation.id,action:'quote'},conversationId:conversation.id});if(quote?.ok!==true){const a=await saveAssistant(conversation,`Order total website se verify nahi ho saka. Team confirm: ${PHONE}`,[]);return NextResponse.json({ok:true,messages:[userMessage,a]});}
+      const committed:any=await runWorker({job:'order',payload:{conversationId:conversation.id,action:'commit'},conversationId:conversation.id});if(committed?.ok!==true){const a=await saveAssistant(conversation,`Website order save nahi ho saka. Team confirm: ${PHONE}`,[]);return NextResponse.json({ok:true,messages:[userMessage,a]});}
+      draft={...draft,stage:'complete',order_id:committed.orderId,whatsapp_url:committed.whatsappUrl||''};const summary=orderSummaryAttachment(committed,draft);const a=await saveAssistant(conversation,summaryText(summary),{order_summary:summary},'order_summary');return NextResponse.json({ok:true,messages:[userMessage,a]});
     }
+    if(!draft.stage&&orderIntent(text)){const chosen=selectedOrderProducts(text,stored.filter(m=>m.id!==userRef.id));if(!chosen.length){const a=await saveAssistant(conversation,'Kaunsa product order karna hai? Product ka naam ya card number (jaise 1st, 2nd, 3rd) batayein.',[]);return NextResponse.json({ok:true,messages:[userMessage,a]});}draft={stage:'awaiting_advance',items:chosen.map(p=>({productId:p.id,quantity:1})),advance_amount:ADVANCE,advance_status:'awaiting_screenshot',customer:{}};await updateDraft(conversation,draft);const a=await saveAssistant(conversation,`Bilkul. Order proceed karne ke liye Rs ${ADVANCE} advance ka screenshot bhej dein. Hum complete order ready karke VIDEO share karenge; remaining payment VIDEO dekhne ke baad hogi.`,{products:chosen});return NextResponse.json({ok:true,messages:[userMessage,a]});}
+    if(topic){const result:any=await runWorker({job:'knowledge',payload:{topic},conversationId:conversation.id});const a=await saveAssistant(conversation,knowledgeReply(result),result?.found===false||!result?.url?[]:{links:[{title:String(result.title||topic),url:String(result.url)}]});return NextResponse.json({ok:true,messages:[userMessage,a]});}
+    if(imageUrl){const candidates=recentProducts(stored);const vision:any=await runWorker({job:'vision',payload:{imageUrl,question:text,productCandidates:candidates},conversationId:conversation.id});let reply='';let attachments:any=[];if(vision?.ok!==true)reply=`Image verify nahi ho saki. Team confirm: ${PHONE}`;else if(vision.matchProductId){const exact:any=await runWorker({job:'catalogue',payload:{productId:vision.matchProductId},conversationId:conversation.id});if(exact?.type==='product'&&exact.product){reply=`${cleanVisionText(vision.answer||vision.description)||'Yeh photo website ke is product se match karti hai.'}\n\n${productFactReply(exact.product,text)}`;attachments={products:[exact.product]};}else reply=`Image samajh aayi lekin website product verify nahi ho saka. Team confirm: ${PHONE}`;}else reply=cleanVisionText(vision.answer||vision.description)||`Image verify nahi ho saki. Team confirm: ${PHONE}`;const a=await saveAssistant(conversation,reply,attachments);return NextResponse.json({ok:true,messages:[userMessage,a]});}
+    const referenced=resolveReferencedProduct(text,stored);if(referenced){const exact:any=await runWorker({job:'catalogue',payload:{productId:referenced.id},conversationId:conversation.id});const a=await saveAssistant(conversation,exact?.type==='product'&&exact.product?productFactReply(exact.product,text):noVerifiedResult(),exact?.type==='product'&&exact.product?{products:[exact.product]}:[]);return NextResponse.json({ok:true,messages:[userMessage,a]});}
 
-    if (!draft.stage && orderIntent(text)) {
-      const chosen = selectedOrderProducts(text, stored.filter((message) => message.id !== userRef.id));
-      if (!chosen.length) {
-        const assistantMessage = await saveAssistant(conversation, 'Kaunsa product order karna hai? Product ka naam ya card number (jaise 1st, 2nd, 3rd) batayein.', []);
-        return NextResponse.json({ ok: true, messages: [userMessage, assistantMessage] }, { headers: { 'Cache-Control': 'no-store, private' } });
-      }
-      draft = { stage: 'awaiting_advance', items: chosen.map((product) => ({ productId: product.id, quantity: 1 })), advance_amount: ADVANCE, advance_status: 'awaiting_screenshot', customer: {} };
-      await updateDraft(conversation, draft);
-      const assistantMessage = await saveAssistant(conversation, `Bilkul. Order proceed karne ke liye Rs ${ADVANCE} advance ka screenshot bhej dein. Hum complete order ready karke VIDEO share karenge; remaining payment VIDEO dekhne ke baad hogi.`, { products: chosen });
-      return NextResponse.json({ ok: true, messages: [userMessage, assistantMessage] }, { headers: { 'Cache-Control': 'no-store, private' } });
-    }
-
-    if (topic) {
-      const result: any = await runWorker({ job: 'knowledge', payload: { topic }, conversationId: conversation.id });
-      const assistantText = knowledgeReply(result); const attachments = result?.found === false || !result?.url ? [] : { links: [{ title: String(result.title || topic), url: String(result.url) }] };
-      const assistantMessage = await saveAssistant(conversation, assistantText, attachments);
-      return NextResponse.json({ ok: true, messages: [userMessage, assistantMessage] }, { headers: { 'Cache-Control': 'no-store, private' } });
-    }
-
-    if (imageUrl) {
-      const candidates = recentProducts(stored); const vision: any = await runWorker({ job: 'vision', payload: { imageUrl, question: text, productCandidates: candidates }, conversationId: conversation.id });
-      let assistantText = ''; let attachments: any = [];
-      if (vision?.ok !== true) assistantText = `Image verify nahi ho saki. Team confirm: ${PHONE}`;
-      else if (vision.matchProductId) {
-        const exact: any = await runWorker({ job: 'catalogue', payload: { productId: vision.matchProductId }, conversationId: conversation.id });
-        if (exact?.type === 'product' && exact.product) { assistantText = `${cleanVisionText(vision.answer || vision.description) || 'Yeh photo website ke is product se match karti hai.'}\n\n${productFactReply(exact.product, text)}`; attachments = { products: [exact.product] }; }
-        else assistantText = `Image samajh aayi lekin website product verify nahi ho saka. Team confirm: ${PHONE}`;
-      } else assistantText = cleanVisionText(vision.answer || vision.description) || `Image verify nahi ho saki. Team confirm: ${PHONE}`;
-      const assistantMessage = await saveAssistant(conversation, assistantText, attachments);
-      return NextResponse.json({ ok: true, messages: [userMessage, assistantMessage] }, { headers: { 'Cache-Control': 'no-store, private' } });
-    }
-
-    const referenced = resolveReferencedProduct(text, stored);
-    if (referenced) {
-      const exact: any = await runWorker({ job: 'catalogue', payload: { productId: referenced.id }, conversationId: conversation.id });
-      const assistantText = exact?.type === 'product' && exact.product ? productFactReply(exact.product, text) : noVerifiedResult();
-      const attachments = exact?.type === 'product' && exact.product ? { products: [exact.product] } : [];
-      const assistantMessage = await saveAssistant(conversation, assistantText, attachments);
-      return NextResponse.json({ ok: true, messages: [userMessage, assistantMessage] }, { headers: { 'Cache-Control': 'no-store, private' } });
-    }
-
-    let assistantText = ''; let products: WorkerProduct[] = []; let lastCollections: any[] | null = null; let usedTool = false; let successfulTool = false; let failedTool = false;
-    try {
-      const brain = await buildSalarBrainPrompt(); const isCollectionFollowUp = collectionFollowUp(stored);
-      const systemPrompt = `${brain}\n\n# Live tool rules\nNever invent catalogue, stock, price, delivery, payment or website facts. There is ONE Worker: catalogue, knowledge, vision, order. Order closing is server-enforced: Rs 300 screenshot first, then one field at a time. Never claim advance is verified; screenshot status remains pending staff verification. Website order is auto-saved once the summary is complete. For broad shopping call catalogue with q only, list every returned collection and ask which one. For website facts use knowledge. Keep replies short and warm. Phone ${PHONE} if verified tools fail.`;
-      const llmMessages: SalarLlmMessage[] = [{ role: 'system', content: systemPrompt }, ...historyForModel(stored)]; let toolRounds = 0;
-      while (true) {
-        const completion = await chatCompletionWithTools({ messages: llmMessages, tools: toolRounds < 4 ? TOOLS : [] });
-        if (!completion.toolCalls.length) { assistantText = completion.text.trim(); break; }
-        toolRounds += 1; usedTool = true;
-        llmMessages.push({ role: 'assistant', content: completion.text || '', tool_calls: completion.toolCalls.map((call) => ({ id: call.id, type: 'function', function: { name: call.name, arguments: call.rawArguments || JSON.stringify(call.arguments) } })) });
-        for (const call of completion.toolCalls) {
-          const args = safeArgs(call.arguments);
-          const result = call.name === 'catalogue' ? await runWorker({ job: 'catalogue', payload: args, conversationId: conversation.id }) : call.name === 'knowledge' ? await runWorker({ job: 'knowledge', payload: args, conversationId: conversation.id }) : { found: false, reason: `Unsupported tool ${call.name}` };
-          if ((result as any)?.found === false) failedTool = true; else successfulTool = true;
-          if ((result as any)?.type === 'collections') lastCollections = Array.isArray((result as any).collections) ? (result as any).collections : [];
-          if ((result as any)?.type === 'products' && Array.isArray((result as any).products)) products = (result as any).products.map((product: any) => ({ id: String(product.id), name: String(product.name), price: Number(product.price) || 0, image_url: product.image_url || null, url: product.url || '', size: product.size || null, material: product.material || null, collection_names: product.collection_names || [] }));
-          llmMessages.push({ role: 'tool', name: call.name, tool_call_id: call.id, content: JSON.stringify(result) });
-        }
-      }
-      if (!usedTool && (shoppingLike(text) || isCollectionFollowUp)) {
-        const fallback: any = await runWorker({ job: 'catalogue', payload: isCollectionFollowUp ? { collection: text } : { q: text }, conversationId: conversation.id }); usedTool = true;
-        if (fallback?.found === false) failedTool = true; else successfulTool = true;
-        if (fallback?.type === 'collections') lastCollections = Array.isArray(fallback.collections) ? fallback.collections : [];
-        if (fallback?.type === 'products' && Array.isArray(fallback.products)) products = fallback.products.map((product: any) => ({ id: String(product.id), name: String(product.name), price: Number(product.price) || 0, image_url: product.image_url || null, url: product.url || '', size: product.size || null, material: product.material || null, collection_names: product.collection_names || [] }));
-      }
-      if (failedTool && !successfulTool) assistantText = noVerifiedResult(); else if (lastCollections) assistantText = collectionReply(lastCollections); else if (products.length && !assistantText) assistantText = 'Yeh is collection ke verified PrimeHub products hain.'; else if (!assistantText) assistantText = noVerifiedResult();
-    } catch { assistantText = SALAR_SAFE_ERROR_MESSAGE; products = []; }
-
-    const attachments = products.length ? { products } : []; const assistantMessage = await saveAssistant(conversation, assistantText, attachments);
-    return NextResponse.json({ ok: true, messages: [userMessage, assistantMessage] }, { headers: { 'Cache-Control': 'no-store, private' } });
-  } catch (error) {
-    if (error instanceof Error && error.message === 'SALAR_BLOCKED') return NextResponse.json({ error: 'blocked', unblockEmail: SALAR_UNBLOCK_EMAIL }, { status: 403 });
-    return NextResponse.json({ error: 'Unable to save Salar message.' }, { status: 500 });
-  }
+    let assistantText='';let products:WorkerProduct[]=[];let lastCollections:any[]|null=null;let usedTool=false;let successfulTool=false;let failedTool=false;
+    try{const brain=await buildSalarBrainPrompt();const isCollectionFollowUp=collectionFollowUp(stored);const systemPrompt=`${brain}\n\n# Live tool rules\nNever invent catalogue, stock, price, delivery, payment or website facts. There is ONE Worker: catalogue, knowledge, vision, order, moderate. Moderation is server-enforced before you. Never teach illegal or harmful instructions. Order closing is server-enforced: Rs 300 screenshot first, then one field at a time. Never claim advance is verified. Website order is auto-saved once summary is complete. For broad shopping call catalogue with q only, list every returned collection and ask which one. For website facts use knowledge. Keep replies short, meetha, adab se. Shopping starts should identify you as Salar from PrimeHub Mall. Phone ${PHONE} if verified tools fail.`;const llmMessages:SalarLlmMessage[]=[{role:'system',content:systemPrompt},...historyForModel(stored)];let rounds=0;
+      while(true){const completion=await chatCompletionWithTools({messages:llmMessages,tools:rounds<4?TOOLS:[]});if(!completion.toolCalls.length){assistantText=completion.text.trim();break;}rounds++;usedTool=true;llmMessages.push({role:'assistant',content:completion.text||'',tool_calls:completion.toolCalls.map(c=>({id:c.id,type:'function',function:{name:c.name,arguments:c.rawArguments||JSON.stringify(c.arguments)}}))});for(const call of completion.toolCalls){const args=safeArgs(call.arguments);const result=call.name==='catalogue'?await runWorker({job:'catalogue',payload:args,conversationId:conversation.id}):call.name==='knowledge'?await runWorker({job:'knowledge',payload:args,conversationId:conversation.id}):{found:false,reason:`Unsupported tool ${call.name}`};if((result as any)?.found===false)failedTool=true;else successfulTool=true;if((result as any)?.type==='collections')lastCollections=Array.isArray((result as any).collections)?(result as any).collections:[];if((result as any)?.type==='products'&&Array.isArray((result as any).products))products=(result as any).products;llmMessages.push({role:'tool',name:call.name,tool_call_id:call.id,content:JSON.stringify(result)});}}
+      if(!usedTool&&(shoppingLike(text)||isCollectionFollowUp)){const fallback:any=await runWorker({job:'catalogue',payload:isCollectionFollowUp?{collection:text}:{q:text},conversationId:conversation.id});usedTool=true;if(fallback?.found===false)failedTool=true;else successfulTool=true;if(fallback?.type==='collections')lastCollections=Array.isArray(fallback.collections)?fallback.collections:[];if(fallback?.type==='products'&&Array.isArray(fallback.products))products=fallback.products;}
+      if(failedTool&&!successfulTool)assistantText=noVerifiedResult();else if(lastCollections)assistantText=collectionReply(lastCollections);else if(products.length&&!assistantText)assistantText='Yeh is collection ke verified PrimeHub products hain.';else if(!assistantText)assistantText=noVerifiedResult();
+    }catch{assistantText=SALAR_SAFE_ERROR_MESSAGE;products=[];}
+    const a=await saveAssistant(conversation,assistantText,products.length?{products}:[]);return NextResponse.json({ok:true,messages:[userMessage,a]},{headers:{'Cache-Control':'no-store, private'}});
+  }catch(error){if(error instanceof Error&&error.message==='SALAR_BLOCKED')return NextResponse.json({error:'blocked',unblockEmail:SALAR_UNBLOCK_EMAIL},{status:403});return NextResponse.json({error:'Unable to save Salar message.'},{status:500});}
 }
