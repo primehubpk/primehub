@@ -36,11 +36,7 @@ function AdminPanel() {
 
   function openSection(tab: AdminTab) {
     if (tab === 'dashboard') return;
-    if (tab === 'resellers') {
-      router.push('/admin/resellers');
-      return;
-    }
-    if (tab === 'reseller-tasks') {
+    if (tab === 'resellers' || tab === 'reseller-tasks' || tab === 'rewards') {
       router.push('/admin/reseller-tasks');
       return;
     }
