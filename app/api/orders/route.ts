@@ -15,6 +15,7 @@ function pakistanWeekday(): Weekday {
   return (WEEKDAYS.includes(day as Weekday) ? day : 'sunday') as Weekday;
 }
 function numberValue(value: unknown) { const parsed = Number(value); return Number.isFinite(parsed) ? parsed : 0; }
+function cleanGuestId(value: unknown) { const id = String(value || '').trim(); return /^g_[a-zA-Z0-9]{12,80}$/.test(id) ? id : ''; }
 function variantValue(row: any, key: 'color' | 'size') {
   const direct = row?.[key] ?? row?.[`variant${key[0].toUpperCase()}${key.slice(1)}`];
   if (typeof direct === 'string' || typeof direct === 'number') return String(direct).trim().toLowerCase();
@@ -58,19 +59,7 @@ async function buildAuthoritativeItems(items: IncomingItem[]) {
     const price = isLiveDealItem ? liveDealPrice : (variant && numberValue(variant.price) > 0 ? numberValue(variant.price) : regularPrice);
     if (price <= 0) throw new Error('Product price is not available.');
     const quantity = Math.max(1, Math.min(50, Math.floor(numberValue(item.quantity ?? item.qty ?? 1))));
-    return {
-      productId,
-      title: String(product.title || product.name || item.title || item.name || 'Product'),
-      price,
-      originalPrice: numberValue(product.originalPrice) > regularPrice ? numberValue(product.originalPrice) : regularPrice,
-      quantity,
-      image: String(variant?.imageUrl || product.imageUrl || product.image || item.imageUrl || item.image || ''),
-      variant: item.variant || null,
-      weeklyDealDay: isLiveDealItem ? currentDay : null,
-      isWholesale: isWholesaleProduct(product),
-      category: product.category || '',
-      categoryId: product.categoryId || '',
-    };
+    return { productId, title: String(product.title || product.name || item.title || item.name || 'Product'), price, originalPrice: numberValue(product.originalPrice) > regularPrice ? numberValue(product.originalPrice) : regularPrice, quantity, image: String(variant?.imageUrl || product.imageUrl || product.image || item.imageUrl || item.image || ''), variant: item.variant || null, weeklyDealDay: isLiveDealItem ? currentDay : null, isWholesale: isWholesaleProduct(product), category: product.category || '', categoryId: product.categoryId || '' };
   });
 }
 async function optionalReseller(request: Request) {
@@ -114,6 +103,7 @@ export async function POST(request: Request) {
     const customer = body?.customer as Customer | undefined;
     if (!customer?.name?.trim() || !customer?.phone?.trim() || (!selfCollect && (!customer?.address?.trim() || !customer?.city?.trim()))) return NextResponse.json({ error: selfCollect ? 'Name and phone are required.' : 'Name, phone, address and city are required.' }, { status: 400 });
     const resellerUserId = reseller?.userId || '';
+    const resellerGuestId = cleanGuestId(body?.guestId);
     const orderRef = getAdminDb().collection('orders').doc();
     const orderData: any = {
       customer: { name: customer.name.trim(), phone: customer.phone.trim(), email: String(customer.email || '').trim(), address: selfCollect ? 'PrimeHub Shop Pickup' : customer.address.trim(), city: selfCollect ? 'Lahore' : customer.city.trim(), notes: String(customer.notes || '').trim() },
@@ -122,14 +112,12 @@ export async function POST(request: Request) {
       currency: 'PKR', status: 'pending', source: 'website', createdAt: new Date(),
     };
     if (resellerUserId) orderData.resellerUserId = resellerUserId;
+    if (resellerGuestId) orderData.resellerGuestId = resellerGuestId;
     await orderRef.set(orderData);
     const supabaseRow = mapOrderToSupabase(orderRef.id, orderData);
     const mirror = await mirrorSupabaseUpsert({ table: 'orders', row: supabaseRow });
-    if (mirror.attempted && !mirror.ok) {
-      console.error('Order Supabase mirror failed:', mirror.error);
-      await recordMirrorFailure('orders', orderRef.id, 'upsert', supabaseRow);
-    }
-    return NextResponse.json({ orderId: orderRef.id, ...quote, resellerLinked: Boolean(resellerUserId) });
+    if (mirror.attempted && !mirror.ok) { console.error('Order Supabase mirror failed:', mirror.error); await recordMirrorFailure('orders', orderRef.id, 'upsert', supabaseRow); }
+    return NextResponse.json({ orderId: orderRef.id, ...quote, resellerLinked: Boolean(resellerUserId), guestTracked: Boolean(resellerGuestId) });
   } catch (error) {
     console.error('Secure order creation failed:', error);
     return NextResponse.json({ error: error instanceof Error ? error.message : 'Unable to place order.' }, { status: 400 });
