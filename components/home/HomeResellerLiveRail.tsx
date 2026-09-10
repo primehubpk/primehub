@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { collection, doc, onSnapshot } from "firebase/firestore";
-import { CheckCircle2, ChevronRight, Gift, History, Users } from "lucide-react";
+import { CheckCircle2, ChevronRight, Gift, Users } from "lucide-react";
 import { auth, db } from "@/lib/firebase";
 import { DEFAULT_MONTHLY_CHALLENGE, DEFAULT_RESELLER_TASKS, type ResellerTask } from "@/lib/resellerTasks";
 import { getResellerTiers } from "@/lib/resellerTiers";
@@ -35,6 +35,7 @@ function readTaskEvents():string[]{try{const x=JSON.parse(localStorage.getItem(T
 function saveTaskEvent(id:string){const c=readTaskEvents();if(!c.includes(id)){try{localStorage.setItem(TASK_EVENT_KEY,JSON.stringify([...c,id]));}catch{}}}
 function productImage(product?:RewardProduct){if(!product)return "";if(product.imageUrl)return product.imageUrl;if(product.image)return product.image;const first=product.images?.[0];return typeof first==="string"?first:first?.url||"";}
 function premiumVoucherImage(title:string,art:string,icon:string){const safe=title.replace(/[<>&]/g,"");const svg=`<svg xmlns='http://www.w3.org/2000/svg' width='640' height='360' viewBox='0 0 640 360'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop stop-color='${art}'/><stop offset='1' stop-color='#14140F'/></linearGradient></defs><rect width='640' height='360' rx='36' fill='url(#g)'/><circle cx='540' cy='60' r='110' fill='white' opacity='.12'/><text x='52' y='142' font-size='78'>${icon}</text><text x='52' y='230' fill='white' font-size='34' font-weight='800'>${safe}</text><text x='52' y='276' fill='white' opacity='.72' font-size='18' letter-spacing='4'>PRIMEHUB PREMIUM REWARD</text></svg>`;return `data:image/svg+xml,${encodeURIComponent(svg)}`;}
+function cleanResellerName(profile:ResellerProfile|null,user:User|null){const authName=String(user?.displayName||"").trim();const profileName=String(profile?.displayName||"").trim();const source=(authName&&!authName.includes("@")?authName:profileName&&!profileName.includes("@")?profileName:String(user?.email||profile?.email||"PrimeHub Reseller").split("@")[0]).replace(/[._-]+/g," ").replace(/\d+$/g,"").trim();return source.replace(/\b\w/g,c=>c.toUpperCase())||"PrimeHub Reseller";}
 
 export default function HomeResellerLiveRail(){
   const {settings}=useSettings();
@@ -70,7 +71,7 @@ export default function HomeResellerLiveRail(){
   const streak=Math.max(0,Math.min(7,Number(wallet.streak||0))); const monthlyOrders=Math.max(0,Number(profile?.monthlyOrders||0));
   const cashAvailable=Math.max(0,Number(profile?.walletAvailable||0)); const cashPending=Math.max(0,Number(profile?.walletPending||0));
   const currentTier=tiers.reduce((selected,tier)=>monthlyOrders>=Number(tier.minMonthlyOrders||0)?tier:selected,tiers[0]);
-  const nextTier=tiers.find(tier=>Number(tier.minMonthlyOrders||0)>monthlyOrders);
+  const resellerName=cleanResellerName(profile,user);
   const challenge={...DEFAULT_MONTHLY_CHALLENGE,...(source.resellerMonthlyChallenge||{})}; const target=Math.max(1,Number(challenge.targetOrders||10)); const vi=source.resellerVoucherImages||{};
   const vouchers:Voucher[]=[
     {id:"cash-500",title:"Rs. 500 Cash",description:"Credit to wallet",requirement:"5 orders",icon:"₨",art:"#0E7C6F",minOrders:5,imageUrl:vi["cash-500"]},
@@ -98,16 +99,6 @@ export default function HomeResellerLiveRail(){
 
   return <section className="ph-live-rail" id="reseller-home">
     <HomeHeading>Reseller Club</HomeHeading>
-    <div className="ph-reseller-profile">
-      <div className="ph-reseller-profile-icon"><Users size={19}/></div>
-      {user ? <>
-        <div className="ph-reseller-profile-copy"><small>RESELLER PROFILE</small><strong>{profile?.displayName||user.displayName||user.email||"PrimeHub Reseller"}</strong><span>{currentTier?.name||"Starter"} tier · {monthlyOrders} monthly orders{nextTier?` · ${Math.max(0,nextTier.minMonthlyOrders-monthlyOrders)} to ${nextTier.name}`:" · Top tier"}</span></div>
-        <Link className="ph-reseller-profile-action" href="/reseller/wallet"><History size={13}/> History</Link>
-      </> : <>
-        <div className="ph-reseller-profile-copy"><small>RESELLER PROFILE</small><strong>Login to your Reseller Club</strong><span>See your tier, wallet, points and order progress.</span></div>
-        <Link className="ph-reseller-profile-action" href="/login?redirect=/#reseller-home">Login</Link>
-      </>}
-    </div>
     <div className="ph-live-tabs"><a href="#reseller-rewards">Rewards</a><a href="#reseller-tasks">Tasks</a><a href="#reseller-wallet">Wallet</a><a href="#reseller-tiers">Tiers</a><Link href="/reseller/dashboard">Open Club</Link></div>
     <div className="ph-live-hint">Swipe → all tasks, wallet, tiers, vouchers & gifts</div>
     <div className="ph-live-scroll"><div className="ph-live-grid">
@@ -118,7 +109,14 @@ export default function HomeResellerLiveRail(){
         {topGifts.map(g=><GiftCard key={g.id} gift={g}/>) }
       </div>
       <div className="ph-live-row">
-        <article className="ph-card ph-wallet" id="reseller-wallet"><small>WALLET</small><div className="ph-wallet-grid"><div><span>CASH WALLET</span><strong>Rs. {cashAvailable.toLocaleString()}</strong><b>Pending Rs. {cashPending.toLocaleString()}</b></div><div><span>POINTS WALLET</span><strong>{Number(wallet.points||0).toLocaleString()}</strong><b>Reward points</b></div></div><Link href={user?"/reseller/wallet":"/login?redirect=/reseller/wallet"}>History & withdrawal</Link></article>
+        <article className="ph-card ph-wallet" id="reseller-wallet">
+          <div className="ph-wallet-profile">
+            <div className="ph-wallet-profile-icon"><Users size={18}/></div>
+            {user?<div className="ph-wallet-profile-copy"><strong>{resellerName}</strong><span>{currentTier?.name||"Starter"} · {Number(currentTier?.discountPercent||0)}% OFF · {monthlyOrders} orders</span></div>:<div className="ph-wallet-profile-copy"><strong>Reseller profile</strong><span>Login to see tier & discount</span></div>}
+          </div>
+          <div className="ph-wallet-grid"><div><span>CASH WALLET</span><strong>Rs. {cashAvailable.toLocaleString()}</strong><b>Pending Rs. {cashPending.toLocaleString()}</b></div><div><span>POINTS WALLET</span><strong>{Number(wallet.points||0).toLocaleString()}</strong><b>Reward points</b></div></div>
+          <Link href={user?"/reseller/wallet":"/login?redirect=/reseller/wallet"}>{user?"History & withdrawal":"Login to wallet"}</Link>
+        </article>
         {tiers.map((tier,index)=>{const current=monthlyOrders>=tier.minMonthlyOrders&&(index===tiers.length-1||monthlyOrders<tiers[index+1].minMonthlyOrders);const need=Math.max(0,tier.minMonthlyOrders-monthlyOrders);return <article className={`ph-card ph-tier ph-tier-${Math.min(index+1,4)} ${current?"current":""}`} id={index===0?"reseller-tiers":undefined} key={tier.id}><div className="ph-tier-top"><span>{index+1}</span>{current?<em>CURRENT</em>:null}</div><h4>{tier.name}</h4><small>{tier.minMonthlyOrders}+ monthly orders</small><div className="ph-tier-discount"><strong>{Number(tier.discountPercent||0)}%</strong><i> OFF</i></div><ul>{(tier.benefits||[]).slice(0,3).map(x=><li key={x}>✓ {x}</li>)}</ul><div className="ph-tier-status">{current?"Your current tier":need?`Need ${need} orders`:"Unlocked"}</div></article>})}
         {vouchers.map(v=>{const unlocked=monthlyOrders>=v.minOrders;const image=v.imageUrl||premiumVoucherImage(v.title,v.art,v.icon);return <article className="ph-card ph-voucher" key={v.id}><div className="ph-voucher-art"><img src={image} alt={v.title}/><span className={unlocked?"unlocked":""}>{unlocked?"Unlocked":"🔒 Locked"}</span></div><div className="ph-voucher-copy"><h4>{v.title}</h4><p>{v.description}</p><b>{v.requirement}</b></div></article>})}
         {bottomGifts.map(g=><GiftCard key={g.id} gift={g}/>) }
