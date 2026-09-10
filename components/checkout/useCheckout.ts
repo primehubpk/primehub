@@ -21,6 +21,15 @@ async function getAdminWhatsAppNumber() { for (const reference of [doc(db, 'sett
 async function authHeader(): Promise<Record<string, string>> { const user = auth.currentUser; if (!user) return {}; try { return { Authorization: `Bearer ${await user.getIdToken()}` }; } catch { return {}; } }
 
 const REVIEW_ORDER_KEY = 'primehub_review_orders_v1';
+const ORDER_PROGRESS_KEY = 'primehub_reseller_order_progress_v1';
+const GUEST_ID_KEY = 'primehub_reseller_guest_id_v1';
+function guestId() {
+  try {
+    let id = window.localStorage.getItem(GUEST_ID_KEY) || '';
+    if (!id) { id = `g_${crypto.randomUUID().replace(/-/g, '')}`; window.localStorage.setItem(GUEST_ID_KEY, id); }
+    return id;
+  } catch { return ''; }
+}
 function rememberReviewOrder(orderId: string, productIds: string[]) {
   try {
     const raw = window.localStorage.getItem(REVIEW_ORDER_KEY);
@@ -28,6 +37,16 @@ function rememberReviewOrder(orderId: string, productIds: string[]) {
     const entries = Array.isArray(existing) ? existing : [];
     const next = [{ orderId, productIds: [...new Set(productIds.filter(Boolean))] }, ...entries.filter((entry: any) => entry?.orderId !== orderId)].slice(0, 20);
     window.localStorage.setItem(REVIEW_ORDER_KEY, JSON.stringify(next));
+  } catch {}
+}
+function rememberOrderProgress(orderId: string, wholesaleItems = 0) {
+  try {
+    const raw = window.localStorage.getItem(ORDER_PROGRESS_KEY);
+    const existing = raw ? JSON.parse(raw) : [];
+    const entries = Array.isArray(existing) ? existing : [];
+    const next = [{ orderId, createdAt: new Date().toISOString(), wholesale: Number(wholesaleItems || 0) > 0 }, ...entries.filter((entry: any) => entry?.orderId !== orderId)].slice(0, 100);
+    window.localStorage.setItem(ORDER_PROGRESS_KEY, JSON.stringify(next));
+    window.dispatchEvent(new Event('primehub:reseller-progress'));
   } catch {}
 }
 
@@ -51,7 +70,7 @@ export function useCheckout() {
     return () => { cancelled = true; };
   }, [items, selfCollect]);
   const update = (key: keyof Customer, value: string) => setCustomer(previous => ({ ...previous, [key]: value }));
-  const placeOrder = async (event: FormEvent) => { event.preventDefault(); setError(''); if (!items.length) return setError('Your cart is empty. Please add a product first.'); if (!customer.name.trim() || !customer.phone.trim() || (!selfCollect && (!customer.address.trim() || !customer.city.trim()))) return setError(selfCollect ? 'Please fill your name and phone.' : 'Please fill your name, phone, address and city.'); setPlacing(true); try { const response = await fetch('/api/orders', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(await authHeader()) }, body: JSON.stringify({ customer, items, selfCollect }) }); const data = await response.json(); if (!response.ok) throw new Error(data.error || 'Order save nahi ho saka.'); const productIds = Array.isArray(data.items) ? data.items.map((item: any) => String(item.productId || item.id || '')).filter(Boolean) : items.map((item: any) => String(item.productId || item.id || '')).filter(Boolean); setReviewProductIds(productIds); rememberReviewOrder(data.orderId, productIds); setOrderId(data.orderId); clearCart(); } catch (caught) { console.error(caught); setError(caught instanceof Error ? caught.message : 'Order save nahi ho saka. Please try again.'); } finally { setPlacing(false); } };
+  const placeOrder = async (event: FormEvent) => { event.preventDefault(); setError(''); if (!items.length) return setError('Your cart is empty. Please add a product first.'); if (!customer.name.trim() || !customer.phone.trim() || (!selfCollect && (!customer.address.trim() || !customer.city.trim()))) return setError(selfCollect ? 'Please fill your name and phone.' : 'Please fill your name, phone, address and city.'); setPlacing(true); try { const response = await fetch('/api/orders', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(await authHeader()) }, body: JSON.stringify({ customer, items, selfCollect, guestId: guestId() }) }); const data = await response.json(); if (!response.ok) throw new Error(data.error || 'Order save nahi ho saka.'); const productIds = Array.isArray(data.items) ? data.items.map((item: any) => String(item.productId || item.id || '')).filter(Boolean) : items.map((item: any) => String(item.productId || item.id || '')).filter(Boolean); setReviewProductIds(productIds); rememberReviewOrder(data.orderId, productIds); rememberOrderProgress(data.orderId, Number(data.wholesaleItems || wholesaleItems || 0)); setOrderId(data.orderId); clearCart(); } catch (caught) { console.error(caught); setError(caught instanceof Error ? caught.message : 'Order save nahi ho saka. Please try again.'); } finally { setPlacing(false); } };
   const whatsappOrder = async () => { if (!items.length) return; setError(''); try { const [quote, adminNumber] = await Promise.all([getAuthoritativeQuote(items, selfCollect), getAdminWhatsAppNumber()]); const user = auth.currentUser; let resellerCode = '', requestId = ''; if (user) { const token = await user.getIdToken(); const track = await fetch('/api/reseller/whatsapp-order', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ customer, items: quote.items, subtotal: quote.subtotal, deliveryCharge: quote.deliveryCharge, total: quote.total, selfCollect }) }); const trackData = await track.json(); if (track.ok) { resellerCode = String(trackData.resellerCode || ''); requestId = String(trackData.requestId || ''); } else if (track.status !== 401) throw new Error(trackData.error || 'Unable to create WhatsApp reseller request.'); }
     const lines = quote.items.map((validated: any, index: number) => [`${index + 1}. ${validated.title} x ${validated.quantity}`, `- ${variantText(validated.variant)}`, `- Price: Rs. ${Number(validated.price).toLocaleString()}`, `- Image: ${validated.image || 'N/A'}`].join('\n'));
     const tracking = resellerCode ? ['', '*RESELLER ORDER*', `Reseller Code: ${resellerCode}`, `Request ID: ${requestId}`] : [];
