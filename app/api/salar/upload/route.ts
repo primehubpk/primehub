@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto';
 import { NextResponse } from 'next/server';
 import { compressForR2, isR2PublicUrl, uploadWebpToR2 } from '@/lib/r2';
-import { ensureSalarConversation, readSalarSid, SALAR_UNBLOCK_EMAIL, verifiedCustomerUid } from '@/lib/salar/chatStore';
+import { consumeSalarUploadRateLimit, ensureSalarConversation, readSalarSid, SALAR_UNBLOCK_EMAIL, verifiedCustomerUid } from '@/lib/salar/chatStore';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -17,9 +17,8 @@ export async function POST(request: Request) {
     const customerUid = await verifiedCustomerUid(request);
     const conversation = await ensureSalarConversation(sid, customerUid);
     const snapshot = await conversation.ref.get();
-    if (snapshot.data()?.blocked === true) {
-      return NextResponse.json({ error: 'blocked', unblockEmail: SALAR_UNBLOCK_EMAIL }, { status: 403 });
-    }
+    if (snapshot.data()?.blocked === true) return NextResponse.json({ error: 'blocked', unblockEmail: SALAR_UNBLOCK_EMAIL }, { status: 403 });
+    if (!consumeSalarUploadRateLimit(conversation.id)) return NextResponse.json({ error: 'upload_rate_limited' }, { status: 429 });
 
     const form = await request.formData();
     const image = form.get('image');
@@ -32,7 +31,6 @@ export async function POST(request: Request) {
     const key = `salar/${safeConversation}/${Date.now()}-${randomUUID().slice(0, 8)}.webp`;
     const url = await uploadWebpToR2(compressed, key);
     if (!isR2PublicUrl(url)) return NextResponse.json({ error: 'Image storage returned an invalid URL.' }, { status: 502 });
-
     return NextResponse.json({ ok: true, url }, { headers: { 'Cache-Control': 'no-store, private' } });
   } catch {
     return NextResponse.json({ error: 'Image upload service is unavailable.' }, { status: 500 });
