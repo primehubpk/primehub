@@ -67,6 +67,28 @@ function dashboardContentIsReady(host: HTMLDivElement | null) {
   return !waitingForProfile;
 }
 
+function keepSingleWalletSection(host: HTMLDivElement | null) {
+  if (!host) return;
+  const sections = Array.from(host.querySelectorAll('main section section')) as HTMLElement[];
+  const walletSections = sections.filter(section => {
+    const label = Array.from(section.querySelectorAll(':scope > span')).find(span => {
+      const text = span.textContent?.trim().toLowerCase();
+      return text === 'wallet' || text === 'reward wallet';
+    });
+    return Boolean(label);
+  });
+
+  walletSections.forEach(section => { section.style.display = ''; });
+  if (walletSections.length > 1) {
+    // The dashboard currently renders the summary wallet and the wallet-view card together.
+    // Keep the dedicated Reward wallet card and hide only the duplicate summary presentation.
+    const rewardWallet = walletSections.find(section => section.querySelector(':scope > span')?.textContent?.trim().toLowerCase() === 'reward wallet');
+    walletSections.forEach(section => {
+      if (rewardWallet && section !== rewardWallet) section.style.display = 'none';
+    });
+  }
+}
+
 export default function ResellerDashboardLayout({ children }: { children: ReactNode }) {
   const contentRef = useRef<HTMLDivElement>(null);
   const [contentReady, setContentReady] = useState(false);
@@ -75,7 +97,10 @@ export default function ResellerDashboardLayout({ children }: { children: ReactN
     const host = contentRef.current;
     if (!host) return;
 
-    const check = () => setContentReady(dashboardContentIsReady(host));
+    const check = () => {
+      setContentReady(dashboardContentIsReady(host));
+      keepSingleWalletSection(host);
+    };
     check();
 
     const observer = new MutationObserver(check);
