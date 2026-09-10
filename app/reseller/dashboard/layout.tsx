@@ -67,26 +67,15 @@ function dashboardContentIsReady(host: HTMLDivElement | null) {
   return !waitingForProfile;
 }
 
-function keepSingleWalletSection(host: HTMLDivElement | null) {
+function hideDuplicateRewardWallet(host: HTMLDivElement | null) {
   if (!host) return;
-  const sections = Array.from(host.querySelectorAll('main section section')) as HTMLElement[];
-  const walletSections = sections.filter(section => {
-    const label = Array.from(section.querySelectorAll(':scope > span')).find(span => {
-      const text = span.textContent?.trim().toLowerCase();
-      return text === 'wallet' || text === 'reward wallet';
-    });
-    return Boolean(label);
+  const sections = Array.from(host.querySelectorAll('main section')) as HTMLElement[];
+  sections.forEach(section => {
+    const directLabel = Array.from(section.children).find(child => child.tagName === 'SPAN');
+    const label = directLabel?.textContent?.trim().toLowerCase();
+    if (label === 'reward wallet') section.style.display = 'none';
+    else if (label === 'wallet') section.style.display = '';
   });
-
-  walletSections.forEach(section => { section.style.display = ''; });
-  if (walletSections.length > 1) {
-    // The dashboard currently renders the summary wallet and the wallet-view card together.
-    // Keep the dedicated Reward wallet card and hide only the duplicate summary presentation.
-    const rewardWallet = walletSections.find(section => section.querySelector(':scope > span')?.textContent?.trim().toLowerCase() === 'reward wallet');
-    walletSections.forEach(section => {
-      if (rewardWallet && section !== rewardWallet) section.style.display = 'none';
-    });
-  }
 }
 
 export default function ResellerDashboardLayout({ children }: { children: ReactNode }) {
@@ -99,7 +88,7 @@ export default function ResellerDashboardLayout({ children }: { children: ReactN
 
     const check = () => {
       setContentReady(dashboardContentIsReady(host));
-      keepSingleWalletSection(host);
+      hideDuplicateRewardWallet(host);
     };
     check();
 
