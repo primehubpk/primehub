@@ -1,4 +1,4 @@
 "use client";
 
 import "./HomeResellerUnified.css";
-export { default } from "./HomeResellerUnified";
+export { default } from "./HomeResellerUnifiedV2";
