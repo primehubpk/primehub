@@ -6,8 +6,9 @@ import { getDualWriteMode, isSupabaseWriteConfigured } from '@/lib/dualWriteServ
 export const runtime = 'nodejs';
 
 type Prize = { id: string; name: string; type: string; points?: number; probability?: number; active?: boolean; stock?: number; voucherCode?: string; imageUrl?: string };
-type GuestWallet = { lastSpin?: string; pendingPrize?: Prize | null; pendingPrizeToken?: string; claimedAt?: string };
-type UserWallet = { points?: number; streak?: number; lastCheckIn?: string; lastSpin?: string; coupons?: string[] };
+type RewardHistoryEntry = { id: string; action: 'spin'; prizeId: string; name: string; type: string; status: 'pending' | 'claimed'; createdAt: string; claimedAt?: string; source: 'guest' };
+type GuestWallet = { lastSpin?: string; pendingPrize?: Prize | null; pendingPrizeToken?: string; claimedAt?: string; history?: RewardHistoryEntry[] };
+type UserWallet = { points?: number; streak?: number; lastCheckIn?: string; lastSpin?: string; coupons?: string[]; history?: RewardHistoryEntry[] };
 
 function dayKey() { return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Karachi' }).format(new Date()); }
 function validGuestId(value: unknown) { const id = String(value || '').trim(); return /^g_[a-zA-Z0-9]{12,80}$/.test(id) ? id : ''; }
@@ -32,12 +33,15 @@ export async function POST(request: Request) {
       const guest = await readGuest(guestId);
       const prize = guest.pendingPrize;
       if (!prize || !guest.pendingPrizeToken) return NextResponse.json({ error: 'No guest reward is waiting to be claimed.' }, { status: 400 });
-      const current = { points: 0, coupons: [], ...(await readUser(user.uid)) } as UserWallet;
+      const current = { points: 0, coupons: [], history: [], ...(await readUser(user.uid)) } as UserWallet;
       const voucher = (prize.type === 'coupon' || prize.type === 'free-delivery') ? (String(prize.voucherCode || '').trim() || `PH-${Math.random().toString(36).slice(2, 8).toUpperCase()}`) : '';
       const points = prize.type === 'points' ? Math.max(0, Number(prize.points || 0)) : 0;
-      const next = { ...current, points: Number(current.points || 0) + points, coupons: voucher ? [...(current.coupons || []), voucher] : (current.coupons || []) };
+      const now = new Date().toISOString();
+      const claimedEntry: RewardHistoryEntry = { id: guest.pendingPrizeToken, action: 'spin', prizeId: prize.id, name: prize.name, type: prize.type, status: 'claimed', createdAt: guest.history?.find(entry => entry.id === guest.pendingPrizeToken)?.createdAt || now, claimedAt: now, source: 'guest' };
+      const history = [...(current.history || []).filter(entry => entry.id !== claimedEntry.id), claimedEntry].slice(-100);
+      const next = { ...current, points: Number(current.points || 0) + points, lastSpin: guest.lastSpin || current.lastSpin, coupons: voucher ? [...(current.coupons || []), voucher] : (current.coupons || []), history };
       await writeUser(user.uid, next);
-      await writeGuest(guestId, { ...guest, pendingPrize: null, pendingPrizeToken: '', claimedAt: new Date().toISOString() });
+      await writeGuest(guestId, { ...guest, pendingPrize: null, pendingPrizeToken: '', claimedAt: now, history: (guest.history || []).map(entry => entry.id === claimedEntry.id ? { ...entry, status: 'claimed', claimedAt: now } : entry) });
       return NextResponse.json({ ok: true, wallet: next, prize, voucher, claimed: true });
     }
 
@@ -48,7 +52,9 @@ export async function POST(request: Request) {
     const prize = choosePrize(Array.isArray(settings.spinWheelSlots) ? settings.spinWheelSlots : []);
     if (!prize) return NextResponse.json({ error: 'Spin prizes are being refreshed from Admin.' }, { status: 400 });
     const pendingPrizeToken = crypto.randomUUID();
-    const next: GuestWallet = { ...current, lastSpin: today, pendingPrize: prize, pendingPrizeToken };
+    const now = new Date().toISOString();
+    const historyEntry: RewardHistoryEntry = { id: pendingPrizeToken, action: 'spin', prizeId: prize.id, name: prize.name, type: prize.type, status: 'pending', createdAt: now, source: 'guest' };
+    const next: GuestWallet = { ...current, lastSpin: today, pendingPrize: prize, pendingPrizeToken, history: [...(current.history || []), historyEntry].slice(-100) };
     await writeGuest(guestId, next);
     return NextResponse.json({ ok: true, guest: true, wallet: next, prize, loginRequiredToClaim: prize.type !== 'try-again' });
   } catch (error) {
