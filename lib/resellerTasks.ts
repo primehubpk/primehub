@@ -4,6 +4,7 @@ export type ResellerTask = {
   description: string;
   icon: string;
   url?: string;
+  shareText?: string;
   reward: number;
   active: boolean;
   verification: 'manual' | 'link';
@@ -16,8 +17,8 @@ export const DEFAULT_RESELLER_TASKS: ResellerTask[] = [
   { id: 'youtube', title: 'Subscribe on YouTube', description: 'Subscribe to PrimeHub and submit your completion for review.', icon: '▶', reward: 50, active: true, verification: 'manual' },
   { id: 'instagram', title: 'Follow on Instagram', description: 'Follow PrimeHub on Instagram and submit your username.', icon: '◎', reward: 50, active: true, verification: 'manual' },
   { id: 'tiktok', title: 'Follow on TikTok', description: 'Follow PrimeHub on TikTok and submit your username.', icon: '♪', reward: 50, active: true, verification: 'manual' },
-  { id: 'whatsapp-share', title: 'Share on WhatsApp', description: 'Share PrimeHub products with 5 friends or groups and submit proof.', icon: '💬', reward: 75, active: true, verification: 'manual' },
-  { id: 'refer-reseller', title: 'Refer a reseller', description: 'Invite one verified reseller to join PrimeHub Reseller Club.', icon: '🤝', reward: 300, active: true, verification: 'manual' },
+  { id: 'whatsapp-share', title: 'Share on WhatsApp', description: 'Share PrimeHub products with 5 friends or groups.', icon: '💬', reward: 75, active: true, verification: 'manual', shareText: 'PrimeHub par latest deals dekhein aur Reseller Club join karein.' },
+  { id: 'refer-reseller', title: 'Refer a reseller', description: 'Invite one verified reseller to join PrimeHub Reseller Club.', icon: '🤝', reward: 300, active: true, verification: 'manual', shareText: 'PrimeHub Reseller Club join karein — Buy More • Save More • Earn More.' },
 ];
 
 export type MonthlyChallengeSettings = {

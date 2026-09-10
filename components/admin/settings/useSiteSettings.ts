@@ -50,6 +50,7 @@ export default function useSiteSettings() {
         freeDeliveryThreshold: Number.isFinite(deliveryThreshold) ? deliveryThreshold : DEFAULT_SETTINGS.freeDeliveryThreshold,
         storePolicyInfo: typeof rawMain.storePolicyInfo === 'string' ? rawMain.storePolicyInfo : '',
         youtubeGuideUrl: typeof rawMain.youtubeGuideUrl === 'string' ? rawMain.youtubeGuideUrl : '',
+        resellerHomeEnabled: rawMain.resellerHomeEnabled !== false,
         priceBuckets: Array.isArray(rawMain.priceBuckets) && rawMain.priceBuckets.length ? rawMain.priceBuckets : DEFAULT_BUCKETS,
       });
     }).catch(() => setToast('Unable to load site settings.')).finally(() => setLoading(false));
@@ -77,6 +78,7 @@ export default function useSiteSettings() {
           announcementText: settings.announcementText.trim(),
           whatsappNumber,
           youtubeGuideUrl: settings.youtubeGuideUrl.trim(),
+          resellerHomeEnabled: settings.resellerHomeEnabled,
           freeShippingCount: Number(settings.freeDeliveryThreshold || 0),
           freeDelivery: { enabled: true, itemThreshold: Number(settings.freeDeliveryThreshold || 0), message: 'Add {remaining} more item{plural} to unlock FREE DELIVERY', unlockedMessage: 'FREE DELIVERY UNLOCKED 🎉' },
           storePolicyInfo: settings.storePolicyInfo.trim(),

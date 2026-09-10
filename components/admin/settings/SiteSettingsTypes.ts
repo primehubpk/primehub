@@ -13,6 +13,7 @@ export type Settings = {
   freeDeliveryThreshold: number;
   storePolicyInfo: string;
   youtubeGuideUrl: string;
+  resellerHomeEnabled: boolean;
   priceBuckets: PriceBucket[];
 };
 
@@ -51,5 +52,6 @@ export const DEFAULT_SETTINGS: Settings = {
   freeDeliveryThreshold: 5,
   storePolicyInfo: '',
   youtubeGuideUrl: '',
+  resellerHomeEnabled: true,
   priceBuckets: DEFAULT_BUCKETS,
 };
