@@ -1,4 +1,3 @@
 "use client";
 
-import "./HomeResellerUnified.css";
-export { default } from "./HomeResellerUnifiedV2";
+export { default } from "./HomeResellerLiveRail";
