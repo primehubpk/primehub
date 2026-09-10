@@ -1,0 +1,50 @@
+name: Salar Phase 8 Admin Testing CI
+
+on:
+  push:
+    branches:
+      - feature/salar
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'app/api/salar/**'
+      - 'app/api/admin/salar/**'
+      - 'components/salar/**'
+      - 'components/admin/Salar*.tsx'
+      - 'lib/salar/**'
+      - 'SALAR.md'
+      - '.env.example'
+      - 'vercel.json'
+      - '.github/workflows/salar-phase8-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  harden:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install
+        run: npm ci
+      - name: Secret prefix scan
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -RInE 's[k]-[A-Za-z0-9]|AI[z]a[A-Za-z0-9_-]|gs[k]_[A-Za-z0-9]' . --exclude-dir=.git; then
+            echo 'Possible committed API key prefix found.' >&2
+            exit 1
+          fi
+      - name: Verify Salar branch deploy remains disabled
+        run: node -e "const v=require('./vercel.json'); if(v?.git?.deploymentEnabled?.['feature/salar']!==false) process.exit(1)"
+      - name: Type check
+        run: npx tsc --noEmit
+      - name: Build
+        run: npm run build
