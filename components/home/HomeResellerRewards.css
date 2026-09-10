@@ -88,6 +88,22 @@
   font-weight: 800;
 }
 
+.home-bottom-nav a[data-nav-key="reseller"] > .reseller-club-nav-icon {
+  background: #e7f6f3 !important;
+  color: #0e7c6f !important;
+  border-radius: 11px !important;
+}
+
+.home-bottom-nav a[data-nav-key="reseller"] > span:last-child {
+  color: #0e7c6f !important;
+  font-weight: 700 !important;
+}
+
+.home-bottom-nav a[data-nav-key="reseller"][aria-current="page"] > span:first-child {
+  background: #0f6a5f !important;
+  color: #fff !important;
+}
+
 @media (max-width: 600px) {
   .home-club .home-reseller-reward-rail {
     padding-bottom: 40px;

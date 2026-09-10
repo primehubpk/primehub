@@ -83,6 +83,7 @@ export default function BottomNav() {
         {NAV_ITEMS.map(({ key, label, href, icon: Icon }) => {
           const isActive = pathname === href || (key === 'reseller' && pathname.startsWith('/reseller')) || (key === 'skills' && pathname.startsWith('/skills'));
           const pending = pendingKey === key && pathname !== href;
+          const resellerIcon = key === 'reseller';
           return (
             <Link
               key={key}
@@ -90,6 +91,7 @@ export default function BottomNav() {
               prefetch={true}
               aria-current={isActive ? 'page' : undefined}
               aria-busy={pending || undefined}
+              data-nav-key={key}
               onPointerEnter={() => warmRoute(href)}
               onFocus={() => warmRoute(href)}
               onTouchStart={() => markPending(key, href)}
@@ -99,7 +101,7 @@ export default function BottomNav() {
               onClick={() => markPending(key, href)}
               className={`group relative flex min-w-0 flex-col items-center gap-1 rounded-xl px-0.5 py-2 transition duration-150 active:scale-[0.96] ${pending ? 'bg-black/[0.035]' : ''}`}
             >
-              <span className={`relative flex h-8 w-8 items-center justify-center rounded-[11px] transition-all ${pending ? 'scale-95 bg-[#0F6A5F] text-white shadow-[0_7px_16px_rgba(15,106,95,0.22)]' : isActive ? '-translate-y-0.5 bg-[#0F6A5F] text-white shadow-[0_7px_16px_rgba(15,106,95,0.28)]' : 'text-[#181914] group-hover:bg-black/5'}`}>
+              <span className={`relative flex h-8 w-8 items-center justify-center rounded-[11px] transition-all ${resellerIcon && !pending && !isActive ? 'reseller-club-nav-icon bg-[#E7F6F3] text-[#0E7C6F]' : ''} ${pending ? 'scale-95 bg-[#0F6A5F] text-white shadow-[0_7px_16px_rgba(15,106,95,0.22)]' : isActive ? '-translate-y-0.5 bg-[#0F6A5F] text-white shadow-[0_7px_16px_rgba(15,106,95,0.28)]' : resellerIcon ? '' : 'text-[#181914] group-hover:bg-black/5'}`}>
                 {pending ? (
                   <LoaderCircle className="h-[16px] w-[16px] animate-spin" aria-hidden="true" />
                 ) : key === 'skills' && pathname === '/' ? (
@@ -108,7 +110,7 @@ export default function BottomNav() {
                   <Icon className="h-[17px] w-[17px]" aria-hidden="true" />
                 )}
               </span>
-              <span className={`w-full truncate text-center text-[8px] font-black leading-tight sm:text-[9px] ${pending || isActive ? 'text-[#0F6A5F]' : 'text-black/60'}`}>
+              <span className={`w-full truncate text-center text-[8px] font-black leading-tight sm:text-[9px] ${pending || isActive ? 'text-[#0F6A5F]' : resellerIcon ? 'text-[#0E7C6F]' : 'text-black/60'}`}>
                 {pending ? 'Opening…' : label}
               </span>
             </Link>

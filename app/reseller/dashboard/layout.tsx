@@ -67,6 +67,17 @@ function dashboardContentIsReady(host: HTMLDivElement | null) {
   return !waitingForProfile;
 }
 
+function hideDuplicateRewardWallet(host: HTMLDivElement | null) {
+  if (!host) return;
+  const sections = Array.from(host.querySelectorAll('main section')) as HTMLElement[];
+  sections.forEach(section => {
+    const directLabel = Array.from(section.children).find(child => child.tagName === 'SPAN');
+    const label = directLabel?.textContent?.trim().toLowerCase();
+    if (label === 'reward wallet') section.style.display = 'none';
+    else if (label === 'wallet') section.style.display = '';
+  });
+}
+
 export default function ResellerDashboardLayout({ children }: { children: ReactNode }) {
   const contentRef = useRef<HTMLDivElement>(null);
   const [contentReady, setContentReady] = useState(false);
@@ -75,7 +86,10 @@ export default function ResellerDashboardLayout({ children }: { children: ReactN
     const host = contentRef.current;
     if (!host) return;
 
-    const check = () => setContentReady(dashboardContentIsReady(host));
+    const check = () => {
+      setContentReady(dashboardContentIsReady(host));
+      hideDuplicateRewardWallet(host);
+    };
     check();
 
     const observer = new MutationObserver(check);
