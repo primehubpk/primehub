@@ -52,16 +52,19 @@ export default function CartMiniBar() {
     if (!ids.length) return;
 
     ids.forEach((id) => requestedImageIds.current.add(id));
-    let cancelled = false;
+    const controller = new AbortController();
     const query = encodeURIComponent(JSON.stringify(ids));
 
-    fetch(`/api/storefront/read?type=products&ids=${query}`, { cache: 'no-store' })
+    fetch(`/api/storefront/read?type=products&ids=${query}`, {
+      cache: 'no-store',
+      signal: controller.signal,
+    })
       .then((response) => {
         if (!response.ok) throw new Error(`cart image lookup ${response.status}`);
         return response.json();
       })
       .then((data) => {
-        if (cancelled || !Array.isArray(data?.products)) return;
+        if (!Array.isArray(data?.products)) return;
         const byId = new Map<string, any>(
           data.products.map((product: any) => [String(product?.id || ''), product]),
         );
@@ -79,7 +82,7 @@ export default function CartMiniBar() {
       });
 
     return () => {
-      cancelled = true;
+      controller.abort();
     };
   }, [items, resolvedImages]);
 
