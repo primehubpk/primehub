@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo } from 'react';
+import { useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useShopCatalog } from './shop/useShopCatalog';
 import CatalogHeader from './shop/CatalogHeader';
@@ -10,7 +10,6 @@ import { FilterDrawer } from './shop/CatalogFilters';
 import CatalogProductGrid from './shop/CatalogProductGrid';
 import CompactCategoryStrip from './shop/CompactCategoryStrip';
 import { productMatchesCategory } from '@/lib/categoryUtils';
-import { cacheProductCatalog } from '@/lib/productNavigationCache';
 import { getEffectivePrice } from '@/lib/dealPricing';
 import { saleMelaBucketLabel } from '@/lib/priceBucketUtils';
 import type { Product, Category } from './shop/ShopTypes';
@@ -63,10 +62,6 @@ export default function ShopCatalog({
       : saleMelaView
         ? shop.wholesaleOnly || [99, 299, 999].includes(activeSaleAmount)
         : numericBucket > 0 && shop.maxPrice === String(numericBucket));
-
-  useEffect(() => {
-    cacheProductCatalog(shop.products);
-  }, [shop.products]);
 
   const picks = useMemo(
     () => [...shop.filtered].sort((a, b) => score(a.id) - score(b.id)),
