@@ -176,13 +176,13 @@ export function SettingsProvider({ initialSettings, children }: { initialSetting
     refreshSettings,
   }), [settings, loading, hasData, seedSettings, refreshSettings]);
 
-  // A subtree with server-provided settings stays authoritative for its first render.
-  // Do not hand those settings to the parent and then switch context sources during
-  // hydration; that transition caused the homepage to visibly repaint after opening.
-  const ownsContext = !parent || hasInitialSettings;
+  // Server-seeded nested providers remain authoritative for their subtree, but only
+  // the app-wide provider owns network refreshes. This keeps the homepage stable and
+  // prevents a second settings timer/API read from running underneath the root one.
+  const ownsNetworkRefresh = !parent;
 
   useEffect(() => {
-    if (!ownsContext) return;
+    if (!ownsNetworkRefresh) return;
 
     if (!hasInitialSettings) void refreshSettings();
     const timer = window.setInterval(() => { void refreshSettings(); }, 60_000);
@@ -200,7 +200,7 @@ export function SettingsProvider({ initialSettings, children }: { initialSetting
       document.removeEventListener('visibilitychange', refreshWhenVisible);
       window.removeEventListener('focus', refreshOnFocus);
     };
-  }, [ownsContext, hasInitialSettings, refreshSettings]);
+  }, [ownsNetworkRefresh, hasInitialSettings, refreshSettings]);
 
   const contextValue = useMemo<SettingsContextValue>(() => {
     if (hasInitialSettings) return localValue;
