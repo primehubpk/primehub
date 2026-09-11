@@ -3,7 +3,7 @@ import { Suspense } from 'react';
 import ShopCatalog from '@/components/ShopCatalog';
 import { getPublicCatalogSnapshot } from '@/lib/publicCatalogServer';
 
-export const revalidate = 300;
+export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
   title: 'Shop Bangles, Jewellery, Watches & Wholesale Deals',
@@ -38,8 +38,23 @@ function ShopLoadingState() {
 }
 
 async function ShopCatalogContent() {
-  const snapshot = await getPublicCatalogSnapshot();
-  return <ShopCatalog initialProducts={snapshot.products} initialCategories={snapshot.categories} />;
+  try {
+    const snapshot = await getPublicCatalogSnapshot();
+    return <ShopCatalog initialProducts={snapshot.products} initialCategories={snapshot.categories} />;
+  } catch (error) {
+    console.error('Shop catalog unavailable', error);
+    return (
+      <main className="min-h-screen bg-[#F4F4F1] px-4 pb-28 pt-8">
+        <div className="mx-auto max-w-md rounded-3xl bg-white p-6 text-center shadow-sm">
+          <h1 className="text-xl font-black text-[#14140F]">Shop is reconnecting</h1>
+          <p className="mt-2 text-sm leading-6 text-black/55">Products could not be loaded right now. Please try again.</p>
+          <a href="/shop" className="mt-5 inline-flex rounded-full bg-[#14140F] px-5 py-3 text-xs font-black text-white">
+            Try again
+          </a>
+        </div>
+      </main>
+    );
+  }
 }
 
 export default function ShopPage() {
