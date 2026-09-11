@@ -67,19 +67,10 @@ function dashboardContentIsReady(host: HTMLDivElement | null) {
   return !waitingForProfile;
 }
 
-function hideDuplicateRewardWallet(host: HTMLDivElement | null) {
-  if (!host) return;
-  const sections = Array.from(host.querySelectorAll('main section')) as HTMLElement[];
-  sections.forEach(section => {
-    const directLabel = Array.from(section.children).find(child => child.tagName === 'SPAN');
-    const label = directLabel?.textContent?.trim().toLowerCase();
-    if (label === 'reward wallet') section.style.display = 'none';
-    else if (label === 'wallet') section.style.display = '';
-  });
-}
-
 export default function ResellerDashboardLayout({ children }: { children: ReactNode }) {
   const contentRef = useRef<HTMLDivElement>(null);
+  const readyRef = useRef(false);
+  const frameRef = useRef<number | null>(null);
   const [contentReady, setContentReady] = useState(false);
 
   useEffect(() => {
@@ -87,14 +78,26 @@ export default function ResellerDashboardLayout({ children }: { children: ReactN
     if (!host) return;
 
     const check = () => {
-      setContentReady(dashboardContentIsReady(host));
-      hideDuplicateRewardWallet(host);
+      frameRef.current = null;
+      if (!readyRef.current && dashboardContentIsReady(host)) {
+        readyRef.current = true;
+        setContentReady(true);
+      }
     };
-    check();
 
-    const observer = new MutationObserver(check);
+    const scheduleCheck = () => {
+      if (frameRef.current != null) return;
+      frameRef.current = window.requestAnimationFrame(check);
+    };
+
+    check();
+    const observer = new MutationObserver(scheduleCheck);
     observer.observe(host, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
-    return () => observer.disconnect();
+
+    return () => {
+      observer.disconnect();
+      if (frameRef.current != null) window.cancelAnimationFrame(frameRef.current);
+    };
   }, []);
 
   return (

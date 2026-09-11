@@ -93,33 +93,38 @@ async function getFreshFirebaseWholesaleVideos() {
 }
 
 export async function getFreshRewardSettingsSnapshot() {
-  try {
-    const snapshot = await getAdminDb().collection('settings').doc('rewards').get();
-    if (!snapshot.exists) return {};
-    return snapshot.data() || {};
-  } catch (error) {
-    console.warn('Fresh Firebase reward settings recovery skipped', error);
-    return {};
-  }
+  const result = await getDualSettings({ cache: 'no-store' });
+  return result.documents?.rewards || {};
 }
 
+async function loadRewardSettings() {
+  const result = await getDualSettings(SETTINGS_READ_CACHE);
+  return result.documents?.rewards || {};
+}
+
+export const getRewardSettingsSnapshot = unstable_cache(
+  loadRewardSettings,
+  ['primehub-home-reward-settings-dual-v2'],
+  { revalidate: 60, tags: ['storefront-settings', 'rewards'] },
+);
+
 export async function getFreshStorefrontSettingsSnapshot() {
-  const [result, firebaseWholesaleVideos] = await Promise.all([
-    getStorefrontSettingsWithBigDealRecovery({ cache: 'no-store' }),
-    getFreshFirebaseWholesaleVideos(),
-  ]);
+  const result = await getStorefrontSettingsWithBigDealRecovery({ cache: 'no-store' });
   const documents = result.documents as Record<string, any>;
   const main = documents.main || {};
   const legacy = documents.general || {};
   const merged = { ...legacy, ...main };
   const primaryWholesaleVideos = Array.isArray(merged.wholesaleVideos) ? merged.wholesaleVideos : [];
 
-  // Supabase remains the configured primary source. During migration, recover only
-  // when the admin/Firebase document contains a newer, longer wholesale package list.
-  if (
-    Array.isArray(firebaseWholesaleVideos) &&
-    firebaseWholesaleVideos.length > primaryWholesaleVideos.length
-  ) {
+  // Supabase is primary. Do not hit Firebase in parallel when the primary payload
+  // already contains wholesale videos. Firebase is used only as a narrow migration
+  // recovery when Supabase succeeded but this field has not arrived there yet.
+  if (result.source !== 'supabase' || primaryWholesaleVideos.length > 0) {
+    return merged;
+  }
+
+  const firebaseWholesaleVideos = await getFreshFirebaseWholesaleVideos();
+  if (Array.isArray(firebaseWholesaleVideos) && firebaseWholesaleVideos.length > 0) {
     return { ...merged, wholesaleVideos: firebaseWholesaleVideos };
   }
 

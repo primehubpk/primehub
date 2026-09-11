@@ -5,6 +5,8 @@ import { isSupabaseWriteConfigured } from '@/lib/dualWriteServer';
 
 export const runtime = 'nodejs';
 
+const SUPABASE_REWARD_TIMEOUT_MS = 3500;
+
 type HistoryEntry = { id: string; action: 'spin' | 'checkin'; name: string; type: string; status: 'claimed' | 'completed'; createdAt: string; source: 'account' };
 type Wallet = { points?: number; streak?: number; lastCheckIn?: string; lastSpin?: string; coupons?: string[]; freeDeliveryCredits?: number; history?: HistoryEntry[] };
 type GuestWallet = { lastSpin?: string; pendingPrize?: Prize | null; pendingPrizeToken?: string };
@@ -13,7 +15,7 @@ type Prize = { id: string; name: string; type: string; points?: number; probabil
 function dayKey() { return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Karachi' }).format(new Date()); }
 function validGuestId(value: unknown) { const id = String(value || '').trim(); return /^g_[a-zA-Z0-9]{12,80}$/.test(id) ? id : ''; }
 function cfg() { const url = String(process.env.SUPABASE_URL || '').replace(/\/+$/, ''); const key = String(process.env.SUPABASE_SERVICE_ROLE_KEY || ''); return { url, key }; }
-async function sb(path: string, init: RequestInit = {}) { const { url, key } = cfg(); if (!url || !key) throw new Error('Supabase is not configured.'); const r = await fetch(`${url}/rest/v1/${path}`, { ...init, headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', ...(init.headers || {}) }, cache: 'no-store' }); if (!r.ok) throw new Error(`Supabase ${r.status}: ${await r.text()}`); return r; }
+async function sb(path: string, init: RequestInit = {}) { const { url, key } = cfg(); if (!url || !key) throw new Error('Supabase is not configured.'); const r = await fetch(`${url}/rest/v1/${path}`, { ...init, signal: init.signal || AbortSignal.timeout(SUPABASE_REWARD_TIMEOUT_MS), headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', ...(init.headers || {}) }, cache: 'no-store' }); if (!r.ok) throw new Error(`Supabase ${r.status}: ${await r.text()}`); return r; }
 async function readSupabaseWallet(uid: string): Promise<Wallet> { const r = await sb(`user_rewards?id=eq.${encodeURIComponent(uid)}&select=payload&limit=1`); const rows = await r.json(); return (rows?.[0]?.payload || {}) as Wallet; }
 async function readSupabaseGuest(guestId: string): Promise<GuestWallet> { if (!guestId) return {}; const r = await sb(`user_rewards?id=eq.${encodeURIComponent(`guest:${guestId}`)}&select=payload&limit=1`); const rows = await r.json(); return (rows?.[0]?.payload || {}) as GuestWallet; }
 async function readSupabaseRewardSettings() { const r = await sb('settings?id=eq.rewards&select=payload&limit=1'); const rows = await r.json(); return rows?.[0]?.payload || {}; }
@@ -68,14 +70,18 @@ export async function GET(request: Request) {
     const guestId = validGuestId(url.searchParams.get('guestId'));
     const today = dayKey();
     if (isSupabaseWriteConfigured()) {
-      const [savedWallet, guest, settings] = await Promise.all([readSupabaseWallet(user.uid), readSupabaseGuest(guestId), readSupabaseRewardSettings()]);
-      let wallet = { points: 0, streak: 0, coupons: [], freeDeliveryCredits: 0, history: [], ...savedWallet } as Wallet;
-      if (guest.lastSpin === today && wallet.lastSpin !== today) {
-        wallet = { ...wallet, lastSpin: today };
-        await writeSupabaseWallet(user.uid, wallet);
-        await mirrorFirebaseWallet(user.uid, wallet);
+      try {
+        const [savedWallet, guest, settings] = await Promise.all([readSupabaseWallet(user.uid), readSupabaseGuest(guestId), readSupabaseRewardSettings()]);
+        let wallet = { points: 0, streak: 0, coupons: [], freeDeliveryCredits: 0, history: [], ...savedWallet } as Wallet;
+        if (guest.lastSpin === today && wallet.lastSpin !== today) {
+          wallet = { ...wallet, lastSpin: today };
+          await writeSupabaseWallet(user.uid, wallet);
+          await mirrorFirebaseWallet(user.uid, wallet);
+        }
+        return NextResponse.json({ ok: true, source: 'supabase', wallet, settings, guest: { lastSpin: guest.lastSpin, hasPendingPrize: Boolean(guest.pendingPrize && guest.pendingPrizeToken) }, spinUsedToday: wallet.lastSpin === today || guest.lastSpin === today });
+      } catch (error) {
+        console.error('Supabase reward state read failed; using Firebase fallback:', error);
       }
-      return NextResponse.json({ ok: true, source: 'supabase', wallet, settings, guest: { lastSpin: guest.lastSpin, hasPendingPrize: Boolean(guest.pendingPrize && guest.pendingPrizeToken) }, spinUsedToday: wallet.lastSpin === today || guest.lastSpin === today });
     }
     const db = getAdminDb();
     const [walletSnap, settingsSnap, guestSnap] = await Promise.all([

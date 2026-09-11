@@ -11,6 +11,8 @@ type CategoriesSnapshot = { categories: any[]; source: 'firebase' | 'supabase' |
 type SettingsSnapshot = { documents: Record<string, any>; source: 'firebase' | 'supabase' | 'empty' };
 type SkillsSnapshot = { skills: any[]; source: 'firebase' | 'supabase' | 'empty' };
 
+const SUPABASE_READ_TIMEOUT_MS = 3500;
+
 function envValue(...names: string[]) {
   for (const name of names) {
     const value = String(process.env[name] || '').trim();
@@ -110,11 +112,18 @@ function readFetchInit(options?: DualReadCacheOptions): NextFetchInit {
   };
 }
 
+function supabaseReadInit(options?: DualReadCacheOptions): NextFetchInit {
+  return {
+    ...readFetchInit(options),
+    signal: AbortSignal.timeout(SUPABASE_READ_TIMEOUT_MS),
+  };
+}
+
 async function sbRows(table: string, select = '*', useServiceRole = false, options?: DualReadCacheOptions) {
   const { url, key } = useServiceRole ? supabaseServiceConfig() : supabaseConfig();
   const response = await fetch(`${url}/rest/v1/${table}?select=${encodeURIComponent(select)}`, {
     headers: { apikey: key, Authorization: `Bearer ${key}` },
-    ...readFetchInit(options),
+    ...supabaseReadInit(options),
   });
   if (!response.ok) throw new Error(`Supabase ${table} read failed ${response.status}`);
   return await response.json() as any[];
@@ -205,7 +214,7 @@ async function supabaseProduct(id: string, options?: DualReadCacheOptions): Prom
     `${url}/rest/v1/products?select=*&id=eq.${encodeURIComponent(id)}&limit=1`,
     {
       headers: { apikey: key, Authorization: `Bearer ${key}` },
-      ...readFetchInit(options),
+      ...supabaseReadInit(options),
     },
   );
   if (!response.ok) throw new Error(`Supabase product read failed ${response.status}`);
