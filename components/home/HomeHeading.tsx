@@ -3,7 +3,14 @@
 import Link from "next/link";
 import { useRef, type KeyboardEvent, type PointerEvent, type ReactNode } from "react";
 
-const CLICKABLE_HEADINGS: Record<string, { href: string; title: string; label?: string; displayText?: string }> = {
+type HeadingDestination = {
+  href: string;
+  title: string;
+  label?: string;
+  displayText?: string;
+};
+
+const CLICKABLE_HEADINGS: Record<string, HeadingDestination> = {
   "PrimeHubMall Weekly Deals": {
     href: "/weekly-deals",
     title: "Open all weekly deals",
@@ -12,18 +19,40 @@ const CLICKABLE_HEADINGS: Record<string, { href: string; title: string; label?: 
     href: "/new-arrivals",
     title: "Open all new arrivals",
   },
-  "Reseller Club": {
+  "PrimeHubMall Reseller Rewards": {
     href: "/reseller/dashboard",
     title: "Open PrimeHubMall Reseller Rewards",
     label: "Open",
-    displayText: "PrimeHubMall Reseller Rewards",
+  },
+  "Wholesale Packages": {
+    href: "/wholesale-video-hub",
+    title: "Open Wholesale Packages",
+    label: "Open",
+  },
+  "Prime Skills": {
+    href: "/skills",
+    title: "Open Prime Skills",
+    label: "Open",
   },
 };
 
-export default function HomeHeading({ children }: { children: ReactNode }) {
+export default function HomeHeading({
+  children,
+  href,
+  actionLabel,
+  title,
+}: {
+  children: ReactNode;
+  href?: string;
+  actionLabel?: string;
+  title?: string;
+}) {
   const pressStartedAt = useRef(0);
   const headingText = typeof children === "string" ? children : "";
-  const destination = CLICKABLE_HEADINGS[headingText];
+  const mapped = CLICKABLE_HEADINGS[headingText];
+  const destination: HeadingDestination | undefined = href
+    ? { href, title: title || "Open section", label: actionLabel }
+    : mapped;
 
   const openDestination = () => {
     if (destination) window.location.assign(destination.href);
@@ -49,11 +78,11 @@ export default function HomeHeading({ children }: { children: ReactNode }) {
   if (destination) {
     return (
       <h2 className="home-heading relative">
-        <span>
+        <span className="relative">
           <span aria-hidden="true">❧</span>
           <Link
             href={destination.href}
-            className="inline-flex shrink-0 -translate-y-[5px] whitespace-nowrap text-[8px] font-black uppercase tracking-[0.12em] text-[#8A651F] no-underline sm:text-[9px]"
+            className="absolute right-1 bottom-[62%] z-10 whitespace-nowrap bg-[#fffcf7] px-1 text-[8px] font-black uppercase tracking-[0.12em] text-[#8A651F] no-underline sm:text-[9px]"
           >
             {destination.label || "View all"}
           </Link>
@@ -68,7 +97,7 @@ export default function HomeHeading({ children }: { children: ReactNode }) {
           style={{ WebkitUserSelect: "text", userSelect: "text" }}
           title={destination.title}
         >
-          {destination.displayText || children}
+          {children}
         </span>
         <span aria-hidden="true">❧</span>
       </h2>
