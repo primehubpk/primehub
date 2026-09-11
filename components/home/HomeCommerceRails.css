@@ -8,7 +8,7 @@
 
 .home-commerce-rail {
   grid-auto-columns: minmax(220px, 34%);
-  padding-bottom: 40px;
+  padding-bottom: 9px;
   scrollbar-width: thin;
   scrollbar-color: #c3964c transparent;
 }
@@ -68,6 +68,11 @@
   height: 100%;
   object-fit: cover;
   display: block;
+}
+
+.home-prime-skills .home-commerce-media > img.home-prime-skill-first-image {
+  object-fit: contain;
+  background: #fffdf9;
 }
 
 .home-commerce-placeholder {
@@ -157,7 +162,7 @@
   .home-commerce-rail {
     grid-auto-columns: calc(76% - 20px);
     gap: 7px;
-    padding-bottom: 40px;
+    padding-bottom: 9px;
   }
 
   .home-video-packages .home-commerce-rail {
