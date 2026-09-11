@@ -2,7 +2,6 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useEffect, useRef, useState } from 'react';
 import { GraduationCap, Home, Package, ShoppingBag, Users } from 'lucide-react';
 
 const NAV_ITEMS = [
@@ -42,31 +41,6 @@ function isItemActive(pathname: string, item: NavItem) {
 
 export default function BottomNav() {
   const pathname = usePathname();
-  const [pendingHref, setPendingHref] = useState<string | null>(null);
-  const pendingResetTimer = useRef<number | null>(null);
-
-  const markNavigationIntent = (href: string) => {
-    if (href === pathname) return;
-    setPendingHref(href);
-
-    if (pendingResetTimer.current != null) window.clearTimeout(pendingResetTimer.current);
-    pendingResetTimer.current = window.setTimeout(() => {
-      setPendingHref((current) => (current === href ? null : current));
-      pendingResetTimer.current = null;
-    }, 2500);
-  };
-
-  useEffect(() => {
-    setPendingHref(null);
-    if (pendingResetTimer.current != null) {
-      window.clearTimeout(pendingResetTimer.current);
-      pendingResetTimer.current = null;
-    }
-  }, [pathname]);
-
-  useEffect(() => () => {
-    if (pendingResetTimer.current != null) window.clearTimeout(pendingResetTimer.current);
-  }, []);
 
   return (
     <nav
@@ -77,29 +51,26 @@ export default function BottomNav() {
         {NAV_ITEMS.map((item) => {
           const { key, label, href, icon: Icon } = item;
           const isActive = isItemActive(pathname, item);
-          const isPending = pendingHref === href && !isActive;
-          const visualActive = pendingHref ? pendingHref === href : isActive;
+          const shouldPrefetch = key === 'home' || key === 'shop';
 
           return (
             <Link
               key={key}
               href={href}
-              prefetch={true}
+              prefetch={shouldPrefetch}
               aria-current={isActive ? 'page' : undefined}
               data-nav-key={key}
-              data-active={visualActive ? 'true' : 'false'}
-              data-pending={isPending ? 'true' : 'false'}
-              onPointerDown={() => markNavigationIntent(href)}
-              className={`group relative flex min-w-0 touch-manipulation select-none flex-col items-center justify-center gap-1 px-0.5 py-2.5 ${
-                isPending ? 'bg-black/[0.035]' : ''
-              } ${visualActive ? 'text-[#005448]' : 'text-[#131915]'}`}
+              data-active={isActive ? 'true' : 'false'}
+              className={`group relative flex min-w-0 touch-manipulation select-none flex-col items-center justify-center gap-1 px-0.5 py-2.5 active:bg-black/[0.035] ${
+                isActive ? 'text-[#005448]' : 'text-[#131915]'
+              }`}
             >
               <span className="flex h-8 w-8 shrink-0 items-center justify-center">
                 <Icon className="h-[27px] w-[27px] shrink-0 stroke-[1.35]" aria-hidden="true" />
               </span>
               <span
                 className={`w-full truncate text-center text-[10px] leading-tight ${
-                  visualActive ? 'font-bold text-[#005448]' : 'font-medium text-[#141510]'
+                  isActive ? 'font-bold text-[#005448]' : 'font-medium text-[#141510]'
                 }`}
               >
                 {label}
