@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { doc, onSnapshot } from "firebase/firestore";
 import { MessageCircle, Play, PlayCircle, Sparkles } from "lucide-react";
 import HomeHeading from "./HomeHeading";
 import { useSettings } from "@/lib/useSettings";
+import { db } from "@/lib/firebase";
 import { PRIME_SKILLS_SEED } from "@/lib/primeSkillsSeed";
 import { normalizeImageUrl } from "@/lib/imageUrl";
 import { thumbnailOf, type WholesaleVideo } from "@/lib/wholesaleVideos";
@@ -58,10 +60,28 @@ function skillDisplayPrice(item: PrimeSkillHomeItem) {
 
 export function HomeWholesaleVideos() {
   const { settings, contact } = useSettings();
-  const videos = (
+  const initialVideos = (
     (settings as typeof settings & { wholesaleVideos?: WholesaleVideo[] })
       .wholesaleVideos || []
   ).filter((video) => video.active !== false);
+  const [videos, setVideos] = useState<WholesaleVideo[]>(initialVideos);
+
+  useEffect(() => {
+    return onSnapshot(
+      doc(db, "settings", "main"),
+      (snapshot) => {
+        const list = snapshot.data()?.wholesaleVideos;
+        if (!Array.isArray(list)) return;
+        const liveVideos = (list as WholesaleVideo[]).filter(
+          (video) => video.active !== false,
+        );
+        setVideos((current) =>
+          liveVideos.length > current.length ? liveVideos : current,
+        );
+      },
+      () => undefined,
+    );
+  }, []);
 
   const storeWhatsApp =
     cleanWhatsApp(contact?.whatsappNumber) ||
