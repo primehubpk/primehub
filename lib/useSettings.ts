@@ -130,7 +130,6 @@ export function SettingsProvider({ initialSettings, children }: { initialSetting
   const [hasData, setHasData] = useState(hasInitialSettings);
   const requestRef = useRef<Promise<void> | null>(null);
   const lastRefreshRef = useRef(hasInitialSettings ? Date.now() : 0);
-  const parentSeededRef = useRef(false);
 
   const seedSettings = useCallback((nextSettings: SiteSettings) => {
     setSettings(nextSettings);
@@ -177,16 +176,10 @@ export function SettingsProvider({ initialSettings, children }: { initialSetting
     refreshSettings,
   }), [settings, loading, hasData, seedSettings, refreshSettings]);
 
-  // Only the app-wide provider owns network refreshes. A homepage provider may
-  // render server-seeded data immediately, then hand that seed to the parent and
-  // follow the parent's shared refresh lifecycle instead of starting a second one.
-  const ownsContext = !parent;
-
-  useEffect(() => {
-    if (!parent || !hasInitialSettings || parentSeededRef.current) return;
-    parentSeededRef.current = true;
-    parent.seedSettings(seed);
-  }, [parent, hasInitialSettings, seed]);
+  // A subtree with server-provided settings stays authoritative for its first render.
+  // Do not hand those settings to the parent and then switch context sources during
+  // hydration; that transition caused the homepage to visibly repaint after opening.
+  const ownsContext = !parent || hasInitialSettings;
 
   useEffect(() => {
     if (!ownsContext) return;
@@ -210,7 +203,7 @@ export function SettingsProvider({ initialSettings, children }: { initialSetting
   }, [ownsContext, hasInitialSettings, refreshSettings]);
 
   const contextValue = useMemo<SettingsContextValue>(() => {
-    if (hasInitialSettings && (!parent || !parent.hasData)) return localValue;
+    if (hasInitialSettings) return localValue;
     if (parent) return parent;
     return localValue;
   }, [parent, localValue, hasInitialSettings]);
