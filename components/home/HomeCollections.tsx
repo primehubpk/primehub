@@ -190,7 +190,7 @@ export default function HomeCollections({
                 <Link
                   className="home-budget"
                   href={href}
-                  prefetch={true}
+                  prefetch={false}
                   aria-label={`Browse ${bucket.title}`}
                 >
                   <span className="home-budget-medallion">
@@ -238,7 +238,7 @@ export default function HomeCollections({
                   ) : (
                     <p className="home-empty">
                       New offers are on their way.{" "}
-                      <Link href={href} prefetch={true}>
+                      <Link href={href} prefetch={false}>
                         Browse collection <ChevronRight size={14} />
                       </Link>
                     </p>
