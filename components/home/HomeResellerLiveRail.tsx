@@ -99,7 +99,7 @@ export default function HomeResellerLiveRail(){
 
   return <section className="ph-live-rail" id="reseller-home">
     <HomeHeading>Reseller Club</HomeHeading>
-    <div className="ph-live-tabs"><a href="#reseller-rewards">Rewards</a><a href="#reseller-tasks">Tasks</a><a href="#reseller-wallet">Wallet</a><a href="#reseller-tiers">Tiers</a><Link href="/reseller/dashboard">Open Club</Link></div>
+    <div className="ph-live-tabs"><a href="#reseller-rewards">Rewards</a><a href="#reseller-tasks">Tasks</a><a href="#reseller-wallet">Wallet</a><a href="#reseller-tiers">Tiers</a><Link href="/reseller/dashboard" prefetch={false}>Open Club</Link></div>
     <div className="ph-live-hint">Swipe → all tasks, wallet, tiers, vouchers & gifts</div>
     <div className="ph-live-scroll"><div className="ph-live-grid">
       <div className="ph-live-row">
@@ -115,7 +115,7 @@ export default function HomeResellerLiveRail(){
             {user?<div className="ph-wallet-profile-copy"><strong>{resellerName}</strong><span>{currentTier?.name||"Starter"} · {Number(currentTier?.discountPercent||0)}% OFF · {monthlyOrders} orders</span></div>:<div className="ph-wallet-profile-copy"><strong>Reseller profile</strong><span>Login to see tier & discount</span></div>}
           </div>
           <div className="ph-wallet-grid"><div><span>CASH WALLET</span><strong>Rs. {cashAvailable.toLocaleString()}</strong><b>Pending Rs. {cashPending.toLocaleString()}</b></div><div><span>POINTS WALLET</span><strong>{Number(wallet.points||0).toLocaleString()}</strong><b>Reward points</b></div></div>
-          <Link href={user?"/reseller/wallet":"/reseller/dashboard"}>{user?"History & withdrawal":"Login to wallet"}</Link>
+          <Link href={user?"/reseller/wallet":"/reseller/dashboard"} prefetch={false}>{user?"History & withdrawal":"Login to wallet"}</Link>
         </article>
         {tiers.map((tier,index)=>{const current=monthlyOrders>=tier.minMonthlyOrders&&(index===tiers.length-1||monthlyOrders<tiers[index+1].minMonthlyOrders);const need=Math.max(0,tier.minMonthlyOrders-monthlyOrders);return <article className={`ph-card ph-tier ph-tier-${Math.min(index+1,4)} ${current?"current":""}`} id={index===0?"reseller-tiers":undefined} key={tier.id}><div className="ph-tier-top"><span>{index+1}</span>{current?<em>CURRENT</em>:null}</div><h4>{tier.name}</h4><small>{tier.minMonthlyOrders}+ monthly orders</small><div className="ph-tier-discount"><strong>{Number(tier.discountPercent||0)}%</strong><i> OFF</i></div><ul>{(tier.benefits||[]).slice(0,3).map(x=><li key={x}>✓ {x}</li>)}</ul><div className="ph-tier-status">{current?"Your current tier":need?`Need ${need} orders`:"Unlocked"}</div></article>})}
         {vouchers.map(v=>{const unlocked=monthlyOrders>=v.minOrders;const image=v.imageUrl||premiumVoucherImage(v.title,v.art,v.icon);return <article className="ph-card ph-voucher" key={v.id}><div className="ph-voucher-art"><img src={image} alt={v.title}/><span className={unlocked?"unlocked":""}>{unlocked?"Unlocked":"🔒 Locked"}</span></div><div className="ph-voucher-copy"><h4>{v.title}</h4><p>{v.description}</p><b>{v.requirement}</b></div></article>})}
