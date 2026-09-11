@@ -14,10 +14,6 @@ const NAV_ITEMS = [
 ] as const;
 
 type NavItem = (typeof NAV_ITEMS)[number];
-type IdleWindow = Window & {
-  requestIdleCallback?: (callback: () => void, options?: { timeout?: number }) => number;
-  cancelIdleCallback?: (handle: number) => void;
-};
 
 function isShopRoute(pathname: string) {
   return (
@@ -44,60 +40,37 @@ function isItemActive(pathname: string, item: NavItem) {
   return pathname === item.href || pathname.startsWith(`${item.href}/`);
 }
 
-function isWarmableRoute(href: string) {
-  return href === '/' || href === '/shop' || href === '/reseller/dashboard';
+function shouldPrefetch(item: NavItem) {
+  return item.key === 'home' || item.key === 'shop' || item.key === 'reseller';
 }
 
 export default function BottomNav() {
   const pathname = usePathname();
   const router = useRouter();
   const [pendingHref, setPendingHref] = useState<string | null>(null);
-  const warmedRoutes = useRef(new Set<string>());
-
-  const warmRoute = useCallback((href: string) => {
-    if (!isWarmableRoute(href) || href === pathname || warmedRoutes.current.has(href)) return;
-    warmedRoutes.current.add(href);
-    router.prefetch(href);
-  }, [pathname, router]);
+  const navigatingTo = useRef<string | null>(null);
 
   useEffect(() => {
-    warmedRoutes.current.delete(pathname);
+    navigatingTo.current = null;
     setPendingHref(null);
   }, [pathname]);
 
   useEffect(() => {
     if (!pendingHref) return;
-    const timer = window.setTimeout(() => setPendingHref(null), 3500);
+    const timer = window.setTimeout(() => {
+      navigatingTo.current = null;
+      setPendingHref(null);
+    }, 5000);
     return () => window.clearTimeout(timer);
   }, [pendingHref]);
 
-  useEffect(() => {
-    const primaryTarget = pathname === '/' ? '/shop' : '/';
-    const resellerTarget = '/reseller/dashboard';
-    const browser = window as IdleWindow;
-    let idleId: number | null = null;
-    let timerId: number | null = null;
-    let resellerTimerId: number | null = null;
+  const navigateTo = useCallback((href: string) => {
+    if (href === pathname || navigatingTo.current === href) return;
 
-    const warmPrimaryThenReseller = () => {
-      warmRoute(primaryTarget);
-      if (!pathname.startsWith('/reseller')) {
-        resellerTimerId = window.setTimeout(() => warmRoute(resellerTarget), 350);
-      }
-    };
-
-    if (browser.requestIdleCallback) {
-      idleId = browser.requestIdleCallback(warmPrimaryThenReseller, { timeout: 700 });
-    } else {
-      timerId = window.setTimeout(warmPrimaryThenReseller, 250);
-    }
-
-    return () => {
-      if (idleId != null) browser.cancelIdleCallback?.(idleId);
-      if (timerId != null) window.clearTimeout(timerId);
-      if (resellerTimerId != null) window.clearTimeout(resellerTimerId);
-    };
-  }, [pathname, warmRoute]);
+    navigatingTo.current = href;
+    setPendingHref(href);
+    router.push(href);
+  }, [pathname, router]);
 
   return (
     <nav
@@ -112,7 +85,6 @@ export default function BottomNav() {
           const visuallyActive = pendingHref ? pendingHref === href : routeIsActive;
 
           const markNavigationIntent = () => {
-            warmRoute(href);
             if (pathname !== href) setPendingHref(href);
           };
 
@@ -120,16 +92,39 @@ export default function BottomNav() {
             <Link
               key={key}
               href={href}
-              prefetch={false}
+              prefetch={shouldPrefetch(item)}
               aria-current={routeIsActive ? 'page' : undefined}
               aria-busy={isPending || undefined}
               data-nav-key={key}
               data-active={routeIsActive ? 'true' : 'false'}
               data-pending={isPending ? 'true' : 'false'}
-              onPointerEnter={() => warmRoute(href)}
-              onFocus={() => warmRoute(href)}
               onPointerDown={markNavigationIntent}
-              onClick={markNavigationIntent}
+              onPointerUp={(event) => {
+                if (
+                  event.button !== 0 ||
+                  event.metaKey ||
+                  event.ctrlKey ||
+                  event.shiftKey ||
+                  event.altKey
+                ) {
+                  return;
+                }
+                navigateTo(href);
+              }}
+              onClick={(event) => {
+                if (
+                  event.button !== 0 ||
+                  event.metaKey ||
+                  event.ctrlKey ||
+                  event.shiftKey ||
+                  event.altKey
+                ) {
+                  return;
+                }
+
+                event.preventDefault();
+                navigateTo(href);
+              }}
               className={`group relative flex min-w-0 touch-manipulation select-none flex-col items-center justify-center gap-1 px-0.5 py-2.5 transition-[color,background-color,transform] duration-100 active:scale-[0.98] active:bg-black/[0.035] ${
                 visuallyActive ? 'text-[#005448]' : 'text-[#131915]'
               }`}
