@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { GraduationCap, Home, Package, ShoppingBag, Users } from 'lucide-react';
 
 const NAV_ITEMS = [
@@ -52,13 +52,17 @@ export default function BottomNav() {
   const pathname = usePathname();
   const router = useRouter();
   const [pendingHref, setPendingHref] = useState<string | null>(null);
+  const warmedRoutes = useRef(new Set<string>());
 
   const warmPrimaryRoute = useCallback((href: string) => {
-    if (!isPrimaryFastRoute(href) || href === pathname) return;
+    if (!isPrimaryFastRoute(href) || href === pathname || warmedRoutes.current.has(href)) return;
+    warmedRoutes.current.add(href);
     router.prefetch(href);
   }, [pathname, router]);
 
   useEffect(() => {
+    // Once a route is actually visited, allow it to be warmed again after we leave it.
+    warmedRoutes.current.delete(pathname);
     setPendingHref(null);
   }, [pathname]);
 
@@ -99,7 +103,6 @@ export default function BottomNav() {
           const routeIsActive = isItemActive(pathname, item);
           const isPending = pendingHref === href && pathname !== href;
           const visuallyActive = pendingHref ? pendingHref === href : routeIsActive;
-          const shouldPrefetch = key === 'home' || key === 'shop';
 
           const markNavigationIntent = () => {
             warmPrimaryRoute(href);
@@ -110,7 +113,7 @@ export default function BottomNav() {
             <Link
               key={key}
               href={href}
-              prefetch={shouldPrefetch}
+              prefetch={false}
               aria-current={routeIsActive ? 'page' : undefined}
               aria-busy={isPending || undefined}
               data-nav-key={key}
