@@ -89,6 +89,7 @@ function buildSettings(documents: Record<string, any>): SiteSettings {
   const legacyData = (documents.general || {}) as RawSettings;
   const policyData = (documents.policy || {}) as RawPolicy;
   const contactData = (documents.contact || {}) as RawContact;
+  const rewardData = documents.rewards || mainData.homeRewardSettings || {};
   const merged: RawSettings = resolveRotatingBigDeal({ ...DEFAULT_SETTINGS, ...legacyData, ...mainData });
   const mainWhatsApp = typeof mainData.whatsappNumber === 'string' ? mainData.whatsappNumber : '';
   const contactWhatsApp = typeof contactData.whatsappNumber === 'string' ? contactData.whatsappNumber : '';
@@ -97,6 +98,7 @@ function buildSettings(documents: Record<string, any>): SiteSettings {
 
   return {
     ...merged,
+    homeRewardSettings: rewardData,
     announcementText: resolveAnnouncement(mainData, legacyData),
     whatsappNumber: contactWhatsApp || mainWhatsApp || DEFAULT_SETTINGS.whatsappNumber,
     contact: {
@@ -128,11 +130,13 @@ export function SettingsProvider({ initialSettings, children }: { initialSetting
   const [hasData, setHasData] = useState(hasInitialSettings);
   const requestRef = useRef<Promise<void> | null>(null);
   const lastRefreshRef = useRef(hasInitialSettings ? Date.now() : 0);
+  const parentSeededRef = useRef(false);
 
   const seedSettings = useCallback((nextSettings: SiteSettings) => {
     setSettings(nextSettings);
     setHasData(true);
     setLoading(false);
+    lastRefreshRef.current = Date.now();
   }, []);
 
   const refreshSettings = useCallback(async () => {
@@ -173,9 +177,16 @@ export function SettingsProvider({ initialSettings, children }: { initialSetting
     refreshSettings,
   }), [settings, loading, hasData, seedSettings, refreshSettings]);
 
-  // A nested provider with server-provided settings owns its subtree. This prevents
-  // the blank root provider from replacing fresh homepage settings after hydration.
-  const ownsContext = !parent || hasInitialSettings;
+  // Only the app-wide provider owns network refreshes. A homepage provider may
+  // render server-seeded data immediately, then hand that seed to the parent and
+  // follow the parent's shared refresh lifecycle instead of starting a second one.
+  const ownsContext = !parent;
+
+  useEffect(() => {
+    if (!parent || !hasInitialSettings || parentSeededRef.current) return;
+    parentSeededRef.current = true;
+    parent.seedSettings(seed);
+  }, [parent, hasInitialSettings, seed]);
 
   useEffect(() => {
     if (!ownsContext) return;
@@ -199,7 +210,7 @@ export function SettingsProvider({ initialSettings, children }: { initialSetting
   }, [ownsContext, hasInitialSettings, refreshSettings]);
 
   const contextValue = useMemo<SettingsContextValue>(() => {
-    if (hasInitialSettings) return localValue;
+    if (hasInitialSettings && (!parent || !parent.hasData)) return localValue;
     if (parent) return parent;
     return localValue;
   }, [parent, localValue, hasInitialSettings]);
