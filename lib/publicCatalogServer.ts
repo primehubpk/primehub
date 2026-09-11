@@ -103,6 +103,12 @@ export async function getFreshRewardSettingsSnapshot() {
   }
 }
 
+export const getRewardSettingsSnapshot = unstable_cache(
+  getFreshRewardSettingsSnapshot,
+  ['primehub-home-reward-settings-v1'],
+  { revalidate: 60, tags: ['storefront-settings', 'rewards'] },
+);
+
 export async function getFreshStorefrontSettingsSnapshot() {
   const [result, firebaseWholesaleVideos] = await Promise.all([
     getStorefrontSettingsWithBigDealRecovery({ cache: 'no-store' }),
