@@ -10,6 +10,11 @@ import { rememberProduct } from '@/lib/recentlyViewedHistory';
 import type { ProductVariantSelection, WeeklyDeal } from '@/lib/types';
 import { dealDiscount, imagesOf, originalPriceOf, regularPriceOf, titleOf, type Product, type ProductDetailModel, money } from './ProductDetailTypes';
 
+type IdleWindow = Window & {
+  requestIdleCallback?: (callback: () => void, options?: { timeout?: number }) => number;
+  cancelIdleCallback?: (handle: number) => void;
+};
+
 function dealIsActive(deal: any, now: number): boolean {
   if (!deal || deal.active === false) return false;
   const start = deal.startAt ? new Date(deal.startAt).getTime() : 0;
@@ -70,34 +75,20 @@ export function useProductDetail(): ProductDetailModel {
   const [wished, setWished] = useState(false);
   const [videoOpen, setVideoOpen] = useState(false);
   const [added, setAdded] = useState(false);
-  const [nowTick, setNowTick] = useState<number | null>(null);
+  const [nowTick, setNowTick] = useState<number>(() => Date.now());
   const [variantModalOpen, setVariantModalOpen] = useState(false);
   const [variantMode, setVariantMode] = useState<'cart' | 'buy'>('cart');
   const [variantSelection, setVariantSelection] = useState<ProductVariantSelection | undefined>();
 
   useEffect(() => {
-    setNowTick(Date.now());
     const timer = window.setInterval(() => setNowTick(Date.now()), 1000);
     return () => window.clearInterval(timer);
   }, []);
 
   useEffect(() => {
     let cancelled = false;
-    async function load() {
-      if (!id) return;
-      const cached = readCachedProduct<Product>(id);
-      if (cached) {
-        setProduct(cached);
-        setWeeklyProducts({ [id]: cached });
-        setLoading(false);
-        setFailed(false);
-        rememberProduct(id);
-      } else {
-        setProduct(null);
-        setWeeklyProducts({});
-        setLoading(true);
-        setFailed(false);
-      }
+
+    async function loadFreshProduct() {
       try {
         const response = await fetch(`/api/storefront/read?type=product&id=${encodeURIComponent(id)}`, {
           cache: 'no-store',
@@ -110,10 +101,8 @@ export function useProductDetail(): ProductDetailModel {
             ? ({ ...data.product, id: String(data.product.id || id) } as Product)
             : null;
         if (!nextProduct) {
-          if (!cached) {
-            setProduct(null);
-            setFailed(true);
-          }
+          setProduct(null);
+          setFailed(true);
           return;
         }
         setProduct(nextProduct);
@@ -121,12 +110,32 @@ export function useProductDetail(): ProductDetailModel {
         cacheProductForNavigation(nextProduct);
         rememberProduct(id);
       } catch {
-        if (!cancelled && !cached) setFailed(true);
+        if (!cancelled) setFailed(true);
       } finally {
         if (!cancelled) setLoading(false);
       }
     }
-    load();
+
+    if (!id) return () => { cancelled = true; };
+
+    const cached = readCachedProduct<Product>(id);
+    if (cached) {
+      // Home/Shop navigation already seeded this exact product. Reuse it as the
+      // authoritative first view instead of starting a duplicate no-store request
+      // that competes with the hero image on mobile data.
+      setProduct((current) => (current?.id === cached.id ? current : cached));
+      setWeeklyProducts((current) => (current[id] === cached ? current : { [id]: cached }));
+      setLoading(false);
+      setFailed(false);
+      rememberProduct(id);
+    } else {
+      setProduct(null);
+      setWeeklyProducts({});
+      setLoading(true);
+      setFailed(false);
+      void loadFreshProduct();
+    }
+
     return () => {
       cancelled = true;
     };
@@ -148,27 +157,44 @@ export function useProductDetail(): ProductDetailModel {
 
   useEffect(() => {
     let cancelled = false;
-    const ids = Array.from(new Set(weeklyDeals.map((deal) => deal.productId).filter(Boolean)));
+    const browser = window as IdleWindow;
+    let idleId: number | null = null;
+    let fallbackTimer: number | null = null;
+    const ids = Array.from(
+      new Set(weeklyDeals.map((deal) => deal.productId).filter((productId) => Boolean(productId) && productId !== id)),
+    );
     if (!ids.length) return () => { cancelled = true; };
 
-    loadProductsForNavigation<Product>(ids)
-      .then((loaded) => {
-        if (cancelled) return;
-        setWeeklyProducts((current) => ({
-          ...current,
-          ...loaded,
-          ...(product ? { [product.id]: product } : {}),
-        }));
-      })
-      .catch(() => undefined);
+    const loadWeeklyProducts = () => {
+      void loadProductsForNavigation<Product>(ids)
+        .then((loaded) => {
+          if (cancelled) return;
+          setWeeklyProducts((current) => ({
+            ...current,
+            ...loaded,
+            ...(product ? { [product.id]: product } : {}),
+          }));
+        })
+        .catch(() => undefined);
+    };
+
+    // Adjacent weekly products are below the hero and do not belong on the critical
+    // path. Load them only after the browser has painted the selected product.
+    if (browser.requestIdleCallback) {
+      idleId = browser.requestIdleCallback(loadWeeklyProducts, { timeout: 1800 });
+    } else {
+      fallbackTimer = window.setTimeout(loadWeeklyProducts, 900);
+    }
 
     return () => {
       cancelled = true;
+      if (idleId != null) browser.cancelIdleCallback?.(idleId);
+      if (fallbackTimer != null) window.clearTimeout(fallbackTimer);
     };
-  }, [weeklyDeals, product]);
+  }, [weeklyDeals, product, id]);
 
   const currentDeal = useMemo(() => weeklyDeals.find((deal) => deal.productId === id), [weeklyDeals, id]);
-  const timing = currentDeal && nowTick !== null ? dealTiming(currentDeal.day, new Date(nowTick)) : null;
+  const timing = currentDeal ? dealTiming(currentDeal.day, new Date(nowTick)) : null;
   const liveDeal = Boolean(currentDeal && timing?.isLive);
   const dealPrice = currentDeal ? Number(currentDeal.dealPrice || 0) : 0;
   const normalForDeal = currentDeal
@@ -177,12 +203,11 @@ export function useProductDetail(): ProductDetailModel {
   const savingsAmount =
     currentDeal && dealPrice > 0 && normalForDeal > dealPrice ? normalForDeal - dealPrice : 0;
   const savingsPercent = dealDiscount(dealPrice, normalForDeal);
-  const countdown =
-    timing && nowTick !== null ? countdownParts(timing.unlockAt.getTime() - nowTick) : null;
+  const countdown = timing ? countdownParts(timing.unlockAt.getTime() - nowTick) : null;
 
   const activeAdminDeal = useMemo(() => {
     if (!product || !bigDealRequested) return null;
-    const now = nowTick ?? Date.now();
+    const now = nowTick;
     const candidates = [(settings as any).dailyDeal, (settings as any).bigDeal].filter(Boolean);
     for (const deal of candidates) {
       const resolved = currentBigDealForProduct(deal, product.id, now, regularPrice);
@@ -196,10 +221,14 @@ export function useProductDetail(): ProductDetailModel {
     const bigDealImage = bigDealRequested
       ? normalizeImageUrl(String(activeAdminDeal?.imageUrl || ''))
       : '';
-    return bigDealImage
-      ? [bigDealImage, ...productImages.filter((image) => image !== bigDealImage)]
+    const weeklyDealImage = currentDeal
+      ? normalizeImageUrl(String(currentDeal.imageUrl || ''))
+      : '';
+    const preferredDealImage = bigDealImage || weeklyDealImage;
+    return preferredDealImage
+      ? [preferredDealImage, ...productImages.filter((image) => image !== preferredDealImage)]
       : productImages;
-  }, [product, bigDealRequested, activeAdminDeal?.imageUrl]);
+  }, [product, bigDealRequested, activeAdminDeal?.imageUrl, currentDeal?.imageUrl]);
 
   const bigDealActive = Boolean(activeAdminDeal);
   const activeDealPrice = activeAdminDeal
