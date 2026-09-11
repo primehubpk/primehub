@@ -6,7 +6,8 @@
   "git": {
     "deploymentEnabled": {
       "feature/home-nav-instant-active-fix": false,
-      "fix/mobile-nav-performance-audit": true
+      "fix/mobile-nav-performance-audit": true,
+      "fix/bottom-nav-performance": true
     }
   }
 }

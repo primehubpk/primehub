@@ -2,7 +2,7 @@ import 'server-only';
 import { getAdminDb } from '@/lib/firebaseAdmin';
 
 type ReadMode = 'firebase-primary' | 'supabase-primary' | 'firebase-only' | 'supabase-only';
-export type DualReadCacheOptions = { cache?: RequestCache; revalidate?: number; tags?: string[] };
+export type DualReadCacheOptions = { cache?: RequestCache; revalidate?: number; tags?: string[]; timeoutMs?: number };
 type NextFetchInit = RequestInit & { next?: { revalidate?: number; tags?: string[] } };
 
 type CatalogSnapshot = { products: any[]; categories: any[]; source: 'firebase' | 'supabase' | 'empty' };
@@ -113,9 +113,10 @@ function readFetchInit(options?: DualReadCacheOptions): NextFetchInit {
 }
 
 function supabaseReadInit(options?: DualReadCacheOptions): NextFetchInit {
+  const timeoutMs = Math.max(500, Number(options?.timeoutMs || SUPABASE_READ_TIMEOUT_MS));
   return {
     ...readFetchInit(options),
-    signal: AbortSignal.timeout(SUPABASE_READ_TIMEOUT_MS),
+    signal: AbortSignal.timeout(timeoutMs),
   };
 }
 

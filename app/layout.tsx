@@ -130,12 +130,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema) }}
         />
+        <BottomNav />
         <SettingsProvider>
           <ProductNavigationIntentBridge />
           {children}
           <GlobalFooter />
           <GlobalVariantSelector />
-          <BottomNav />
           <CartMiniBar />
           <PWARegister />
         </SettingsProvider>

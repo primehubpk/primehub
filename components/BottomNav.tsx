@@ -2,54 +2,135 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useCallback } from 'react';
-import { GraduationCap, Home, Package, ShoppingBag, Sparkles, Users } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { GraduationCap, Home, Package, ShoppingBag, Users } from 'lucide-react';
 
 const NAV_ITEMS = [
   { key: 'home', label: 'Home', href: '/', icon: Home },
   { key: 'shop', label: 'Shop', href: '/shop', icon: ShoppingBag },
   { key: 'reseller', label: 'Reseller Club', href: '/reseller/dashboard', icon: Users },
-  { key: 'skills', label: 'Prime Skills', href: '/skills', icon: Sparkles },
+  { key: 'skills', label: 'Prime Skills', href: '/skills', icon: GraduationCap },
   { key: 'orders', label: 'Orders', href: '/orders', icon: Package },
 ] as const;
+
+type NavItem = (typeof NAV_ITEMS)[number];
+type IdleWindow = Window & {
+  requestIdleCallback?: (callback: () => void, options?: { timeout?: number }) => number;
+  cancelIdleCallback?: (handle: number) => void;
+};
+
+function isItemActive(pathname: string, item: NavItem) {
+  if (item.key === 'home') return pathname === '/';
+  if (item.key === 'reseller') {
+    return pathname === '/reseller' || pathname === item.href || pathname.startsWith('/reseller/');
+  }
+  return pathname === item.href || pathname.startsWith(`${item.href}/`);
+}
 
 export default function BottomNav() {
   const pathname = usePathname();
   const router = useRouter();
+  const [pendingHref, setPendingHref] = useState<string | null>(null);
+  const warmedRoutes = useRef(new Set<string>());
+  const pendingResetTimer = useRef<number | null>(null);
 
   const warmRoute = useCallback((href: string) => {
-    if (href !== pathname) router.prefetch(href);
+    if (href === pathname || warmedRoutes.current.has(href)) return;
+    warmedRoutes.current.add(href);
+    router.prefetch(href);
   }, [pathname, router]);
 
+  const markNavigationIntent = useCallback((href: string) => {
+    if (href === pathname) return;
+    warmRoute(href);
+    setPendingHref(href);
+
+    if (pendingResetTimer.current != null) window.clearTimeout(pendingResetTimer.current);
+    pendingResetTimer.current = window.setTimeout(() => {
+      setPendingHref(current => (current === href ? null : current));
+      pendingResetTimer.current = null;
+    }, 2500);
+  }, [pathname, warmRoute]);
+
+  useEffect(() => {
+    setPendingHref(null);
+    if (pendingResetTimer.current != null) {
+      window.clearTimeout(pendingResetTimer.current);
+      pendingResetTimer.current = null;
+    }
+  }, [pathname]);
+
+  useEffect(() => {
+    const browser = window as IdleWindow;
+    const timers: number[] = [];
+    let idleId: number | null = null;
+    let fallbackTimer: number | null = null;
+    let cancelled = false;
+
+    const prewarmPrimaryRoutes = () => {
+      if (cancelled) return;
+      NAV_ITEMS.forEach((item, index) => {
+        if (item.href === window.location.pathname || warmedRoutes.current.has(item.href)) return;
+        const timer = window.setTimeout(() => {
+          if (!cancelled) warmRoute(item.href);
+        }, index * 140);
+        timers.push(timer);
+      });
+    };
+
+    if (browser.requestIdleCallback) {
+      idleId = browser.requestIdleCallback(prewarmPrimaryRoutes, { timeout: 1200 });
+    } else {
+      fallbackTimer = window.setTimeout(prewarmPrimaryRoutes, 650);
+    }
+
+    return () => {
+      cancelled = true;
+      if (idleId != null) browser.cancelIdleCallback?.(idleId);
+      if (fallbackTimer != null) window.clearTimeout(fallbackTimer);
+      timers.forEach(timer => window.clearTimeout(timer));
+    };
+  }, [warmRoute]);
+
+  useEffect(() => () => {
+    if (pendingResetTimer.current != null) window.clearTimeout(pendingResetTimer.current);
+  }, []);
+
   return (
-    <nav aria-label="Bottom navigation" className={`fixed inset-x-0 bottom-0 z-40 px-2 pb-[max(6px,env(safe-area-inset-bottom))] sm:px-4 ${pathname === '/' ? 'home-bottom-nav' : ''}`}>
-      <div className="mx-auto grid max-w-xl grid-cols-5 overflow-hidden rounded-[18px] border border-black/5 bg-[#FFFCF7]/95 px-1 shadow-[0_-6px_25px_rgba(20,20,15,0.13)] backdrop-blur-xl sm:mb-2 sm:rounded-[22px] sm:px-2">
-        {NAV_ITEMS.map(({ key, label, href, icon: Icon }) => {
-          const isActive =
-            pathname === href ||
-            (key === 'reseller' && pathname.startsWith('/reseller')) ||
-            (key === 'skills' && pathname.startsWith('/skills'));
+    <nav
+      aria-label="Bottom navigation"
+      className="fixed inset-x-0 bottom-0 z-40 border-t border-[#C9BFB0] bg-[#FFFDF8]/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl"
+    >
+      <div className="mx-auto grid min-h-[72px] w-full max-w-[650px] grid-cols-5">
+        {NAV_ITEMS.map((item) => {
+          const { key, label, href, icon: Icon } = item;
+          const isActive = isItemActive(pathname, item);
+          const isPending = !isActive && pendingHref === href;
 
           return (
             <Link
               key={key}
               href={href}
-              prefetch={true}
+              prefetch={false}
               aria-current={isActive ? 'page' : undefined}
               data-nav-key={key}
+              data-active={isActive ? 'true' : 'false'}
+              data-pending={isPending ? 'true' : 'false'}
               onPointerEnter={() => warmRoute(href)}
               onFocus={() => warmRoute(href)}
-              onPointerDown={() => warmRoute(href)}
-              className="group relative flex min-w-0 flex-col items-center gap-1 rounded-xl px-0.5 py-2 transition duration-150 active:scale-[0.96]"
+              onPointerDown={() => markNavigationIntent(href)}
+              className={`group relative flex min-w-0 touch-manipulation select-none flex-col items-center justify-center gap-1 px-0.5 py-2.5 ${
+                isPending ? 'bg-black/[0.035]' : ''
+              } ${isActive ? 'text-[#005448]' : 'text-[#131915]'}`}
             >
-              <span className={`relative flex h-8 w-8 items-center justify-center rounded-[11px] transition-all ${isActive ? '-translate-y-0.5 bg-[#0F6A5F] text-white shadow-[0_7px_16px_rgba(15,106,95,0.28)]' : 'text-[#181914] group-hover:bg-black/5'}`}>
-                {key === 'skills' && pathname === '/' ? (
-                  <GraduationCap className="h-[17px] w-[17px]" aria-hidden="true" />
-                ) : (
-                  <Icon className="h-[17px] w-[17px]" aria-hidden="true" />
-                )}
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center">
+                <Icon className="h-[27px] w-[27px] shrink-0 stroke-[1.35]" aria-hidden="true" />
               </span>
-              <span className={`w-full truncate text-center text-[8px] font-black leading-tight sm:text-[9px] ${isActive ? 'text-[#0F6A5F]' : 'text-black/60'}`}>
+              <span
+                className={`w-full truncate text-center text-[10px] leading-tight ${
+                  isActive ? 'font-bold text-[#005448]' : 'font-medium text-[#141510]'
+                }`}
+              >
                 {label}
               </span>
             </Link>
