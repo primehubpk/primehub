@@ -15,8 +15,25 @@ const NAV_ITEMS = [
 
 type NavItem = (typeof NAV_ITEMS)[number];
 
+function isShopRoute(pathname: string) {
+  return (
+    pathname === '/shop' ||
+    pathname.startsWith('/shop/') ||
+    pathname.startsWith('/category/') ||
+    pathname.startsWith('/product/') ||
+    pathname === '/sale-mela' ||
+    pathname.startsWith('/sale-mela/') ||
+    pathname === '/new-arrivals' ||
+    pathname.startsWith('/new-arrivals/') ||
+    pathname === '/weekly-deals' ||
+    pathname.startsWith('/weekly-deals/') ||
+    pathname.startsWith('/deals/')
+  );
+}
+
 function isItemActive(pathname: string, item: NavItem) {
   if (item.key === 'home') return pathname === '/';
+  if (item.key === 'shop') return isShopRoute(pathname);
   if (item.key === 'reseller') {
     return pathname === '/reseller' || pathname === item.href || pathname.startsWith('/reseller/');
   }
@@ -60,7 +77,8 @@ export default function BottomNav() {
         {NAV_ITEMS.map((item) => {
           const { key, label, href, icon: Icon } = item;
           const isActive = isItemActive(pathname, item);
-          const isPending = !isActive && pendingHref === href;
+          const isPending = pendingHref === href && !isActive;
+          const visualActive = pendingHref ? pendingHref === href : isActive;
 
           return (
             <Link
@@ -69,19 +87,19 @@ export default function BottomNav() {
               prefetch={true}
               aria-current={isActive ? 'page' : undefined}
               data-nav-key={key}
-              data-active={isActive ? 'true' : 'false'}
+              data-active={visualActive ? 'true' : 'false'}
               data-pending={isPending ? 'true' : 'false'}
               onPointerDown={() => markNavigationIntent(href)}
               className={`group relative flex min-w-0 touch-manipulation select-none flex-col items-center justify-center gap-1 px-0.5 py-2.5 ${
                 isPending ? 'bg-black/[0.035]' : ''
-              } ${isActive ? 'text-[#005448]' : 'text-[#131915]'}`}
+              } ${visualActive ? 'text-[#005448]' : 'text-[#131915]'}`}
             >
               <span className="flex h-8 w-8 shrink-0 items-center justify-center">
                 <Icon className="h-[27px] w-[27px] shrink-0 stroke-[1.35]" aria-hidden="true" />
               </span>
               <span
                 className={`w-full truncate text-center text-[10px] leading-tight ${
-                  isActive ? 'font-bold text-[#005448]' : 'font-medium text-[#141510]'
+                  visualActive ? 'font-bold text-[#005448]' : 'font-medium text-[#141510]'
                 }`}
               >
                 {label}
