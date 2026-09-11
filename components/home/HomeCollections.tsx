@@ -155,25 +155,15 @@ export default function HomeCollections({
     <>
       {buckets.length > 0 && (
         <section className="home-sale" aria-label="PrimeHubMall Sale Mela">
-          <div className="relative">
-            <Link
-              href="/sale-mela"
-              prefetch={true}
-              className="absolute left-[18%] top-0 z-10 whitespace-nowrap text-[9px] font-black uppercase tracking-[0.14em] text-[#8A651F] no-underline sm:left-[22%]"
-              aria-label="Open PrimeHubMall Sale Mela"
-            >
-              Open
-            </Link>
-            <HomeHeading>
-              <Link
-                href="/sale-mela"
-                prefetch={true}
-                aria-label="Open PrimeHubMall Sale Mela"
-              >
-                PrimeHubMall <span className="text-[#d60707]">Sale Mela</span>
-              </Link>
-            </HomeHeading>
-          </div>
+          <HomeHeading
+            href="/sale-mela"
+            actionLabel="Open"
+            title="Open PrimeHubMall Sale Mela"
+          >
+            <>
+              PrimeHubMall <span className="text-[#d60707]">Sale Mela</span>
+            </>
+          </HomeHeading>
 
           {buckets.map((bucket) => {
             const wholesale = isWholesalePriceBucket(bucket);
