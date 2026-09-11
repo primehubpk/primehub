@@ -1,5 +1,8 @@
 import HomePageClient from '@/components/HomePageClient';
+import WeeklyDealNavigationWarmup from '@/components/home/WeeklyDealNavigationWarmup';
 import { getPublicCatalogSnapshot, getStorefrontSettingsResultSnapshot } from '@/lib/publicCatalogServer';
+import { normalizeImageUrl } from '@/lib/imageUrl';
+import { pakistanNowWeekday } from '@/lib/weeklyDealUtils';
 import type { Category, SiteSettings } from '@/lib/types';
 import type { Product } from '@/components/shop/ShopTypes';
 
@@ -65,11 +68,27 @@ export default async function HomePage() {
     homeRewardSettings: rewardSettings,
   };
 
+  const weeklyDeals = Array.isArray(initialSettings.weeklyDeals) ? initialSettings.weeklyDeals : [];
+  const today = pakistanNowWeekday(new Date());
+  const liveWeeklyDeal = weeklyDeals.find(
+    (deal: any) => deal?.active !== false && deal?.day === today && deal?.productId && Number(deal?.dealPrice) > 0,
+  );
+  const liveWeeklyProduct = liveWeeklyDeal
+    ? (snapshot.products as any[]).find((product) => String(product?.id || '') === String(liveWeeklyDeal.productId || ''))
+    : null;
+  const liveWeeklyImage = normalizeImageUrl(
+    String(liveWeeklyDeal?.imageUrl || productImage(liveWeeklyProduct) || ''),
+  );
+
   return (
-    <HomePageClient
-      initialProducts={snapshot.products as Product[]}
-      initialCategories={snapshot.categories as Category[]}
-      initialSettings={initialSettings as Partial<SiteSettings>}
-    />
+    <>
+      {liveWeeklyImage ? <link rel="preload" as="image" href={liveWeeklyImage} /> : null}
+      <WeeklyDealNavigationWarmup weeklyDeals={weeklyDeals} />
+      <HomePageClient
+        initialProducts={snapshot.products as Product[]}
+        initialCategories={snapshot.categories as Category[]}
+        initialSettings={initialSettings as Partial<SiteSettings>}
+      />
+    </>
   );
 }
