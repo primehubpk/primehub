@@ -80,6 +80,18 @@ export async function getStorefrontSettingsSnapshot() {
   return { ...legacy, ...main };
 }
 
+async function getFreshFirebaseWholesaleVideos() {
+  try {
+    const snapshot = await getAdminDb().collection('settings').doc('main').get();
+    if (!snapshot.exists) return null;
+    const data = snapshot.data() || {};
+    return Array.isArray(data.wholesaleVideos) ? data.wholesaleVideos : null;
+  } catch (error) {
+    console.warn('Fresh Firebase wholesale videos recovery skipped', error);
+    return null;
+  }
+}
+
 export async function getFreshRewardSettingsSnapshot() {
   try {
     const snapshot = await getAdminDb().collection('settings').doc('rewards').get();
@@ -92,11 +104,26 @@ export async function getFreshRewardSettingsSnapshot() {
 }
 
 export async function getFreshStorefrontSettingsSnapshot() {
-  const result = await getStorefrontSettingsWithBigDealRecovery({ cache: 'no-store' });
+  const [result, firebaseWholesaleVideos] = await Promise.all([
+    getStorefrontSettingsWithBigDealRecovery({ cache: 'no-store' }),
+    getFreshFirebaseWholesaleVideos(),
+  ]);
   const documents = result.documents as Record<string, any>;
   const main = documents.main || {};
   const legacy = documents.general || {};
-  return { ...legacy, ...main };
+  const merged = { ...legacy, ...main };
+  const primaryWholesaleVideos = Array.isArray(merged.wholesaleVideos) ? merged.wholesaleVideos : [];
+
+  // Supabase remains the configured primary source. During migration, recover only
+  // when the admin/Firebase document contains a newer, longer wholesale package list.
+  if (
+    Array.isArray(firebaseWholesaleVideos) &&
+    firebaseWholesaleVideos.length > primaryWholesaleVideos.length
+  ) {
+    return { ...merged, wholesaleVideos: firebaseWholesaleVideos };
+  }
+
+  return merged;
 }
 
 async function loadPrimeSkills() {
