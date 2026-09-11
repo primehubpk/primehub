@@ -49,14 +49,14 @@ export default function CategorySwiper({
           <p className="text-[9px] font-black uppercase tracking-[0.2em] text-[#0F6A5F]">Browse the collection</p>
           <h2 className="mt-0.5 font-[family-name:var(--font-display)] text-base font-black tracking-tight">Shop by Category</h2>
         </div>
-        <Link href="/shop" className="flex items-center gap-0.5 rounded-full bg-white px-2.5 py-1.5 text-[10px] font-black text-[#0F6A5F] shadow-sm ring-1 ring-black/5">
+        <Link href="/shop" prefetch={false} className="flex items-center gap-0.5 rounded-full bg-white px-2.5 py-1.5 text-[10px] font-black text-[#0F6A5F] shadow-sm ring-1 ring-black/5">
           View all <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
         </Link>
       </div>
 
       <div className="flex gap-3 overflow-x-auto overflow-y-visible touch-pan-x touch-pan-y cursor-grab active:cursor-grabbing snap-x snap-mandatory overscroll-x-contain scroll-smooth pb-3 [scrollbar-width:none] lg:[scrollbar-width:thin] lg:[scrollbar-color:#9ca3af_transparent] [&::-webkit-scrollbar]:hidden lg:[&::-webkit-scrollbar]:block lg:[&::-webkit-scrollbar]:h-1.5 lg:[&::-webkit-scrollbar-thumb]:rounded-full lg:[&::-webkit-scrollbar-thumb]:bg-black/25">
         {visible.map((category, index) => (
-          <Link key={category.id} href={categoryHref(category)} className="group w-[92px] shrink-0 snap-start text-center lg:w-[78px]">
+          <Link key={category.id} href={categoryHref(category)} prefetch={false} className="group w-[92px] shrink-0 snap-start text-center lg:w-[78px]">
             <span className="relative mx-auto flex h-20 w-20 items-center justify-center overflow-hidden rounded-full bg-[#F4F4F1] ring-1 ring-black/5 lg:h-[68px] lg:w-[68px]">
               {category.iconUrl ? (
                 <Image
