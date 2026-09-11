@@ -71,7 +71,6 @@
 }
 
 .home-prime-skills .home-prime-skill-first-media {
-  aspect-ratio: 1 / 1;
   background: #fffdf9;
 }
 
@@ -189,10 +188,6 @@
     aspect-ratio: 16 / 9;
   }
 
-  .home-prime-skills .home-prime-skill-first-media {
-    aspect-ratio: 1 / 1;
-  }
-
   .home-video-packages .home-commerce-media {
     aspect-ratio: 4 / 3;
   }
@@ -273,4 +268,3 @@
     min-height: 148px;
   }
 }
-
