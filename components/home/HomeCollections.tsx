@@ -155,6 +155,16 @@ export default function HomeCollections({
     <>
       {buckets.length > 0 && (
         <section className="home-sale" aria-label="PrimeHubMall Sale Mela">
+          <div className="mb-1 flex justify-center">
+            <Link
+              href="/sale-mela"
+              prefetch={true}
+              className="inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-[0.14em] text-[#8A651F] no-underline"
+              aria-label="View PrimeHubMall Sale Mela"
+            >
+              View PrimeHubMall Sale Mela <ChevronRight size={12} />
+            </Link>
+          </div>
           <div>
             <HomeHeading>
               <Link
@@ -222,7 +232,7 @@ export default function HomeCollections({
                   aria-label={`${bucket.title} products`}
                 >
                   {matches.length ? (
-                    matches.slice(0, 18).map((product) => (
+                    matches.map((product) => (
                       <div
                         key={product.id}
                         style={{
@@ -254,4 +264,3 @@ export default function HomeCollections({
     </>
   );
 }
-
