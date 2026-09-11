@@ -4,11 +4,12 @@ import { getDualCatalog, getDualProduct, getDualSettings, getDualSkills } from '
 import { getAdminDb } from '@/lib/firebaseAdmin';
 import { getStorefrontSettingsWithBigDealRecovery } from '@/lib/storefrontSettingsServer';
 
-const RETRY_DELAYS_MS = [0, 250, 750];
-const CATALOG_READ_CACHE = { revalidate: 3600, tags: ['public-catalog'] };
+const CATALOG_RETRY_DELAYS_MS = [0, 180];
+const SETTINGS_RETRY_DELAYS_MS = [0, 250, 750];
+const CATALOG_READ_CACHE = { revalidate: 3600, tags: ['public-catalog'], timeoutMs: 1800 };
 const PRODUCT_READ_CACHE = { revalidate: 60, tags: ['public-products'] };
 const SETTINGS_READ_CACHE = { revalidate: 60, tags: ['storefront-settings'] };
-const SKILLS_READ_CACHE = { revalidate: 600, tags: ['prime-skills', 'storefront-settings'] };
+const SKILLS_READ_CACHE = { revalidate: 600, tags: ['prime-skills', 'storefront-settings'], timeoutMs: 1800 };
 
 async function wait(ms: number) {
   if (ms <= 0) return;
@@ -18,7 +19,7 @@ async function wait(ms: number) {
 async function loadPublicCatalog() {
   let lastSource = 'empty';
 
-  for (const delay of RETRY_DELAYS_MS) {
+  for (const delay of CATALOG_RETRY_DELAYS_MS) {
     await wait(delay);
     const result = await getDualCatalog(CATALOG_READ_CACHE);
     lastSource = result.source;
@@ -37,7 +38,7 @@ async function loadPublicCatalog() {
 
 export const getPublicCatalogSnapshot = unstable_cache(
   loadPublicCatalog,
-  ['primehub-public-catalog-dual-v4'],
+  ['primehub-public-catalog-dual-v5'],
   { revalidate: 3600, tags: ['public-catalog'] },
 );
 
@@ -54,7 +55,7 @@ export const getPublicProductSnapshot = unstable_cache(
 );
 
 async function loadStorefrontSettingsResult() {
-  for (const delay of RETRY_DELAYS_MS) {
+  for (const delay of SETTINGS_RETRY_DELAYS_MS) {
     await wait(delay);
     const result = await getStorefrontSettingsWithBigDealRecovery(SETTINGS_READ_CACHE);
 
@@ -146,6 +147,6 @@ async function loadPrimeSkills() {
 
 export const getPrimeSkillsSnapshot = unstable_cache(
   loadPrimeSkills,
-  ['primehub-prime-skills-dual-v3'],
+  ['primehub-prime-skills-dual-v4'],
   { revalidate: 600, tags: ['prime-skills'] },
 );
