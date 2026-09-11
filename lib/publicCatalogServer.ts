@@ -6,10 +6,10 @@ import { getStorefrontSettingsWithBigDealRecovery } from '@/lib/storefrontSettin
 
 const CATALOG_RETRY_DELAYS_MS = [0, 180];
 const SETTINGS_RETRY_DELAYS_MS = [0, 250, 750];
-const CATALOG_READ_CACHE = { revalidate: 3600, tags: ['public-catalog'], timeoutMs: 1800 };
+const CATALOG_READ_CACHE = { revalidate: 3600, tags: ['public-catalog'], timeoutMs: 2800 };
 const PRODUCT_READ_CACHE = { revalidate: 60, tags: ['public-products'] };
 const SETTINGS_READ_CACHE = { revalidate: 60, tags: ['storefront-settings'] };
-const SKILLS_READ_CACHE = { revalidate: 600, tags: ['prime-skills', 'storefront-settings'], timeoutMs: 1800 };
+const SKILLS_READ_CACHE = { revalidate: 600, tags: ['prime-skills', 'storefront-settings'], timeoutMs: 2800 };
 
 async function wait(ms: number) {
   if (ms <= 0) return;
@@ -38,7 +38,7 @@ async function loadPublicCatalog() {
 
 export const getPublicCatalogSnapshot = unstable_cache(
   loadPublicCatalog,
-  ['primehub-public-catalog-dual-v5'],
+  ['primehub-public-catalog-dual-v6'],
   { revalidate: 3600, tags: ['public-catalog'] },
 );
 
@@ -147,6 +147,6 @@ async function loadPrimeSkills() {
 
 export const getPrimeSkillsSnapshot = unstable_cache(
   loadPrimeSkills,
-  ['primehub-prime-skills-dual-v4'],
+  ['primehub-prime-skills-dual-v5'],
   { revalidate: 600, tags: ['prime-skills'] },
 );
