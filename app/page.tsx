@@ -1,7 +1,9 @@
 import HomePageClient from '@/components/HomePageClient';
-import { getFreshRewardSettingsSnapshot, getFreshStorefrontSettingsSnapshot, getPublicCatalogSnapshot } from '@/lib/publicCatalogServer';
+import { getPublicCatalogSnapshot, getRewardSettingsSnapshot, getStorefrontSettingsSnapshot } from '@/lib/publicCatalogServer';
 import type { Category, SiteSettings } from '@/lib/types';
 import type { Product } from '@/components/shop/ShopTypes';
+
+export const revalidate = 60;
 
 function productImage(product: any) {
   if (!product) return '';
@@ -44,8 +46,8 @@ function hydrateBigDealImages(settings: Record<string, any>, products: any[]) {
 export default async function HomePage() {
   const [catalogResult, settingsResult, rewardsResult] = await Promise.allSettled([
     getPublicCatalogSnapshot(),
-    getFreshStorefrontSettingsSnapshot(),
-    getFreshRewardSettingsSnapshot(),
+    getStorefrontSettingsSnapshot(),
+    getRewardSettingsSnapshot(),
   ]);
 
   const snapshot = catalogResult.status === 'fulfilled'
