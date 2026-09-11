@@ -24,7 +24,7 @@ import ProductGridRewards from "@/components/ProductGridRewards";
 import YouTubeGuide from "@/components/YouTubeGuide";
 import Footer from "@/components/Footer";
 import {
-  cacheProductCatalog,
+  cacheCatalogForNavigation,
   cacheProductForNavigation,
 } from "@/lib/productNavigationCache";
 import { SettingsProvider } from "@/lib/useSettings";
@@ -109,8 +109,8 @@ export default function HomePageClient({
   }, [initialProducts, initialCategories]);
 
   useEffect(() => {
-    cacheProductCatalog(products);
-  }, [products]);
+    cacheCatalogForNavigation(products, categories);
+  }, [products, categories]);
 
   const handleStorefrontClickCapture = (event: MouseEvent<HTMLDivElement>) => {
     const target = event.target as Element | null;

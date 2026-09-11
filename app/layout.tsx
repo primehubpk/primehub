@@ -9,7 +9,6 @@ import GlobalFooter from '@/components/GlobalFooter';
 import CartMiniBar from '@/components/CartMiniBar';
 import PWARegister from '@/components/PWARegister';
 import GlobalVariantSelector from '@/components/GlobalVariantSelector';
-import { ProductNavigationIntentBridge } from '@/components/FastProductLink';
 import { SettingsProvider } from '@/lib/useSettings';
 import './globals.css';
 
@@ -132,7 +131,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
         <BottomNav />
         <SettingsProvider>
-          <ProductNavigationIntentBridge />
           {children}
           <GlobalFooter />
           <GlobalVariantSelector />

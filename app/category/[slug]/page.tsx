@@ -4,6 +4,8 @@ import ShopCatalog from '@/components/ShopCatalog';
 import { slugifyCategory } from '@/lib/categoryUtils';
 import { getPublicCatalogSnapshot } from '@/lib/publicCatalogServer';
 
+export const revalidate = 300;
+
 function humanizeCategory(value: string) {
   return decodeURIComponent(value || '')
     .replace(/[-_]+/g, ' ')
@@ -37,18 +39,55 @@ export async function generateMetadata({
   };
 }
 
+function CategoryLoadingState() {
+  return (
+    <main className="min-h-screen bg-[#F4F4F1] px-4 pb-28 pt-5" role="status" aria-label="Opening category">
+      <div className="mx-auto max-w-6xl animate-pulse">
+        <div className="h-12 rounded-2xl bg-white shadow-sm" />
+        <div className="mt-4 flex gap-2 overflow-hidden">
+          {Array.from({ length: 5 }, (_, index) => (
+            <div key={index} className="h-9 w-24 shrink-0 rounded-full bg-white shadow-sm" />
+          ))}
+        </div>
+        <div className="mt-6 h-6 w-48 rounded-full bg-black/[0.08]" />
+        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+          {Array.from({ length: 8 }, (_, index) => (
+            <div key={index} className="rounded-2xl bg-white p-3 shadow-sm">
+              <div className="aspect-square rounded-xl bg-black/[0.06]" />
+              <div className="mt-3 h-3 w-4/5 rounded-full bg-black/[0.08]" />
+              <div className="mt-2 h-3 w-1/2 rounded-full bg-black/[0.05]" />
+            </div>
+          ))}
+        </div>
+      </div>
+      <span className="sr-only">Loading category products…</span>
+    </main>
+  );
+}
+
+async function CategoryCatalogContent({ slug }: { slug: string }) {
+  const snapshot = await getPublicCatalogSnapshot();
+  return (
+    <ShopCatalog
+      initialCategory={slug}
+      initialProducts={snapshot.products}
+      initialCategories={snapshot.categories}
+    />
+  );
+}
+
 export default async function CategoryPage({
   params,
 }: {
   params: { slug: string } | Promise<{ slug: string }>;
 }) {
   const resolved = await Promise.resolve(params);
-  const slug = slugifyCategory(decodeURIComponent(resolved.slug || '')) || decodeURIComponent(resolved.slug || '');
-  const snapshot = await getPublicCatalogSnapshot();
+  const rawSlug = decodeURIComponent(resolved.slug || '');
+  const slug = slugifyCategory(rawSlug) || rawSlug;
 
   return (
-    <Suspense fallback={<div className="min-h-screen bg-[#F4F4F1] p-8 text-center text-xs text-black/50">Loading category...</div>}>
-      <ShopCatalog initialCategory={slug} initialProducts={snapshot.products} initialCategories={snapshot.categories} />
+    <Suspense fallback={<CategoryLoadingState />}>
+      <CategoryCatalogContent slug={slug} />
     </Suspense>
   );
 }

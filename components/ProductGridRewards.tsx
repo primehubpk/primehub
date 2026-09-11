@@ -27,6 +27,7 @@ import { auth, db } from "@/lib/firebase";
 import { useCartStore } from "@/lib/cartStore";
 import { ProductUrgencyBadges } from "@/components/ProductCard";
 import ProductShareButton from "@/components/ProductShareButton";
+import FastProductLink from "@/components/FastProductLink";
 import {
   MemberFeatureRail,
   ShopFeatureBanner,
@@ -445,7 +446,7 @@ export default function ProductGridRewards({
       </div>
 
       {homeLayout && (
-        <Link href="/shop" className="home-view-all">
+        <Link href="/shop" prefetch={false} className="home-view-all">
           View all products →
         </Link>
       )}
@@ -480,8 +481,8 @@ export default function ProductGridRewards({
                 <article className="overflow-hidden rounded-[18px] border border-black/7 bg-white shadow-sm sm:rounded-[24px]">
                   <div className="relative aspect-square overflow-hidden bg-[#F4F4F1]">
                     {img ? (
-                      <Link
-                        href={`/product/${p.id}`}
+                      <FastProductLink
+                        product={p}
                         className="block h-full w-full"
                       >
                         <Image
@@ -495,7 +496,7 @@ export default function ProductGridRewards({
                           quality={72}
                           className="object-cover"
                         />
-                      </Link>
+                      </FastProductLink>
                     ) : (
                       <div className="flex h-full items-center justify-center text-xs text-black/30">
                         No image
@@ -567,7 +568,7 @@ export default function ProductGridRewards({
                   </div>
 
                   <div className="p-3">
-                    <Link href={`/product/${p.id}`} className="block">
+                    <FastProductLink product={p} className="block">
                       <p className="line-clamp-2 min-h-[32px] text-[12px] font-extrabold leading-4">
                         {title(p)}
                       </p>
@@ -581,7 +582,7 @@ export default function ProductGridRewards({
                           </span>
                         )}
                       </div>
-                    </Link>
+                    </FastProductLink>
 
                     {r && (
                       <div className="mt-2 rounded-xl bg-[#F7F7F2] p-2">
@@ -598,6 +599,7 @@ export default function ProductGridRewards({
                             </p>
                             <Link
                               href="/rewards"
+                              prefetch={false}
                               className="mt-1 inline-flex text-[9px] font-black text-[#E1352B]"
                             >
                               Earn More Points →

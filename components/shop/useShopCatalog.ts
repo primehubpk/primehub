@@ -10,7 +10,7 @@ import { isWholesaleProduct } from '@/lib/wholesale';
 import { shuffleProducts } from '@/lib/shuffleProducts';
 import { getEffectivePrice } from '@/lib/dealPricing';
 import { priceBucketRange, saleMelaPriceRange } from '@/lib/priceBucketUtils';
-import { cacheProductCatalog } from '@/lib/productNavigationCache';
+import { cacheCatalogForNavigation, readCachedCatalog } from '@/lib/productNavigationCache';
 import { Product, Category, ShopCatalogModel, imageOf, priceOf, originalOf, productHasVariants, titleOf } from './ShopTypes';
 
 export function useShopCatalog(initialCategory?: string, initialQuery = '', initialProducts: Product[] = [], initialCategories: Category[] = []): ShopCatalogModel {
@@ -51,14 +51,26 @@ export function useShopCatalog(initialCategory?: string, initialQuery = '', init
     }
 
     let cancelled = false;
+    const cached = readCachedCatalog<Product, Category>();
+
+    if (cached && cached.products.length > 0) {
+      setProducts(shuffleProducts(cached.products));
+      if (cached.categories.length > 0) setCategories(cached.categories);
+      setLoading(false);
+    }
+
     async function load() {
       try {
         const response = await fetch('/api/storefront/read?type=catalog', { cache: 'no-store' });
         if (!response.ok) throw new Error(`catalog read ${response.status}`);
         const data = await response.json();
         if (cancelled) return;
-        setProducts(shuffleProducts((Array.isArray(data?.products) ? data.products : []) as Product[]));
-        setCategories((Array.isArray(data?.categories) ? data.categories : []) as Category[]);
+
+        const nextProducts = (Array.isArray(data?.products) ? data.products : []) as Product[];
+        const nextCategories = (Array.isArray(data?.categories) ? data.categories : []) as Category[];
+
+        if (nextProducts.length > 0) setProducts(shuffleProducts(nextProducts));
+        if (nextCategories.length > 0) setCategories(nextCategories);
       } catch (error) {
         console.warn('shop dual catalog read unavailable', error);
       } finally {
@@ -68,15 +80,16 @@ export function useShopCatalog(initialCategory?: string, initialQuery = '', init
         }
       }
     }
-    load();
+
+    void load();
     return () => {
       cancelled = true;
     };
   }, [hasServerData]);
 
   useEffect(() => {
-    cacheProductCatalog(products);
-  }, [products]);
+    cacheCatalogForNavigation(products, categories);
+  }, [products, categories]);
 
   const buckets = useMemo(
     () => [...(settings.priceBuckets || [])].filter((bucket) => bucket.active).sort((a, b) => a.sortOrder - b.sortOrder),

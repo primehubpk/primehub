@@ -1,8 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { usePathname } from 'next/navigation';
 import { GraduationCap, Home, Package, ShoppingBag, Users } from 'lucide-react';
 
 const NAV_ITEMS = [
@@ -14,13 +13,26 @@ const NAV_ITEMS = [
 ] as const;
 
 type NavItem = (typeof NAV_ITEMS)[number];
-type IdleWindow = Window & {
-  requestIdleCallback?: (callback: () => void, options?: { timeout?: number }) => number;
-  cancelIdleCallback?: (handle: number) => void;
-};
+
+function isShopRoute(pathname: string) {
+  return (
+    pathname === '/shop' ||
+    pathname.startsWith('/shop/') ||
+    pathname.startsWith('/category/') ||
+    pathname.startsWith('/product/') ||
+    pathname === '/sale-mela' ||
+    pathname.startsWith('/sale-mela/') ||
+    pathname === '/new-arrivals' ||
+    pathname.startsWith('/new-arrivals/') ||
+    pathname === '/weekly-deals' ||
+    pathname.startsWith('/weekly-deals/') ||
+    pathname.startsWith('/deals/')
+  );
+}
 
 function isItemActive(pathname: string, item: NavItem) {
   if (item.key === 'home') return pathname === '/';
+  if (item.key === 'shop') return isShopRoute(pathname);
   if (item.key === 'reseller') {
     return pathname === '/reseller' || pathname === item.href || pathname.startsWith('/reseller/');
   }
@@ -29,72 +41,6 @@ function isItemActive(pathname: string, item: NavItem) {
 
 export default function BottomNav() {
   const pathname = usePathname();
-  const router = useRouter();
-  const [pendingHref, setPendingHref] = useState<string | null>(null);
-  const warmedRoutes = useRef(new Set<string>());
-  const pendingResetTimer = useRef<number | null>(null);
-
-  const warmRoute = useCallback((href: string) => {
-    if (href === pathname || warmedRoutes.current.has(href)) return;
-    warmedRoutes.current.add(href);
-    router.prefetch(href);
-  }, [pathname, router]);
-
-  const markNavigationIntent = useCallback((href: string) => {
-    if (href === pathname) return;
-    warmRoute(href);
-    setPendingHref(href);
-
-    if (pendingResetTimer.current != null) window.clearTimeout(pendingResetTimer.current);
-    pendingResetTimer.current = window.setTimeout(() => {
-      setPendingHref(current => (current === href ? null : current));
-      pendingResetTimer.current = null;
-    }, 2500);
-  }, [pathname, warmRoute]);
-
-  useEffect(() => {
-    setPendingHref(null);
-    if (pendingResetTimer.current != null) {
-      window.clearTimeout(pendingResetTimer.current);
-      pendingResetTimer.current = null;
-    }
-  }, [pathname]);
-
-  useEffect(() => {
-    const browser = window as IdleWindow;
-    const timers: number[] = [];
-    let idleId: number | null = null;
-    let fallbackTimer: number | null = null;
-    let cancelled = false;
-
-    const prewarmPrimaryRoutes = () => {
-      if (cancelled) return;
-      NAV_ITEMS.forEach((item, index) => {
-        if (item.href === window.location.pathname || warmedRoutes.current.has(item.href)) return;
-        const timer = window.setTimeout(() => {
-          if (!cancelled) warmRoute(item.href);
-        }, index * 140);
-        timers.push(timer);
-      });
-    };
-
-    if (browser.requestIdleCallback) {
-      idleId = browser.requestIdleCallback(prewarmPrimaryRoutes, { timeout: 1200 });
-    } else {
-      fallbackTimer = window.setTimeout(prewarmPrimaryRoutes, 650);
-    }
-
-    return () => {
-      cancelled = true;
-      if (idleId != null) browser.cancelIdleCallback?.(idleId);
-      if (fallbackTimer != null) window.clearTimeout(fallbackTimer);
-      timers.forEach(timer => window.clearTimeout(timer));
-    };
-  }, [warmRoute]);
-
-  useEffect(() => () => {
-    if (pendingResetTimer.current != null) window.clearTimeout(pendingResetTimer.current);
-  }, []);
 
   return (
     <nav
@@ -105,23 +51,19 @@ export default function BottomNav() {
         {NAV_ITEMS.map((item) => {
           const { key, label, href, icon: Icon } = item;
           const isActive = isItemActive(pathname, item);
-          const isPending = !isActive && pendingHref === href;
+          const shouldPrefetch = key === 'home' || key === 'shop';
 
           return (
             <Link
               key={key}
               href={href}
-              prefetch={false}
+              prefetch={shouldPrefetch}
               aria-current={isActive ? 'page' : undefined}
               data-nav-key={key}
               data-active={isActive ? 'true' : 'false'}
-              data-pending={isPending ? 'true' : 'false'}
-              onPointerEnter={() => warmRoute(href)}
-              onFocus={() => warmRoute(href)}
-              onPointerDown={() => markNavigationIntent(href)}
-              className={`group relative flex min-w-0 touch-manipulation select-none flex-col items-center justify-center gap-1 px-0.5 py-2.5 ${
-                isPending ? 'bg-black/[0.035]' : ''
-              } ${isActive ? 'text-[#005448]' : 'text-[#131915]'}`}
+              className={`group relative flex min-w-0 touch-manipulation select-none flex-col items-center justify-center gap-1 px-0.5 py-2.5 active:bg-black/[0.035] ${
+                isActive ? 'text-[#005448]' : 'text-[#131915]'
+              }`}
             >
               <span className="flex h-8 w-8 shrink-0 items-center justify-center">
                 <Icon className="h-[27px] w-[27px] shrink-0 stroke-[1.35]" aria-hidden="true" />

@@ -1,8 +1,16 @@
-type CacheableProduct = { id?: unknown; [key: string]: unknown };
+type CacheableProduct = { id?: unknown };
+type CacheableCategory = { id?: unknown };
+
+type CatalogNavigationSnapshot = {
+  products: CacheableProduct[];
+  categories: CacheableCategory[];
+  updatedAt: number;
+};
 
 type PrimeHubWindow = Window &
   typeof globalThis & {
     __primehubProductNavigationCache?: Record<string, CacheableProduct>;
+    __primehubCatalogNavigationCache?: CatalogNavigationSnapshot;
   };
 
 const pendingProductLoads = new Map<string, Promise<CacheableProduct | null>>();
@@ -41,6 +49,46 @@ export function cacheProductCatalog(products: CacheableProduct[] | null | undefi
     const id = String(product?.id ?? '').trim();
     if (id) store[id] = product;
   }
+}
+
+export function cacheCatalogForNavigation(
+  products: CacheableProduct[] | null | undefined,
+  categories: CacheableCategory[] | null | undefined,
+) {
+  if (typeof window === 'undefined') return;
+
+  const target = window as PrimeHubWindow;
+  const existing = target.__primehubCatalogNavigationCache;
+  const nextProducts = Array.isArray(products) && products.length > 0
+    ? products
+    : existing?.products || [];
+  const nextCategories = Array.isArray(categories) && categories.length > 0
+    ? categories
+    : existing?.categories || [];
+
+  if (nextProducts.length === 0 && nextCategories.length === 0) return;
+
+  cacheProductCatalog(nextProducts);
+  target.__primehubCatalogNavigationCache = {
+    products: nextProducts,
+    categories: nextCategories,
+    updatedAt: Date.now(),
+  };
+}
+
+export function readCachedCatalog<
+  TProduct extends CacheableProduct = CacheableProduct,
+  TCategory extends CacheableCategory = CacheableCategory,
+>() {
+  if (typeof window === 'undefined') return null;
+  const snapshot = (window as PrimeHubWindow).__primehubCatalogNavigationCache;
+  if (!snapshot) return null;
+
+  return {
+    products: [...snapshot.products] as TProduct[],
+    categories: [...snapshot.categories] as TCategory[],
+    updatedAt: snapshot.updatedAt,
+  };
 }
 
 export function readCachedProduct<T extends CacheableProduct = CacheableProduct>(id: string): T | null {
