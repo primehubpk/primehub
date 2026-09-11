@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { Outfit } from 'next/font/google';
 import { useEffect, useMemo, useState, type ElementType } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
-import { addDoc, collection, doc, onSnapshot } from 'firebase/firestore';
+import { collection, doc, onSnapshot } from 'firebase/firestore';
 import {
   ArrowLeft,
   Bell,
@@ -126,6 +126,20 @@ export default function ResellerDashboardPage() {
         },
         () => setLoading(false),
       );
+
+      void (async () => {
+        try {
+          const token = await user.getIdToken();
+          const guestId = currentGuestId();
+          const response = await fetch(`/api/reseller/reward-action?guestId=${encodeURIComponent(guestId)}`, { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' });
+          const data = await response.json();
+          if (!response.ok) throw new Error(data.error || 'Reward state unavailable.');
+          setRewardWallet({ points: 0, streak: 0, ...(data.wallet || {}) });
+          setRewardSettings({ checkInRewards: [10, 15, 20, 25, 30, 50, 100], spinWheelSlots: [], ...(data.settings || {}) });
+        } catch (error) {
+          console.warn('Shared reseller reward state unavailable', error);
+        }
+      })();
     });
 
     return () => {
@@ -154,34 +168,49 @@ export default function ResellerDashboardPage() {
   );
 
   useEffect(() => {
-    const stopAuth = onAuthStateChanged(auth, user => {
-      if (!user) return;
-      void (async () => {
-        try {
-          const token = await user.getIdToken();
-          const guestId = currentGuestId();
-          const response = await fetch(`/api/reseller/reward-action?guestId=${encodeURIComponent(guestId)}`, { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' });
-          const data = await response.json();
-          if (!response.ok) throw new Error(data.error || 'Reward state unavailable.');
-          setRewardWallet({ points: 0, streak: 0, ...(data.wallet || {}) });
-          setRewardSettings({ checkInRewards: [10, 15, 20, 25, 30, 50, 100], spinWheelSlots: [], ...(data.settings || {}) });
-        } catch (error) {
-          console.warn('Shared reseller reward state unavailable', error);
-        }
-      })();
-    });
-    return stopAuth;
+    return onSnapshot(
+      collection(db, 'reward_gifts'),
+      snap => setRewardGifts(
+        snap.docs
+          .map(row => ({ id: row.id, ...row.data() }) as RewardGift)
+          .filter(gift => gift.active !== false),
+      ),
+    );
   }, []);
 
   useEffect(() => {
-    const stopGifts = onSnapshot(collection(db, 'reward_gifts'), snap => setRewardGifts(snap.docs.map(row => ({ id: row.id, ...row.data() }) as RewardGift).filter(gift => gift.active !== false)));
-    const stopProducts = onSnapshot(collection(db, 'products'), snap => {
-      const next: Record<string, RewardProduct> = {};
-      snap.docs.forEach(row => { next[row.id] = { id: row.id, ...row.data() } as RewardProduct; });
-      setRewardProducts(next);
-    });
-    return () => { stopGifts(); stopProducts(); };
-  }, []);
+    const productIds = Array.from(
+      new Set(rewardGifts.map(gift => String(gift.productId || '').trim()).filter(Boolean)),
+    ).slice(0, 24);
+
+    if (!productIds.length) {
+      setRewardProducts({});
+      return;
+    }
+
+    const controller = new AbortController();
+    void (async () => {
+      try {
+        const response = await fetch(
+          `/api/storefront/read?type=products&ids=${encodeURIComponent(JSON.stringify(productIds))}`,
+          { cache: 'no-store', signal: controller.signal },
+        );
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Reward products unavailable.');
+        const next: Record<string, RewardProduct> = {};
+        (Array.isArray(data.products) ? data.products : []).forEach((product: RewardProduct) => {
+          if (product?.id) next[String(product.id)] = product;
+        });
+        setRewardProducts(next);
+      } catch (error) {
+        if ((error as Error)?.name !== 'AbortError') {
+          console.warn('Reward product details unavailable', error);
+        }
+      }
+    })();
+
+    return () => controller.abort();
+  }, [rewardGifts]);
 
   async function checkInReward() {
     const user = auth.currentUser;
@@ -382,7 +411,7 @@ export default function ResellerDashboardPage() {
             <div className="grid grid-cols-2 gap-2.5 md:grid-cols-4">{filteredVouchers.map(voucher=><VoucherCard key={voucher.id} voucher={voucher} orders={monthlyOrders} onOpen={setSelectedVoucher}/>)}</div>
           </section>}
 
-          {(view === 'home' || view === 'wallet') && <section className="rounded-[18px] bg-[#FFFDF8] p-3.5 shadow-[0_8px_24px_rgba(20,20,15,.05)]">
+          {view === 'home' && <section className="rounded-[18px] bg-[#FFFDF8] p-3.5 shadow-[0_8px_24px_rgba(20,20,15,.05)]">
             <span className="text-[10px] font-extrabold uppercase tracking-[.14em] text-[#E85D04]">Wallet</span>
             <div className="mt-3 grid grid-cols-2 gap-2"><div className="rounded-2xl bg-[#F1ECE3] p-3"><p className="text-[9px] font-extrabold uppercase tracking-wider text-[#6B6A62]">Cash wallet</p><h2 className="mt-1 text-2xl font-extrabold">Rs. {walletAvailable.toLocaleString()}</h2><p className="text-[10px] text-[#6B6A62]">Pending Rs. {walletPending.toLocaleString()}</p></div><div className="rounded-2xl bg-[#E7F6F3] p-3"><p className="text-[9px] font-extrabold uppercase tracking-wider text-[#0E7C6F]">Points wallet</p><h2 className="mt-1 text-2xl font-extrabold">{Number(rewardWallet.points||0).toLocaleString()}</h2><p className="text-[10px] text-[#0E7C6F]">Reward points</p></div></div>
             <Link href="/reseller/wallet" className="mt-3 block w-full rounded-xl bg-[#14140F] px-3 py-3 text-center text-xs font-extrabold text-white">History & withdrawal</Link>
