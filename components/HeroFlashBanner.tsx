@@ -241,7 +241,7 @@ export default function HeroFlashBanner({ initialProducts = [], liveUpdates = tr
               const dealCountdown = weeklyTiming && nowTick !== null ? countdownParts(weeklyTiming.unlockAt.getTime() - nowTick) : null;
               return (
                 <article key={key} className={`home-week-card ${isLive ? "is-live" : ""}`}>
-                  <Link className="home-week-link" href={deal ? `/product/${deal.productId}` : "/weekly-deals"}>
+                  <Link className="home-week-link" href={deal ? `/product/${deal.productId}` : "/weekly-deals"} prefetch={false}>
                     <strong>{key.slice(0, 3).toUpperCase()}</strong>
                     {saving > 0 ? (
                       <em className="home-week-saving">Save Rs. {saving.toLocaleString("en-PK")}</em>
@@ -281,14 +281,14 @@ export default function HeroFlashBanner({ initialProducts = [], liveUpdates = tr
             <HomeHeading>PrimeHubMall Big Deal of the Day</HomeHeading>
             <div className="home-big-grid">
               <article className="home-big-card">
-                <Link className="home-big-image" href={bigDeal.productId ? `/product/${bigDeal.productId}` : "/deals/big"}>
+                <Link className="home-big-image" href={bigDeal.productId ? `/product/${bigDeal.productId}` : "/deals/big"} prefetch={false}>
                   {src && <Image src={src} alt={bigDeal.title} fill priority loading="eager" fetchPriority="high" unoptimized sizes="(max-width: 600px) 50vw, 600px" className="object-cover" />}
                   <span className="home-live">{live ? "● LIVE" : "SCHEDULED"}</span>
                   {stock > 0 && stock <= 10 ? <span className="home-urgency">Only {stock} left</span> : null}
                   <span className="home-big-seal">BIG<br />DEAL<small>OF THE DAY</small></span>
                 </Link>
                 <div className="home-big-info">
-                  <Link href={bigDeal.productId ? `/product/${bigDeal.productId}` : "/deals/big"}>{bigDeal.title}</Link>
+                  <Link href={bigDeal.productId ? `/product/${bigDeal.productId}` : "/deals/big"} prefetch={false}>{bigDeal.title}</Link>
                   <div className="home-big-prices">
                     <strong>Rs. {price.toLocaleString("en-PK")}</strong>
                     {regularPrice > price ? <s>Rs. {regularPrice.toLocaleString("en-PK")}</s> : null}
@@ -316,7 +316,7 @@ export default function HeroFlashBanner({ initialProducts = [], liveUpdates = tr
       <section id="weekly-deals" className="mx-4 mt-3 scroll-mt-4">
         <div className="mb-3 flex items-center justify-between gap-3 rounded-[22px] border border-black/8 bg-white px-4 py-3 shadow-sm sm:px-5">
           <div><p className="text-[8px] font-black uppercase tracking-[0.2em] text-[#E1352B]">Deals every day</p><h2 className="mt-0.5 text-lg font-black tracking-tight sm:text-xl">Weekly Deals</h2></div>
-          <Link href="/weekly-deals" className="inline-flex shrink-0 items-center rounded-full bg-[#14140F] px-4 py-2.5 text-[9px] font-black uppercase tracking-[0.1em] text-white transition hover:bg-[#0F6A5F]">View All Deals</Link>
+          <Link href="/weekly-deals" prefetch={false} className="inline-flex shrink-0 items-center rounded-full bg-[#14140F] px-4 py-2.5 text-[9px] font-black uppercase tracking-[0.1em] text-white transition hover:bg-[#0F6A5F]">View All Deals</Link>
         </div>
         <div className="overflow-hidden rounded-[26px] border border-black/8 bg-white shadow-[0_14px_42px_rgba(20,20,15,0.09)]">
           <div className="flex gap-2 overflow-x-auto px-3 py-3.5 sm:px-5 [scrollbar-width:none]">
@@ -333,7 +333,7 @@ export default function HeroFlashBanner({ initialProducts = [], liveUpdates = tr
               return (
                 <div key={key} className={"group relative min-w-[145px] flex-1 overflow-hidden rounded-[20px] border-2 text-center transition duration-200 " + cardClass}>
                   {deal && dealImage ? (
-                    <Link href={`/product/${deal.productId}`} aria-label={`View ${deal.title}`} className="block">
+                    <Link href={`/product/${deal.productId}`} prefetch={false} aria-label={`View ${deal.title}`} className="block">
                       <span className="relative block aspect-[4/3] w-full overflow-hidden">
                         <Image src={dealImage} alt={label} fill priority={isLive} loading={isLive ? "eager" : "lazy"} sizes="(max-width: 640px) 145px, (max-width: 1024px) 20vw, 180px" quality={72} className="object-cover transition duration-200 group-hover:scale-105" />
                         <span className="absolute left-1.5 top-1.5 rounded-full bg-[#E1352B] px-1.5 py-0.5 text-[6px] font-black uppercase tracking-[0.08em] text-white shadow-sm">{isLive ? "Sale" : label}</span>
@@ -346,7 +346,7 @@ export default function HeroFlashBanner({ initialProducts = [], liveUpdates = tr
                   )}
                   <span className="relative z-10 block px-2.5 pb-3 pt-2">
                     {deal?.productId ? (
-                      <Link href={`/product/${deal.productId}`} className="block cursor-pointer">
+                      <Link href={`/product/${deal.productId}`} prefetch={false} className="block cursor-pointer">
                         <span className="block whitespace-nowrap text-[10px] font-black uppercase tracking-[0.07em] text-[#14140F]">{label.toUpperCase()}</span>
                         {!isLive && <span className="mt-1 flex items-center justify-center gap-1 text-[7px] font-black uppercase tracking-[0.04em] text-black/55"><LockKeyhole size={9} /> 🔒 Unlocks {WEEKDAY_LABELS[key]}</span>}
                         <span className="mt-1 block text-[7px] font-black uppercase tracking-[0.08em] text-[#E1352B]">Deal Price</span>
@@ -377,7 +377,7 @@ export default function HeroFlashBanner({ initialProducts = [], liveUpdates = tr
         const productHref = deal.productId ? `/product/${deal.productId}` : "/deals/big";
         return (
           <section className="mx-4 mt-4 overflow-hidden rounded-[30px] border border-black/8 bg-white shadow-[0_20px_52px_rgba(20,20,15,0.12)]">
-            <Link href={productHref} aria-label={`View ${title}`} className="block">
+            <Link href={productHref} prefetch={false} aria-label={`View ${title}`} className="block">
               <div className="relative w-full aspect-square overflow-hidden rounded-[26px] bg-neutral-100 shadow-inner">
                 {productImage ? <Image src={productImage} alt={title} fill priority fetchPriority="high" sizes="(max-width: 768px) 100vw, 920px" quality={78} className="object-cover object-center" /> : <div className="flex h-full items-center justify-center text-sm font-black uppercase tracking-[0.18em] text-black/30">Big Deal</div>}
                 <div className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-black/80 px-3 py-1.5 text-[10px] font-black text-white shadow backdrop-blur-md"><span>🔥</span> BIG DEAL OF THE DAY</div>
@@ -385,7 +385,7 @@ export default function HeroFlashBanner({ initialProducts = [], liveUpdates = tr
               </div>
             </Link>
             <div className="bg-white px-5 py-5 sm:px-8 sm:py-6">
-              <Link href={productHref} className="group/title block" aria-label={`View ${title}`}><h2 className="line-clamp-2 text-2xl font-black leading-tight tracking-tight text-[#14140F] transition group-hover/title:text-[#0F6A5F] sm:text-4xl">{title}</h2></Link>
+              <Link href={productHref} prefetch={false} className="group/title block" aria-label={`View ${title}`}><h2 className="line-clamp-2 text-2xl font-black leading-tight tracking-tight text-[#14140F] transition group-hover/title:text-[#0F6A5F] sm:text-4xl">{title}</h2></Link>
               <div className="mt-4 flex flex-wrap items-center gap-2.5"><span className="text-3xl font-black text-[#E1352B] sm:text-4xl">Rs. {currentPrice.toLocaleString()}</span>{normalPrice > currentPrice && <span className="text-sm font-bold text-black/40 line-through sm:text-base">Rs. {normalPrice.toLocaleString()}</span>}</div>
               {stock > 0 && stock <= 10 && <div className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/15 px-3 py-1 text-[11px] font-black text-amber-700"><span className="h-2 w-2 rounded-full bg-amber-500 animate-ping" />Only {stock} left in stock - order soon!</div>}
               <div className="mt-4"><button type="button" onClick={(event) => { event.preventDefault(); event.stopPropagation(); addBigDealToCart(); }} disabled={!deal.productId || !product || stock <= 0 || currentPrice <= 0} className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#14140F] px-5 py-3 text-xs font-black text-white transition hover:bg-[#0F6A5F] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"><ShoppingCart size={15} /> Add to Cart</button></div>
