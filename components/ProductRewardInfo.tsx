@@ -8,19 +8,161 @@ import { Gift, LogIn, Sparkles } from 'lucide-react';
 import { auth, db } from '@/lib/firebase';
 import { loadProductsForNavigation } from '@/lib/productNavigationCache';
 
-type Reward={productId?:string;pointsCost?:number;active?:boolean;stock?:number;imageUrl?:string};
-type Product={id:string;imageUrl?:string;image?:string;images?:Array<string|{url?:string}>};
-const GUEST_KEY='phdeals-guest-rewards';
-const EMPTY_IMAGES:string[]=[];
-const same=(a:string,b?:string)=>Boolean(a&&b&&a.trim()===b.trim());
-function imagesOfProduct(product?:Product){return [...(Array.isArray(product?.images)?product.images.map((image)=>typeof image==='string'?image:image?.url||''):[]),product?.imageUrl||'',product?.image||''].filter(Boolean)}
+type Reward = { productId?: string; pointsCost?: number; active?: boolean; stock?: number; imageUrl?: string };
+type Product = { id: string; imageUrl?: string; image?: string; images?: Array<string | { url?: string }> };
+type IdleWindow = Window & {
+  requestIdleCallback?: (callback: () => void, options?: { timeout?: number }) => number;
+  cancelIdleCallback?: (handle: number) => void;
+};
 
-export default function ProductRewardInfo({productId,productImages=EMPTY_IMAGES}:{productId:string;productImages?:string[]}){
- const [required,setRequired]=useState<number|null>(null);const [stock,setStock]=useState(0);const [points,setPoints]=useState(0);const [uid,setUid]=useState<string|null>(null);const [images,setImages]=useState(productImages);
- useEffect(()=>{let cancelled=false;if(productImages.length){setImages(productImages);return()=>{cancelled=true}}loadProductsForNavigation<Product>([productId]).then(products=>{if(cancelled)return;setImages(imagesOfProduct(products[productId]))}).catch(()=>{});return()=>{cancelled=true}},[productId,productImages]);
- useEffect(()=>{const r=onSnapshot(collection(db,'reward_gifts'),s=>{const found=s.docs.map(d=>d.data() as Reward).find(x=>x.active!==false&&Number(x.pointsCost)>0&&(x.productId===productId||(x.imageUrl&&images.some(img=>same(img,x.imageUrl)))));setRequired(found?Number(found.pointsCost):null);setStock(Number(found?.stock??1))});return()=>r()},[productId,images]);
- useEffect(()=>{let stop=()=>{};const a=onAuthStateChanged(auth,u=>{stop();setUid(u?.uid||null);if(u)stop=onSnapshot(doc(db,'user_rewards',u.uid),s=>setPoints(Number(s.data()?.points||0)));else{try{setPoints(Number(JSON.parse(localStorage.getItem(GUEST_KEY)||'{}')?.points||0))}catch{setPoints(0)}}});return()=>{a();stop()}},[]);
- if(!required)return null;
- const need=Math.max(0,required-points);const can=need===0&&stock>0;
- return <section className="mx-3 mt-3 rounded-[24px] border border-[#FFB020]/35 bg-gradient-to-r from-[#FFF8E8] to-white p-4 shadow-sm md:mx-5"><div className="flex items-start gap-3"><div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#14140F] text-[#FFB020]"><Gift size={19}/></div><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><span className="rounded-full bg-[#14140F] px-2.5 py-1 text-[9px] font-black text-white">FREE REWARD</span><span className="text-[10px] font-black text-[#0F6A5F]">{required} POINTS REQUIRED</span></div><p className="mt-2 text-sm font-black text-[#14140F]">This product can be claimed with {required} points.</p><p className="mt-1 text-[10px] font-bold text-black/50">You have {points} points{need>0?` • Need ${need} more points`:can?' • You can redeem it now':''}</p>{stock===0&&<p className="mt-1 text-[10px] font-black text-[#E1352B]">Currently out of stock</p>}<div className="mt-3 flex flex-wrap gap-2">{need>0?<Link href="/rewards" className="inline-flex items-center gap-1.5 rounded-xl bg-[#E1352B] px-3 py-2 text-[10px] font-black text-white"><Sparkles size={12}/>Earn {need} More Points</Link>:<Link href="/rewards#redeem-rewards" className="inline-flex items-center gap-1.5 rounded-xl bg-[#0F6A5F] px-3 py-2 text-[10px] font-black text-white">Redeem This Gift</Link>}{!uid&&<Link href="/login?redirect=/rewards" className="inline-flex items-center gap-1.5 rounded-xl border border-black/10 bg-white px-3 py-2 text-[10px] font-black"><LogIn size={12}/>Login to save points</Link>}</div></div></div></section>;
+const GUEST_KEY = 'phdeals-guest-rewards';
+const EMPTY_IMAGES: string[] = [];
+const same = (a: string, b?: string) => Boolean(a && b && a.trim() === b.trim());
+
+function imagesOfProduct(product?: Product) {
+  return [
+    ...(Array.isArray(product?.images)
+      ? product.images.map((image) => (typeof image === 'string' ? image : image?.url || ''))
+      : []),
+    product?.imageUrl || '',
+    product?.image || '',
+  ].filter(Boolean);
+}
+
+export default function ProductRewardInfo({
+  productId,
+  productImages = EMPTY_IMAGES,
+}: {
+  productId: string;
+  productImages?: string[];
+}) {
+  const [required, setRequired] = useState<number | null>(null);
+  const [stock, setStock] = useState(0);
+  const [points, setPoints] = useState(0);
+  const [uid, setUid] = useState<string | null>(null);
+  const [images, setImages] = useState(productImages);
+  const [lookupReady, setLookupReady] = useState(false);
+
+  useEffect(() => {
+    const browser = window as IdleWindow;
+    let idleId: number | null = null;
+    let fallbackTimer: number | null = null;
+
+    setLookupReady(false);
+    setImages(productImages);
+    const startRewardLookup = () => setLookupReady(true);
+
+    // Reward metadata is invisible until a match exists. Keep its Firebase listeners
+    // and fallback product lookup off the product hero's critical network path.
+    if (browser.requestIdleCallback) {
+      idleId = browser.requestIdleCallback(startRewardLookup, { timeout: 2500 });
+    } else {
+      fallbackTimer = window.setTimeout(startRewardLookup, 1500);
+    }
+
+    return () => {
+      if (idleId != null) browser.cancelIdleCallback?.(idleId);
+      if (fallbackTimer != null) window.clearTimeout(fallbackTimer);
+    };
+  }, [productId, productImages]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (productImages.length) {
+      setImages(productImages);
+      return () => { cancelled = true; };
+    }
+    if (!lookupReady) return () => { cancelled = true; };
+
+    loadProductsForNavigation<Product>([productId])
+      .then((products) => {
+        if (cancelled) return;
+        setImages(imagesOfProduct(products[productId]));
+      })
+      .catch(() => undefined);
+
+    return () => { cancelled = true; };
+  }, [productId, productImages, lookupReady]);
+
+  useEffect(() => {
+    if (!lookupReady) return;
+    const stop = onSnapshot(collection(db, 'reward_gifts'), (snapshot) => {
+      const found = snapshot.docs
+        .map((item) => item.data() as Reward)
+        .find(
+          (reward) =>
+            reward.active !== false &&
+            Number(reward.pointsCost) > 0 &&
+            (reward.productId === productId ||
+              (reward.imageUrl && images.some((image) => same(image, reward.imageUrl)))),
+        );
+      setRequired(found ? Number(found.pointsCost) : null);
+      setStock(Number(found?.stock ?? 1));
+    });
+    return () => stop();
+  }, [productId, images, lookupReady]);
+
+  useEffect(() => {
+    if (!lookupReady) return;
+    let stop = () => {};
+    const authStop = onAuthStateChanged(auth, (user) => {
+      stop();
+      setUid(user?.uid || null);
+      if (user) {
+        stop = onSnapshot(doc(db, 'user_rewards', user.uid), (snapshot) =>
+          setPoints(Number(snapshot.data()?.points || 0)),
+        );
+      } else {
+        try {
+          setPoints(Number(JSON.parse(localStorage.getItem(GUEST_KEY) || '{}')?.points || 0));
+        } catch {
+          setPoints(0);
+        }
+      }
+    });
+    return () => {
+      authStop();
+      stop();
+    };
+  }, [lookupReady]);
+
+  if (!required) return null;
+
+  const need = Math.max(0, required - points);
+  const can = need === 0 && stock > 0;
+
+  return (
+    <section className="mx-3 mt-3 rounded-[24px] border border-[#FFB020]/35 bg-gradient-to-r from-[#FFF8E8] to-white p-4 shadow-sm md:mx-5">
+      <div className="flex items-start gap-3">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#14140F] text-[#FFB020]"><Gift size={19} /></div>
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="rounded-full bg-[#14140F] px-2.5 py-1 text-[9px] font-black text-white">FREE REWARD</span>
+            <span className="text-[10px] font-black text-[#0F6A5F]">{required} POINTS REQUIRED</span>
+          </div>
+          <p className="mt-2 text-sm font-black text-[#14140F]">This product can be claimed with {required} points.</p>
+          <p className="mt-1 text-[10px] font-bold text-black/50">
+            You have {points} points{need > 0 ? ` • Need ${need} more points` : can ? ' • You can redeem it now' : ''}
+          </p>
+          {stock === 0 && <p className="mt-1 text-[10px] font-black text-[#E1352B]">Currently out of stock</p>}
+          <div className="mt-3 flex flex-wrap gap-2">
+            {need > 0 ? (
+              <Link href="/rewards" className="inline-flex items-center gap-1.5 rounded-xl bg-[#E1352B] px-3 py-2 text-[10px] font-black text-white">
+                <Sparkles size={12} />Earn {need} More Points
+              </Link>
+            ) : (
+              <Link href="/rewards#redeem-rewards" className="inline-flex items-center gap-1.5 rounded-xl bg-[#0F6A5F] px-3 py-2 text-[10px] font-black text-white">
+                Redeem This Gift
+              </Link>
+            )}
+            {!uid && (
+              <Link href="/login?redirect=/rewards" className="inline-flex items-center gap-1.5 rounded-xl border border-black/10 bg-white px-3 py-2 text-[10px] font-black">
+                <LogIn size={12} />Login to save points
+              </Link>
+            )}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
 }
