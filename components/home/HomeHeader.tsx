@@ -69,15 +69,15 @@ export default function HomeHeader() {
           >
             <Menu />
           </button>
-          <Link href="/" className="home-logo" aria-label="PrimeHubMall home">
+          <Link href="/" prefetch={false} className="home-logo" aria-label="PrimeHubMall home">
             PrimeHub<span>Mall</span>
           </Link>
           <nav aria-label="Quick links" className="home-quick-links">
-            <Link href="/orders">
+            <Link href="/orders" prefetch={false}>
               <ReceiptText />
               <span>My Orders</span>
             </Link>
-            <Link href="/shop">
+            <Link href="/shop" prefetch={false}>
               <ShoppingBag />
               <span>Shop</span>
             </Link>
@@ -139,7 +139,7 @@ export default function HomeHeader() {
             ["Rewards", "/rewards"],
             ["Contact us", "/contact"],
           ].map(([label, href]) => (
-            <Link key={href} href={href} onClick={() => menu.current?.close()}>
+            <Link key={href} href={href} prefetch={false} onClick={() => menu.current?.close()}>
               {label}
             </Link>
           ))}
