@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowRight, MessageCircle, Play, PlayCircle, Sparkles } from "lucide-react";
+import { MessageCircle, Play, PlayCircle, Sparkles } from "lucide-react";
 import HomeHeading from "./HomeHeading";
 import { useSettings } from "@/lib/useSettings";
 import { PRIME_SKILLS_SEED } from "@/lib/primeSkillsSeed";
@@ -139,12 +139,6 @@ export function HomeWholesaleVideos() {
             );
           })}
         </div>
-        <Link
-          className="home-view-all home-commerce-view-all"
-          href="/wholesale-video-hub"
-        >
-          View all wholesale packages <ArrowRight size={13} />
-        </Link>
       </div>
     </section>
   );
@@ -214,6 +208,7 @@ export function HomePrimeSkills() {
                       src={thumbnail}
                       alt={item.title || "Prime Skill"}
                       loading={index < 2 ? "eager" : "lazy"}
+                      className={index === 0 ? "home-prime-skill-first-image" : undefined}
                     />
                   ) : (
                     <span className="home-commerce-placeholder">
@@ -249,9 +244,6 @@ export function HomePrimeSkills() {
             );
           })}
         </div>
-        <Link className="home-view-all home-commerce-view-all" href="/skills">
-          View all Prime Skills <ArrowRight size={13} />
-        </Link>
       </div>
     </section>
   );
