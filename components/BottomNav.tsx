@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import { GraduationCap, Home, Package, ShoppingBag, Users } from 'lucide-react';
 
 const NAV_ITEMS = [
@@ -41,6 +42,17 @@ function isItemActive(pathname: string, item: NavItem) {
 
 export default function BottomNav() {
   const pathname = usePathname();
+  const [pendingHref, setPendingHref] = useState<string | null>(null);
+
+  useEffect(() => {
+    setPendingHref(null);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!pendingHref) return;
+    const timer = window.setTimeout(() => setPendingHref(null), 3500);
+    return () => window.clearTimeout(timer);
+  }, [pendingHref]);
 
   return (
     <nav
@@ -50,19 +62,29 @@ export default function BottomNav() {
       <div className="mx-auto grid min-h-[72px] w-full max-w-[650px] grid-cols-5">
         {NAV_ITEMS.map((item) => {
           const { key, label, href, icon: Icon } = item;
-          const isActive = isItemActive(pathname, item);
+          const routeIsActive = isItemActive(pathname, item);
+          const isPending = pendingHref === href && !routeIsActive;
+          const visuallyActive = pendingHref ? pendingHref === href : routeIsActive;
           const shouldPrefetch = key === 'home' || key === 'shop';
+
+          const markNavigationIntent = () => {
+            if (!routeIsActive) setPendingHref(href);
+          };
 
           return (
             <Link
               key={key}
               href={href}
               prefetch={shouldPrefetch}
-              aria-current={isActive ? 'page' : undefined}
+              aria-current={routeIsActive ? 'page' : undefined}
+              aria-busy={isPending || undefined}
               data-nav-key={key}
-              data-active={isActive ? 'true' : 'false'}
-              className={`group relative flex min-w-0 touch-manipulation select-none flex-col items-center justify-center gap-1 px-0.5 py-2.5 active:bg-black/[0.035] ${
-                isActive ? 'text-[#005448]' : 'text-[#131915]'
+              data-active={routeIsActive ? 'true' : 'false'}
+              data-pending={isPending ? 'true' : 'false'}
+              onPointerDown={markNavigationIntent}
+              onClick={markNavigationIntent}
+              className={`group relative flex min-w-0 touch-manipulation select-none flex-col items-center justify-center gap-1 px-0.5 py-2.5 transition-[color,background-color,transform] duration-100 active:scale-[0.98] active:bg-black/[0.035] ${
+                visuallyActive ? 'text-[#005448]' : 'text-[#131915]'
               }`}
             >
               <span className="flex h-8 w-8 shrink-0 items-center justify-center">
@@ -70,7 +92,7 @@ export default function BottomNav() {
               </span>
               <span
                 className={`w-full truncate text-center text-[10px] leading-tight ${
-                  isActive ? 'font-bold text-[#005448]' : 'font-medium text-[#141510]'
+                  visuallyActive ? 'font-bold text-[#005448]' : 'font-medium text-[#141510]'
                 }`}
               >
                 {label}
