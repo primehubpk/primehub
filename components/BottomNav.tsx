@@ -15,7 +15,7 @@ const NAV_ITEMS = [
 
 function isItemActive(pathname: string, key: (typeof NAV_ITEMS)[number]['key'], href: string) {
   if (key === 'home') return pathname === '/';
-  if (key === 'reseller') return pathname === href || pathname.startsWith('/reseller/');
+  if (key === 'reseller') return pathname === '/reseller' || pathname === href || pathname.startsWith('/reseller/');
   if (key === 'skills') return pathname === href || pathname.startsWith('/skills/');
   return pathname === href;
 }
