@@ -44,8 +44,8 @@ function isItemActive(pathname: string, item: NavItem) {
   return pathname === item.href || pathname.startsWith(`${item.href}/`);
 }
 
-function isPrimaryFastRoute(href: string) {
-  return href === '/' || href === '/shop';
+function isWarmableRoute(href: string) {
+  return href === '/' || href === '/shop' || href === '/reseller/dashboard';
 }
 
 export default function BottomNav() {
@@ -54,14 +54,13 @@ export default function BottomNav() {
   const [pendingHref, setPendingHref] = useState<string | null>(null);
   const warmedRoutes = useRef(new Set<string>());
 
-  const warmPrimaryRoute = useCallback((href: string) => {
-    if (!isPrimaryFastRoute(href) || href === pathname || warmedRoutes.current.has(href)) return;
+  const warmRoute = useCallback((href: string) => {
+    if (!isWarmableRoute(href) || href === pathname || warmedRoutes.current.has(href)) return;
     warmedRoutes.current.add(href);
     router.prefetch(href);
   }, [pathname, router]);
 
   useEffect(() => {
-    // Once a route is actually visited, allow it to be warmed again after we leave it.
     warmedRoutes.current.delete(pathname);
     setPendingHref(null);
   }, [pathname]);
@@ -73,24 +72,32 @@ export default function BottomNav() {
   }, [pendingHref]);
 
   useEffect(() => {
-    const target = pathname === '/' ? '/shop' : '/';
+    const primaryTarget = pathname === '/' ? '/shop' : '/';
+    const resellerTarget = '/reseller/dashboard';
     const browser = window as IdleWindow;
     let idleId: number | null = null;
     let timerId: number | null = null;
+    let resellerTimerId: number | null = null;
 
-    const warm = () => warmPrimaryRoute(target);
+    const warmPrimaryThenReseller = () => {
+      warmRoute(primaryTarget);
+      if (!pathname.startsWith('/reseller')) {
+        resellerTimerId = window.setTimeout(() => warmRoute(resellerTarget), 350);
+      }
+    };
 
     if (browser.requestIdleCallback) {
-      idleId = browser.requestIdleCallback(warm, { timeout: 700 });
+      idleId = browser.requestIdleCallback(warmPrimaryThenReseller, { timeout: 700 });
     } else {
-      timerId = window.setTimeout(warm, 250);
+      timerId = window.setTimeout(warmPrimaryThenReseller, 250);
     }
 
     return () => {
       if (idleId != null) browser.cancelIdleCallback?.(idleId);
       if (timerId != null) window.clearTimeout(timerId);
+      if (resellerTimerId != null) window.clearTimeout(resellerTimerId);
     };
-  }, [pathname, warmPrimaryRoute]);
+  }, [pathname, warmRoute]);
 
   return (
     <nav
@@ -105,7 +112,7 @@ export default function BottomNav() {
           const visuallyActive = pendingHref ? pendingHref === href : routeIsActive;
 
           const markNavigationIntent = () => {
-            warmPrimaryRoute(href);
+            warmRoute(href);
             if (pathname !== href) setPendingHref(href);
           };
 
@@ -119,8 +126,8 @@ export default function BottomNav() {
               data-nav-key={key}
               data-active={routeIsActive ? 'true' : 'false'}
               data-pending={isPending ? 'true' : 'false'}
-              onPointerEnter={() => warmPrimaryRoute(href)}
-              onFocus={() => warmPrimaryRoute(href)}
+              onPointerEnter={() => warmRoute(href)}
+              onFocus={() => warmRoute(href)}
               onPointerDown={markNavigationIntent}
               onClick={markNavigationIntent}
               className={`group relative flex min-w-0 touch-manipulation select-none flex-col items-center justify-center gap-1 px-0.5 py-2.5 transition-[color,background-color,transform] duration-100 active:scale-[0.98] active:bg-black/[0.035] ${
