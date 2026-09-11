@@ -34,8 +34,8 @@ export default function HomeHeading({ children }: { children: ReactNode }) {
   if (isWeeklyDealsHeading) {
     return (
       <h2 className="home-heading relative">
-        <span aria-hidden="true">
-          ❧
+        <span>
+          <span aria-hidden="true">❧</span>
           <Link
             href={WEEKLY_DEALS_HREF}
             className="absolute left-0 top-1/2 z-10 -translate-y-1/2 rounded-full bg-[#FFFCF7] px-2 py-1 text-[8px] font-black uppercase tracking-[0.12em] text-[#8A651F] no-underline sm:text-[9px]"
