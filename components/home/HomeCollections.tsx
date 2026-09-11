@@ -155,17 +155,15 @@ export default function HomeCollections({
     <>
       {buckets.length > 0 && (
         <section className="home-sale" aria-label="PrimeHubMall Sale Mela">
-          <div className="mb-1 flex justify-center">
+          <div className="relative">
             <Link
               href="/sale-mela"
               prefetch={true}
-              className="inline-flex items-center gap-1 text-[9px] font-black uppercase tracking-[0.14em] text-[#8A651F] no-underline"
-              aria-label="View PrimeHubMall Sale Mela"
+              className="absolute left-[18%] top-0 z-10 whitespace-nowrap text-[9px] font-black uppercase tracking-[0.14em] text-[#8A651F] no-underline sm:left-[22%]"
+              aria-label="Open PrimeHubMall Sale Mela"
             >
-              View PrimeHubMall Sale Mela <ChevronRight size={12} />
+              Open
             </Link>
-          </div>
-          <div>
             <HomeHeading>
               <Link
                 href="/sale-mela"
