@@ -1,8 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
+import { useCallback, useEffect, useState } from 'react';
 import { GraduationCap, Home, Package, ShoppingBag, Users } from 'lucide-react';
 
 const NAV_ITEMS = [
@@ -14,6 +14,10 @@ const NAV_ITEMS = [
 ] as const;
 
 type NavItem = (typeof NAV_ITEMS)[number];
+type IdleWindow = Window & {
+  requestIdleCallback?: (callback: () => void, options?: { timeout?: number }) => number;
+  cancelIdleCallback?: (handle: number) => void;
+};
 
 function isShopRoute(pathname: string) {
   return (
@@ -40,9 +44,19 @@ function isItemActive(pathname: string, item: NavItem) {
   return pathname === item.href || pathname.startsWith(`${item.href}/`);
 }
 
+function isPrimaryFastRoute(href: string) {
+  return href === '/' || href === '/shop';
+}
+
 export default function BottomNav() {
   const pathname = usePathname();
+  const router = useRouter();
   const [pendingHref, setPendingHref] = useState<string | null>(null);
+
+  const warmPrimaryRoute = useCallback((href: string) => {
+    if (!isPrimaryFastRoute(href) || href === pathname) return;
+    router.prefetch(href);
+  }, [pathname, router]);
 
   useEffect(() => {
     setPendingHref(null);
@@ -54,6 +68,26 @@ export default function BottomNav() {
     return () => window.clearTimeout(timer);
   }, [pendingHref]);
 
+  useEffect(() => {
+    const target = pathname === '/' ? '/shop' : '/';
+    const browser = window as IdleWindow;
+    let idleId: number | null = null;
+    let timerId: number | null = null;
+
+    const warm = () => warmPrimaryRoute(target);
+
+    if (browser.requestIdleCallback) {
+      idleId = browser.requestIdleCallback(warm, { timeout: 700 });
+    } else {
+      timerId = window.setTimeout(warm, 250);
+    }
+
+    return () => {
+      if (idleId != null) browser.cancelIdleCallback?.(idleId);
+      if (timerId != null) window.clearTimeout(timerId);
+    };
+  }, [pathname, warmPrimaryRoute]);
+
   return (
     <nav
       aria-label="Bottom navigation"
@@ -63,12 +97,13 @@ export default function BottomNav() {
         {NAV_ITEMS.map((item) => {
           const { key, label, href, icon: Icon } = item;
           const routeIsActive = isItemActive(pathname, item);
-          const isPending = pendingHref === href && !routeIsActive;
+          const isPending = pendingHref === href && pathname !== href;
           const visuallyActive = pendingHref ? pendingHref === href : routeIsActive;
           const shouldPrefetch = key === 'home' || key === 'shop';
 
           const markNavigationIntent = () => {
-            if (!routeIsActive) setPendingHref(href);
+            warmPrimaryRoute(href);
+            if (pathname !== href) setPendingHref(href);
           };
 
           return (
@@ -81,6 +116,8 @@ export default function BottomNav() {
               data-nav-key={key}
               data-active={routeIsActive ? 'true' : 'false'}
               data-pending={isPending ? 'true' : 'false'}
+              onPointerEnter={() => warmPrimaryRoute(href)}
+              onFocus={() => warmPrimaryRoute(href)}
               onPointerDown={markNavigationIntent}
               onClick={markNavigationIntent}
               className={`group relative flex min-w-0 touch-manipulation select-none flex-col items-center justify-center gap-1 px-0.5 py-2.5 transition-[color,background-color,transform] duration-100 active:scale-[0.98] active:bg-black/[0.035] ${
