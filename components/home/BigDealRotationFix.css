@@ -1,12 +1,14 @@
-.home-storefront .home-big-info::after {
+.home-storefront .home-big-prices::after {
   content: attr(data-countdown);
-  grid-column: 1 / -1;
-  display: block;
-  margin-top: 2px;
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.02em;
+  display: inline-flex;
+  align-items: center;
+  margin-left: 2px;
   color: #064d40;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  line-height: 1.1;
+  white-space: nowrap;
 }
 
 .home-storefront .home-next-deal {
@@ -132,6 +134,12 @@
     line-height: 1.1;
   }
 
+  .home-storefront .home-big-prices::after {
+    margin-left: 0;
+    font-size: 7px;
+    line-height: 1.1;
+  }
+
   .home-storefront .home-big-info > small {
     grid-column: 1 / -1;
     margin-top: 1px;
@@ -146,12 +154,6 @@
     margin-top: 3px;
     padding: 3px 5px;
     font-size: 9px;
-  }
-
-  .home-storefront .home-big-info::after {
-    margin-top: 0;
-    font-size: 6.5px;
-    line-height: 1.1;
   }
 
   .home-storefront .home-next-deal > span {
