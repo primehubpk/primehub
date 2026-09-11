@@ -19,6 +19,12 @@ const CLICKABLE_HEADINGS: Record<string, HeadingDestination> = {
     href: "/new-arrivals",
     title: "Open all new arrivals",
   },
+  "Reseller Club": {
+    href: "/reseller/dashboard",
+    title: "Open PrimeHubMall Reseller Rewards",
+    label: "Open",
+    displayText: "PrimeHubMall Reseller Rewards",
+  },
   "PrimeHubMall Reseller Rewards": {
     href: "/reseller/dashboard",
     title: "Open PrimeHubMall Reseller Rewards",
@@ -97,7 +103,7 @@ export default function HomeHeading({
           style={{ WebkitUserSelect: "text", userSelect: "text" }}
           title={destination.title}
         >
-          {children}
+          {destination.displayText || children}
         </span>
         <span aria-hidden="true">❧</span>
       </h2>
