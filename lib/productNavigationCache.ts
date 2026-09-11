@@ -1,5 +1,5 @@
-type CacheableProduct = { id?: unknown; [key: string]: unknown };
-type CacheableCategory = { id?: unknown; [key: string]: unknown };
+type CacheableProduct = { id?: unknown };
+type CacheableCategory = { id?: unknown };
 
 type CatalogNavigationSnapshot = {
   products: CacheableProduct[];
