@@ -1,4 +1,3 @@
-import { Suspense } from 'react';
 import HomePageClient from '@/components/HomePageClient';
 import { getPublicCatalogSnapshot, getStorefrontSettingsResultSnapshot } from '@/lib/publicCatalogServer';
 import type { Category, SiteSettings } from '@/lib/types';
@@ -44,39 +43,7 @@ function hydrateBigDealImages(settings: Record<string, any>, products: any[]) {
   };
 }
 
-function HomeLoadingState() {
-  return (
-    <main className="min-h-screen bg-[#FFFCF7] px-4 pb-28 pt-5" role="status" aria-label="Opening home page">
-      <div className="mx-auto max-w-6xl animate-pulse">
-        <div className="rounded-2xl bg-white p-4 shadow-sm">
-          <div className="h-8 w-52 rounded-full bg-black/[0.09]" />
-          <div className="mt-4 h-12 rounded-full bg-black/[0.05]" />
-        </div>
-        <div className="mt-6 grid grid-cols-4 gap-3">
-          {Array.from({ length: 4 }, (_, index) => (
-            <div key={index} className="text-center">
-              <div className="mx-auto aspect-square w-full max-w-[110px] rounded-full bg-black/[0.06]" />
-              <div className="mx-auto mt-2 h-3 w-4/5 rounded-full bg-black/[0.07]" />
-            </div>
-          ))}
-        </div>
-        <div className="mt-7 h-7 w-64 rounded-full bg-black/[0.08]" />
-        <div className="mt-4 grid grid-cols-3 gap-3">
-          {Array.from({ length: 3 }, (_, index) => (
-            <div key={index} className="rounded-2xl bg-white p-3 shadow-sm">
-              <div className="aspect-[4/5] rounded-xl bg-black/[0.06]" />
-              <div className="mt-3 h-3 w-3/4 rounded-full bg-black/[0.08]" />
-              <div className="mt-2 h-3 w-1/2 rounded-full bg-black/[0.05]" />
-            </div>
-          ))}
-        </div>
-      </div>
-      <span className="sr-only">Loading PrimeHubMall home…</span>
-    </main>
-  );
-}
-
-async function HomeContent() {
+export default async function HomePage() {
   const [catalogResult, settingsResult] = await Promise.allSettled([
     getPublicCatalogSnapshot(),
     getStorefrontSettingsResultSnapshot(),
@@ -104,13 +71,5 @@ async function HomeContent() {
       initialCategories={snapshot.categories as Category[]}
       initialSettings={initialSettings as Partial<SiteSettings>}
     />
-  );
-}
-
-export default function HomePage() {
-  return (
-    <Suspense fallback={<HomeLoadingState />}>
-      <HomeContent />
-    </Suspense>
   );
 }
