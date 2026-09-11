@@ -5,7 +5,7 @@
   },
   "git": {
     "deploymentEnabled": {
-      "feature/home-nav-instant-active-fix": true
+      "feature/home-nav-instant-active-fix": false
     }
   }
 }
