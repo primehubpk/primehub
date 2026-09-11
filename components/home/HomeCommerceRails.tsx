@@ -221,6 +221,7 @@ export function HomePrimeSkills() {
                 <Link
                   className={index === 0 ? "home-commerce-media home-prime-skill-first-media" : "home-commerce-media"}
                   href={detailHref}
+                  prefetch={false}
                   aria-label={`Open ${item.title}`}
                 >
                   {thumbnail ? (
@@ -237,7 +238,7 @@ export function HomePrimeSkills() {
                   )}
                 </Link>
                 <div className="home-commerce-info">
-                  <Link className="home-commerce-title" href={detailHref}>
+                  <Link className="home-commerce-title" href={detailHref} prefetch={false}>
                     {item.title || "Prime Skill"}
                   </Link>
                   {displayPrice.value > 0 ? (
