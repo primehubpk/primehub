@@ -11,6 +11,8 @@ import { categoryHref } from '@/lib/categoryUtils';
 import { normalizeImageUrl } from '@/lib/imageUrl';
 import { Category } from '@/lib/types';
 
+const ABOVE_THE_FOLD_CATEGORY_IMAGES = 4;
+
 export default function CategorySwiper({
   initialCategories = [],
   liveUpdates = true,
@@ -55,28 +57,31 @@ export default function CategorySwiper({
       </div>
 
       <div className="flex gap-3 overflow-x-auto overflow-y-visible touch-pan-x touch-pan-y cursor-grab active:cursor-grabbing snap-x snap-mandatory overscroll-x-contain scroll-smooth pb-3 [scrollbar-width:none] lg:[scrollbar-width:thin] lg:[scrollbar-color:#9ca3af_transparent] [&::-webkit-scrollbar]:hidden lg:[&::-webkit-scrollbar]:block lg:[&::-webkit-scrollbar]:h-1.5 lg:[&::-webkit-scrollbar-thumb]:rounded-full lg:[&::-webkit-scrollbar-thumb]:bg-black/25">
-        {visible.map((category, index) => (
-          <Link key={category.id} href={categoryHref(category)} prefetch={false} className="group w-[92px] shrink-0 snap-start text-center lg:w-[78px]">
-            <span className="relative mx-auto flex h-20 w-20 items-center justify-center overflow-hidden rounded-full bg-[#F4F4F1] ring-1 ring-black/5 lg:h-[68px] lg:w-[68px]">
-              {category.iconUrl ? (
-                <Image
-                  src={normalizeImageUrl(category.iconUrl)}
-                  alt={category.title}
-                  fill
-                  priority={index < 2}
-                  loading={index < 2 ? 'eager' : 'lazy'}
-                  fetchPriority={index < 2 ? 'high' : 'auto'}
-                  sizes="(max-width: 600px) 22vw, 195px"
-                  quality={72}
-                  className="object-cover"
-                />
-              ) : (
-                <span className="font-[family-name:var(--font-display)] text-xl font-black text-[#0F6A5F]">{category.title.charAt(0)}</span>
-              )}
-            </span>
-            <span className="mt-2 block truncate text-[10px] font-black text-[#14140F]">{category.title}</span>
-          </Link>
-        ))}
+        {visible.map((category, index) => {
+          const aboveTheFold = index < ABOVE_THE_FOLD_CATEGORY_IMAGES;
+          return (
+            <Link key={category.id} href={categoryHref(category)} prefetch={false} className="group w-[92px] shrink-0 snap-start text-center lg:w-[78px]">
+              <span className="relative mx-auto flex h-20 w-20 items-center justify-center overflow-hidden rounded-full bg-[#F4F4F1] ring-1 ring-black/5 lg:h-[68px] lg:w-[68px]">
+                {category.iconUrl ? (
+                  <Image
+                    src={normalizeImageUrl(category.iconUrl)}
+                    alt={category.title}
+                    fill
+                    priority={aboveTheFold}
+                    loading={aboveTheFold ? 'eager' : 'lazy'}
+                    fetchPriority={aboveTheFold ? 'high' : 'auto'}
+                    sizes="(max-width: 600px) 22vw, 195px"
+                    quality={72}
+                    className="object-cover"
+                  />
+                ) : (
+                  <span className="font-[family-name:var(--font-display)] text-xl font-black text-[#0F6A5F]">{category.title.charAt(0)}</span>
+                )}
+              </span>
+              <span className="mt-2 block truncate text-center text-[10px] font-black text-[#14140F]">{category.title}</span>
+            </Link>
+          );
+        })}
       </div>
     </section>
   );
