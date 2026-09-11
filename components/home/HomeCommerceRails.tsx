@@ -199,7 +199,7 @@ export function HomePrimeSkills() {
             return (
               <article className="home-commerce-card" key={item.id}>
                 <Link
-                  className="home-commerce-media"
+                  className={index === 0 ? "home-commerce-media home-prime-skill-first-media" : "home-commerce-media"}
                   href={detailHref}
                   aria-label={`Open ${item.title}`}
                 >
