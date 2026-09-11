@@ -1,8 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { usePathname } from 'next/navigation';
+import { useEffect, useRef, useState } from 'react';
 import { GraduationCap, Home, Package, ShoppingBag, Users } from 'lucide-react';
 
 const NAV_ITEMS = [
@@ -14,10 +14,6 @@ const NAV_ITEMS = [
 ] as const;
 
 type NavItem = (typeof NAV_ITEMS)[number];
-type IdleWindow = Window & {
-  requestIdleCallback?: (callback: () => void, options?: { timeout?: number }) => number;
-  cancelIdleCallback?: (handle: number) => void;
-};
 
 function isItemActive(pathname: string, item: NavItem) {
   if (item.key === 'home') return pathname === '/';
@@ -29,28 +25,19 @@ function isItemActive(pathname: string, item: NavItem) {
 
 export default function BottomNav() {
   const pathname = usePathname();
-  const router = useRouter();
   const [pendingHref, setPendingHref] = useState<string | null>(null);
-  const warmedRoutes = useRef(new Set<string>());
   const pendingResetTimer = useRef<number | null>(null);
 
-  const warmRoute = useCallback((href: string) => {
-    if (href === pathname || warmedRoutes.current.has(href)) return;
-    warmedRoutes.current.add(href);
-    router.prefetch(href);
-  }, [pathname, router]);
-
-  const markNavigationIntent = useCallback((href: string) => {
+  const markNavigationIntent = (href: string) => {
     if (href === pathname) return;
-    warmRoute(href);
     setPendingHref(href);
 
     if (pendingResetTimer.current != null) window.clearTimeout(pendingResetTimer.current);
     pendingResetTimer.current = window.setTimeout(() => {
-      setPendingHref(current => (current === href ? null : current));
+      setPendingHref((current) => (current === href ? null : current));
       pendingResetTimer.current = null;
     }, 2500);
-  }, [pathname, warmRoute]);
+  };
 
   useEffect(() => {
     setPendingHref(null);
@@ -59,38 +46,6 @@ export default function BottomNav() {
       pendingResetTimer.current = null;
     }
   }, [pathname]);
-
-  useEffect(() => {
-    const browser = window as IdleWindow;
-    const timers: number[] = [];
-    let idleId: number | null = null;
-    let fallbackTimer: number | null = null;
-    let cancelled = false;
-
-    const prewarmPrimaryRoutes = () => {
-      if (cancelled) return;
-      NAV_ITEMS.forEach((item, index) => {
-        if (item.href === window.location.pathname || warmedRoutes.current.has(item.href)) return;
-        const timer = window.setTimeout(() => {
-          if (!cancelled) warmRoute(item.href);
-        }, index * 140);
-        timers.push(timer);
-      });
-    };
-
-    if (browser.requestIdleCallback) {
-      idleId = browser.requestIdleCallback(prewarmPrimaryRoutes, { timeout: 1200 });
-    } else {
-      fallbackTimer = window.setTimeout(prewarmPrimaryRoutes, 650);
-    }
-
-    return () => {
-      cancelled = true;
-      if (idleId != null) browser.cancelIdleCallback?.(idleId);
-      if (fallbackTimer != null) window.clearTimeout(fallbackTimer);
-      timers.forEach(timer => window.clearTimeout(timer));
-    };
-  }, [warmRoute]);
 
   useEffect(() => () => {
     if (pendingResetTimer.current != null) window.clearTimeout(pendingResetTimer.current);
@@ -111,13 +66,11 @@ export default function BottomNav() {
             <Link
               key={key}
               href={href}
-              prefetch={false}
+              prefetch={true}
               aria-current={isActive ? 'page' : undefined}
               data-nav-key={key}
               data-active={isActive ? 'true' : 'false'}
               data-pending={isPending ? 'true' : 'false'}
-              onPointerEnter={() => warmRoute(href)}
-              onFocus={() => warmRoute(href)}
               onPointerDown={() => markNavigationIntent(href)}
               className={`group relative flex min-w-0 touch-manipulation select-none flex-col items-center justify-center gap-1 px-0.5 py-2.5 ${
                 isPending ? 'bg-black/[0.035]' : ''
