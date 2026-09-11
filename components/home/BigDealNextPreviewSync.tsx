@@ -1,11 +1,9 @@
 "use client";
 
-import { useLayoutEffect } from "react";
-import { normalizeImageUrl } from "@/lib/imageUrl";
+import { useEffect } from "react";
 import { useSettings } from "@/lib/useSettings";
 import {
   bigDealConfiguredSlotCount,
-  bigDealRotationIndex,
   nextBigDealRotationIndex,
 } from "@/lib/bigDealRotation";
 import "./BigDealRotationFix.css";
@@ -13,7 +11,6 @@ import "./BigDealRotationFix.css";
 type BigDeal = NonNullable<ReturnType<typeof useSettings>["settings"]["dailyDeal"]>;
 
 type DealSlot = {
-  imageUrl: string;
   productId: string;
   title: string;
   originalPrice: number;
@@ -37,14 +34,12 @@ function cleanDealTitle(value: unknown) {
 }
 
 function slotAt(deal: BigDeal, index: number): DealSlot {
-  const images = Array.isArray(deal.imageUrls) ? deal.imageUrls : [];
   const productIds = Array.isArray(deal.productIds) ? deal.productIds : [];
   const titles = Array.isArray(deal.titles) ? deal.titles : [];
   const originalPrices = Array.isArray(deal.originalPrices) ? deal.originalPrices : [];
   const dealPrices = Array.isArray(deal.dealPrices) ? deal.dealPrices : [];
 
   return {
-    imageUrl: normalizeImageUrl(String(images[index] || deal.imageUrl || images[0] || "")),
     productId: String(productIds[index] || deal.productId || productIds[0] || "").trim(),
     title: cleanDealTitle(titles[index] || deal.title || titles[0] || "Big Deal"),
     originalPrice: Math.max(0, Number(originalPrices[index] ?? deal.originalPrice ?? 0) || 0),
@@ -75,47 +70,90 @@ export default function BigDealNextPreviewSync() {
   const { settings } = useSettings();
   const bigDeal = settings.dailyDeal;
 
-  useLayoutEffect(() => {
+  useEffect(() => {
     if (!bigDeal?.active) return;
+
+    const section = document.querySelector<HTMLElement>(".home-big-deal");
+    if (!section) return;
+
+    let timer: number | null = null;
+    let observer: IntersectionObserver | null = null;
+    let lastNextIndex = -1;
+
+    const prices = section.querySelector<HTMLElement>(".home-big-prices");
+    const nextCard = section.querySelector<HTMLElement>(".home-next-deal");
+    const badge = nextCard?.querySelector<HTMLElement>(":scope > span") || null;
+    const smalls = badge?.querySelectorAll<HTMLElement>("small") || null;
+    const price = badge?.querySelector<HTMLElement>("strong") || null;
+
+    const stopTimer = () => {
+      if (timer !== null) {
+        window.clearInterval(timer);
+        timer = null;
+      }
+    };
 
     const applyDealCards = () => {
       const now = new Date();
-      const slotCount = bigDealConfiguredSlotCount(bigDeal);
-      const currentIndex = bigDealRotationIndex(bigDeal.rotationStartedAt, now, slotCount);
-      const nextIndex = nextBigDealRotationIndex(bigDeal.rotationStartedAt, now, slotCount);
-      const currentDeal = slotAt(bigDeal, currentIndex);
-      const nextDeal = slotAt(bigDeal, nextIndex);
       const countdown = pakistanMidnightCountdown(now);
-      void currentDeal;
-
-      const prices = document.querySelector<HTMLElement>(".home-big-prices");
       if (prices) prices.dataset.countdown = `Ends in ${countdown}`;
-
-      const nextCard = document.querySelector<HTMLElement>(".home-next-deal");
-      const badge = nextCard?.querySelector<HTMLElement>(":scope > span") || null;
+      if (badge) badge.dataset.countdown = `Unlocks in ${countdown}`;
       if (!nextCard || !badge) return;
 
-      nextCard.setAttribute("aria-label", `Next Big Deal locked until tomorrow: ${nextDeal.title}, ${money(nextDeal.dealPrice)}`);
+      const slotCount = bigDealConfiguredSlotCount(bigDeal);
+      const nextIndex = nextBigDealRotationIndex(bigDeal.rotationStartedAt, now, slotCount);
+      if (nextIndex === lastNextIndex) return;
+      lastNextIndex = nextIndex;
+
+      const nextDeal = slotAt(bigDeal, nextIndex);
+      nextCard.setAttribute(
+        "aria-label",
+        `Next Big Deal locked until tomorrow: ${nextDeal.title}, ${money(nextDeal.dealPrice)}`,
+      );
       nextCard.setAttribute("aria-disabled", "true");
       nextCard.dataset.locked = "true";
       nextCard.dataset.synced = "true";
       if (nextDeal.productId) nextCard.dataset.nextProductId = nextDeal.productId;
+      else delete nextCard.dataset.nextProductId;
 
-      const smalls = badge.querySelectorAll<HTMLElement>("small");
-      const price = badge.querySelector<HTMLElement>("strong");
-      if (smalls[0]) smalls[0].textContent = nextDeal.title;
+      if (smalls?.[0]) smalls[0].textContent = nextDeal.title;
       if (price) {
         price.textContent = money(nextDeal.dealPrice);
-        price.dataset.regular = nextDeal.originalPrice > nextDeal.dealPrice ? money(nextDeal.originalPrice) : "";
+        price.dataset.regular =
+          nextDeal.originalPrice > nextDeal.dealPrice
+            ? money(nextDeal.originalPrice)
+            : "";
       }
       const saved = Math.max(0, nextDeal.originalPrice - nextDeal.dealPrice);
-      if (smalls[1]) smalls[1].textContent = saved > 0 ? `Save ${money(saved)}` : "Tomorrow's deal";
-      badge.dataset.countdown = `Unlocks in ${countdown}`;
+      if (smalls?.[1]) {
+        smalls[1].textContent = saved > 0 ? `Save ${money(saved)}` : "Tomorrow's deal";
+      }
     };
 
-    applyDealCards();
-    const timer = window.setInterval(applyDealCards, 1000);
-    return () => window.clearInterval(timer);
+    const startTimer = () => {
+      if (timer !== null) return;
+      applyDealCards();
+      timer = window.setInterval(applyDealCards, 1000);
+    };
+
+    if (typeof IntersectionObserver === "undefined") {
+      startTimer();
+    } else {
+      observer = new IntersectionObserver(
+        (entries) => {
+          const nearViewport = entries.some((entry) => entry.isIntersecting);
+          if (nearViewport) startTimer();
+          else stopTimer();
+        },
+        { rootMargin: "300px 0px" },
+      );
+      observer.observe(section);
+    }
+
+    return () => {
+      observer?.disconnect();
+      stopTimer();
+    };
   }, [bigDeal]);
 
   return null;
