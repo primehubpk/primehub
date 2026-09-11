@@ -2,11 +2,9 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { doc, onSnapshot } from "firebase/firestore";
 import { MessageCircle, Play, PlayCircle, Sparkles } from "lucide-react";
 import HomeHeading from "./HomeHeading";
 import { useSettings } from "@/lib/useSettings";
-import { db } from "@/lib/firebase";
 import { PRIME_SKILLS_SEED } from "@/lib/primeSkillsSeed";
 import { normalizeImageUrl } from "@/lib/imageUrl";
 import { thumbnailOf, type WholesaleVideo } from "@/lib/wholesaleVideos";
@@ -60,28 +58,10 @@ function skillDisplayPrice(item: PrimeSkillHomeItem) {
 
 export function HomeWholesaleVideos() {
   const { settings, contact } = useSettings();
-  const initialVideos = (
+  const videos = (
     (settings as typeof settings & { wholesaleVideos?: WholesaleVideo[] })
       .wholesaleVideos || []
   ).filter((video) => video.active !== false);
-  const [videos, setVideos] = useState<WholesaleVideo[]>(initialVideos);
-
-  useEffect(() => {
-    return onSnapshot(
-      doc(db, "settings", "main"),
-      (snapshot) => {
-        const list = snapshot.data()?.wholesaleVideos;
-        if (!Array.isArray(list)) return;
-        const liveVideos = (list as WholesaleVideo[]).filter(
-          (video) => video.active !== false,
-        );
-        setVideos((current) =>
-          liveVideos.length > current.length ? liveVideos : current,
-        );
-      },
-      () => undefined,
-    );
-  }, []);
 
   const storeWhatsApp =
     cleanWhatsApp(contact?.whatsappNumber) ||
@@ -171,14 +151,22 @@ export function HomePrimeSkills() {
   );
 
   useEffect(() => {
-    fetch("/api/storefront/read?type=skills", { cache: "no-store" })
-      .then((response) => (response.ok ? response.json() : null))
-      .then((data) => {
-        if (Array.isArray(data?.skills) && data.skills.length) {
-          setItems(data.skills as PrimeSkillHomeItem[]);
-        }
-      })
-      .catch(() => undefined);
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      fetch("/api/storefront/read?type=skills", { cache: "no-store" })
+        .then((response) => (response.ok ? response.json() : null))
+        .then((data) => {
+          if (!cancelled && Array.isArray(data?.skills) && data.skills.length) {
+            setItems(data.skills as PrimeSkillHomeItem[]);
+          }
+        })
+        .catch(() => undefined);
+    }, 1400);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
   }, []);
 
   const skills = useMemo(
