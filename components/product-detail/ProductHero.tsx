@@ -15,7 +15,7 @@ type Props = {
   onVideoOpen: () => void;
 };
 
-function useDirectStorefrontImage(url: string, bigDealActive: boolean) {
+function shouldUseDirectStorefrontImage(url: string, bigDealActive: boolean) {
   if (bigDealActive) return true;
   return (
     url.startsWith('https://images.primehubmall.com/') ||
@@ -25,7 +25,7 @@ function useDirectStorefrontImage(url: string, bigDealActive: boolean) {
 
 export default function ProductHero({ product, images, activeImage, savingsAmount, liveDeal, bigDealActive, onImageChange, onVideoOpen }: Props) {
   const displayImage = images[activeImage] || '';
-  const directDisplayImage = useDirectStorefrontImage(displayImage, bigDealActive);
+  const directDisplayImage = shouldUseDirectStorefrontImage(displayImage, bigDealActive);
   const [zoomed, setZoomed] = useState(false);
 
   useEffect(() => {
@@ -73,7 +73,7 @@ export default function ProductHero({ product, images, activeImage, savingsAmoun
         <div className="flex gap-2 overflow-x-auto p-3">
           {images.map((image, index) => (
             <button type="button" key={`${image}-${index}`} onClick={() => onImageChange(() => index)} className={`relative h-16 w-16 shrink-0 overflow-hidden rounded-xl border-2 ${index === activeImage ? 'border-[#E1352B]' : 'border-transparent'}`} aria-label={`View image ${index + 1}`}>
-              <Image src={image} alt="" fill unoptimized={useDirectStorefrontImage(image, bigDealActive)} sizes="64px" quality={65} loading="lazy" className="object-cover" />
+              <Image src={image} alt="" fill unoptimized={shouldUseDirectStorefrontImage(image, bigDealActive)} sizes="64px" quality={65} loading="lazy" className="object-cover" />
             </button>
           ))}
         </div>
