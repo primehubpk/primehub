@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getConfiguredReadMode } from '@/lib/dualReadServer';
 import {
-  getFreshStorefrontSettingsSnapshot,
+  getFreshStorefrontSettingsDocumentsSnapshot,
   getPrimeSkillsSnapshot,
   getPublicCatalogSnapshot,
   getPublicProductSnapshot,
@@ -34,9 +34,9 @@ export async function GET(request: Request) {
   const type = String(url.searchParams.get('type') || 'catalog');
   try {
     if (type === 'settings') {
-      const settings = await getFreshStorefrontSettingsSnapshot();
+      const documents = await getFreshStorefrontSettingsDocumentsSnapshot();
       return NextResponse.json(
-        { documents: { main: settings }, source: 'fresh', mode: getConfiguredReadMode() },
+        { documents, source: 'fresh', mode: getConfiguredReadMode() },
         { headers: FRESH_BROWSER_HEADERS },
       );
     }
