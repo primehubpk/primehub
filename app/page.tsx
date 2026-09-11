@@ -1,6 +1,7 @@
 import HomePageClient from '@/components/HomePageClient';
 import WeeklyDealNavigationWarmup from '@/components/home/WeeklyDealNavigationWarmup';
 import { getPublicCatalogSnapshot, getStorefrontSettingsResultSnapshot } from '@/lib/publicCatalogServer';
+import { getWholesaleVideosSnapshot } from '@/lib/wholesaleVideosServer';
 import { normalizeImageUrl } from '@/lib/imageUrl';
 import { pakistanNowWeekday } from '@/lib/weeklyDealUtils';
 import type { Category, SiteSettings } from '@/lib/types';
@@ -47,9 +48,10 @@ function hydrateBigDealImages(settings: Record<string, any>, products: any[]) {
 }
 
 export default async function HomePage() {
-  const [catalogResult, settingsResult] = await Promise.allSettled([
+  const [catalogResult, settingsResult, wholesaleResult] = await Promise.allSettled([
     getPublicCatalogSnapshot(),
     getStorefrontSettingsResultSnapshot(),
+    getWholesaleVideosSnapshot(),
   ]);
 
   const snapshot = catalogResult.status === 'fulfilled'
@@ -63,8 +65,12 @@ export default async function HomePage() {
     ...(settingsDocuments.main || {}),
   };
   const rewardSettings = settingsDocuments.rewards || {};
+  const wholesaleVideos = wholesaleResult.status === 'fulfilled'
+    ? wholesaleResult.value.videos
+    : [];
   const initialSettings = {
     ...hydrateBigDealImages(rawSettings, snapshot.products as any[]),
+    ...(wholesaleVideos.length ? { wholesaleVideos } : {}),
     homeRewardSettings: rewardSettings,
   };
 
