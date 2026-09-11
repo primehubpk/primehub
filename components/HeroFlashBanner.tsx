@@ -238,24 +238,26 @@ export default function HeroFlashBanner({ initialProducts = [], liveUpdates = tr
               const dealImage = normalizeImageUrl(deal?.imageUrl || (deal ? products[deal.productId]?.imageUrl : "") || "");
               const isLive = Boolean(deal && todayKey === key);
               const weeklyTiming = deal && nowTick !== null ? dealTiming(deal.day, new Date(nowTick)) : null;
-              const unlockCountdown = weeklyTiming && !weeklyTiming.isLive && nowTick !== null ? countdownParts(weeklyTiming.unlockAt.getTime() - nowTick) : null;
+              const dealCountdown = weeklyTiming && nowTick !== null ? countdownParts(weeklyTiming.unlockAt.getTime() - nowTick) : null;
               return (
                 <article key={key} className={`home-week-card ${isLive ? "is-live" : ""}`}>
                   <Link className="home-week-link" href={deal ? `/product/${deal.productId}` : "/weekly-deals"}>
                     <strong>{key.slice(0, 3).toUpperCase()}</strong>
                     {saving > 0 ? (
-                      <em className="mt-1 inline-flex rounded-full bg-[#E8F5EE] px-2 py-0.5 text-[9px] font-black not-italic text-[#0F6A5F]">Save Rs. {saving.toLocaleString("en-PK")}</em>
+                      <em className="home-week-saving">Save Rs. {saving.toLocaleString("en-PK")}</em>
                     ) : null}
-                    <span className={isLive ? "home-live" : "home-unlocks"}>
-                      {isLive ? "● LIVE" : <><LockKeyhole size={10} />{deal ? "UNLOCKS" : "SOON"}</>}
+                    <span className={`home-week-status ${isLive ? "is-live" : ""}`}>
+                      <span className={isLive ? "home-live" : "home-unlocks"}>
+                        {isLive ? "● LIVE" : <><LockKeyhole size={9} />{deal ? "UNLOCKS" : "SOON"}</>}
+                      </span>
+                      {dealCountdown ? (
+                        <small className="home-week-countdown">
+                          {isLive ? "Ends in " : ""}{dealCountdown.days > 0 ? `${dealCountdown.days}d ` : ""}{String(dealCountdown.hours).padStart(2, "0")}h {String(dealCountdown.minutes).padStart(2, "0")}m {String(dealCountdown.seconds).padStart(2, "0")}s
+                        </small>
+                      ) : null}
                     </span>
-                    {unlockCountdown ? (
-                      <small className="mt-1 block font-[family-name:var(--font-mono)] text-[9px] font-black text-[#0F6A5F]">
-                        {unlockCountdown.days}d {String(unlockCountdown.hours).padStart(2, "0")}h {String(unlockCountdown.minutes).padStart(2, "0")}m {String(unlockCountdown.seconds).padStart(2, "0")}s
-                      </small>
-                    ) : null}
                     <span className="home-week-image">
-                      {dealImage ? <Image src={dealImage} alt={deal?.title || key} fill sizes="(max-width: 600px) 80px, 170px" className="object-cover" /> : <Icon size={25} />}
+                      {dealImage ? <Image src={dealImage} alt={deal?.title || key} fill sizes="(max-width: 600px) 90px, 170px" className="object-cover" /> : <Icon size={25} />}
                     </span>
                     {deal ? (
                       <span className="home-week-pricing">
