@@ -7,7 +7,7 @@
     "deploymentEnabled": {
       "feature/home-nav-instant-active-fix": false,
       "fix/mobile-nav-performance-audit": true,
-      "fix/bottom-nav-performance": false
+      "fix/bottom-nav-performance": true
     }
   }
 }
