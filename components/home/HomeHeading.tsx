@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRef, type KeyboardEvent, type PointerEvent, type ReactNode } from "react";
 
-const CLICKABLE_HEADINGS: Record<string, { href: string; title: string }> = {
+const CLICKABLE_HEADINGS: Record<string, { href: string; title: string; label?: string }> = {
   "PrimeHubMall Weekly Deals": {
     href: "/weekly-deals",
     title: "Open all weekly deals",
@@ -11,6 +11,11 @@ const CLICKABLE_HEADINGS: Record<string, { href: string; title: string }> = {
   "New Arrivals": {
     href: "/new-arrivals",
     title: "Open all new arrivals",
+  },
+  "PrimeHubMall Reseller Rewards": {
+    href: "/reseller/dashboard",
+    title: "Open PrimeHubMall Reseller Rewards",
+    label: "Open",
   },
 };
 
@@ -49,7 +54,7 @@ export default function HomeHeading({ children }: { children: ReactNode }) {
             href={destination.href}
             className="inline-flex shrink-0 -translate-y-[5px] whitespace-nowrap text-[8px] font-black uppercase tracking-[0.12em] text-[#8A651F] no-underline sm:text-[9px]"
           >
-            View all
+            {destination.label || "View all"}
           </Link>
         </span>
         <span
