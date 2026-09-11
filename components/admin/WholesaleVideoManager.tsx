@@ -1,10 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { doc, onSnapshot } from 'firebase/firestore';
 import { Plus, Save, Trash2, Video } from 'lucide-react';
-import { db } from '@/lib/firebase';
-import { setAdminDocument } from './shared';
 import type { VideoPlatform, WholesaleVideo } from '@/lib/wholesaleVideos';
 
 const empty = {
@@ -21,19 +18,45 @@ export default function WholesaleVideoManager() {
   const [videos, setVideos] = useState<WholesaleVideo[]>([]);
   const [form, setForm] = useState(empty);
   const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [source, setSource] = useState('');
   const [message, setMessage] = useState('');
 
-  useEffect(
-    () =>
-      onSnapshot(doc(db, 'settings', 'main'), (snapshot) =>
-        setVideos(
-          Array.isArray(snapshot.data()?.wholesaleVideos)
-            ? snapshot.data()!.wholesaleVideos
-            : [],
-        ),
-      ),
-    [],
-  );
+  useEffect(() => {
+    let cancelled = false;
+
+    fetch('/api/admin/wholesale-videos', {
+      cache: 'no-store',
+      credentials: 'same-origin',
+    })
+      .then(async (response) => {
+        const result = await response.json().catch(() => null);
+        if (!response.ok || !result?.success) {
+          throw new Error(result?.error || 'Wholesale packages load failed.');
+        }
+        return result;
+      })
+      .then((result) => {
+        if (cancelled) return;
+        setVideos(Array.isArray(result.videos) ? result.videos : []);
+        setSource(String(result.source || ''));
+        if (result.source === 'supabase-repaired') {
+          setMessage('Missing fallback packages Supabase primary mein recover ho gaye.');
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setMessage(error instanceof Error ? error.message : 'Wholesale packages load failed.');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   function add() {
     if (!form.title.trim() || !form.url.trim()) {
@@ -51,8 +74,25 @@ export default function WholesaleVideoManager() {
   async function save(next = videos) {
     setSaving(true);
     try {
-      await setAdminDocument('settings', 'main', { wholesaleVideos: next });
-      setMessage('Wholesale videos save ho gaye.');
+      const response = await fetch('/api/admin/wholesale-videos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        cache: 'no-store',
+        body: JSON.stringify({ videos: next }),
+      });
+      const result = await response.json().catch(() => null);
+      if (!response.ok || !result?.success) {
+        throw new Error(result?.error || 'Save failed');
+      }
+      const saved = Array.isArray(result.videos) ? result.videos : next;
+      setVideos(saved);
+      setSource(String(result.source || ''));
+      setMessage(
+        result.source === 'supabase'
+          ? `Wholesale packages Supabase primary mein save ho gaye${result.firebaseMirrored === false ? '; Firebase mirror pending hai.' : ' aur Firebase fallback mirror bhi update ho gaya.'}`
+          : 'Supabase unavailable tha; packages Firebase fallback mein save hue.',
+      );
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Save failed');
     } finally {
@@ -74,7 +114,10 @@ export default function WholesaleVideoManager() {
           <div>
             <h2 className="text-lg font-black">Wholesale Video Hub</h2>
             <p className="text-[10px] text-black/45">
-              YouTube, TikTok aur Instagram links manage karein.
+              Supabase primary · Firebase fallback. Homepage par pehle 4 packages 2×2 preview mein aate hain.
+            </p>
+            <p className="mt-1 text-[9px] font-bold text-[#0F6A5F]">
+              {loading ? 'Loading primary data…' : `${videos.length} package${videos.length === 1 ? '' : 's'} loaded${source ? ` · ${source}` : ''}`}
             </p>
           </div>
         </div>
@@ -131,14 +174,15 @@ export default function WholesaleVideoManager() {
           />
           <button
             onClick={add}
-            className="flex items-center justify-center gap-2 rounded-xl bg-[#14140F] p-3 text-xs font-black text-white"
+            disabled={loading}
+            className="flex items-center justify-center gap-2 rounded-xl bg-[#14140F] p-3 text-xs font-black text-white disabled:opacity-50"
           >
             <Plus size={14} /> Add Video
           </button>
           <button
-            disabled={saving}
+            disabled={saving || loading}
             onClick={() => save()}
-            className="flex items-center justify-center gap-2 rounded-xl bg-[#E1352B] p-3 text-xs font-black text-white"
+            className="flex items-center justify-center gap-2 rounded-xl bg-[#E1352B] p-3 text-xs font-black text-white disabled:opacity-50"
           >
             <Save size={14} /> {saving ? 'Saving...' : 'Save Changes'}
           </button>
@@ -167,7 +211,8 @@ export default function WholesaleVideoManager() {
               </div>
               <button
                 onClick={() => remove(video.id)}
-                className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-[#E1352B]"
+                disabled={saving}
+                className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-[#E1352B] disabled:opacity-50"
               >
                 <Trash2 size={14} />
               </button>
