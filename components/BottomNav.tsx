@@ -3,15 +3,22 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useCallback } from 'react';
-import { GraduationCap, Home, Package, ShoppingBag, Sparkles, Users } from 'lucide-react';
+import { GraduationCap, Home, Package, ShoppingBag, Users } from 'lucide-react';
 
 const NAV_ITEMS = [
   { key: 'home', label: 'Home', href: '/', icon: Home },
   { key: 'shop', label: 'Shop', href: '/shop', icon: ShoppingBag },
   { key: 'reseller', label: 'Reseller Club', href: '/reseller/dashboard', icon: Users },
-  { key: 'skills', label: 'Prime Skills', href: '/skills', icon: Sparkles },
+  { key: 'skills', label: 'Prime Skills', href: '/skills', icon: GraduationCap },
   { key: 'orders', label: 'Orders', href: '/orders', icon: Package },
 ] as const;
+
+function isItemActive(pathname: string, key: (typeof NAV_ITEMS)[number]['key'], href: string) {
+  if (key === 'home') return pathname === '/';
+  if (key === 'reseller') return pathname === href || pathname.startsWith('/reseller/');
+  if (key === 'skills') return pathname === href || pathname.startsWith('/skills/');
+  return pathname === href;
+}
 
 export default function BottomNav() {
   const pathname = usePathname();
@@ -22,13 +29,13 @@ export default function BottomNav() {
   }, [pathname, router]);
 
   return (
-    <nav aria-label="Bottom navigation" className={`fixed inset-x-0 bottom-0 z-40 px-2 pb-[max(6px,env(safe-area-inset-bottom))] sm:px-4 ${pathname === '/' ? 'home-bottom-nav' : ''}`}>
-      <div className="mx-auto grid max-w-xl grid-cols-5 overflow-hidden rounded-[18px] border border-black/5 bg-[#FFFCF7]/95 px-1 shadow-[0_-6px_25px_rgba(20,20,15,0.13)] backdrop-blur-xl sm:mb-2 sm:rounded-[22px] sm:px-2">
+    <nav
+      aria-label="Bottom navigation"
+      className="fixed inset-x-0 bottom-0 z-40 border-t border-[#C9BFB0] bg-[#FFFDF8]/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl"
+    >
+      <div className="mx-auto grid w-full max-w-[650px] grid-cols-5">
         {NAV_ITEMS.map(({ key, label, href, icon: Icon }) => {
-          const isActive =
-            pathname === href ||
-            (key === 'reseller' && pathname.startsWith('/reseller')) ||
-            (key === 'skills' && pathname.startsWith('/skills'));
+          const isActive = isItemActive(pathname, key, href);
 
           return (
             <Link
@@ -40,16 +47,12 @@ export default function BottomNav() {
               onPointerEnter={() => warmRoute(href)}
               onFocus={() => warmRoute(href)}
               onPointerDown={() => warmRoute(href)}
-              className="group relative flex min-w-0 flex-col items-center gap-1 rounded-xl px-0.5 py-2 transition duration-150 active:scale-[0.96]"
+              className={`group relative flex min-w-0 flex-col items-center justify-center gap-1 px-0.5 py-2.5 transition-transform duration-100 active:scale-[0.97] ${isActive ? 'text-[#005448]' : 'text-[#131915]'}`}
             >
-              <span className={`relative flex h-8 w-8 items-center justify-center rounded-[11px] transition-all ${isActive ? '-translate-y-0.5 bg-[#0F6A5F] text-white shadow-[0_7px_16px_rgba(15,106,95,0.28)]' : 'text-[#181914] group-hover:bg-black/5'}`}>
-                {key === 'skills' && pathname === '/' ? (
-                  <GraduationCap className="h-[17px] w-[17px]" aria-hidden="true" />
-                ) : (
-                  <Icon className="h-[17px] w-[17px]" aria-hidden="true" />
-                )}
+              <span className="flex h-8 w-8 items-center justify-center">
+                <Icon className="h-[27px] w-[27px] stroke-[1.35]" aria-hidden="true" />
               </span>
-              <span className={`w-full truncate text-center text-[8px] font-black leading-tight sm:text-[9px] ${isActive ? 'text-[#0F6A5F]' : 'text-black/60'}`}>
+              <span className={`w-full truncate text-center text-[10px] leading-tight ${isActive ? 'font-bold text-[#005448]' : 'font-medium text-[#141510]'}`}>
                 {label}
               </span>
             </Link>
