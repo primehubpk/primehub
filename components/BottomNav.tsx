@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { GraduationCap, Home, LoaderCircle, Package, ShoppingBag, Sparkles, Users } from 'lucide-react';
+import { GraduationCap, Home, Package, ShoppingBag, Sparkles, Users } from 'lucide-react';
 
 const NAV_ITEMS = [
   { key: 'home', label: 'Home', href: '/', icon: Home },
@@ -69,6 +69,7 @@ export default function BottomNav() {
   const markPending = useCallback((key: string, href: string) => {
     warmRoute(href);
     if (pathname === href) return;
+
     setPendingKey(key);
     if (pendingTimer.current != null) window.clearTimeout(pendingTimer.current);
     pendingTimer.current = window.setTimeout(() => {
@@ -83,35 +84,29 @@ export default function BottomNav() {
         {NAV_ITEMS.map(({ key, label, href, icon: Icon }) => {
           const isActive = pathname === href || (key === 'reseller' && pathname.startsWith('/reseller')) || (key === 'skills' && pathname.startsWith('/skills'));
           const pending = pendingKey === key && pathname !== href;
-          const resellerIcon = key === 'reseller';
+          const displayActive = isActive || pending;
+
           return (
             <Link
               key={key}
               href={href}
               prefetch={true}
               aria-current={isActive ? 'page' : undefined}
-              aria-busy={pending || undefined}
               data-nav-key={key}
               onPointerEnter={() => warmRoute(href)}
               onFocus={() => warmRoute(href)}
-              onTouchStart={() => markPending(key, href)}
-              onPointerDown={(event) => {
-                if (event.pointerType !== 'touch') markPending(key, href);
-              }}
-              onClick={() => markPending(key, href)}
-              className={`group relative flex min-w-0 flex-col items-center gap-1 rounded-xl px-0.5 py-2 transition duration-150 active:scale-[0.96] ${pending ? 'bg-black/[0.035]' : ''}`}
+              onPointerDown={() => markPending(key, href)}
+              className="group relative flex min-w-0 flex-col items-center gap-1 rounded-xl px-0.5 py-2 transition duration-150 active:scale-[0.96]"
             >
-              <span className={`relative flex h-8 w-8 items-center justify-center rounded-[11px] transition-all ${resellerIcon && !pending && !isActive ? 'reseller-club-nav-icon bg-[#E7F6F3] text-[#0E7C6F]' : ''} ${pending ? 'scale-95 bg-[#0F6A5F] text-white shadow-[0_7px_16px_rgba(15,106,95,0.22)]' : isActive ? '-translate-y-0.5 bg-[#0F6A5F] text-white shadow-[0_7px_16px_rgba(15,106,95,0.28)]' : resellerIcon ? '' : 'text-[#181914] group-hover:bg-black/5'}`}>
-                {pending ? (
-                  <LoaderCircle className="h-[16px] w-[16px] animate-spin" aria-hidden="true" />
-                ) : key === 'skills' && pathname === '/' ? (
+              <span className={`relative flex h-8 w-8 items-center justify-center rounded-[11px] transition-all ${displayActive ? '-translate-y-0.5 bg-[#0F6A5F] text-white shadow-[0_7px_16px_rgba(15,106,95,0.28)]' : 'text-[#181914] group-hover:bg-black/5'}`}>
+                {key === 'skills' && pathname === '/' ? (
                   <GraduationCap className="h-[17px] w-[17px]" aria-hidden="true" />
                 ) : (
                   <Icon className="h-[17px] w-[17px]" aria-hidden="true" />
                 )}
               </span>
-              <span className={`w-full truncate text-center text-[8px] font-black leading-tight sm:text-[9px] ${pending || isActive ? 'text-[#0F6A5F]' : resellerIcon ? 'text-[#0E7C6F]' : 'text-black/60'}`}>
-                {pending ? 'Opening…' : label}
+              <span className={`w-full truncate text-center text-[8px] font-black leading-tight sm:text-[9px] ${displayActive ? 'text-[#0F6A5F]' : 'text-black/60'}`}>
+                {label}
               </span>
             </Link>
           );

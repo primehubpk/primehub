@@ -73,19 +73,7 @@ export default function NewArrivalsRail({
   if (homeLayout) {
     return (
       <section className="home-arrivals">
-        <div className="relative">
-          <Link
-            className="home-view-all !absolute !right-0 !top-0 !z-10 !mt-0 bg-[#fffcf7] pl-2"
-            href="/new-arrivals"
-          >
-            View all new arrivals <ArrowRight size={14} />
-          </Link>
-          <HomeHeading>
-            <Link href="/new-arrivals" aria-label="View all new arrivals">
-              New Arrivals
-            </Link>
-          </HomeHeading>
-        </div>
+        <HomeHeading>New Arrivals</HomeHeading>
         <div className="grid grid-flow-col grid-rows-2 auto-cols-[calc((100%-7px)/2)] gap-2 overflow-x-auto overscroll-x-contain pb-2 scroll-smooth snap-x snap-mandatory [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {newest.map((p) => (
             <div key={p.id} className="min-w-0 snap-start">

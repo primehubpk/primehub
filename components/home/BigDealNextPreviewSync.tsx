@@ -71,11 +71,9 @@ function pakistanMidnightCountdown(now: Date) {
   return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
 }
 
-
 export default function BigDealNextPreviewSync() {
   const { settings } = useSettings();
   const bigDeal = settings.dailyDeal;
-
 
   useLayoutEffect(() => {
     if (!bigDeal?.active) return;
@@ -88,9 +86,10 @@ export default function BigDealNextPreviewSync() {
       const currentDeal = slotAt(bigDeal, currentIndex);
       const nextDeal = slotAt(bigDeal, nextIndex);
       const countdown = pakistanMidnightCountdown(now);
+      void currentDeal;
 
-      const info = document.querySelector<HTMLElement>(".home-big-info");
-      if (info) info.dataset.countdown = `Ends in ${countdown}`;
+      const prices = document.querySelector<HTMLElement>(".home-big-prices");
+      if (prices) prices.dataset.countdown = `Ends in ${countdown}`;
 
       const nextCard = document.querySelector<HTMLElement>(".home-next-deal");
       const badge = nextCard?.querySelector<HTMLElement>(":scope > span") || null;
@@ -121,4 +120,3 @@ export default function BigDealNextPreviewSync() {
 
   return null;
 }
-

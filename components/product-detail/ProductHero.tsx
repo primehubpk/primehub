@@ -10,11 +10,12 @@ type Props = {
   activeImage: number;
   savingsAmount: number;
   liveDeal: boolean;
+  bigDealActive: boolean;
   onImageChange: (updater: (index: number) => number) => void;
   onVideoOpen: () => void;
 };
 
-export default function ProductHero({ product, images, activeImage, savingsAmount, liveDeal, onImageChange, onVideoOpen }: Props) {
+export default function ProductHero({ product, images, activeImage, savingsAmount, liveDeal, bigDealActive, onImageChange, onVideoOpen }: Props) {
   const displayImage = images[activeImage] || '';
   const [zoomed, setZoomed] = useState(false);
 
@@ -45,6 +46,7 @@ export default function ProductHero({ product, images, activeImage, savingsAmoun
               fill
               priority
               fetchPriority="high"
+              unoptimized={bigDealActive}
               sizes="(max-width: 768px) 100vw, 52vw"
               quality={78}
               className="object-cover"
@@ -62,7 +64,7 @@ export default function ProductHero({ product, images, activeImage, savingsAmoun
         <div className="flex gap-2 overflow-x-auto p-3">
           {images.map((image, index) => (
             <button type="button" key={`${image}-${index}`} onClick={() => onImageChange(() => index)} className={`relative h-16 w-16 shrink-0 overflow-hidden rounded-xl border-2 ${index === activeImage ? 'border-[#E1352B]' : 'border-transparent'}`} aria-label={`View image ${index + 1}`}>
-              <Image src={image} alt="" fill sizes="64px" quality={65} loading="lazy" className="object-cover" />
+              <Image src={image} alt="" fill unoptimized={bigDealActive} sizes="64px" quality={65} loading="lazy" className="object-cover" />
             </button>
           ))}
         </div>
@@ -73,7 +75,7 @@ export default function ProductHero({ product, images, activeImage, savingsAmoun
       <div role="dialog" aria-modal="true" aria-label={`${titleOf(product)} enlarged image`} className="fixed inset-0 z-[120] flex items-center justify-center bg-black/95 p-3 sm:p-8" onClick={() => setZoomed(false)}>
         <button type="button" onClick={() => setZoomed(false)} className="absolute right-4 top-4 z-20 flex h-11 w-11 items-center justify-center rounded-full bg-white text-black shadow-lg" aria-label="Close enlarged image"><X size={20}/></button>
         <div className="relative h-full w-full max-w-6xl" onClick={(event) => event.stopPropagation()}>
-          <Image src={displayImage} alt={`${titleOf(product)} enlarged`} fill priority sizes="100vw" quality={85} className="object-contain" />
+          <Image src={displayImage} alt={`${titleOf(product)} enlarged`} fill priority unoptimized={bigDealActive} sizes="100vw" quality={85} className="object-contain" />
         </div>
         {images.length > 1 && <><button type="button" onClick={(event) => { event.stopPropagation(); onImageChange((index) => (index - 1 + images.length) % images.length); }} className="absolute left-3 top-1/2 z-20 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white text-black shadow-lg sm:left-6" aria-label="Previous enlarged image"><ChevronLeft size={21}/></button><button type="button" onClick={(event) => { event.stopPropagation(); onImageChange((index) => (index + 1) % images.length); }} className="absolute right-3 top-1/2 z-20 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white text-black shadow-lg sm:right-6" aria-label="Next enlarged image"><ChevronRight size={21}/></button></>}
         <span className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-white/15 px-3 py-1.5 text-[10px] font-black text-white">{activeImage + 1} / {images.length}</span>

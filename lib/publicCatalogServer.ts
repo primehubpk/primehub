@@ -112,8 +112,14 @@ export async function getFreshStorefrontSettingsSnapshot() {
   const main = documents.main || {};
   const legacy = documents.general || {};
   const merged = { ...legacy, ...main };
+  const primaryWholesaleVideos = Array.isArray(merged.wholesaleVideos) ? merged.wholesaleVideos : [];
 
-  if (firebaseWholesaleVideos) {
+  // Supabase remains the configured primary source. During migration, recover only
+  // when the admin/Firebase document contains a newer, longer wholesale package list.
+  if (
+    Array.isArray(firebaseWholesaleVideos) &&
+    firebaseWholesaleVideos.length > primaryWholesaleVideos.length
+  ) {
     return { ...merged, wholesaleVideos: firebaseWholesaleVideos };
   }
 

@@ -4,7 +4,8 @@ import { getVariantRows, useCartStore } from '@/lib/cartStore';
 import { useSettings } from '@/lib/useSettings';
 import { WEEKDAY_LABELS, WEEKDAY_ORDER, countdownParts, dealTiming } from '@/lib/weeklyDealUtils';
 import { bigDealConfiguredSlotCount, bigDealRotationIndex } from '@/lib/bigDealRotation';
-import { cacheProductForNavigation, readCachedProduct } from '@/lib/productNavigationCache';
+import { cacheProductForNavigation, loadProductsForNavigation, readCachedProduct } from '@/lib/productNavigationCache';
+import { normalizeImageUrl } from '@/lib/imageUrl';
 import { rememberProduct } from '@/lib/recentlyViewedHistory';
 import type { ProductVariantSelection, WeeklyDeal } from '@/lib/types';
 import { dealDiscount, imagesOf, originalPriceOf, regularPriceOf, titleOf, type Product, type ProductDetailModel, money } from './ProductDetailTypes';
@@ -24,6 +25,7 @@ function currentBigDealForProduct(deal: any, productId: string, now: number, reg
   const productIds = Array.isArray(deal.productIds) ? deal.productIds : [];
   const dealPrices = Array.isArray(deal.dealPrices) ? deal.dealPrices : [];
   const originalPrices = Array.isArray(deal.originalPrices) ? deal.originalPrices : [];
+  const imageUrls = Array.isArray(deal.imageUrls) ? deal.imageUrls : [];
   const activeProductId = String(productIds[slotIndex] || deal.productId || productIds[0] || '').trim();
   if (!activeProductId || activeProductId !== productId) return null;
 
@@ -33,6 +35,9 @@ function currentBigDealForProduct(deal: any, productId: string, now: number, reg
   const activeOriginalPrice = Number(
     originalPrices[slotIndex] ?? deal.normalPrice ?? deal.originalPrice ?? regularPrice ?? activeDealPrice,
   );
+  const activeImageUrl = normalizeImageUrl(
+    String(imageUrls[slotIndex] || deal.imageUrl || imageUrls[0] || ''),
+  );
 
   return {
     ...deal,
@@ -40,6 +45,7 @@ function currentBigDealForProduct(deal: any, productId: string, now: number, reg
     dealPrice: activeDealPrice,
     originalPrice: activeOriginalPrice,
     normalPrice: activeOriginalPrice,
+    imageUrl: activeImageUrl || deal.imageUrl,
   };
 }
 
@@ -126,7 +132,6 @@ export function useProductDetail(): ProductDetailModel {
     };
   }, [id]);
 
-  const images = useMemo(() => (product ? imagesOf(product) : []), [product]);
   const regularPrice = product ? regularPriceOf(product) : 0;
   const productOriginal = product ? originalPriceOf(product) : 0;
   const stock = Number(product?.stock ?? product?.quantity ?? product?.inventory ?? 10);
@@ -140,6 +145,28 @@ export function useProductDetail(): ProductDetailModel {
         .sort((a, b) => WEEKDAY_ORDER.indexOf(a.day) - WEEKDAY_ORDER.indexOf(b.day)),
     [settings.weeklyDeals],
   );
+
+  useEffect(() => {
+    let cancelled = false;
+    const ids = Array.from(new Set(weeklyDeals.map((deal) => deal.productId).filter(Boolean)));
+    if (!ids.length) return () => { cancelled = true; };
+
+    loadProductsForNavigation<Product>(ids)
+      .then((loaded) => {
+        if (cancelled) return;
+        setWeeklyProducts((current) => ({
+          ...current,
+          ...loaded,
+          ...(product ? { [product.id]: product } : {}),
+        }));
+      })
+      .catch(() => undefined);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [weeklyDeals, product]);
+
   const currentDeal = useMemo(() => weeklyDeals.find((deal) => deal.productId === id), [weeklyDeals, id]);
   const timing = currentDeal && nowTick !== null ? dealTiming(currentDeal.day, new Date(nowTick)) : null;
   const liveDeal = Boolean(currentDeal && timing?.isLive);
@@ -163,6 +190,16 @@ export function useProductDetail(): ProductDetailModel {
     }
     return null;
   }, [product, settings, nowTick, regularPrice, bigDealRequested]);
+
+  const images = useMemo(() => {
+    const productImages = product ? imagesOf(product) : [];
+    const bigDealImage = bigDealRequested
+      ? normalizeImageUrl(String(activeAdminDeal?.imageUrl || ''))
+      : '';
+    return bigDealImage
+      ? [bigDealImage, ...productImages.filter((image) => image !== bigDealImage)]
+      : productImages;
+  }, [product, bigDealRequested, activeAdminDeal?.imageUrl]);
 
   const bigDealActive = Boolean(activeAdminDeal);
   const activeDealPrice = activeAdminDeal
