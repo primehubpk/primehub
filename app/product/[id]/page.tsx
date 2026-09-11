@@ -43,6 +43,7 @@ export default function ProductDetailPage() {
     weeklyDeals,
     currentDeal,
     liveDeal,
+    bigDealActive,
     dealPrice,
     normalForDeal,
     savingsAmount,
@@ -140,6 +141,7 @@ export default function ProductDetailPage() {
             activeImage={activeImage}
             savingsAmount={savingsAmount}
             liveDeal={liveDeal}
+            bigDealActive={bigDealActive}
             onImageChange={setActiveImage}
             onVideoOpen={() => setVideoOpen(true)}
           />
