@@ -14,7 +14,7 @@ export default function CompactCategoryStrip({ categories }: { categories: Categ
         {active.map((category) => {
           const image = category.imageUrl || category.iconUrl;
           return (
-            <Link key={category.id} href={categoryHref(category)} className="min-w-0 text-center">
+            <Link key={category.id} href={categoryHref(category)} prefetch={false} className="min-w-0 text-center">
               <span className="mx-auto flex aspect-square w-full max-w-[64px] overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-black/5">
                 {image ? <img src={image} alt={category.title} className="h-full w-full object-cover" /> : <span className="m-auto text-lg">✨</span>}
               </span>
