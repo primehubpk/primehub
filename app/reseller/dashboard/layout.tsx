@@ -80,6 +80,8 @@ function hideDuplicateRewardWallet(host: HTMLDivElement | null) {
 
 export default function ResellerDashboardLayout({ children }: { children: ReactNode }) {
   const contentRef = useRef<HTMLDivElement>(null);
+  const readyRef = useRef(false);
+  const frameRef = useRef<number | null>(null);
   const [contentReady, setContentReady] = useState(false);
 
   useEffect(() => {
@@ -87,14 +89,28 @@ export default function ResellerDashboardLayout({ children }: { children: ReactN
     if (!host) return;
 
     const check = () => {
-      setContentReady(dashboardContentIsReady(host));
-      hideDuplicateRewardWallet(host);
+      frameRef.current = null;
+      const ready = dashboardContentIsReady(host);
+      if (ready && !readyRef.current) {
+        readyRef.current = true;
+        setContentReady(true);
+      }
+      if (ready) hideDuplicateRewardWallet(host);
     };
-    check();
 
-    const observer = new MutationObserver(check);
+    const scheduleCheck = () => {
+      if (frameRef.current != null) return;
+      frameRef.current = window.requestAnimationFrame(check);
+    };
+
+    check();
+    const observer = new MutationObserver(scheduleCheck);
     observer.observe(host, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
-    return () => observer.disconnect();
+
+    return () => {
+      observer.disconnect();
+      if (frameRef.current != null) window.cancelAnimationFrame(frameRef.current);
+    };
   }, []);
 
   return (
