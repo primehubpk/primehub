@@ -9,22 +9,86 @@
   flex: 1;
   flex-direction: column;
   align-items: center;
-  gap: 5px;
+  gap: 2px;
 }
 
 .home-week-link > strong {
-  font-size: 16px;
-  font-weight: 650;
-  line-height: 1.2;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.home-week-saving {
+  display: inline-flex;
+  max-width: 100%;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: #e8f5ee;
+  color: #0f6a5f;
+  font-size: 9px;
+  font-style: normal;
+  font-weight: 800;
+  line-height: 1;
+  padding: 4px 7px;
+  white-space: nowrap;
+}
+
+.home-week-status {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  min-height: 20px;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  line-height: 1;
+}
+
+.home-week-status.is-live {
+  justify-content: flex-start;
+}
+
+.home-week-status .home-live,
+.home-week-status .home-unlocks {
+  position: static;
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 2px;
+  margin: 0;
+  line-height: 1;
+}
+
+.home-week-countdown {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  color: #0f6a5f;
+  font-family: var(--font-mono);
+  font-size: 8px;
+  font-weight: 800;
+  line-height: 1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.home-week-status.is-live .home-week-countdown {
+  flex: 1 1 auto;
+  text-align: right;
+}
+
+.home-week-image {
+  margin-top: 1px;
 }
 
 .home-week-pricing {
   display: grid;
   width: 100%;
   min-width: 0;
-  gap: 2px;
+  gap: 0;
   text-align: center;
-  line-height: 1.2;
+  line-height: 1.05;
 }
 
 .home-week-pricing small,
@@ -41,6 +105,15 @@
   font-style: normal;
 }
 
+.home-week-pricing small b {
+  font-size: 11px;
+  color: #d60707;
+}
+
+.home-week-pricing small s {
+  color: rgba(20, 20, 15, 0.52);
+}
+
 .home-week-pricing em {
   border-radius: 999px;
   background: #e7f5ef;
@@ -48,25 +121,25 @@
   font-size: 8px;
   font-style: normal;
   font-weight: 700;
-  padding: 3px 4px;
+  padding: 2px 4px;
 }
 
 .home-week-add {
   display: inline-flex;
   width: 100%;
   min-width: 0;
-  min-height: 32px;
+  min-height: 30px;
   align-items: center;
   justify-content: center;
   gap: 3px;
-  margin-top: auto;
+  margin-top: 4px;
   border-radius: 6px;
   background: #075447;
   color: #fff;
   font-size: 9px;
   font-weight: 700;
-  line-height: 1.15;
-  padding: 6px 4px;
+  line-height: 1;
+  padding: 5px 4px;
   text-align: center;
   white-space: nowrap;
 }
@@ -93,29 +166,50 @@
   .home-week-card {
     flex: 0 0 106px;
     scroll-snap-align: start;
-    padding: 7px 4px;
+    padding: 5px 4px;
   }
 
   .home-week-link > strong {
     font-size: 12px;
   }
 
+  .home-week-saving {
+    font-size: 8px;
+    padding: 3px 6px;
+  }
+
+  .home-week-status {
+    min-height: 17px;
+    gap: 3px;
+  }
+
+  .home-week-status .home-live,
+  .home-week-status .home-unlocks,
+  .home-week-countdown {
+    font-size: 7px;
+  }
+
   .home-week-image {
-    aspect-ratio: 1;
+    aspect-ratio: 5 / 6;
   }
 
   .home-week-pricing small {
     font-size: 8px;
   }
 
+  .home-week-pricing small b {
+    font-size: 10px;
+  }
+
   .home-week-pricing em {
     font-size: 7px;
-    padding: 3px 2px;
+    padding: 2px;
   }
 
   .home-week-add {
-    min-height: 30px;
+    min-height: 28px;
+    margin-top: 3px;
     font-size: 8px;
-    padding: 5px 2px;
+    padding: 4px 2px;
   }
 }
