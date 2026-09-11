@@ -13,6 +13,8 @@ import { priceBucketRange, saleMelaPriceRange } from '@/lib/priceBucketUtils';
 import { cacheCatalogForNavigation, readCachedCatalog } from '@/lib/productNavigationCache';
 import { Product, Category, ShopCatalogModel, imageOf, priceOf, originalOf, productHasVariants, titleOf } from './ShopTypes';
 
+const NAVIGATION_CACHE_FRESH_MS = 45_000;
+
 export function useShopCatalog(initialCategory?: string, initialQuery = '', initialProducts: Product[] = [], initialCategories: Category[] = []): ShopCatalogModel {
   const { settings } = useSettings();
   const addItem = useCartStore((state) => state.addItem);
@@ -52,6 +54,9 @@ export function useShopCatalog(initialCategory?: string, initialQuery = '', init
 
     let cancelled = false;
     const cached = readCachedCatalog<Product, Category>();
+    const hasWarmCatalog = Boolean(cached && cached.products.length > 0);
+    const cacheAge = cached ? Date.now() - cached.updatedAt : Number.POSITIVE_INFINITY;
+    const cacheIsFresh = hasWarmCatalog && cacheAge <= NAVIGATION_CACHE_FRESH_MS;
 
     if (cached && cached.products.length > 0) {
       setProducts(shuffleProducts(cached.products));
@@ -81,7 +86,12 @@ export function useShopCatalog(initialCategory?: string, initialQuery = '', init
       }
     }
 
-    void load();
+    if (!cacheIsFresh) {
+      void load();
+    } else {
+      setFiltersOpen(false);
+    }
+
     return () => {
       cancelled = true;
     };
