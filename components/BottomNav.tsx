@@ -111,7 +111,7 @@ export default function BottomNav() {
             <Link
               key={key}
               href={href}
-              prefetch={true}
+              prefetch={false}
               aria-current={isActive ? 'page' : undefined}
               data-nav-key={key}
               data-active={isActive ? 'true' : 'false'}
@@ -119,8 +119,6 @@ export default function BottomNav() {
               onPointerEnter={() => warmRoute(href)}
               onFocus={() => warmRoute(href)}
               onPointerDown={() => markNavigationIntent(href)}
-              onTouchStart={() => markNavigationIntent(href)}
-              onClick={() => markNavigationIntent(href)}
               className={`group relative flex min-w-0 touch-manipulation select-none flex-col items-center justify-center gap-1 px-0.5 py-2.5 ${
                 isPending ? 'bg-black/[0.035]' : ''
               } ${isActive ? 'text-[#005448]' : 'text-[#131915]'}`}
