@@ -93,19 +93,18 @@ async function getFreshFirebaseWholesaleVideos() {
 }
 
 export async function getFreshRewardSettingsSnapshot() {
-  try {
-    const snapshot = await getAdminDb().collection('settings').doc('rewards').get();
-    if (!snapshot.exists) return {};
-    return snapshot.data() || {};
-  } catch (error) {
-    console.warn('Fresh Firebase reward settings recovery skipped', error);
-    return {};
-  }
+  const result = await getDualSettings({ cache: 'no-store' });
+  return result.documents?.rewards || {};
+}
+
+async function loadRewardSettings() {
+  const result = await getDualSettings(SETTINGS_READ_CACHE);
+  return result.documents?.rewards || {};
 }
 
 export const getRewardSettingsSnapshot = unstable_cache(
-  getFreshRewardSettingsSnapshot,
-  ['primehub-home-reward-settings-v1'],
+  loadRewardSettings,
+  ['primehub-home-reward-settings-dual-v2'],
   { revalidate: 60, tags: ['storefront-settings', 'rewards'] },
 );
 
