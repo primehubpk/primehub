@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { MessageCircle, Play, PlayCircle, Sparkles } from "lucide-react";
 import HomeHeading from "./HomeHeading";
 import { useSettings } from "@/lib/useSettings";
@@ -78,7 +78,7 @@ export function HomeWholesaleVideos() {
           className="home-two-row-rail home-commerce-rail"
           aria-label="Wholesale packages. Four are visible as a 2 by 2 preview when available; swipe horizontally for more."
         >
-          {videos.map((video, index) => {
+          {videos.map((video) => {
             const thumbnail = normalizeImageUrl(thumbnailOf(video));
             const price = Number(video.price || 0);
             const orderHref = whatsappHref(
@@ -98,7 +98,7 @@ export function HomeWholesaleVideos() {
                     <img
                       src={thumbnail}
                       alt={video.title}
-                      loading={index < 4 ? "eager" : "lazy"}
+                      loading="lazy"
                     />
                   ) : (
                     <span className="home-commerce-placeholder">
@@ -146,13 +146,18 @@ export function HomeWholesaleVideos() {
 
 export function HomePrimeSkills() {
   const { settings, contact } = useSettings();
+  const sectionRef = useRef<HTMLElement | null>(null);
   const [items, setItems] = useState<PrimeSkillHomeItem[]>(
     PRIME_SKILLS_SEED as PrimeSkillHomeItem[],
   );
 
   useEffect(() => {
     let cancelled = false;
-    const timer = window.setTimeout(() => {
+    let started = false;
+
+    const loadSkills = () => {
+      if (started) return;
+      started = true;
       fetch("/api/storefront/read?type=skills", { cache: "no-store" })
         .then((response) => (response.ok ? response.json() : null))
         .then((data) => {
@@ -161,11 +166,30 @@ export function HomePrimeSkills() {
           }
         })
         .catch(() => undefined);
-    }, 1400);
+    };
+
+    const node = sectionRef.current;
+    if (!node || typeof IntersectionObserver === "undefined") {
+      loadSkills();
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          observer.disconnect();
+          loadSkills();
+        }
+      },
+      { rootMargin: "700px 0px" },
+    );
+    observer.observe(node);
 
     return () => {
       cancelled = true;
-      window.clearTimeout(timer);
+      observer.disconnect();
     };
   }, []);
 
@@ -185,7 +209,7 @@ export function HomePrimeSkills() {
   if (!skills.length) return null;
 
   return (
-    <section className="home-prime-skills home-commerce-section">
+    <section ref={sectionRef} className="home-prime-skills home-commerce-section">
       <HomeHeading>Prime Skills</HomeHeading>
       <div className="home-commerce-rail-wrap">
         <div
@@ -216,7 +240,7 @@ export function HomePrimeSkills() {
                     <img
                       src={thumbnail}
                       alt={item.title || "Prime Skill"}
-                      loading={index < 2 ? "eager" : "lazy"}
+                      loading="lazy"
                       className={index === 0 ? "home-prime-skill-first-image" : undefined}
                     />
                   ) : (
