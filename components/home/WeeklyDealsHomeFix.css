@@ -6,7 +6,7 @@
   display: flex;
   width: 100%;
   min-width: 0;
-  flex: 1;
+  flex: 0 0 auto;
   flex-direction: column;
   align-items: center;
   gap: 2px;
@@ -38,7 +38,7 @@
   display: flex;
   width: 100%;
   min-width: 0;
-  min-height: 20px;
+  min-height: 0;
   align-items: center;
   justify-content: center;
   gap: 4px;
@@ -79,7 +79,7 @@
 }
 
 .home-week-image {
-  margin-top: 1px;
+  margin-top: 0;
 }
 
 .home-week-pricing {
@@ -151,6 +151,7 @@
 @media (max-width: 600px) {
   .home-week-grid {
     display: flex;
+    align-items: flex-start;
     gap: 7px;
     overflow-x: auto;
     overscroll-behavior-x: contain;
@@ -165,8 +166,13 @@
 
   .home-week-card {
     flex: 0 0 106px;
+    align-self: flex-start;
     scroll-snap-align: start;
     padding: 5px 4px;
+  }
+
+  .home-week-link {
+    gap: 1px;
   }
 
   .home-week-link > strong {
@@ -174,12 +180,14 @@
   }
 
   .home-week-saving {
+    margin-top: 1px;
     font-size: 8px;
     padding: 3px 6px;
   }
 
   .home-week-status {
-    min-height: 17px;
+    min-height: 0;
+    margin-top: 1px;
     gap: 3px;
   }
 
@@ -190,7 +198,12 @@
   }
 
   .home-week-image {
+    margin-top: 1px;
     aspect-ratio: 5 / 6;
+  }
+
+  .home-week-pricing {
+    margin-top: 1px;
   }
 
   .home-week-pricing small {
