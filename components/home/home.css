@@ -701,45 +701,6 @@
 .home-storefront #discover-deals-section h2 {
   font-size: 25px;
 }
-.home-bottom-nav {
-  padding: 0 !important;
-  background: #fffdf8f7;
-  border-top: 1px solid #c9bfb0;
-  padding-bottom: env(safe-area-inset-bottom) !important;
-  backdrop-filter: blur(12px);
-}
-.home-bottom-nav > div {
-  max-width: 650px !important;
-  border: 0 !important;
-  background: transparent !important;
-  box-shadow: none !important;
-  border-radius: 0 !important;
-  margin-bottom: 0 !important;
-}
-.home-bottom-nav a {
-  padding: 9px 1px !important;
-}
-.home-bottom-nav a > span:first-child {
-  background: transparent !important;
-  box-shadow: none !important;
-  transform: none !important;
-  color: #131915 !important;
-  width: 32px !important;
-  height: 32px !important;
-}
-.home-bottom-nav a > span:first-child svg {
-  width: 27px !important;
-  height: 27px !important;
-  stroke-width: 1.35;
-}
-.home-bottom-nav a > span:last-child {
-  font-size: 11px !important;
-  font-weight: 500 !important;
-  color: #141510 !important;
-}
-.home-bottom-nav a[aria-current="page"] > span {
-  color: #005448 !important;
-}
 @media (min-width: 900px) {
   .home-header {
     display: grid;
@@ -1080,9 +1041,6 @@
   .home-empty {
     font-size: 11px;
     padding: 12px;
-  }
-  .home-bottom-nav a > span:last-child {
-    font-size: 10px !important;
   }
 }
 @media (max-width: 370px) {
