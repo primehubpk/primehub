@@ -47,7 +47,7 @@ export default function HomeHeading({ children }: { children: ReactNode }) {
           <span aria-hidden="true">❧</span>
           <Link
             href={destination.href}
-            className="absolute left-0 top-1/2 z-10 -translate-y-1/2 rounded-full bg-[#FFFCF7] px-2 py-1 text-[8px] font-black uppercase tracking-[0.12em] text-[#8A651F] no-underline sm:text-[9px]"
+            className="absolute left-4 top-0 z-10 -translate-y-[2px] whitespace-nowrap text-[8px] font-black uppercase tracking-[0.12em] text-[#8A651F] no-underline sm:left-5 sm:text-[9px]"
           >
             View all
           </Link>
