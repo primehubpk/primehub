@@ -14,8 +14,6 @@ import {
 import "./home/home.css";
 import "./home/WeeklyDealsHomeFix.css";
 import "./home/HomeFeatureRails.css";
-import "./home/HomeResellerRewards.css";
-import "./home/HomeResellerTasksDirect.css";
 import "./home/HomeCommerceRails.css";
 import HeroFlashBanner from "@/components/HeroFlashBanner";
 import CategorySwiper from "@/components/CategorySwiper";
@@ -170,7 +168,7 @@ export default function HomePageClient({
             onSelect={selectPrice}
             onWholesaleSelect={selectWholesale}
           />
-          <HomeResellerClubFull />
+          <HomeResellerClubFull initialProducts={products} />
           <HomeWholesaleVideos />
           <HomePrimeSkills />
           <div id="discover-deals-section">

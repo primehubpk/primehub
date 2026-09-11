@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { collection, doc, onSnapshot } from "firebase/firestore";
 import { CheckCircle2, ChevronRight, Gift, Users } from "lucide-react";
@@ -37,19 +37,22 @@ function productImage(product?:RewardProduct){if(!product)return "";if(product.i
 function premiumVoucherImage(title:string,art:string,icon:string){const safe=title.replace(/[<>&]/g,"");const svg=`<svg xmlns='http://www.w3.org/2000/svg' width='640' height='360' viewBox='0 0 640 360'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop stop-color='${art}'/><stop offset='1' stop-color='#14140F'/></linearGradient></defs><rect width='640' height='360' rx='36' fill='url(#g)'/><circle cx='540' cy='60' r='110' fill='white' opacity='.12'/><text x='52' y='142' font-size='78'>${icon}</text><text x='52' y='230' fill='white' font-size='34' font-weight='800'>${safe}</text><text x='52' y='276' fill='white' opacity='.72' font-size='18' letter-spacing='4'>PRIMEHUB PREMIUM REWARD</text></svg>`;return `data:image/svg+xml,${encodeURIComponent(svg)}`;}
 function cleanResellerName(profile:ResellerProfile|null,user:User|null){const authName=String(user?.displayName||"").trim();const profileName=String(profile?.displayName||"").trim();const source=(authName&&!authName.includes("@")?authName:profileName&&!profileName.includes("@")?profileName:String(user?.email||profile?.email||"PrimeHub Reseller").split("@")[0]).replace(/[._-]+/g," ").replace(/\d+$/g,"").trim();return source.replace(/\b\w/g,c=>c.toUpperCase())||"PrimeHub Reseller";}
 
-export default function HomeResellerLiveRail(){
+export default function HomeResellerLiveRail({initialProducts=[]}:{initialProducts?:RewardProduct[]}){
   const {settings}=useSettings();
   const fallback=settings as typeof settings & LiveSettings;
   const initialRewards=fallback.homeRewardSettings||{};
-  const [live,setLive]=useState<LiveSettings>({});
-  const [rewardSettings,setRewardSettings]=useState<RewardSettings>({
+  const rewardSettings:RewardSettings={
     ...initialRewards,
     checkInRewards:Array.isArray(initialRewards.checkInRewards)?initialRewards.checkInRewards:[10,15,20,25,30,50,100],
     spinWheelSlots:Array.isArray(initialRewards.spinWheelSlots)?initialRewards.spinWheelSlots:[],
     guestMode:initialRewards.guestMode!==false,
-  });
+  };
   const [gifts,setGifts]=useState<RewardGift[]>([]);
-  const [products,setProducts]=useState<Record<string,RewardProduct>>({});
+  const catalogProducts=useMemo<Record<string,RewardProduct>>(()=>{const next:Record<string,RewardProduct>={};initialProducts.forEach(product=>{if(product?.id)next[String(product.id)]=product;});return next;},[initialProducts]);
+  const [resolvedProducts,setResolvedProducts]=useState<Record<string,RewardProduct>>({});
+  const products=useMemo(()=>({...catalogProducts,...resolvedProducts}),[catalogProducts,resolvedProducts]);
+  const [liveDataActive,setLiveDataActive]=useState(false);
+  const sectionRef=useRef<HTMLElement|null>(null);
   const [user,setUser]=useState<User|null>(null);
   const [profile,setProfile]=useState<ResellerProfile|null>(null);
   const [wallet,setWallet]=useState<RewardWallet>({});
@@ -58,12 +61,12 @@ export default function HomeResellerLiveRail(){
   const [rotation,setRotation]=useState(0);
   const [message,setMessage]=useState("");
 
-  useEffect(()=>onSnapshot(doc(db,"settings","main"),s=>setLive((s.data()||{}) as LiveSettings),()=>undefined),[]);
-  useEffect(()=>onSnapshot(doc(db,"settings","rewards"),s=>{const d=s.data()||{};setRewardSettings({...d,checkInRewards:Array.isArray(d.checkInRewards)?d.checkInRewards:[10,15,20,25,30,50,100],spinWheelSlots:Array.isArray(d.spinWheelSlots)?d.spinWheelSlots:[]});},()=>undefined),[]);
-  useEffect(()=>{const stopG=onSnapshot(collection(db,"reward_gifts"),s=>setGifts(s.docs.map(d=>({id:d.id,...d.data()} as RewardGift)).filter(g=>g.active!==false&&Number(g.stock??1)>0)),()=>undefined);const stopP=onSnapshot(collection(db,"products"),s=>{const next:Record<string,RewardProduct>={};s.docs.forEach(d=>{next[d.id]={id:d.id,...d.data()} as RewardProduct;});setProducts(next);},()=>undefined);return()=>{stopG();stopP();};},[]);
-  useEffect(()=>{setEvents(readTaskEvents());let sp:(()=>void)|undefined;let sw:(()=>void)|undefined;const stop=onAuthStateChanged(auth,u=>{sp?.();sw?.();setUser(u);if(!u){setProfile(null);setWallet(readGuestWallet());return;}sp=onSnapshot(doc(db,"reseller_profiles",u.uid),s=>setProfile(s.exists()?s.data() as ResellerProfile:null),()=>undefined);sw=onSnapshot(doc(db,"user_rewards",u.uid),s=>setWallet(s.data()||{}),()=>undefined);});return()=>{stop();sp?.();sw?.();};},[]);
+  useEffect(()=>{const node=sectionRef.current;if(!node)return;if(typeof IntersectionObserver==="undefined"){setLiveDataActive(true);return;}const observer=new IntersectionObserver(entries=>{if(entries.some(entry=>entry.isIntersecting)){setLiveDataActive(true);observer.disconnect();}},{rootMargin:"600px 0px"});observer.observe(node);return()=>observer.disconnect();},[]);
+  useEffect(()=>{if(!liveDataActive)return;return onSnapshot(collection(db,"reward_gifts"),s=>setGifts(s.docs.map(d=>({id:d.id,...d.data()} as RewardGift)).filter(g=>g.active!==false&&Number(g.stock??1)>0)),()=>undefined);},[liveDataActive]);
+  useEffect(()=>{if(!liveDataActive||!gifts.length)return;const missingIds=Array.from(new Set(gifts.map(g=>String(g.productId||"").trim()).filter(Boolean))).filter(id=>!catalogProducts[id]&&!resolvedProducts[id]).slice(0,24);if(!missingIds.length)return;let cancelled=false;const query=encodeURIComponent(JSON.stringify(missingIds));fetch(`/api/storefront/read?type=products&ids=${query}`,{cache:"no-store"}).then(response=>response.ok?response.json():null).then(data=>{if(cancelled||!Array.isArray(data?.products))return;const next:Record<string,RewardProduct>={};data.products.forEach((product:RewardProduct)=>{if(product?.id)next[String(product.id)]=product;});if(Object.keys(next).length)setResolvedProducts(current=>({...current,...next}));}).catch(()=>undefined);return()=>{cancelled=true};},[liveDataActive,gifts,catalogProducts,resolvedProducts]);
+  useEffect(()=>{if(!liveDataActive)return;setEvents(readTaskEvents());let sp:(()=>void)|undefined;let sw:(()=>void)|undefined;const stop=onAuthStateChanged(auth,u=>{sp?.();sw?.();setUser(u);if(!u){setProfile(null);setWallet(readGuestWallet());return;}sp=onSnapshot(doc(db,"reseller_profiles",u.uid),s=>setProfile(s.exists()?s.data() as ResellerProfile:null),()=>undefined);sw=onSnapshot(doc(db,"user_rewards",u.uid),s=>setWallet(s.data()||{}),()=>undefined);});return()=>{stop();sp?.();sw?.();};},[liveDataActive]);
 
-  const source:LiveSettings={...fallback,...live};
+  const source:LiveSettings=fallback;
   const tasks=useMemo(()=>(source.resellerTasks?.length?source.resellerTasks:DEFAULT_RESELLER_TASKS).filter(t=>t.active!==false),[source.resellerTasks]);
   const tiers=useMemo(()=>(source.resellerTiers?.length?[...source.resellerTiers]:getResellerTiers()).sort((a,b)=>a.minMonthlyOrders-b.minMonthlyOrders),[source.resellerTiers]);
   const prizes=(rewardSettings.spinWheelSlots||[]).filter(p=>p.active!==false&&Number(p.stock??1)>0);
@@ -97,7 +100,7 @@ export default function HomeResellerLiveRail(){
   const topBase=2+tasks.length; const bottomBase=1+tiers.length+vouchers.length; const topGiftCount=Math.max(0,Math.min(gifts.length,Math.round((bottomBase+gifts.length-topBase)/2))); const topGifts=gifts.slice(0,topGiftCount); const bottomGifts=gifts.slice(topGiftCount);
   const GiftCard=({gift}:{gift:RewardGift})=>{const image=gift.imageUrl||productImage(gift.productId?products[gift.productId]:undefined);return <article className="ph-card ph-gift"><div className="ph-gift-art">{image?<img src={image} alt={gift.title||"Gift"}/>:<Gift size={30}/>}</div><small>POINT STORE</small><h4>{gift.title||products[gift.productId||""]?.title||products[gift.productId||""]?.name||"PrimeHub Gift"}</h4><p>{Number(gift.pointsCost||0).toLocaleString()} points</p></article>;};
 
-  return <section className="ph-live-rail" id="reseller-home">
+  return <section ref={sectionRef} className="ph-live-rail" id="reseller-home">
     <HomeHeading>Reseller Club</HomeHeading>
     <div className="ph-live-tabs"><a href="#reseller-rewards">Rewards</a><a href="#reseller-tasks">Tasks</a><a href="#reseller-wallet">Wallet</a><a href="#reseller-tiers">Tiers</a><Link href="/reseller/dashboard" prefetch={false}>Open Club</Link></div>
     <div className="ph-live-hint">Swipe → all tasks, wallet, tiers, vouchers & gifts</div>

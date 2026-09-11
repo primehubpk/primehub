@@ -1,6 +1,6 @@
 import { Suspense } from 'react';
 import HomePageClient from '@/components/HomePageClient';
-import { getPublicCatalogSnapshot, getRewardSettingsSnapshot, getStorefrontSettingsSnapshot } from '@/lib/publicCatalogServer';
+import { getPublicCatalogSnapshot, getStorefrontSettingsResultSnapshot } from '@/lib/publicCatalogServer';
 import type { Category, SiteSettings } from '@/lib/types';
 import type { Product } from '@/components/shop/ShopTypes';
 
@@ -77,23 +77,24 @@ function HomeLoadingState() {
 }
 
 async function HomeContent() {
-  const [catalogResult, settingsResult, rewardsResult] = await Promise.allSettled([
+  const [catalogResult, settingsResult] = await Promise.allSettled([
     getPublicCatalogSnapshot(),
-    getStorefrontSettingsSnapshot(),
-    getRewardSettingsSnapshot(),
+    getStorefrontSettingsResultSnapshot(),
   ]);
 
   const snapshot = catalogResult.status === 'fulfilled'
     ? catalogResult.value
     : { products: [], categories: [] };
-  const rawSettings = settingsResult.status === 'fulfilled'
-    ? settingsResult.value
+  const settingsDocuments = settingsResult.status === 'fulfilled'
+    ? (settingsResult.value.documents as Record<string, any>)
     : {};
-  const rewardSettings = rewardsResult.status === 'fulfilled'
-    ? rewardsResult.value
-    : {};
+  const rawSettings = {
+    ...(settingsDocuments.general || {}),
+    ...(settingsDocuments.main || {}),
+  };
+  const rewardSettings = settingsDocuments.rewards || {};
   const initialSettings = {
-    ...hydrateBigDealImages(rawSettings as Record<string, any>, snapshot.products as any[]),
+    ...hydrateBigDealImages(rawSettings, snapshot.products as any[]),
     homeRewardSettings: rewardSettings,
   };
 

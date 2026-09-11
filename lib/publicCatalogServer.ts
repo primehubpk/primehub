@@ -109,8 +109,9 @@ export const getRewardSettingsSnapshot = unstable_cache(
   { revalidate: 60, tags: ['storefront-settings', 'rewards'] },
 );
 
-export async function getFreshStorefrontSettingsSnapshot() {
-  const result = await getStorefrontSettingsWithBigDealRecovery({ cache: 'no-store' });
+async function mergeFreshStorefrontSettings(
+  result: Awaited<ReturnType<typeof getStorefrontSettingsWithBigDealRecovery>>,
+) {
   const documents = result.documents as Record<string, any>;
   const main = documents.main || {};
   const legacy = documents.general || {};
@@ -130,6 +131,20 @@ export async function getFreshStorefrontSettingsSnapshot() {
   }
 
   return merged;
+}
+
+export async function getFreshStorefrontSettingsDocumentsSnapshot() {
+  const result = await getStorefrontSettingsWithBigDealRecovery({ cache: 'no-store' });
+  const main = await mergeFreshStorefrontSettings(result);
+  return {
+    ...(result.documents as Record<string, any>),
+    main,
+  };
+}
+
+export async function getFreshStorefrontSettingsSnapshot() {
+  const documents = await getFreshStorefrontSettingsDocumentsSnapshot();
+  return documents.main || {};
 }
 
 async function loadPrimeSkills() {
