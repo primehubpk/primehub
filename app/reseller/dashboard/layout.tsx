@@ -67,17 +67,6 @@ function dashboardContentIsReady(host: HTMLDivElement | null) {
   return !waitingForProfile;
 }
 
-function hideDuplicateRewardWallet(host: HTMLDivElement | null) {
-  if (!host) return;
-  const sections = Array.from(host.querySelectorAll('main section')) as HTMLElement[];
-  sections.forEach(section => {
-    const directLabel = Array.from(section.children).find(child => child.tagName === 'SPAN');
-    const label = directLabel?.textContent?.trim().toLowerCase();
-    if (label === 'reward wallet') section.style.display = 'none';
-    else if (label === 'wallet') section.style.display = '';
-  });
-}
-
 export default function ResellerDashboardLayout({ children }: { children: ReactNode }) {
   const contentRef = useRef<HTMLDivElement>(null);
   const readyRef = useRef(false);
@@ -90,12 +79,10 @@ export default function ResellerDashboardLayout({ children }: { children: ReactN
 
     const check = () => {
       frameRef.current = null;
-      const ready = dashboardContentIsReady(host);
-      if (ready && !readyRef.current) {
+      if (!readyRef.current && dashboardContentIsReady(host)) {
         readyRef.current = true;
         setContentReady(true);
       }
-      if (ready) hideDuplicateRewardWallet(host);
     };
 
     const scheduleCheck = () => {
