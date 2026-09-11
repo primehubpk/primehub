@@ -8,7 +8,7 @@
       "feature/home-nav-instant-active-fix": false,
       "fix/mobile-nav-performance-audit": true,
       "fix/bottom-nav-performance": true,
-      "fix/instant-home-shop-navigation-phase1": false
+      "fix/instant-home-shop-navigation-phase1": true
     }
   }
 }
