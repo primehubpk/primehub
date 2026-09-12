@@ -1,4 +1,10 @@
+import { revalidateTag } from 'next/cache';
 import { getAdminDb } from '@/lib/firebaseAdmin';
+import {
+  mapFirebaseDocumentToSupabase,
+  mirrorSupabaseUpsert,
+  recordMirrorFailure,
+} from '@/lib/dualWriteServer';
 
 export type ProductSyncInput = {
   title: string;
@@ -87,6 +93,25 @@ export function validateProductInput(body: unknown): ProductSyncInput {
   };
 }
 
+async function syncProductToStorefront(productId: string) {
+  const snapshot = await getAdminDb().collection('products').doc(productId).get();
+  if (!snapshot.exists) return;
+
+  const row = mapFirebaseDocumentToSupabase('products', productId, snapshot.data() || {});
+  if (row) {
+    const result = await mirrorSupabaseUpsert({ table: 'products', row });
+    if (result.attempted && !result.ok) {
+      console.error(`Bot product ${productId} Supabase mirror failed`, result.error);
+      await recordMirrorFailure('products', productId, 'upsert', row);
+    }
+  }
+
+  revalidateTag('public-catalog');
+  revalidateTag('public-products');
+  revalidateTag('salaar-catalog');
+  revalidateTag('salaar-store-knowledge');
+}
+
 export async function upsertProduct(input: ProductSyncInput): Promise<ProductSyncResult> {
   const db = getAdminDb();
   const slug = input.slug || slugify(input.title);
@@ -121,9 +146,12 @@ export async function upsertProduct(input: ProductSyncInput): Promise<ProductSyn
       ...payload,
       createdAt: now,
     });
+    await syncProductToStorefront(ref.id);
     return { id: ref.id, slug, created: true };
   }
 
+  const productId = existing.docs[0].id;
   await existing.docs[0].ref.set(payload, { merge: true });
-  return { id: existing.docs[0].id, slug, created: false };
+  await syncProductToStorefront(productId);
+  return { id: productId, slug, created: false };
 }
