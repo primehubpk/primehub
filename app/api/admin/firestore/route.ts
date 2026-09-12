@@ -1,11 +1,24 @@
 import { NextResponse } from 'next/server';
 import { revalidateTag } from 'next/cache';
 import { getAdminDb } from '@/lib/firebaseAdmin';
-import { mapFirebaseDocumentToSupabase, mirrorSupabaseDelete, mirrorSupabaseUpsert, recordMirrorFailure } from '@/lib/dualWriteServer';
+import {
+  getSupabasePrimaryPayload,
+  mapDocumentToSupabase,
+  recordMirrorFailure,
+  supabasePrimaryDelete,
+  supabasePrimaryUpsert,
+} from '@/lib/dualWriteServer';
 
 export const runtime = 'nodejs';
 
 const ADMIN_EMAIL = 'primehubpk1@gmail.com';
+const SUPABASE_PRIMARY_COLLECTIONS = new Set([
+  'products',
+  'categories',
+  'settings',
+  'prime_skills',
+  'reward_gifts',
+]);
 
 function isAuthorized(request: Request) {
   const cookie = request.headers.get('cookie') || '';
@@ -34,15 +47,46 @@ function refreshCachesForCollection(name: string) {
   }
 }
 
-async function mirrorFinalDocument(name: string, id: string) {
+async function firebaseData(name: string, id: string) {
   const snapshot = await getAdminDb().collection(name).doc(id).get();
-  if (!snapshot.exists) return;
-  const row = mapFirebaseDocumentToSupabase(name, id, snapshot.data() || {});
-  if (!row) return;
-  const result = await mirrorSupabaseUpsert({ table: name, row });
-  if (result.attempted && !result.ok) {
-    console.error(`Admin ${name}/${id} Supabase mirror failed`, result.error);
-    await recordMirrorFailure(name, id, 'upsert', row);
+  return snapshot.exists ? (snapshot.data() || {}) : null;
+}
+
+async function currentPrimaryData(name: string, id: string) {
+  try {
+    const payload = await getSupabasePrimaryPayload(name, id);
+    if (payload) return payload;
+  } catch (error) {
+    console.error(`Admin ${name}/${id} Supabase primary read failed`, error);
+    throw error;
+  }
+  return firebaseData(name, id);
+}
+
+async function writeSupabaseFirst(name: string, id: string, data: Record<string, any>) {
+  const row = mapDocumentToSupabase(name, id, data, 'supabase');
+  if (!row) throw new Error(`Supabase primary mapping is unavailable for ${name}.`);
+  await supabasePrimaryUpsert({ table: name, row });
+
+  try {
+    await getAdminDb().collection(name).doc(id).set(data, { merge: false });
+    return null;
+  } catch (error) {
+    console.error(`Admin ${name}/${id} Firebase mirror failed`, error);
+    await recordMirrorFailure(name, id, 'upsert', data, 'firebase');
+    return error instanceof Error ? error.message : String(error);
+  }
+}
+
+async function deleteSupabaseFirst(name: string, id: string) {
+  await supabasePrimaryDelete({ table: name, id });
+  try {
+    await getAdminDb().collection(name).doc(id).delete();
+    return null;
+  } catch (error) {
+    console.error(`Admin ${name}/${id} Firebase delete mirror failed`, error);
+    await recordMirrorFailure(name, id, 'delete', {}, 'firebase');
+    return error instanceof Error ? error.message : String(error);
   }
 }
 
@@ -58,40 +102,70 @@ export async function POST(request: Request) {
 
     if (!name) return NextResponse.json({ error: 'Collection name is required.' }, { status: 400 });
 
+    const supabasePrimary = SUPABASE_PRIMARY_COLLECTIONS.has(name);
+
     if (action === 'create') {
       const ref = db.collection(name).doc();
-      await ref.set({ ...normalize(name, body.value || {}), adminActor: ADMIN_EMAIL });
-      await mirrorFinalDocument(name, ref.id);
+      const data = { ...normalize(name, body.value || {}), adminActor: ADMIN_EMAIL };
+
+      if (supabasePrimary) {
+        const mirrorWarning = await writeSupabaseFirst(name, ref.id, data);
+        refreshCachesForCollection(name);
+        return NextResponse.json({ success: true, id: ref.id, primary: 'supabase', mirrorWarning });
+      }
+
+      await ref.set(data);
       refreshCachesForCollection(name);
-      return NextResponse.json({ success: true, id: ref.id });
+      return NextResponse.json({ success: true, id: ref.id, primary: 'firebase' });
     }
 
     if (action === 'update') {
       if (!id) return NextResponse.json({ error: 'Document id is required.' }, { status: 400 });
-      await db.collection(name).doc(id).update(normalize(name, body.value || {}));
-      await mirrorFinalDocument(name, id);
+      const patch = normalize(name, body.value || {});
+
+      if (supabasePrimary) {
+        const existing = await currentPrimaryData(name, id);
+        if (!existing) return NextResponse.json({ error: 'Document not found.' }, { status: 404 });
+        const data = { ...existing, ...patch };
+        const mirrorWarning = await writeSupabaseFirst(name, id, data);
+        refreshCachesForCollection(name);
+        return NextResponse.json({ success: true, id, primary: 'supabase', mirrorWarning });
+      }
+
+      await db.collection(name).doc(id).update(patch);
       refreshCachesForCollection(name);
-      return NextResponse.json({ success: true, id });
+      return NextResponse.json({ success: true, id, primary: 'firebase' });
     }
 
     if (action === 'set') {
       if (!id) return NextResponse.json({ error: 'Document id is required.' }, { status: 400 });
-      await db.collection(name).doc(id).set(normalize(name, body.value || {}), { merge: true });
-      await mirrorFinalDocument(name, id);
+      const patch = normalize(name, body.value || {});
+
+      if (supabasePrimary) {
+        const existing = await currentPrimaryData(name, id) || {};
+        const data = { ...existing, ...patch };
+        const mirrorWarning = await writeSupabaseFirst(name, id, data);
+        refreshCachesForCollection(name);
+        return NextResponse.json({ success: true, id, primary: 'supabase', mirrorWarning });
+      }
+
+      await db.collection(name).doc(id).set(patch, { merge: true });
       refreshCachesForCollection(name);
-      return NextResponse.json({ success: true, id });
+      return NextResponse.json({ success: true, id, primary: 'firebase' });
     }
 
     if (action === 'delete') {
       if (!id) return NextResponse.json({ error: 'Document id is required.' }, { status: 400 });
-      await db.collection(name).doc(id).delete();
-      const result = await mirrorSupabaseDelete({ table: name, id });
-      if (result.attempted && !result.ok) {
-        console.error(`Admin ${name}/${id} Supabase delete mirror failed`, result.error);
-        await recordMirrorFailure(name, id, 'delete', {});
+
+      if (supabasePrimary) {
+        const mirrorWarning = await deleteSupabaseFirst(name, id);
+        refreshCachesForCollection(name);
+        return NextResponse.json({ success: true, id, primary: 'supabase', mirrorWarning });
       }
+
+      await db.collection(name).doc(id).delete();
       refreshCachesForCollection(name);
-      return NextResponse.json({ success: true, id });
+      return NextResponse.json({ success: true, id, primary: 'firebase' });
     }
 
     if (action === 'get') {
@@ -109,6 +183,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Unsupported admin firestore action.' }, { status: 400 });
   } catch (error) {
     console.error('Admin firestore route error', error);
-    return NextResponse.json({ error: 'Admin operation failed.' }, { status: 500 });
+    const message = error instanceof Error ? error.message : 'Admin operation failed.';
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
