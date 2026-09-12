@@ -68,7 +68,7 @@ export default async function HomePage() {
   const wholesaleVideos = wholesaleResult.status === 'fulfilled'
     ? wholesaleResult.value.videos
     : [];
-  const initialSettings = {
+  const initialSettings: Record<string, any> = {
     ...hydrateBigDealImages(rawSettings, snapshot.products as any[]),
     ...(wholesaleVideos.length ? { wholesaleVideos } : {}),
     homeRewardSettings: rewardSettings,
