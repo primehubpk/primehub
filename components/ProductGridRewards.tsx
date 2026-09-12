@@ -78,6 +78,17 @@ const GUEST_KEY = "phdeals-guest-rewards";
 
 const title = (p: Product) => p.title || p.name || "Untitled Product";
 
+function reconcileProducts(current: Product[], incoming: Product[]) {
+  if (current.length === 0) return shuffleProducts(incoming);
+  const latestById = new Map(incoming.map((product) => [product.id, product]));
+  const currentIds = new Set(current.map((product) => product.id));
+  const retained = current
+    .filter((product) => latestById.has(product.id))
+    .map((product) => latestById.get(product.id) as Product);
+  const added = incoming.filter((product) => !currentIds.has(product.id));
+  return [...retained, ...added];
+}
+
 const image = (p: Product) => {
   const first = p.images?.[0];
   const raw =
@@ -176,7 +187,7 @@ export default function ProductGridRewards({
 
   useEffect(() => {
     if (!liveUpdates) {
-      setProducts(shuffleProducts(initialProducts));
+      setProducts((current) => reconcileProducts(current, initialProducts));
       setLoading(initialProducts.length === 0);
     }
   }, [initialProducts, liveUpdates]);
