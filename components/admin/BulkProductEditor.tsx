@@ -36,11 +36,12 @@ type BulkDraft = {
 const EMPTY_BULK: BulkDraft = { category: '', originalPrice: '', price: '', stock: '', published: '', bucketId: '', bucketAction: '', isWholesale: '' };
 
 function draftOf(product: Product): ProductDraft {
+  const legacyStock = (product as any).stock ?? (product as any).quantity ?? (product as any).inventory;
   return {
     title: String(product.title || ''),
     originalPrice: String(product.originalPrice ?? product.price ?? 0),
     price: String(product.price ?? 0),
-    stock: String(product.stock ?? 0),
+    stock: legacyStock == null ? '' : String(legacyStock),
     category: String(product.category || ''),
     priceBucketIds: Array.isArray(product.priceBucketIds) ? product.priceBucketIds.map(String) : [],
     published: product.published !== false,
@@ -129,7 +130,7 @@ export default function BulkProductEditor() {
     try {
       const originalPrice = safeNumber(draft.originalPrice, 'Original price');
       const price = safeNumber(draft.price, 'Price');
-      const stock = safeNumber(draft.stock, 'Stock');
+      const stock = draft.stock.trim() === '' ? null : safeNumber(draft.stock, 'Stock');
       if (!draft.title.trim()) throw new Error('Product name is required.');
       if (!draft.category) throw new Error('Category is required.');
       if (price > originalPrice) throw new Error('Price cannot be higher than original price.');
@@ -137,7 +138,9 @@ export default function BulkProductEditor() {
         ? product.variantMatrix.map((row: any) => ({ ...row, price: String(price) }))
         : product.variantMatrix;
       await updateAdminDocument('products', product.id, {
-        title: draft.title.trim(), slug: slugify(draft.title), originalPrice, price, stock, category: draft.category,
+        title: draft.title.trim(), slug: slugify(draft.title), originalPrice, price,
+        ...(stock != null ? { stock } : {}),
+        category: draft.category,
         priceBucketIds: draft.priceBucketIds, published: draft.published, isWholesale: draft.isWholesale,
         ...(variantMatrix ? { variantMatrix } : {}), updatedAt: new Date().toISOString(),
       });
@@ -265,7 +268,7 @@ function EditableProductRow({ product, categories, priceBuckets, checked, saving
       <input aria-label="Product name" value={draft.title} onChange={event => setDraft(current => ({ ...current, title: event.target.value }))} className={`${inputClass} font-bold`}/>
       <label className="grid gap-1"><span className="text-[8px] font-black uppercase text-black/35">Original</span><input aria-label="Original price" type="number" min="0" value={draft.originalPrice} onChange={event => setDraft(current => ({ ...current, originalPrice: event.target.value }))} className={inputClass}/></label>
       <label className="grid gap-1"><span className="text-[8px] font-black uppercase text-black/35">Sale price</span><input aria-label="Sale price" type="number" min="0" value={draft.price} onChange={event => setDraft(current => ({ ...current, price: event.target.value }))} className={inputClass}/></label>
-      <label className="grid gap-1"><span className="text-[8px] font-black uppercase text-black/35">Stock</span><input aria-label="Stock" type="number" min="0" value={draft.stock} onChange={event => setDraft(current => ({ ...current, stock: event.target.value }))} className={inputClass}/></label>
+      <label className="grid gap-1"><span className="text-[8px] font-black uppercase text-black/35">Stock</span><input aria-label="Stock" type="number" min="0" value={draft.stock} onChange={event => setDraft(current => ({ ...current, stock: event.target.value }))} placeholder="Keep existing" className={inputClass}/></label>
       <select aria-label="Category" value={draft.category} onChange={event => setDraft(current => ({ ...current, category: event.target.value }))} className={inputClass}><option value="">Select category</option>{hasLegacyCategory && <option value={draft.category}>Current: {draft.category}</option>}{categories.map(category => <option key={category.id} value={category.id}>{category.title}</option>)}</select>
       <div className="grid gap-1.5 text-[10px] font-bold"><label className="flex items-center gap-2"><input type="checkbox" checked={draft.published} onChange={event => setDraft(current => ({ ...current, published: event.target.checked }))} className="accent-[#0F6A5F]"/>Published</label><label className="flex items-center gap-2"><input type="checkbox" checked={draft.isWholesale} onChange={event => { const enabled = event.target.checked; const wholesaleIds = new Set(priceBuckets.filter(isWholesalePriceBucket).map(bucket => bucket.id)); setDraft(current => ({ ...current, isWholesale: enabled, priceBucketIds: enabled ? Array.from(new Set([...current.priceBucketIds, ...wholesaleIds])) : current.priceBucketIds.filter(id => !wholesaleIds.has(id)) })); }} className="accent-[#E1352B]"/>Wholesale</label></div>
       <div className="flex gap-1"><button type="button" disabled={saving || disabled} onClick={() => onSave(draft)} aria-label={`Save ${product.title}`} className="rounded-xl bg-[#14140F] p-2.5 text-white disabled:opacity-40">{saving ? <Loader2 size={14} className="animate-spin"/> : <Save size={14}/>}</button><button type="button" disabled={saving || disabled} onClick={onDelete} aria-label={`Delete ${product.title}`} className="rounded-xl bg-red-50 p-2.5 text-[#E1352B] disabled:opacity-40"><Trash2 size={14}/></button></div>
