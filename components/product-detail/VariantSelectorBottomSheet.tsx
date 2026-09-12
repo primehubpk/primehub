@@ -19,6 +19,8 @@ type Props = {
   onConfirm: (selection: ProductVariantSelection, quantity: number) => void;
 };
 
+const warmedImages = new Map<string, HTMLImageElement>();
+
 function stockOf(row?: ProductVariantRow) {
   return Math.max(0, Number(row?.stock ?? 0));
 }
@@ -38,6 +40,18 @@ function imageValue(value: unknown): string {
 
 function safeImage(value: unknown): string {
   return normalizeImageUrl(imageValue(value));
+}
+
+function warmImage(src: string) {
+  if (!src || typeof window === 'undefined' || warmedImages.has(src)) return;
+  const image = new window.Image();
+  image.decoding = 'sync';
+  image.fetchPriority = 'high';
+  image.src = src;
+  warmedImages.set(src, image);
+  if (typeof image.decode === 'function') {
+    void image.decode().catch(() => undefined);
+  }
 }
 
 export default function VariantSelectorBottomSheet({
@@ -100,11 +114,7 @@ export default function VariantSelectorBottomSheet({
   }, [effectiveRows, fallbackImage, imageForColor]);
 
   useEffect(() => {
-    preloadImages.forEach((src) => {
-      const image = new window.Image();
-      image.decoding = 'async';
-      image.src = src;
-    });
+    preloadImages.forEach(warmImage);
   }, [preloadImages]);
 
   const [color, setColor] = useState('');
@@ -145,7 +155,26 @@ export default function VariantSelectorBottomSheet({
   const valid = Boolean(selected && stock > 0 && displayPrice > 0);
   const safeQty = Math.min(Math.max(1, qty), Math.max(1, stock));
 
-  if (!open) return null;
+  if (!open) {
+    return (
+      <div
+        aria-hidden="true"
+        className="pointer-events-none fixed -left-[9999px] top-0 h-14 w-14 overflow-hidden opacity-0"
+      >
+        {preloadImages.map((src) => (
+          <img
+            key={src}
+            src={src}
+            alt=""
+            loading="eager"
+            decoding="sync"
+            fetchPriority="high"
+            className="h-14 w-14 object-cover"
+          />
+        ))}
+      </div>
+    );
+  }
 
   return (
     <div
@@ -164,11 +193,10 @@ export default function VariantSelectorBottomSheet({
           <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-2xl bg-[#F4F4F1]">
             {selectedImage ? (
               <img
-                key={selectedImage}
                 src={selectedImage}
                 alt=""
                 loading="eager"
-                decoding="async"
+                decoding="sync"
                 fetchPriority="high"
                 className="h-full w-full object-cover"
               />
@@ -226,7 +254,8 @@ export default function VariantSelectorBottomSheet({
                           src={itemImage}
                           alt=""
                           loading="eager"
-                          decoding="async"
+                          decoding="sync"
+                          fetchPriority="high"
                           className="h-full w-full object-cover"
                         />
                       ) : <span className="block h-full w-full bg-black/10" />}
