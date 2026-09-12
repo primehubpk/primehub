@@ -10,3 +10,15 @@
 .ph-wheel-disc em{width:42px;height:42px;border-width:3px;box-shadow:0 2px 8px rgba(0,0,0,.28)}
 @media(max-width:390px){.ph-wheel-wrap{width:136px;height:136px}.ph-wheel-disc em{width:38px;height:38px}.ph-prize{padding:1px}}
 @media(min-width:760px){.ph-wheel-wrap{width:154px;height:154px}}
+
+.ph-win-backdrop{position:fixed;inset:0;z-index:120;display:grid;place-items:center;padding:20px;background:rgba(10,16,15,.72);backdrop-filter:blur(8px)}
+.ph-win-modal{position:relative;width:min(92vw,360px);overflow:hidden;border:1px solid rgba(255,255,255,.55);border-radius:30px;background:linear-gradient(160deg,#fff 0%,#fff9ef 100%);padding:24px;text-align:center;color:#14140f;box-shadow:0 28px 80px rgba(0,0,0,.38)}
+.ph-win-modal:before{content:"";position:absolute;inset:-80px -40px auto;height:170px;background:radial-gradient(circle,#ffbd59 0,rgba(255,189,89,0) 70%);opacity:.45;pointer-events:none}
+.ph-win-close{position:absolute!important;right:12px;top:12px;z-index:3!important;width:32px!important;height:32px!important;border-radius:50%!important;background:#14140f!important;color:#fff!important;font-size:20px!important;line-height:1!important}
+.ph-win-kicker{position:relative;z-index:1;color:#e85d04;font-size:9px;font-weight:950;letter-spacing:.2em}
+.ph-win-art{position:relative;z-index:1;width:150px;height:150px;margin:14px auto 10px;overflow:hidden;border:7px solid #fff;border-radius:34px;background:#fff;box-shadow:0 16px 35px rgba(20,20,15,.17)}
+.ph-win-art img{display:block;width:100%;height:100%;object-fit:contain;background:#fff}
+.ph-win-modal h3{position:relative;z-index:1;margin:8px 0 5px;font-size:25px;line-height:1;font-weight:950}
+.ph-win-modal p{position:relative;z-index:1;margin:0 auto;max-width:280px;color:#5f5d56;font-size:13px;line-height:1.55;font-weight:750}
+.ph-win-modal>a{position:relative;z-index:1;display:block;margin-top:17px;border-radius:14px;background:linear-gradient(135deg,#ff982f,#ffbd59);padding:12px 16px;color:#14140f;font-size:12px;font-weight:950;box-shadow:0 8px 20px rgba(232,93,4,.22)}
+@media(max-width:390px){.ph-win-modal{padding:21px 18px;border-radius:26px}.ph-win-art{width:132px;height:132px;border-radius:29px}.ph-win-modal h3{font-size:22px}.ph-win-modal p{font-size:12px}}
