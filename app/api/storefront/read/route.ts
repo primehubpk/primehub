@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
 import { getConfiguredReadMode } from '@/lib/dualReadServer';
 import {
+  getFreshPublicCatalogSnapshot,
+  getFreshPublicProductSnapshot,
   getFreshStorefrontSettingsDocumentsSnapshot,
   getPrimeSkillsSnapshot,
-  getPublicCatalogSnapshot,
-  getPublicProductSnapshot,
 } from '@/lib/publicCatalogServer';
 
 export const runtime = 'nodejs';
@@ -52,12 +52,12 @@ export async function GET(request: Request) {
       if (ids.length === 0) {
         return NextResponse.json({ error: 'At least one product id is required.' }, { status: 400 });
       }
-      const results = await Promise.all(ids.map((id) => getPublicProductSnapshot(id)));
+      const results = await Promise.all(ids.map((id) => getFreshPublicProductSnapshot(id)));
       const products = results
         .map((result) => result.product)
         .filter((product) => Boolean(product));
       return NextResponse.json(
-        { products, mode: getConfiguredReadMode() },
+        { products, source: 'fresh', mode: getConfiguredReadMode() },
         { headers: FRESH_BROWSER_HEADERS },
       );
     }
@@ -66,7 +66,7 @@ export async function GET(request: Request) {
       if (!id) {
         return NextResponse.json({ error: 'Product id is required.' }, { status: 400 });
       }
-      const result = await getPublicProductSnapshot(id);
+      const result = await getFreshPublicProductSnapshot(id);
       if (!result.product) {
         return NextResponse.json(
           { error: 'Product not found.', mode: getConfiguredReadMode() },
@@ -74,13 +74,13 @@ export async function GET(request: Request) {
         );
       }
       return NextResponse.json(
-        { ...result, mode: getConfiguredReadMode() },
+        { ...result, source: 'fresh', mode: getConfiguredReadMode() },
         { headers: FRESH_BROWSER_HEADERS },
       );
     }
-    const result = await getPublicCatalogSnapshot();
+    const result = await getFreshPublicCatalogSnapshot();
     return NextResponse.json(
-      { ...result, mode: getConfiguredReadMode() },
+      { ...result, source: 'fresh', mode: getConfiguredReadMode() },
       { headers: FRESH_BROWSER_HEADERS },
     );
   } catch (error) {
