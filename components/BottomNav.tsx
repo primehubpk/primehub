@@ -21,8 +21,6 @@ function isShopRoute(pathname: string) {
     pathname.startsWith('/shop/') ||
     pathname.startsWith('/category/') ||
     pathname.startsWith('/product/') ||
-    pathname === '/sale-mela' ||
-    pathname.startsWith('/sale-mela/') ||
     pathname === '/new-arrivals' ||
     pathname.startsWith('/new-arrivals/') ||
     pathname === '/weekly-deals' ||
