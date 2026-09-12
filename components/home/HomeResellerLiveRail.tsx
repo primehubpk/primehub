@@ -41,14 +41,11 @@ function wheelBackground(count:number){const safe=Math.max(1,count);const step=3
 function rewardVisual(prize:RewardPrize,product?:RewardProduct){
   const uploaded=normalizeImageUrl(prize.imageUrl||productImage(product));
   if(uploaded)return uploaded;
-  const value=prize.type==="points"?String(Math.max(0,Number(prize.points||0))):prize.type==="coupon"?`Rs ${Math.max(0,Number(prize.voucherAmount||0)).toLocaleString()}`:prize.type==="free-delivery"?"FREE":prize.type==="product"?"GIFT":"NEXT";
-  const label=prize.type==="points"?"POINTS":prize.type==="coupon"?"VOUCHER":prize.type==="free-delivery"?"DELIVERY":prize.type==="product"?"PRODUCT":"TRY AGAIN";
-  const colors:Record<string,[string,string]>={points:["#6C3CE9","#A88BFF"],coupon:["#E14632","#FF9B55"],product:["#087B68","#38C6A8"],"free-delivery":["#1768AC","#58B7F3"],"try-again":["#303039","#737382"]};
-  const [a,b]=colors[prize.type]||colors["try-again"];
-  const safeValue=value.replace(/[<>&]/g,"");
-  const safeLabel=label.replace(/[<>&]/g,"");
-  const svg=`<svg xmlns='http://www.w3.org/2000/svg' width='320' height='320' viewBox='0 0 320 320'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop stop-color='${a}'/><stop offset='1' stop-color='${b}'/></linearGradient><filter id='s'><feDropShadow dx='0' dy='8' stdDeviation='8' flood-opacity='.25'/></filter></defs><rect width='320' height='320' rx='72' fill='url(#g)'/><circle cx='255' cy='55' r='82' fill='white' opacity='.13'/><circle cx='65' cy='275' r='70' fill='black' opacity='.08'/><path d='M91 82h138a18 18 0 0 1 18 18v120a18 18 0 0 1-18 18H91a18 18 0 0 1-18-18V100a18 18 0 0 1 18-18Z' fill='white' opacity='.97' filter='url(#s)'/><text x='160' y='151' text-anchor='middle' fill='${a}' font-family='Arial,sans-serif' font-size='42' font-weight='900'>${safeValue}</text><text x='160' y='190' text-anchor='middle' fill='#171717' font-family='Arial,sans-serif' font-size='22' font-weight='900' letter-spacing='2'>${safeLabel}</text><circle cx='160' cy='224' r='6' fill='${b}'/></svg>`;
-  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+  if(prize.type==="points")return "/rewards/wheel/points.svg";
+  if(prize.type==="coupon")return "/rewards/wheel/voucher.svg";
+  if(prize.type==="product")return "/rewards/wheel/product.svg";
+  if(prize.type==="free-delivery")return "/rewards/wheel/delivery.svg";
+  return "/rewards/wheel/try-again.svg";
 }
 function rewardMessage(prize:RewardPrize,authenticated:boolean){
   const pending=authenticated?"":" Sign in to add it to your wallet.";
@@ -76,6 +73,7 @@ export default function HomeResellerLiveRail({initialProducts=[]}:{initialProduc
   const products=useMemo(()=>({...catalogProducts,...resolvedProducts}),[catalogProducts,resolvedProducts]);
   const [liveDataActive,setLiveDataActive]=useState(false);
   const sectionRef=useRef<HTMLElement|null>(null);
+  const revealTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
   const [user,setUser]=useState<User|null>(null);
   const [profile,setProfile]=useState<ResellerProfile|null>(null);
   const [wallet,setWallet]=useState<RewardWallet>({});
@@ -85,6 +83,7 @@ export default function HomeResellerLiveRail({initialProducts=[]}:{initialProduc
   const [message,setMessage]=useState("");
   const [selectedPrize,setSelectedPrize]=useState<RewardPrize|null>(null);
 
+  useEffect(()=>()=>{if(revealTimer.current)clearTimeout(revealTimer.current);},[]);
   useEffect(()=>{const node=sectionRef.current;if(!node)return;if(typeof IntersectionObserver==="undefined"){setLiveDataActive(true);return;}const observer=new IntersectionObserver(entries=>{if(entries.some(entry=>entry.isIntersecting)){setLiveDataActive(true);observer.disconnect();}},{rootMargin:"600px 0px"});observer.observe(node);return()=>observer.disconnect();},[]);
   useEffect(()=>{if(!liveDataActive)return;return onSnapshot(collection(db,"reward_gifts"),s=>setGifts(s.docs.map(d=>({id:d.id,...d.data()} as RewardGift)).filter(g=>g.active!==false&&Number(g.stock??1)>0)),()=>undefined);},[liveDataActive]);
   useEffect(()=>{if(!liveDataActive)return;const linkedIds=[...gifts.map(g=>g.productId),...(rewardSettings.spinWheelSlots||[]).filter(p=>p.type==="product").map(p=>p.productId)];const missingIds=Array.from(new Set(linkedIds.map(id=>String(id||"").trim()).filter(Boolean))).filter(id=>!catalogProducts[id]&&!resolvedProducts[id]).slice(0,24);if(!missingIds.length)return;let cancelled=false;const query=encodeURIComponent(JSON.stringify(missingIds));fetch(`/api/storefront/read?type=products&ids=${query}`,{cache:"no-store"}).then(response=>response.ok?response.json():null).then(data=>{if(cancelled||!Array.isArray(data?.products))return;const next:Record<string,RewardProduct>={};data.products.forEach((product:RewardProduct)=>{if(product?.id)next[String(product.id)]=product;});if(Object.keys(next).length)setResolvedProducts(current=>({...current,...next}));}).catch(()=>undefined);return()=>{cancelled=true};},[liveDataActive,gifts,rewardSettings.spinWheelSlots,catalogProducts,resolvedProducts]);
@@ -114,7 +113,39 @@ export default function HomeResellerLiveRail({initialProducts=[]}:{initialProduc
   ];
   if(source.resellerHomeEnabled===false)return null;
 
-  async function spin(){if(busy||usedSpin||!prizes.length)return;setBusy(true);setMessage("");setSelectedPrize(null);try{let data:any;if(user){const token=await user.getIdToken();const r=await fetch("/api/reseller/reward-action",{method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${token}`},body:JSON.stringify({action:"spin",guestId:guestId()})});data=await r.json();if(!r.ok)throw new Error(data.error||"Spin failed.");}else{const r=await fetch("/api/reseller/guest-reward",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"spin",guestId:guestId()})});data=await r.json();if(!r.ok)throw new Error(data.error||"Spin failed.");const next={...guestWallet,lastSpin:data.wallet?.lastSpin||today};writeGuestWallet(next);setWallet(next);if(data.prize&&data.prize.type!=="try-again")try{localStorage.setItem(PENDING_GUEST_PRIZE_KEY,JSON.stringify(data.prize));}catch{}}const winner=Math.max(0,prizes.findIndex(p=>p.id===data?.prize?.id));setRotation(v=>v+1440+(360-winner*(360/Math.max(1,prizes.length))));setSelectedPrize(data?.prize||null);setMessage(data?.prize?rewardMessage(data.prize,Boolean(user)):"Spin complete.");}catch(e){setMessage(e instanceof Error?e.message:"Spin failed.");}finally{setBusy(false);}}
+  async function spin(){
+    if(busy||usedSpin||!prizes.length)return;
+    setBusy(true);setMessage("");setSelectedPrize(null);
+    if(revealTimer.current)clearTimeout(revealTimer.current);
+    try{
+      let data:any;
+      if(user){
+        const token=await user.getIdToken();
+        const response=await fetch("/api/reseller/reward-action",{method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${token}`},body:JSON.stringify({action:"spin",guestId:guestId()})});
+        data=await response.json();
+        if(!response.ok)throw new Error(data.error||"Spin failed.");
+        if(data.wallet)setWallet(data.wallet);
+      }else{
+        const response=await fetch("/api/reseller/guest-reward",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"spin",guestId:guestId()})});
+        data=await response.json();
+        if(!response.ok)throw new Error(data.error||"Spin failed.");
+        const next={...guestWallet,lastSpin:data.wallet?.lastSpin||today};
+        writeGuestWallet(next);setWallet(next);
+        if(data.prize&&data.prize.type!=="try-again")try{localStorage.setItem(PENDING_GUEST_PRIZE_KEY,JSON.stringify(data.prize));}catch{}
+      }
+      const prize=data?.prize as RewardPrize|undefined;
+      const winner=Math.max(0,prizes.findIndex(p=>p.id===prize?.id));
+      setRotation(value=>value+1440+(360-winner*(360/Math.max(1,prizes.length))));
+      revealTimer.current=setTimeout(()=>{
+        setSelectedPrize(prize||null);
+        setMessage(prize?rewardMessage(prize,Boolean(user)):"Spin complete.");
+        setBusy(false);
+      },3150);
+    }catch(error){
+      setMessage(error instanceof Error?error.message:"Spin failed.");
+      setBusy(false);
+    }
+  }
   async function checkIn(){if(busy||wallet.lastCheckIn===today)return;setBusy(true);try{if(user){const token=await user.getIdToken();const r=await fetch("/api/reseller/reward-action",{method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${token}`},body:JSON.stringify({action:"checkin",guestId:guestId()})});const d=await r.json();if(!r.ok)throw new Error(d.error||"Check-in failed.");}else{const y=new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Karachi"}).format(new Date(Date.now()-86400000));const ns=wallet.lastCheckIn===y?Math.min(7,Number(wallet.streak||0)+1):1;const pts=Number(rewardSettings.checkInRewards?.[ns-1]||10);const next={...wallet,streak:ns,lastCheckIn:today,points:Number(wallet.points||0)+pts};writeGuestWallet(next);setWallet(next);}}catch(e){setMessage(e instanceof Error?e.message:"Check-in failed.");}finally{setBusy(false);}}
   function openTask(task:ResellerTask){if(events.includes(task.id)&&!user){location.href="/login?redirect=/#reseller-tasks";return;}if(["weekly-orders","monthly-orders","wholesale-order"].includes(task.id)){location.href="/shop";return;}const url=task.url||(task.id==="refer-reseller"?`${location.origin}/reseller/join?ref=${encodeURIComponent(user?.uid||guestId())}`:"");saveTaskEvent(task.id);setEvents(readTaskEvents());if(task.id==="whatsapp-share"||task.id==="refer-reseller"){window.open(`https://wa.me/?text=${encodeURIComponent(`${task.shareText||task.description}\n${url||location.origin}`)}`,"_blank","noopener,noreferrer");return;}if(url)window.open(url,"_blank","noopener,noreferrer");}
 
