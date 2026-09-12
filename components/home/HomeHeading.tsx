@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useRef, type KeyboardEvent, type PointerEvent, type ReactNode } from "react";
 
 type HeadingDestination = {
@@ -53,6 +54,7 @@ export default function HomeHeading({
   actionLabel?: string;
   title?: string;
 }) {
+  const router = useRouter();
   const pressStartedAt = useRef(0);
   const headingText = typeof children === "string" ? children : "";
   const mapped = CLICKABLE_HEADINGS[headingText];
@@ -61,11 +63,12 @@ export default function HomeHeading({
     : mapped;
 
   const openDestination = () => {
-    if (destination) window.location.assign(destination.href);
+    if (destination) router.push(destination.href);
   };
 
   const handlePointerDown = (_event: PointerEvent<HTMLSpanElement>) => {
     pressStartedAt.current = Date.now();
+    if (destination) router.prefetch(destination.href);
   };
 
   const handlePointerUp = (_event: PointerEvent<HTMLSpanElement>) => {
@@ -88,6 +91,7 @@ export default function HomeHeading({
           <span aria-hidden="true">❧</span>
           <Link
             href={destination.href}
+            prefetch={true}
             className="absolute right-1 bottom-[62%] z-10 whitespace-nowrap bg-[#fffcf7] px-1 text-[8px] font-black uppercase tracking-[0.12em] text-[#8A651F] no-underline sm:text-[9px]"
           >
             {destination.label || "View all"}
