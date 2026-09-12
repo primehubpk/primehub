@@ -152,7 +152,7 @@ export default function ProductDetailPage() {
                 <span className="flex items-center gap-2 text-[10px] font-black text-[#E1352B]">
                   <span>⚡</span>
                   {stock > 0
-                    ? `🔥 Selling Fast! Only ${stock} left in stock.`
+                    ? '🔥 Selling Fast! Popular item.'
                     : 'Stock is limited — check availability before ordering.'}
                 </span>
                 <span className="shrink-0 text-[8px] font-black uppercase tracking-wider text-black/35">

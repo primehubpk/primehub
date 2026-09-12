@@ -54,6 +54,16 @@ function currentBigDealForProduct(deal: any, productId: string, now: number, reg
   };
 }
 
+function stableUrgencyProgress(product: Product | null, stock: number) {
+  if (!product || stock <= 0) return 0;
+  const key = String(product.id || product.slug || product.title || 'primehub');
+  let hash = 0;
+  for (let index = 0; index < key.length; index += 1) {
+    hash = (hash * 31 + key.charCodeAt(index)) >>> 0;
+  }
+  return 38 + (hash % 53);
+}
+
 export function useProductDetail(): ProductDetailModel {
   const params = useParams<{ id: string }>();
   const router = useRouter();
@@ -120,14 +130,12 @@ export function useProductDetail(): ProductDetailModel {
 
     const cached = readCachedProduct<Product>(id);
     if (cached) {
-      // Home/Shop navigation already seeded this exact product. Reuse it as the
-      // authoritative first view instead of starting a duplicate no-store request
-      // that competes with the hero image on mobile data.
       setProduct((current) => (current?.id === cached.id ? current : cached));
       setWeeklyProducts((current) => (current[id] === cached ? current : { [id]: cached }));
       setLoading(false);
       setFailed(false);
       rememberProduct(id);
+      void loadFreshProduct();
     } else {
       setProduct(null);
       setWeeklyProducts({});
@@ -178,8 +186,6 @@ export function useProductDetail(): ProductDetailModel {
         .catch(() => undefined);
     };
 
-    // Adjacent weekly products are below the hero and do not belong on the critical
-    // path. Load them only after the browser has painted the selected product.
     if (browser.requestIdleCallback) {
       idleId = browser.requestIdleCallback(loadWeeklyProducts, { timeout: 1800 });
     } else {
@@ -256,7 +262,7 @@ export function useProductDetail(): ProductDetailModel {
   const currentPrice = effectiveCurrentPrice;
   const whatsappNumber = String(settings.whatsappNumber || '').replace(/\D/g, '');
   const maxQuantity = stock > 0 ? stock : undefined;
-  const stockProgress = Math.max(0, Math.min(100, (stock / Math.max(stock, 50)) * 100));
+  const stockProgress = stableUrgencyProgress(product, stock);
   const bannerCountdown = countdown
     ? liveDeal
       ? `${countdown.hours.toString().padStart(2, '0')}:${countdown.minutes.toString().padStart(2, '0')}:${countdown.seconds.toString().padStart(2, '0')}`
@@ -362,21 +368,13 @@ export function useProductDetail(): ProductDetailModel {
       `Quantity: ${quantity}`,
       `Price: ${money(currentPrice)}`,
       `Total: ${money(currentPrice * quantity)}`,
-      activeAdminDeal
-        ? 'Big Deal — LIVE'
-        : currentDeal
-          ? `Weekly Deal: ${WEEKDAY_LABELS[currentDeal.day]}${liveDeal ? ' — LIVE' : ' — locked'}`
-          : '',
-      `Product ID: ${product.id}`,
       '',
-      'I want to order this product.',
+      window.location.href,
     ]
       .filter(Boolean)
       .join('\n');
-    const target = whatsappNumber
-      ? `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(text)}`
-      : `https://wa.me/?text=${encodeURIComponent(text)}`;
-    window.open(target, '_blank', 'noopener,noreferrer');
+    if (!whatsappNumber) return;
+    window.open(`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
   };
 
   return {
@@ -398,19 +396,18 @@ export function useProductDetail(): ProductDetailModel {
     reviews,
     weeklyDeals,
     currentDeal,
-    timing,
-    liveDeal: effectiveLiveDeal,
+    liveDeal,
     bigDealActive,
+    activeAdminDeal,
     dealPrice: effectiveDealPrice,
     normalForDeal: effectiveNormalPrice,
     savingsAmount: effectiveSavings,
     savingsPercent: effectiveSavingsPercent,
     countdown,
+    bannerCountdown,
     currentPrice,
-    whatsappNumber,
     maxQuantity,
     stockProgress,
-    bannerCountdown,
     variantRows,
     variantModalOpen,
     variantMode,
@@ -421,8 +418,8 @@ export function useProductDetail(): ProductDetailModel {
     setVideoOpen,
     addProduct,
     orderNow,
-    buyWhatsApp,
     openVariantSelector,
+    buyWhatsApp,
     closeVariantSelector,
     confirmVariant,
   };

@@ -1,4 +1,11 @@
+import { revalidateTag } from 'next/cache';
 import { getAdminDb } from '@/lib/firebaseAdmin';
+import {
+  findSupabaseProductBySlug,
+  mapDocumentToSupabase,
+  recordMirrorFailure,
+  supabasePrimaryUpsert,
+} from '@/lib/dualWriteServer';
 
 export type ProductSyncInput = {
   title: string;
@@ -87,11 +94,47 @@ export function validateProductInput(body: unknown): ProductSyncInput {
   };
 }
 
+function refreshProductCaches() {
+  revalidateTag('public-catalog');
+  revalidateTag('public-products');
+  revalidateTag('salaar-catalog');
+  revalidateTag('salaar-store-knowledge');
+}
+
+async function legacyFirebaseProductBySlug(slug: string) {
+  const snapshot = await getAdminDb().collection('products').where('slug', '==', slug).limit(1).get();
+  if (snapshot.empty) return null;
+  return {
+    id: snapshot.docs[0].id,
+    payload: snapshot.docs[0].data() || {},
+  };
+}
+
+async function mirrorProductToFirebase(productId: string, data: Record<string, any>) {
+  try {
+    await getAdminDb().collection('products').doc(productId).set(data, { merge: false });
+  } catch (error) {
+    console.error(`Bot product ${productId} Firebase mirror failed`, error);
+    await recordMirrorFailure('products', productId, 'upsert', data, 'firebase');
+  }
+}
+
 export async function upsertProduct(input: ProductSyncInput): Promise<ProductSyncResult> {
   const db = getAdminDb();
   const slug = input.slug || slugify(input.title);
   const now = new Date().toISOString();
+
+  let existing = await findSupabaseProductBySlug(slug);
+  if (!existing) {
+    existing = await legacyFirebaseProductBySlug(slug);
+  }
+
+  const created = !existing;
+  const productId = existing?.id || db.collection('products').doc().id;
+  const existingPayload = existing?.payload || {};
+
   const payload = {
+    ...existingPayload,
     title: input.title,
     slug,
     price: input.price,
@@ -112,18 +155,20 @@ export async function upsertProduct(input: ProductSyncInput): Promise<ProductSyn
     isFlashSale: Boolean(input.isFlashSale),
     isWeekendSpecial: Boolean(input.isWeekendSpecial),
     isWholesale: input.isWholesale === true,
+    createdAt: existingPayload.createdAt || now,
     updatedAt: now,
   };
 
-  const existing = await db.collection('products').where('slug', '==', slug).limit(1).get();
-  if (existing.empty) {
-    const ref = await db.collection('products').add({
-      ...payload,
-      createdAt: now,
-    });
-    return { id: ref.id, slug, created: true };
-  }
+  const row = mapDocumentToSupabase('products', productId, payload, 'supabase');
+  if (!row) throw new Error('Product could not be mapped for Supabase.');
 
-  await existing.docs[0].ref.set(payload, { merge: true });
-  return { id: existing.docs[0].id, slug, created: false };
+  // Supabase is the source of truth. If this write fails, the bot request fails and
+  // Firebase is left untouched so the two stores cannot disagree about a "success".
+  await supabasePrimaryUpsert({ table: 'products', row });
+
+  // Firebase remains the secondary mirror for legacy/admin compatibility.
+  await mirrorProductToFirebase(productId, payload);
+  refreshProductCaches();
+
+  return { id: productId, slug, created };
 }
