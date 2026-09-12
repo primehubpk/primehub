@@ -125,10 +125,12 @@ export function HomeProductCard({
   );
 }
 
+function bucketAnchor(amount: number | null, wholesale: boolean) {
+  return wholesale ? "bucket-wholesale" : `bucket-${Number(amount)}`;
+}
+
 function bucketHref(amount: number | null, wholesale: boolean) {
-  return wholesale
-    ? "/shop?bucket=wholesale&sale=1&wholesale=true"
-    : `/shop?bucket=${Number(amount)}&sale=1`;
+  return `/shop/sale-mela#${bucketAnchor(amount, wholesale)}`;
 }
 
 function sortBySalePrice(products: Product[]) {
@@ -139,8 +141,10 @@ function sortBySalePrice(products: Product[]) {
 
 export default function HomeCollections({
   products,
+  standalone = false,
 }: {
   products: Product[];
+  standalone?: boolean;
   onSelect?: (amount: number | null) => void;
   onWholesaleSelect?: () => void;
 }) {
@@ -156,9 +160,9 @@ export default function HomeCollections({
       {buckets.length > 0 && (
         <section className="home-sale" aria-label="PrimeHubMall Sale Mela">
           <HomeHeading
-            href="/sale-mela"
-            actionLabel="Open"
-            title="Open PrimeHubMall Sale Mela"
+            href={standalone ? undefined : "/shop/sale-mela"}
+            actionLabel={standalone ? undefined : "Open"}
+            title={standalone ? undefined : "Open PrimeHubMall Sale Mela"}
           >
             <>
               PrimeHubMall <span className="text-[#d60707]">Sale Mela</span>
@@ -168,6 +172,7 @@ export default function HomeCollections({
           {buckets.map((bucket) => {
             const wholesale = isWholesalePriceBucket(bucket);
             const amount = Number(bucket.amount || 0);
+            const anchor = bucketAnchor(bucket.amount ?? null, wholesale);
             const href = bucketHref(bucket.amount ?? null, wholesale);
             const saleRange = saleMelaPriceRange(amount);
             const matches = wholesale
@@ -184,14 +189,15 @@ export default function HomeCollections({
 
             return (
               <div
-                className={`home-sale-row ${wholesale ? "home-sale-wholesale" : ""}`}
+                id={anchor}
+                className={`home-sale-row scroll-mt-24 ${wholesale ? "home-sale-wholesale" : ""}`}
                 key={bucket.id}
               >
                 <Link
                   className="home-budget"
                   href={href}
                   prefetch={false}
-                  aria-label={`Browse ${bucket.title}`}
+                  aria-label={`Browse ${bucket.title} in PrimeHubMall Sale Mela`}
                 >
                   <span className="home-budget-medallion">
                     {wholesale ? (
