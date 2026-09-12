@@ -250,7 +250,7 @@ export function useProductDetail(): ProductDetailModel {
         ? dealPrice
         : regularPrice;
   const effectiveNormalPrice = activeAdminDeal
-    ? activeAdminDealNormalPrice
+    ? activeDealNormalPrice
     : liveDeal && normalForDeal > effectiveCurrentPrice
       ? normalForDeal
       : productOriginal || regularPrice;
