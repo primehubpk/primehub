@@ -8,7 +8,7 @@ import { GraduationCap, Home, Package, ShoppingBag, Users } from 'lucide-react';
 const NAV_ITEMS = [
   { key: 'home', label: 'Home', href: '/', icon: Home },
   { key: 'shop', label: 'Shop', href: '/shop', icon: ShoppingBag },
-  { key: 'reseller', label: 'Reseller Club', href: '/reseller', icon: Users },
+  { key: 'reseller', label: 'Reseller Club', href: '/reseller/dashboard', icon: Users },
   { key: 'skills', label: 'Prime Skills', href: '/skills', icon: GraduationCap },
   { key: 'orders', label: 'Orders', href: '/orders', icon: Package },
 ] as const;
