@@ -69,7 +69,6 @@ function ProductDetailContent() {
     product,
     weeklyProducts,
     loading,
-    failed,
     activeImage,
     quantity,
     wished,
@@ -108,7 +107,10 @@ function ProductDetailContent() {
 
   if (loading) return <ProductRouteLoading />;
 
-  if (failed || !product) {
+  // If a fresh background read fails but we already have a server/navigation
+  // product, keep the usable product visible. A real missing product is still
+  // handled because product remains null.
+  if (!product) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#F4F4F1] px-5">
         <div className="w-full max-w-sm rounded-[28px] bg-white p-8 text-center shadow-sm">
