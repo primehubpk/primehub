@@ -244,7 +244,7 @@ export default function HomeCollections({
                   aria-label={`${bucket.title} products`}
                 >
                   {matches.length ? (
-                    matches.map((product) => (
+                    (standalone ? matches : matches.slice(0, 12)).map((product) => (
                       <div
                         key={product.id}
                         style={standalone ? {
