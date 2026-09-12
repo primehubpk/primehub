@@ -99,8 +99,24 @@ export default function HomePageClient({
     }
 
     void refreshCatalog();
+
+    // Keep an already-open storefront synchronized with Admin/Bot catalog writes.
+    // Cache invalidation refreshes future requests; these listeners also reconcile
+    // the client state without requiring a hard browser reload.
+    const refreshTimer = window.setInterval(() => {
+      void refreshCatalog();
+    }, 15_000);
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") void refreshCatalog();
+    };
+    window.addEventListener("focus", refreshWhenVisible);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+
     return () => {
       cancelled = true;
+      window.clearInterval(refreshTimer);
+      window.removeEventListener("focus", refreshWhenVisible);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
     };
   }, [initialProducts, initialCategories]);
 
