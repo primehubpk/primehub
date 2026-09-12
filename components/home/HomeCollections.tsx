@@ -130,7 +130,7 @@ function bucketAnchor(amount: number | null, wholesale: boolean) {
 }
 
 function bucketHref(amount: number | null, wholesale: boolean) {
-  return `/shop/sale-mela#${bucketAnchor(amount, wholesale)}`;
+  return `/primehubmall/salemela#${bucketAnchor(amount, wholesale)}`;
 }
 
 function sortBySalePrice(products: Product[]) {
@@ -160,7 +160,7 @@ export default function HomeCollections({
       {buckets.length > 0 && (
         <section className="home-sale" aria-label="PrimeHubMall Sale Mela">
           <HomeHeading
-            href={standalone ? undefined : "/shop/sale-mela"}
+            href={standalone ? undefined : "/primehubmall/salemela"}
             actionLabel={standalone ? undefined : "Open"}
             title={standalone ? undefined : "Open PrimeHubMall Sale Mela"}
           >
@@ -173,7 +173,9 @@ export default function HomeCollections({
             const wholesale = isWholesalePriceBucket(bucket);
             const amount = Number(bucket.amount || 0);
             const anchor = bucketAnchor(bucket.amount ?? null, wholesale);
-            const href = bucketHref(bucket.amount ?? null, wholesale);
+            const href = standalone
+              ? `#${anchor}`
+              : bucketHref(bucket.amount ?? null, wholesale);
             const saleRange = saleMelaPriceRange(amount);
             const matches = wholesale
               ? sortBySalePrice(packs)
@@ -196,7 +198,7 @@ export default function HomeCollections({
                 <Link
                   className="home-budget"
                   href={href}
-                  prefetch={false}
+                  prefetch={!standalone}
                   aria-label={`Browse ${bucket.title} in PrimeHubMall Sale Mela`}
                 >
                   <span className="home-budget-medallion">
@@ -244,7 +246,7 @@ export default function HomeCollections({
                   ) : (
                     <p className="home-empty">
                       New offers are on their way.{" "}
-                      <Link href={href} prefetch={false}>
+                      <Link href={href} prefetch={!standalone}>
                         Browse collection <ChevronRight size={14} />
                       </Link>
                     </p>
