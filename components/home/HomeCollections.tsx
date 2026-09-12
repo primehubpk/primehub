@@ -22,6 +22,7 @@ import {
   isWholesalePriceBucket,
   matchesPriceBucket,
   matchesSaleMelaBucket,
+  saleMelaBucketLabel,
   saleMelaPriceRange,
   sortPriceBuckets,
 } from "@/lib/priceBucketUtils";
@@ -125,10 +126,12 @@ export function HomeProductCard({
   );
 }
 
+function bucketAnchor(amount: number | null, wholesale: boolean) {
+  return wholesale ? "bucket-wholesale" : `bucket-${Number(amount)}`;
+}
+
 function bucketHref(amount: number | null, wholesale: boolean) {
-  return wholesale
-    ? "/shop?bucket=wholesale&sale=1&wholesale=true"
-    : `/shop?bucket=${Number(amount)}&sale=1`;
+  return `/primehubmall/salemela#${bucketAnchor(amount, wholesale)}`;
 }
 
 function sortBySalePrice(products: Product[]) {
@@ -139,8 +142,10 @@ function sortBySalePrice(products: Product[]) {
 
 export default function HomeCollections({
   products,
+  standalone = false,
 }: {
   products: Product[];
+  standalone?: boolean;
   onSelect?: (amount: number | null) => void;
   onWholesaleSelect?: () => void;
 }) {
@@ -156,9 +161,9 @@ export default function HomeCollections({
       {buckets.length > 0 && (
         <section className="home-sale" aria-label="PrimeHubMall Sale Mela">
           <HomeHeading
-            href="/sale-mela"
-            actionLabel="Open"
-            title="Open PrimeHubMall Sale Mela"
+            href={standalone ? undefined : "/primehubmall/salemela"}
+            actionLabel={standalone ? undefined : "Open"}
+            title={standalone ? undefined : "Open PrimeHubMall Sale Mela"}
           >
             <>
               PrimeHubMall <span className="text-[#d60707]">Sale Mela</span>
@@ -168,7 +173,10 @@ export default function HomeCollections({
           {buckets.map((bucket) => {
             const wholesale = isWholesalePriceBucket(bucket);
             const amount = Number(bucket.amount || 0);
-            const href = bucketHref(bucket.amount ?? null, wholesale);
+            const anchor = bucketAnchor(bucket.amount ?? null, wholesale);
+            const href = standalone
+              ? `#${anchor}`
+              : bucketHref(bucket.amount ?? null, wholesale);
             const saleRange = saleMelaPriceRange(amount);
             const matches = wholesale
               ? sortBySalePrice(packs)
@@ -184,14 +192,21 @@ export default function HomeCollections({
 
             return (
               <div
-                className={`home-sale-row ${wholesale ? "home-sale-wholesale" : ""}`}
+                id={anchor}
+                className={`home-sale-row scroll-mt-24 ${wholesale ? "home-sale-wholesale" : ""}`}
+                style={standalone ? { display: "block", marginBottom: "28px" } : undefined}
                 key={bucket.id}
               >
                 <Link
                   className="home-budget"
                   href={href}
-                  prefetch={false}
-                  aria-label={`Browse ${bucket.title}`}
+                  prefetch={!standalone}
+                  style={standalone ? {
+                    width: "clamp(96px, 23vw, 145px)",
+                    padding: "0",
+                    marginBottom: "12px",
+                  } : undefined}
+                  aria-label={`Browse ${bucket.title} in PrimeHubMall Sale Mela`}
                 >
                   <span className="home-budget-medallion">
                     {wholesale ? (
@@ -203,12 +218,21 @@ export default function HomeCollections({
                       </>
                     )}
                   </span>
-                  <span className="home-budget-label">{bucket.title}</span>
+                  <span className="home-budget-label">
+                    {standalone && !wholesale ? saleMelaBucketLabel(amount) : bucket.title}
+                  </span>
                 </Link>
 
                 <div
                   className="home-sale-products [scrollbar-width:none]"
-                  style={{
+                  style={standalone ? {
+                    display: "grid",
+                    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+                    gap: "6px",
+                    overflow: "visible",
+                    paddingBottom: "3px",
+                    scrollSnapType: "none",
+                  } : {
                     display: "flex",
                     gridTemplateColumns: "none",
                     gap: "6px",
@@ -223,7 +247,9 @@ export default function HomeCollections({
                     matches.map((product) => (
                       <div
                         key={product.id}
-                        style={{
+                        style={standalone ? {
+                          minWidth: 0,
+                        } : {
                           flex: "0 0 calc((100% - 12px) / 3)",
                           minWidth: 0,
                           scrollSnapAlign: "start",
@@ -238,7 +264,7 @@ export default function HomeCollections({
                   ) : (
                     <p className="home-empty">
                       New offers are on their way.{" "}
-                      <Link href={href} prefetch={false}>
+                      <Link href={href} prefetch={!standalone}>
                         Browse collection <ChevronRight size={14} />
                       </Link>
                     </p>

@@ -1,8 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { usePathname } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import { GraduationCap, Home, Package, ShoppingBag, Users } from 'lucide-react';
 
 const NAV_ITEMS = [
@@ -21,8 +21,6 @@ function isShopRoute(pathname: string) {
     pathname.startsWith('/shop/') ||
     pathname.startsWith('/category/') ||
     pathname.startsWith('/product/') ||
-    pathname === '/sale-mela' ||
-    pathname.startsWith('/sale-mela/') ||
     pathname === '/new-arrivals' ||
     pathname.startsWith('/new-arrivals/') ||
     pathname === '/weekly-deals' ||
@@ -31,8 +29,12 @@ function isShopRoute(pathname: string) {
   );
 }
 
+function isSaleMelaRoute(pathname: string) {
+  return pathname === '/primehubmall/salemela' || pathname.startsWith('/primehubmall/salemela/');
+}
+
 function isItemActive(pathname: string, item: NavItem) {
-  if (item.key === 'home') return pathname === '/';
+  if (item.key === 'home') return pathname === '/' || isSaleMelaRoute(pathname);
   if (item.key === 'shop') return isShopRoute(pathname);
   if (item.key === 'reseller') {
     return pathname === '/reseller' || pathname === item.href || pathname.startsWith('/reseller/');
@@ -46,31 +48,17 @@ function shouldPrefetch(item: NavItem) {
 
 export default function BottomNav() {
   const pathname = usePathname();
-  const router = useRouter();
   const [pendingHref, setPendingHref] = useState<string | null>(null);
-  const navigatingTo = useRef<string | null>(null);
 
   useEffect(() => {
-    navigatingTo.current = null;
     setPendingHref(null);
   }, [pathname]);
 
   useEffect(() => {
     if (!pendingHref) return;
-    const timer = window.setTimeout(() => {
-      navigatingTo.current = null;
-      setPendingHref(null);
-    }, 5000);
+    const timer = window.setTimeout(() => setPendingHref(null), 5000);
     return () => window.clearTimeout(timer);
   }, [pendingHref]);
-
-  const navigateTo = useCallback((href: string) => {
-    if (href === pathname || navigatingTo.current === href) return;
-
-    navigatingTo.current = href;
-    setPendingHref(href);
-    router.push(href);
-  }, [pathname, router]);
 
   return (
     <nav
@@ -84,10 +72,6 @@ export default function BottomNav() {
           const isPending = pendingHref === href && pathname !== href;
           const visuallyActive = pendingHref ? pendingHref === href : routeIsActive;
 
-          const markNavigationIntent = () => {
-            if (pathname !== href) setPendingHref(href);
-          };
-
           return (
             <Link
               key={key}
@@ -98,32 +82,8 @@ export default function BottomNav() {
               data-nav-key={key}
               data-active={routeIsActive ? 'true' : 'false'}
               data-pending={isPending ? 'true' : 'false'}
-              onPointerDown={markNavigationIntent}
-              onPointerUp={(event) => {
-                if (
-                  event.button !== 0 ||
-                  event.metaKey ||
-                  event.ctrlKey ||
-                  event.shiftKey ||
-                  event.altKey
-                ) {
-                  return;
-                }
-                navigateTo(href);
-              }}
-              onClick={(event) => {
-                if (
-                  event.button !== 0 ||
-                  event.metaKey ||
-                  event.ctrlKey ||
-                  event.shiftKey ||
-                  event.altKey
-                ) {
-                  return;
-                }
-
-                event.preventDefault();
-                navigateTo(href);
+              onClick={() => {
+                if (pathname !== href) setPendingHref(href);
               }}
               className={`group relative flex min-w-0 touch-manipulation select-none flex-col items-center justify-center gap-1 px-0.5 py-2.5 transition-[color,background-color,transform] duration-100 active:scale-[0.98] active:bg-black/[0.035] ${
                 visuallyActive ? 'text-[#005448]' : 'text-[#131915]'

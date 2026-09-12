@@ -130,7 +130,6 @@ export function SettingsProvider({ initialSettings, children }: { initialSetting
   const [hasData, setHasData] = useState(hasInitialSettings);
   const requestRef = useRef<Promise<void> | null>(null);
   const lastRefreshRef = useRef(hasInitialSettings ? Date.now() : 0);
-  const parentSeededRef = useRef(false);
 
   const seedSettings = useCallback((nextSettings: SiteSettings) => {
     setSettings(nextSettings);
@@ -177,19 +176,13 @@ export function SettingsProvider({ initialSettings, children }: { initialSetting
     refreshSettings,
   }), [settings, loading, hasData, seedSettings, refreshSettings]);
 
-  // Only the app-wide provider owns network refreshes. A homepage provider may
-  // render server-seeded data immediately, then hand that seed to the parent and
-  // follow the parent's shared refresh lifecycle instead of starting a second one.
-  const ownsContext = !parent;
+  // Server-seeded nested providers remain authoritative for their subtree, but only
+  // the app-wide provider owns network refreshes. This keeps the homepage stable and
+  // prevents a second settings timer/API read from running underneath the root one.
+  const ownsNetworkRefresh = !parent;
 
   useEffect(() => {
-    if (!parent || !hasInitialSettings || parentSeededRef.current) return;
-    parentSeededRef.current = true;
-    parent.seedSettings(seed);
-  }, [parent, hasInitialSettings, seed]);
-
-  useEffect(() => {
-    if (!ownsContext) return;
+    if (!ownsNetworkRefresh) return;
 
     if (!hasInitialSettings) void refreshSettings();
     const timer = window.setInterval(() => { void refreshSettings(); }, 60_000);
@@ -207,10 +200,10 @@ export function SettingsProvider({ initialSettings, children }: { initialSetting
       document.removeEventListener('visibilitychange', refreshWhenVisible);
       window.removeEventListener('focus', refreshOnFocus);
     };
-  }, [ownsContext, hasInitialSettings, refreshSettings]);
+  }, [ownsNetworkRefresh, hasInitialSettings, refreshSettings]);
 
   const contextValue = useMemo<SettingsContextValue>(() => {
-    if (hasInitialSettings && (!parent || !parent.hasData)) return localValue;
+    if (hasInitialSettings) return localValue;
     if (parent) return parent;
     return localValue;
   }, [parent, localValue, hasInitialSettings]);

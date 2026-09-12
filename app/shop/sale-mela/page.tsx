@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
 
-export default function LegacySaleMelaRedirect() {
+export default function LegacyShopSaleMelaRedirect() {
   redirect('/primehubmall/salemela');
 }

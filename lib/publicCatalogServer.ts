@@ -1,8 +1,8 @@
 import 'server-only';
 import { unstable_cache } from 'next/cache';
 import { getDualCatalog, getDualProduct, getDualSettings, getDualSkills } from '@/lib/dualReadServer';
-import { getAdminDb } from '@/lib/firebaseAdmin';
 import { getStorefrontSettingsWithBigDealRecovery } from '@/lib/storefrontSettingsServer';
+import { getWholesaleVideosSnapshot } from '@/lib/wholesaleVideosServer';
 
 const CATALOG_RETRY_DELAYS_MS = [0, 180];
 const SETTINGS_RETRY_DELAYS_MS = [0, 250, 750];
@@ -81,18 +81,6 @@ export async function getStorefrontSettingsSnapshot() {
   return { ...legacy, ...main };
 }
 
-async function getFreshFirebaseWholesaleVideos() {
-  try {
-    const snapshot = await getAdminDb().collection('settings').doc('main').get();
-    if (!snapshot.exists) return null;
-    const data = snapshot.data() || {};
-    return Array.isArray(data.wholesaleVideos) ? data.wholesaleVideos : null;
-  } catch (error) {
-    console.warn('Fresh Firebase wholesale videos recovery skipped', error);
-    return null;
-  }
-}
-
 export async function getFreshRewardSettingsSnapshot() {
   const result = await getDualSettings({ cache: 'no-store' });
   return result.documents?.rewards || {};
@@ -116,21 +104,14 @@ async function mergeFreshStorefrontSettings(
   const main = documents.main || {};
   const legacy = documents.general || {};
   const merged = { ...legacy, ...main };
-  const primaryWholesaleVideos = Array.isArray(merged.wholesaleVideos) ? merged.wholesaleVideos : [];
 
-  // Supabase is primary. Do not hit Firebase in parallel when the primary payload
-  // already contains wholesale videos. Firebase is used only as a narrow migration
-  // recovery when Supabase succeeded but this field has not arrived there yet.
-  if (result.source !== 'supabase' || primaryWholesaleVideos.length > 0) {
-    return merged;
-  }
-
-  const firebaseWholesaleVideos = await getFreshFirebaseWholesaleVideos();
-  if (Array.isArray(firebaseWholesaleVideos) && firebaseWholesaleVideos.length > 0) {
-    return { ...merged, wholesaleVideos: firebaseWholesaleVideos };
-  }
-
-  return merged;
+  // Wholesale packages have one authoritative reader. Supabase stays primary and
+  // Firebase is consulted only when the primary list is incomplete/unavailable.
+  // The wholesale reader also repairs missing fallback items back into Supabase.
+  const wholesaleResult = await getWholesaleVideosSnapshot();
+  return wholesaleResult.videos.length
+    ? { ...merged, wholesaleVideos: wholesaleResult.videos }
+    : merged;
 }
 
 export async function getFreshStorefrontSettingsDocumentsSnapshot() {

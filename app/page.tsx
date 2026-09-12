@@ -1,6 +1,9 @@
-import { Suspense } from 'react';
 import HomePageClient from '@/components/HomePageClient';
+import WeeklyDealNavigationWarmup from '@/components/home/WeeklyDealNavigationWarmup';
 import { getPublicCatalogSnapshot, getStorefrontSettingsResultSnapshot } from '@/lib/publicCatalogServer';
+import { getWholesaleVideosSnapshot } from '@/lib/wholesaleVideosServer';
+import { normalizeImageUrl } from '@/lib/imageUrl';
+import { pakistanNowWeekday } from '@/lib/weeklyDealUtils';
 import type { Category, SiteSettings } from '@/lib/types';
 import type { Product } from '@/components/shop/ShopTypes';
 
@@ -44,42 +47,11 @@ function hydrateBigDealImages(settings: Record<string, any>, products: any[]) {
   };
 }
 
-function HomeLoadingState() {
-  return (
-    <main className="min-h-screen bg-[#FFFCF7] px-4 pb-28 pt-5" role="status" aria-label="Opening home page">
-      <div className="mx-auto max-w-6xl animate-pulse">
-        <div className="rounded-2xl bg-white p-4 shadow-sm">
-          <div className="h-8 w-52 rounded-full bg-black/[0.09]" />
-          <div className="mt-4 h-12 rounded-full bg-black/[0.05]" />
-        </div>
-        <div className="mt-6 grid grid-cols-4 gap-3">
-          {Array.from({ length: 4 }, (_, index) => (
-            <div key={index} className="text-center">
-              <div className="mx-auto aspect-square w-full max-w-[110px] rounded-full bg-black/[0.06]" />
-              <div className="mx-auto mt-2 h-3 w-4/5 rounded-full bg-black/[0.07]" />
-            </div>
-          ))}
-        </div>
-        <div className="mt-7 h-7 w-64 rounded-full bg-black/[0.08]" />
-        <div className="mt-4 grid grid-cols-3 gap-3">
-          {Array.from({ length: 3 }, (_, index) => (
-            <div key={index} className="rounded-2xl bg-white p-3 shadow-sm">
-              <div className="aspect-[4/5] rounded-xl bg-black/[0.06]" />
-              <div className="mt-3 h-3 w-3/4 rounded-full bg-black/[0.08]" />
-              <div className="mt-2 h-3 w-1/2 rounded-full bg-black/[0.05]" />
-            </div>
-          ))}
-        </div>
-      </div>
-      <span className="sr-only">Loading PrimeHubMall home…</span>
-    </main>
-  );
-}
-
-async function HomeContent() {
-  const [catalogResult, settingsResult] = await Promise.allSettled([
+export default async function HomePage() {
+  const [catalogResult, settingsResult, wholesaleResult] = await Promise.allSettled([
     getPublicCatalogSnapshot(),
     getStorefrontSettingsResultSnapshot(),
+    getWholesaleVideosSnapshot(),
   ]);
 
   const snapshot = catalogResult.status === 'fulfilled'
@@ -93,24 +65,36 @@ async function HomeContent() {
     ...(settingsDocuments.main || {}),
   };
   const rewardSettings = settingsDocuments.rewards || {};
-  const initialSettings = {
+  const wholesaleVideos = wholesaleResult.status === 'fulfilled'
+    ? wholesaleResult.value.videos
+    : [];
+  const initialSettings: Record<string, any> = {
     ...hydrateBigDealImages(rawSettings, snapshot.products as any[]),
+    ...(wholesaleVideos.length ? { wholesaleVideos } : {}),
     homeRewardSettings: rewardSettings,
   };
 
-  return (
-    <HomePageClient
-      initialProducts={snapshot.products as Product[]}
-      initialCategories={snapshot.categories as Category[]}
-      initialSettings={initialSettings as Partial<SiteSettings>}
-    />
+  const weeklyDeals = Array.isArray(initialSettings.weeklyDeals) ? initialSettings.weeklyDeals : [];
+  const today = pakistanNowWeekday(new Date());
+  const liveWeeklyDeal = weeklyDeals.find(
+    (deal: any) => deal?.active !== false && deal?.day === today && deal?.productId && Number(deal?.dealPrice) > 0,
   );
-}
+  const liveWeeklyProduct = liveWeeklyDeal
+    ? (snapshot.products as any[]).find((product) => String(product?.id || '') === String(liveWeeklyDeal.productId || ''))
+    : null;
+  const liveWeeklyImage = normalizeImageUrl(
+    String(liveWeeklyDeal?.imageUrl || productImage(liveWeeklyProduct) || ''),
+  );
 
-export default function HomePage() {
   return (
-    <Suspense fallback={<HomeLoadingState />}>
-      <HomeContent />
-    </Suspense>
+    <>
+      {liveWeeklyImage ? <link rel="preload" as="image" href={liveWeeklyImage} /> : null}
+      <WeeklyDealNavigationWarmup weeklyDeals={weeklyDeals} />
+      <HomePageClient
+        initialProducts={snapshot.products as Product[]}
+        initialCategories={snapshot.categories as Category[]}
+        initialSettings={initialSettings as Partial<SiteSettings>}
+      />
+    </>
   );
 }
