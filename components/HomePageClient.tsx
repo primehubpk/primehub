@@ -41,6 +41,7 @@ type Props = {
 };
 
 const RECOVERY_DELAYS_MS = [0, 350, 900];
+const BACKGROUND_REFRESH_INTERVAL_MS = 60_000;
 
 export default function HomePageClient({
   initialProducts,
@@ -99,14 +100,17 @@ export default function HomePageClient({
       }
     }
 
-    void refreshCatalog();
+    // The server already seeded healthy catalog data. Avoid immediately downloading
+    // the full catalog again on first paint; recovery still runs immediately when
+    // the server seed is unavailable.
+    if (initialProducts.length === 0) void refreshCatalog();
 
     // Keep an already-open storefront synchronized with Admin/Bot catalog writes.
-    // Cache invalidation refreshes future requests; these listeners also reconcile
-    // the client state without requiring a hard browser reload.
+    // Direct refresh events remain immediate; the safety poll is intentionally
+    // lighter so customer devices do less background network/JSON work.
     const refreshTimer = window.setInterval(() => {
-      void refreshCatalog();
-    }, 15_000);
+      if (document.visibilityState === "visible") void refreshCatalog();
+    }, BACKGROUND_REFRESH_INTERVAL_MS);
     const refreshWhenVisible = () => {
       if (document.visibilityState === "visible") void refreshCatalog();
     };
