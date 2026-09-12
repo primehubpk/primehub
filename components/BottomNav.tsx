@@ -19,7 +19,6 @@ function isShopRoute(pathname: string) {
   return (
     pathname === '/shop' ||
     pathname.startsWith('/shop/') ||
-    pathname.startsWith('/category/') ||
     pathname.startsWith('/product/') ||
     pathname === '/new-arrivals' ||
     pathname.startsWith('/new-arrivals/') ||
@@ -41,7 +40,6 @@ function isItemActive(pathname: string, item: NavItem) {
   }
   return pathname === item.href || pathname.startsWith(`${item.href}/`);
 }
-
 
 export default function BottomNav() {
   const pathname = usePathname();
