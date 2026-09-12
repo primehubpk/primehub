@@ -23,6 +23,7 @@ type ProductDraft = {
 };
 
 type BulkDraft = {
+  title: string;
   category: string;
   originalPrice: string;
   price: string;
@@ -33,7 +34,7 @@ type BulkDraft = {
   isWholesale: '' | 'true' | 'false';
 };
 
-const EMPTY_BULK: BulkDraft = { category: '', originalPrice: '', price: '', stock: '', published: '', bucketId: '', bucketAction: '', isWholesale: '' };
+const EMPTY_BULK: BulkDraft = { title: '', category: '', originalPrice: '', price: '', stock: '', published: '', bucketId: '', bucketAction: '', isWholesale: '' };
 
 function draftOf(product: Product): ProductDraft {
   const legacyStock = (product as any).stock ?? (product as any).quantity ?? (product as any).inventory;
@@ -156,6 +157,11 @@ export default function BulkProductEditor() {
     if (!selectedProducts.length) return setMessage('Select at least one product first.');
     const payload: Record<string, unknown> = { updatedAt: new Date().toISOString() };
     try {
+      if (bulk.title.trim()) {
+        if (selectedProducts.length !== 1) throw new Error('Select exactly one product to change its title.');
+        payload.title = bulk.title.trim();
+        payload.slug = slugify(bulk.title);
+      }
       if (bulk.category) payload.category = bulk.category;
       if (bulk.originalPrice !== '') payload.originalPrice = safeNumber(bulk.originalPrice, 'Original price');
       if (bulk.price !== '') payload.price = safeNumber(bulk.price, 'Price');
@@ -220,7 +226,7 @@ export default function BulkProductEditor() {
     }
   }
 
-  return <section className="mx-auto max-w-6xl px-4 py-6">
+  return <section className="mx-auto max-w-6xl px-4 py-6 pb-28">
     <div className="flex items-start gap-3"><div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#E1352B] text-white"><PackageSearch size={21}/></div><div><p className="text-[9px] font-black uppercase tracking-[.22em] text-[#E1352B]">Bulk catalog control</p><h2 className="mt-1 text-2xl font-black">Product Editor</h2><p className="mt-1 text-sm text-black/50">Filter category-wise, quickly edit each product, or update and delete selected products together.</p></div></div>
 
     {message && <div role="status" className="mt-4 rounded-xl bg-white p-3 text-xs font-bold text-black/65 shadow-sm">{message}</div>}
@@ -237,8 +243,9 @@ export default function BulkProductEditor() {
     </div>
 
     <div className="mt-4 rounded-3xl border border-[#E1352B]/15 bg-[#FFF8F7] p-4 shadow-sm">
-      <div className="flex flex-wrap items-center justify-between gap-2"><div><p className="text-xs font-black">Bulk edit selected products</p><p className="text-[10px] text-black/45">Leave any field unchanged by keeping it blank.</p></div><span className="rounded-full bg-[#E1352B] px-3 py-1 text-[9px] font-black text-white">{selected.length} selected</span></div>
+      <div className="flex flex-wrap items-center justify-between gap-2"><div><p className="text-xs font-black">Bulk edit selected products</p><p className="text-[10px] text-black/45">These fields apply to selected products. For row edits, use that row&apos;s black Save button. Change colors and sizes from the Products tab.</p></div><span className="rounded-full bg-[#E1352B] px-3 py-1 text-[9px] font-black text-white">{selected.length} selected</span></div>
       <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+        <input value={bulk.title} onChange={event => setBulk(current => ({ ...current, title: event.target.value }))} placeholder="New product title (select exactly 1)" className="rounded-xl bg-white px-3 py-3 text-xs"/>
         <select value={bulk.category} onChange={event => setBulk(current => ({ ...current, category: event.target.value }))} className="rounded-xl bg-white px-3 py-3 text-xs"><option value="">Keep category</option>{categories.map(category => <option key={category.id} value={category.id}>{category.title}</option>)}</select>
         <input type="number" min="0" value={bulk.originalPrice} onChange={event => setBulk(current => ({ ...current, originalPrice: event.target.value }))} placeholder="New original price" className="rounded-xl bg-white px-3 py-3 text-xs"/>
         <input type="number" min="0" value={bulk.price} onChange={event => setBulk(current => ({ ...current, price: event.target.value }))} placeholder="New sale price" className="rounded-xl bg-white px-3 py-3 text-xs"/>
@@ -248,7 +255,7 @@ export default function BulkProductEditor() {
         <select value={bulk.bucketAction} onChange={event => setBulk(current => ({ ...current, bucketAction: event.target.value as BulkDraft['bucketAction'] }))} className="rounded-xl bg-white px-3 py-3 text-xs"><option value="">Keep bucket assignment</option><option value="add">Add selected bucket</option><option value="remove">Remove selected bucket</option><option value="replace">Replace all with selected</option></select>
         <select value={bulk.isWholesale} onChange={event => setBulk(current => ({ ...current, isWholesale: event.target.value as BulkDraft['isWholesale'] }))} className="rounded-xl bg-white px-3 py-3 text-xs"><option value="">Keep retail/wholesale</option><option value="true">Make wholesale</option><option value="false">Make retail</option></select>
       </div>
-      <div className="mt-3 flex flex-wrap gap-2"><button type="button" disabled={busy || !selected.length} onClick={applyBulk} className="inline-flex items-center gap-2 rounded-xl bg-[#0F6A5F] px-4 py-3 text-[10px] font-black text-white disabled:opacity-40">{busy ? <Loader2 size={14} className="animate-spin"/> : <Save size={14}/>}Apply bulk changes</button><button type="button" disabled={busy || !selected.length} onClick={deleteSelected} className="inline-flex items-center gap-2 rounded-xl bg-[#E1352B] px-4 py-3 text-[10px] font-black text-white disabled:opacity-40"><Trash2 size={14}/>Delete selected</button></div>
+      <div className="mt-3 flex flex-wrap gap-2"><button type="button" disabled={busy || !selected.length} onClick={applyBulk} className="inline-flex items-center gap-2 rounded-xl bg-[#0F6A5F] px-4 py-3 text-[10px] font-black text-white disabled:opacity-40">{busy ? <Loader2 size={14} className="animate-spin"/> : <Save size={14}/>}Save selected changes</button><button type="button" disabled={busy || !selected.length} onClick={deleteSelected} className="inline-flex items-center gap-2 rounded-xl bg-[#E1352B] px-4 py-3 text-[10px] font-black text-white disabled:opacity-40"><Trash2 size={14}/>Delete selected</button></div>
     </div>
 
     <div className="mt-4 space-y-3">{filtered.map(product => <EditableProductRow key={product.id} product={product} categories={categories} priceBuckets={priceBuckets} checked={selectedIds.has(product.id)} saving={savingId === product.id} disabled={busy} onChecked={checked => setSelected(current => checked ? Array.from(new Set([...current, product.id])) : current.filter(id => id !== product.id))} onSave={draft => saveOne(product, draft)} onDelete={async () => { if (!confirm(`Delete ${product.title}? This cannot be undone.`)) return; setSavingId(product.id); try { await deleteAdminDocument('products', product.id); setSelected(current => current.filter(id => id !== product.id)); setMessage(`${product.title} deleted.`); } catch (error) { setMessage(error instanceof Error ? error.message : 'Product could not be deleted.'); } finally { setSavingId(''); } }}/>)}</div>
@@ -271,7 +278,7 @@ function EditableProductRow({ product, categories, priceBuckets, checked, saving
       <label className="grid gap-1"><span className="text-[8px] font-black uppercase text-black/35">Stock</span><input aria-label="Stock" type="number" min="0" value={draft.stock} onChange={event => setDraft(current => ({ ...current, stock: event.target.value }))} placeholder="Keep existing" className={inputClass}/></label>
       <select aria-label="Category" value={draft.category} onChange={event => setDraft(current => ({ ...current, category: event.target.value }))} className={inputClass}><option value="">Select category</option>{hasLegacyCategory && <option value={draft.category}>Current: {draft.category}</option>}{categories.map(category => <option key={category.id} value={category.id}>{category.title}</option>)}</select>
       <div className="grid gap-1.5 text-[10px] font-bold"><label className="flex items-center gap-2"><input type="checkbox" checked={draft.published} onChange={event => setDraft(current => ({ ...current, published: event.target.checked }))} className="accent-[#0F6A5F]"/>Published</label><label className="flex items-center gap-2"><input type="checkbox" checked={draft.isWholesale} onChange={event => { const enabled = event.target.checked; const wholesaleIds = new Set(priceBuckets.filter(isWholesalePriceBucket).map(bucket => bucket.id)); setDraft(current => ({ ...current, isWholesale: enabled, priceBucketIds: enabled ? Array.from(new Set([...current.priceBucketIds, ...wholesaleIds])) : current.priceBucketIds.filter(id => !wholesaleIds.has(id)) })); }} className="accent-[#E1352B]"/>Wholesale</label></div>
-      <div className="flex gap-1"><button type="button" disabled={saving || disabled} onClick={() => onSave(draft)} aria-label={`Save ${product.title}`} className="rounded-xl bg-[#14140F] p-2.5 text-white disabled:opacity-40">{saving ? <Loader2 size={14} className="animate-spin"/> : <Save size={14}/>}</button><button type="button" disabled={saving || disabled} onClick={onDelete} aria-label={`Delete ${product.title}`} className="rounded-xl bg-red-50 p-2.5 text-[#E1352B] disabled:opacity-40"><Trash2 size={14}/></button></div>
+      <div className="flex gap-1"><button type="button" disabled={saving || disabled} onClick={() => onSave(draft)} aria-label={`Save ${product.title}`} className="inline-flex items-center gap-1.5 rounded-xl bg-[#14140F] px-3 py-2.5 text-[9px] font-black text-white disabled:opacity-40">{saving ? <Loader2 size={14} className="animate-spin"/> : <><Save size={14}/>Save</>}</button><button type="button" disabled={saving || disabled} onClick={onDelete} aria-label={`Delete ${product.title}`} className="rounded-xl bg-red-50 p-2.5 text-[#E1352B] disabled:opacity-40"><Trash2 size={14}/></button></div>
     </div>
     {priceBuckets.length > 0 && <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-black/5 pt-3"><span className="mr-1 text-[8px] font-black uppercase tracking-wider text-black/35">Price buckets</span>{priceBuckets.map(bucket => <label key={bucket.id} className={`flex cursor-pointer items-center gap-1.5 rounded-full px-2.5 py-1.5 text-[9px] font-bold ${draft.priceBucketIds.includes(bucket.id) ? 'bg-[#0F6A5F] text-white' : 'bg-[#F4F4F1] text-black/55'}`}><input type="checkbox" checked={draft.priceBucketIds.includes(bucket.id)} onChange={event => { const enabled = event.target.checked; setDraft(current => ({ ...current, priceBucketIds: enabled ? Array.from(new Set([...current.priceBucketIds, bucket.id])) : current.priceBucketIds.filter(id => id !== bucket.id), ...(isWholesalePriceBucket(bucket) ? { isWholesale: enabled } : {}) })); }} className="h-3 w-3"/>{bucket.title}</label>)}</div>}
   </article>;
