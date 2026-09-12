@@ -41,21 +41,21 @@ function wheelBackground(count:number){const safe=Math.max(1,count);const step=3
 function rewardVisual(prize:RewardPrize,product?:RewardProduct){
   const uploaded=normalizeImageUrl(prize.imageUrl||productImage(product));
   if(uploaded)return uploaded;
-  const value=prize.type==="points"?String(Math.max(0,Number(prize.points||0))):prize.type==="coupon"?\`Rs \${Math.max(0,Number(prize.voucherAmount||0)).toLocaleString()}\`:prize.type==="free-delivery"?"FREE":prize.type==="product"?"GIFT":"NEXT";
+  const value=prize.type==="points"?String(Math.max(0,Number(prize.points||0))):prize.type==="coupon"?`Rs ${Math.max(0,Number(prize.voucherAmount||0)).toLocaleString()}`:prize.type==="free-delivery"?"FREE":prize.type==="product"?"GIFT":"NEXT";
   const label=prize.type==="points"?"POINTS":prize.type==="coupon"?"VOUCHER":prize.type==="free-delivery"?"DELIVERY":prize.type==="product"?"PRODUCT":"TRY AGAIN";
   const colors:Record<string,[string,string]>={points:["#6C3CE9","#A88BFF"],coupon:["#E14632","#FF9B55"],product:["#087B68","#38C6A8"],"free-delivery":["#1768AC","#58B7F3"],"try-again":["#303039","#737382"]};
   const [a,b]=colors[prize.type]||colors["try-again"];
   const safeValue=value.replace(/[<>&]/g,"");
   const safeLabel=label.replace(/[<>&]/g,"");
-  const svg=\`<svg xmlns='http://www.w3.org/2000/svg' width='320' height='320' viewBox='0 0 320 320'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop stop-color='\${a}'/><stop offset='1' stop-color='\${b}'/></linearGradient><filter id='s'><feDropShadow dx='0' dy='8' stdDeviation='8' flood-opacity='.25'/></filter></defs><rect width='320' height='320' rx='72' fill='url(#g)'/><circle cx='255' cy='55' r='82' fill='white' opacity='.13'/><circle cx='65' cy='275' r='70' fill='black' opacity='.08'/><path d='M91 82h138a18 18 0 0 1 18 18v120a18 18 0 0 1-18 18H91a18 18 0 0 1-18-18V100a18 18 0 0 1 18-18Z' fill='white' opacity='.97' filter='url(#s)'/><text x='160' y='151' text-anchor='middle' fill='\${a}' font-family='Arial,sans-serif' font-size='42' font-weight='900'>\${safeValue}</text><text x='160' y='190' text-anchor='middle' fill='#171717' font-family='Arial,sans-serif' font-size='22' font-weight='900' letter-spacing='2'>\${safeLabel}</text><circle cx='160' cy='224' r='6' fill='\${b}'/></svg>\`;
-  return \`data:image/svg+xml,\${encodeURIComponent(svg)}\`;
+  const svg=`<svg xmlns='http://www.w3.org/2000/svg' width='320' height='320' viewBox='0 0 320 320'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop stop-color='${a}'/><stop offset='1' stop-color='${b}'/></linearGradient><filter id='s'><feDropShadow dx='0' dy='8' stdDeviation='8' flood-opacity='.25'/></filter></defs><rect width='320' height='320' rx='72' fill='url(#g)'/><circle cx='255' cy='55' r='82' fill='white' opacity='.13'/><circle cx='65' cy='275' r='70' fill='black' opacity='.08'/><path d='M91 82h138a18 18 0 0 1 18 18v120a18 18 0 0 1-18 18H91a18 18 0 0 1-18-18V100a18 18 0 0 1 18-18Z' fill='white' opacity='.97' filter='url(#s)'/><text x='160' y='151' text-anchor='middle' fill='${a}' font-family='Arial,sans-serif' font-size='42' font-weight='900'>${safeValue}</text><text x='160' y='190' text-anchor='middle' fill='#171717' font-family='Arial,sans-serif' font-size='22' font-weight='900' letter-spacing='2'>${safeLabel}</text><circle cx='160' cy='224' r='6' fill='${b}'/></svg>`;
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
 }
 function rewardMessage(prize:RewardPrize,authenticated:boolean){
   const pending=authenticated?"":" Sign in to add it to your wallet.";
-  if(prize.type==="points")return authenticated?\`You won \${Number(prize.points||0).toLocaleString()} points — added to your Points Wallet!\`:\`You won \${Number(prize.points||0).toLocaleString()} points!\${pending}\`;
-  if(prize.type==="coupon")return authenticated?\`You won a Rs. \${Number(prize.voucherAmount||0).toLocaleString()} voucher — saved to your wallet!\`:\`You won a Rs. \${Number(prize.voucherAmount||0).toLocaleString()} voucher!\${pending}\`;
-  if(prize.type==="product")return authenticated?\`You won \${prize.name||"a free product"} — saved in your rewards!\`:\`You won \${prize.name||"a free product"}!\${pending}\`;
-  if(prize.type==="free-delivery")return authenticated?"You won free delivery — saved to your wallet!":\`You won free delivery!\${pending}\`;
+  if(prize.type==="points")return authenticated?`You won ${Number(prize.points||0).toLocaleString()} points — added to your Points Wallet!`:`You won ${Number(prize.points||0).toLocaleString()} points!${pending}`;
+  if(prize.type==="coupon")return authenticated?`You won a Rs. ${Number(prize.voucherAmount||0).toLocaleString()} voucher — saved to your wallet!`:`You won a Rs. ${Number(prize.voucherAmount||0).toLocaleString()} voucher!${pending}`;
+  if(prize.type==="product")return authenticated?`You won ${prize.name||"a free product"} — saved in your rewards!`:`You won ${prize.name||"a free product"}!${pending}`;
+  if(prize.type==="free-delivery")return authenticated?"You won free delivery — saved to your wallet!":`You won free delivery!${pending}`;
   return "Better luck next time — come back tomorrow for another spin!";
 }
 function cleanResellerName(profile:ResellerProfile|null,user:User|null){const authName=String(user?.displayName||"").trim();const profileName=String(profile?.displayName||"").trim();const source=(authName&&!authName.includes("@")?authName:profileName&&!profileName.includes("@")?profileName:String(user?.email||profile?.email||"PrimeHub Reseller").split("@")[0]).replace(/[._-]+/g," ").replace(/\d+$/g,"").trim();return source.replace(/\b\w/g,c=>c.toUpperCase())||"PrimeHub Reseller";}
