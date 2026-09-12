@@ -1,10 +1,10 @@
 'use client';
 
-import Image from 'next/image';
 import { useEffect, useMemo, useState } from 'react';
 import { Minus, Plus, ShoppingCart, X, Zap } from 'lucide-react';
 import type { ProductVariantRow, ProductVariantSelection } from '@/lib/types';
 import { normalizeProductVariants, type VariantModalProduct } from '@/lib/cartStore';
+import { normalizeImageUrl } from '@/lib/imageUrl';
 import { money, titleOf } from './ProductDetailTypes';
 
 type Props = {
@@ -36,6 +36,10 @@ function imageValue(value: unknown): string {
   return '';
 }
 
+function safeImage(value: unknown): string {
+  return normalizeImageUrl(imageValue(value));
+}
+
 export default function VariantSelectorBottomSheet({
   product,
   rows,
@@ -56,6 +60,52 @@ export default function VariantSelectorBottomSheet({
   const colors = normalized.colors;
   const sizes = normalized.sizes;
   const colorNames = useMemo(() => colors.map((item) => item.name), [colors]);
+  const fallbackImage = useMemo(
+    () =>
+      safeImage(product.imageUrl) ||
+      safeImage(product.image) ||
+      safeImage(product.images?.[0]),
+    [product.imageUrl, product.image, product.images],
+  );
+
+  const imageForColor = useMemo(() => {
+    const map = new Map<string, string>();
+    colors.forEach((item) => {
+      const fromColor = safeImage(item.imageUrl);
+      const fromAvailableRow = safeImage(
+        effectiveRows.find(
+          (row) =>
+            normalize(row.color) === normalize(item.name) &&
+            stockOf(row) > 0 &&
+            safeImage(row.imageUrl),
+        )?.imageUrl,
+      );
+      const fromAnyRow = safeImage(
+        effectiveRows.find(
+          (row) => normalize(row.color) === normalize(item.name) && safeImage(row.imageUrl),
+        )?.imageUrl,
+      );
+      map.set(normalize(item.name), fromColor || fromAvailableRow || fromAnyRow || fallbackImage);
+    });
+    return map;
+  }, [colors, effectiveRows, fallbackImage]);
+
+  const preloadImages = useMemo(() => {
+    const urls = [
+      fallbackImage,
+      ...Array.from(imageForColor.values()),
+      ...effectiveRows.map((row) => safeImage(row.imageUrl)),
+    ].filter(Boolean);
+    return Array.from(new Set(urls));
+  }, [effectiveRows, fallbackImage, imageForColor]);
+
+  useEffect(() => {
+    preloadImages.forEach((src) => {
+      const image = new window.Image();
+      image.decoding = 'async';
+      image.src = src;
+    });
+  }, [preloadImages]);
 
   const [color, setColor] = useState('');
   const [size, setSize] = useState('');
@@ -86,14 +136,12 @@ export default function VariantSelectorBottomSheet({
   const selectedPrice = Number(selected?.price ?? currentPrice) || currentPrice;
   const hasActiveDeal = currentPrice > 0 && selectedPrice > currentPrice;
   const displayPrice = hasActiveDeal ? currentPrice : selectedPrice;
-  const fallbackImage = imageValue(product.imageUrl) || imageValue(product.image);
-  const selectedImage = String(
-    selected?.imageUrl ||
-    colorRows.find((row) => stockOf(row) > 0 && imageValue(row.imageUrl))?.imageUrl ||
-    selectedColor?.imageUrl ||
-    fallbackImage ||
-    imageValue(product.images?.[0]),
-  );
+  const selectedImage =
+    safeImage(selected?.imageUrl) ||
+    safeImage(colorRows.find((row) => stockOf(row) > 0 && safeImage(row.imageUrl))?.imageUrl) ||
+    safeImage(selectedColor?.imageUrl) ||
+    imageForColor.get(normalize(color)) ||
+    fallbackImage;
   const valid = Boolean(selected && stock > 0 && displayPrice > 0);
   const safeQty = Math.min(Math.max(1, qty), Math.max(1, stock));
 
@@ -115,14 +163,14 @@ export default function VariantSelectorBottomSheet({
         <div className="flex items-center gap-3 border-b border-black/7 pb-4">
           <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-2xl bg-[#F4F4F1]">
             {selectedImage ? (
-              <Image
+              <img
+                key={selectedImage}
                 src={selectedImage}
                 alt=""
-                fill
-                priority
                 loading="eager"
-                sizes="56px"
-                className="object-cover"
+                decoding="async"
+                fetchPriority="high"
+                className="h-full w-full object-cover"
               />
             ) : null}
           </div>
@@ -151,6 +199,7 @@ export default function VariantSelectorBottomSheet({
                 const available = effectiveRows.some(
                   (row) => normalize(row.color) === normalize(item.name) && stockOf(row) > 0,
                 );
+                const itemImage = imageForColor.get(normalize(item.name)) || fallbackImage;
 
                 return (
                   <button
@@ -172,7 +221,15 @@ export default function VariantSelectorBottomSheet({
                     className={`flex min-h-16 items-center gap-2 rounded-2xl border px-2.5 py-2 text-left transition-all duration-200 ${active ? 'border-[#0F6A5F] bg-[#0F6A5F]/[0.06] text-[#0F6A5F] ring-2 ring-[#0F6A5F] ring-offset-2' : 'border-black/10 bg-white text-black/70'} disabled:cursor-not-allowed disabled:opacity-30`}
                   >
                     <span className="relative h-10 w-10 shrink-0 overflow-hidden rounded-xl bg-[#F4F4F1]">
-                      {item.imageUrl ? <Image src={item.imageUrl} alt="" fill priority loading="eager" sizes="40px" className="object-cover" /> : <span className="block h-full w-full bg-black/10" />}
+                      {itemImage ? (
+                        <img
+                          src={itemImage}
+                          alt=""
+                          loading="eager"
+                          decoding="async"
+                          className="h-full w-full object-cover"
+                        />
+                      ) : <span className="block h-full w-full bg-black/10" />}
                     </span>
                     <span className="min-w-0 truncate text-xs font-black">{item.name}</span>
                   </button>
