@@ -1,6 +1,7 @@
 // ==================== ADMIN SHARED TYPES ====================
 import { collection } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { notifyCatalogUpdated } from '@/lib/catalogRefreshSignal';
 
 export interface Product { id: string; title: string; price: number; originalPrice?: number; category: string; stock: number; imageUrl?: string; images?: Array<string | { url?: string }>; description?: string; isFlashSale?: boolean; isWeekendSpecial?: boolean; [key: string]: unknown }
 export interface Category { id: string; title: string; iconUrl?: string; imageUrl?: string; active?: boolean; order?: number; sortOrder?: number; slug?: string; [key: string]: unknown }
@@ -23,6 +24,9 @@ async function adminRequest(action: 'create' | 'update' | 'set' | 'delete' | 'ge
   });
   const result = await response.json().catch(() => null);
   if (!response.ok || !result?.success) throw new Error(result?.error || 'Admin operation failed.');
+  if ((name === 'products' || name === 'categories') && ['create', 'update', 'set', 'delete'].includes(action)) {
+    notifyCatalogUpdated({ action, collection: name, id, at: new Date().toISOString() });
+  }
   return result;
 }
 

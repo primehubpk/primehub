@@ -32,6 +32,7 @@ import type {
   SiteSettings,
 } from "@/lib/types";
 import type { Product } from "@/components/shop/ShopTypes";
+import { CATALOG_REFRESH_EVENT } from "@/lib/catalogRefreshSignal";
 
 type Props = {
   initialProducts: Product[];
@@ -109,14 +110,27 @@ export default function HomePageClient({
     const refreshWhenVisible = () => {
       if (document.visibilityState === "visible") void refreshCatalog();
     };
+    const refreshAfterAdminWrite = () => void refreshCatalog();
+    const refreshFromStorage = (event: StorageEvent) => {
+      if (event.key === CATALOG_REFRESH_EVENT) void refreshCatalog();
+    };
+    const catalogChannel = typeof BroadcastChannel !== "undefined"
+      ? new BroadcastChannel(CATALOG_REFRESH_EVENT)
+      : null;
+    if (catalogChannel) catalogChannel.onmessage = refreshAfterAdminWrite;
     window.addEventListener("focus", refreshWhenVisible);
+    window.addEventListener(CATALOG_REFRESH_EVENT, refreshAfterAdminWrite);
+    window.addEventListener("storage", refreshFromStorage);
     document.addEventListener("visibilitychange", refreshWhenVisible);
 
     return () => {
       cancelled = true;
       window.clearInterval(refreshTimer);
       window.removeEventListener("focus", refreshWhenVisible);
+      window.removeEventListener(CATALOG_REFRESH_EVENT, refreshAfterAdminWrite);
+      window.removeEventListener("storage", refreshFromStorage);
       document.removeEventListener("visibilitychange", refreshWhenVisible);
+      catalogChannel?.close();
     };
   }, [initialProducts, initialCategories]);
 
