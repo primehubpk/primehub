@@ -57,15 +57,12 @@ export default function HomePageClient({
   const catalogUnavailable = products.length === 0;
 
   useEffect(() => {
-    if (initialProducts.length > 0) {
-      setProducts(initialProducts);
-      setCategories(initialCategories);
-      setRecoveringCatalog(false);
-      return;
-    }
+    setProducts(initialProducts);
+    setCategories(initialCategories);
+    setRecoveringCatalog(initialProducts.length === 0);
 
     let cancelled = false;
-    async function recoverCatalog() {
+    async function refreshCatalog() {
       try {
         for (const delay of RECOVERY_DELAYS_MS) {
           if (delay > 0)
@@ -75,6 +72,7 @@ export default function HomePageClient({
           try {
             const response = await fetch("/api/storefront/read?type=catalog", {
               cache: "no-store",
+              headers: { "x-primehub-catalog-refresh": "1" },
             });
             if (!response.ok) continue;
             const data = await response.json();
@@ -92,7 +90,7 @@ export default function HomePageClient({
               return;
             }
           } catch (error) {
-            console.warn("Homepage catalog recovery attempt failed", error);
+            console.warn("Homepage catalog refresh attempt failed", error);
           }
         }
       } finally {
@@ -100,7 +98,7 @@ export default function HomePageClient({
       }
     }
 
-    void recoverCatalog();
+    void refreshCatalog();
     return () => {
       cancelled = true;
     };
