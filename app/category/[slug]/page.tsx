@@ -2,7 +2,6 @@ import type { Metadata } from 'next';
 import { Suspense } from 'react';
 import ShopCatalog from '@/components/ShopCatalog';
 import { slugifyCategory } from '@/lib/categoryUtils';
-import { getPublicCatalogSnapshot } from '@/lib/publicCatalogServer';
 
 export const revalidate = 300;
 
@@ -65,17 +64,6 @@ function CategoryLoadingState() {
   );
 }
 
-async function CategoryCatalogContent({ slug }: { slug: string }) {
-  const snapshot = await getPublicCatalogSnapshot();
-  return (
-    <ShopCatalog
-      initialCategory={slug}
-      initialProducts={snapshot.products}
-      initialCategories={snapshot.categories}
-    />
-  );
-}
-
 export default async function CategoryPage({
   params,
 }: {
@@ -87,7 +75,7 @@ export default async function CategoryPage({
 
   return (
     <Suspense fallback={<CategoryLoadingState />}>
-      <CategoryCatalogContent slug={slug} />
+      <ShopCatalog initialCategory={slug} />
     </Suspense>
   );
 }
