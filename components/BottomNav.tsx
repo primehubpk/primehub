@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { GraduationCap, Home, Package, ShoppingBag, Users } from 'lucide-react';
 
@@ -42,13 +42,28 @@ function isItemActive(pathname: string, item: NavItem) {
   return pathname === item.href || pathname.startsWith(`${item.href}/`);
 }
 
-function shouldPrefetch(item: NavItem) {
-  return item.key === 'home' || item.key === 'shop' || item.key === 'reseller';
-}
 
 export default function BottomNav() {
   const pathname = usePathname();
+  const router = useRouter();
   const [pendingHref, setPendingHref] = useState<string | null>(null);
+
+  useEffect(() => {
+    const hrefs = NAV_ITEMS.map(({ href }) => href).filter((href) => href !== pathname);
+    const warmRoutes = () => hrefs.forEach((href) => router.prefetch(href));
+    const browser = window as Window & {
+      requestIdleCallback?: (callback: () => void, options?: { timeout?: number }) => number;
+      cancelIdleCallback?: (handle: number) => void;
+    };
+
+    if (browser.requestIdleCallback) {
+      const idleId = browser.requestIdleCallback(warmRoutes, { timeout: 1200 });
+      return () => browser.cancelIdleCallback?.(idleId);
+    }
+
+    const timer = window.setTimeout(warmRoutes, 250);
+    return () => window.clearTimeout(timer);
+  }, [pathname, router]);
 
   useEffect(() => {
     setPendingHref(null);
@@ -76,12 +91,15 @@ export default function BottomNav() {
             <Link
               key={key}
               href={href}
-              prefetch={shouldPrefetch(item)}
+              prefetch
               aria-current={routeIsActive ? 'page' : undefined}
               aria-busy={isPending || undefined}
               data-nav-key={key}
               data-active={routeIsActive ? 'true' : 'false'}
               data-pending={isPending ? 'true' : 'false'}
+              onPointerEnter={() => router.prefetch(href)}
+              onPointerDown={() => router.prefetch(href)}
+              onFocus={() => router.prefetch(href)}
               onClick={() => {
                 if (pathname !== href) setPendingHref(href);
               }}
