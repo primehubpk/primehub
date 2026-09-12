@@ -1,10 +1,12 @@
-import { Suspense } from 'react';
-import ShopCatalog from '@/components/ShopCatalog';
+import type { Metadata } from 'next';
+import CategoryDirectory from '@/components/CategoryDirectory';
+
+export const metadata: Metadata = {
+  title: 'Shop by Category',
+  description: 'Browse PrimeHubMall categories and open the products you want directly.',
+  alternates: { canonical: '/category' },
+};
 
 export default function CategoriesPage() {
-  return (
-    <Suspense fallback={<div className="min-h-screen bg-[#F4F4F1] p-8 text-center text-xs text-black/50">Loading shop...</div>}>
-      <ShopCatalog />
-    </Suspense>
-  );
+  return <CategoryDirectory />;
 }
