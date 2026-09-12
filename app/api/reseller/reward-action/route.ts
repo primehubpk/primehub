@@ -8,7 +8,9 @@ export const runtime = 'nodejs';
 const SUPABASE_REWARD_TIMEOUT_MS = 3500;
 
 type HistoryEntry = { id: string; action: 'spin' | 'checkin'; name: string; type: string; status: 'claimed' | 'completed'; createdAt: string; source: 'account' };
-type Wallet = { points?: number; streak?: number; lastCheckIn?: string; lastSpin?: string; coupons?: string[]; freeDeliveryCredits?: number; history?: HistoryEntry[] };
+type VoucherReward = { id: string; code: string; amount: number; name: string; createdAt: string };
+type ProductReward = { id: string; productId: string; name: string; imageUrl?: string; status: 'pending'; createdAt: string };
+type Wallet = { points?: number; streak?: number; lastCheckIn?: string; lastSpin?: string; coupons?: string[]; vouchers?: VoucherReward[]; freeProducts?: ProductReward[]; freeDeliveryCredits?: number; history?: HistoryEntry[] };
 type GuestWallet = { lastSpin?: string; pendingPrize?: Prize | null; pendingPrizeToken?: string };
 type Prize = { id: string; name: string; type: string; points?: number; probability?: number; active?: boolean; stock?: number; productId?: string; voucherCode?: string; voucherAmount?: number; imageUrl?: string };
 
@@ -21,15 +23,18 @@ async function readSupabaseGuest(guestId: string): Promise<GuestWallet> { if (!g
 async function readSupabaseRewardSettings() { const r = await sb('settings?id=eq.rewards&select=payload&limit=1'); const rows = await r.json(); return rows?.[0]?.payload || {}; }
 async function writeSupabaseWallet(uid: string, wallet: Wallet) { await sb('user_rewards?on_conflict=id', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ id: uid, user_id: uid, payload: wallet, authoritative_source: 'supabase', mirror_status: 'pending', updated_at: new Date().toISOString() }) }); }
 async function mirrorFirebaseWallet(uid: string, wallet: Wallet) { try { await getAdminDb().collection('user_rewards').doc(uid).set({ ...wallet, updatedAt: FieldValue.serverTimestamp() }, { merge: true }); } catch {} }
-function choosePrize(prizes: Prize[]) { const active = prizes.filter(p => p.active !== false && Number(p.probability) > 0 && Number(p.stock ?? 1) > 0); const total = active.reduce((s, p) => s + Number(p.probability || 0), 0); if (!active.length || total <= 0) return null; let cursor = Math.random() * total; for (const p of active) { cursor -= Number(p.probability || 0); if (cursor <= 0) return p; } return active[active.length - 1]; }
+function choosePrize(prizes: Prize[]) { const active = prizes.filter(p => p.active !== false && Number(p.probability) > 0 && Number(p.stock ?? 1) > 0).slice(0, 5); const total = active.reduce((s, p) => s + Number(p.probability || 0), 0); if (!active.length || total <= 0) return null; let cursor = Math.random() * total; for (const p of active) { cursor -= Number(p.probability || 0); if (cursor <= 0) return p; } return active[active.length - 1]; }
 function isLogicalRewardError(error: unknown) { const message = error instanceof Error ? error.message : String(error); return /Already checked in today|Come back tomorrow|Spin prizes are being refreshed/i.test(message); }
 function appendHistory(current: Wallet, entry: HistoryEntry) { return [...(current.history || []), entry].slice(-100); }
 function applySpin(current: Wallet, prize: Prize, today: string): Wallet {
   const points = prize.type === 'points' ? Math.max(0, Number(prize.points || 0)) : 0;
   const voucher = prize.type === 'coupon' ? (String(prize.voucherCode || '').trim() || `PH-${Math.random().toString(36).slice(2, 8).toUpperCase()}`) : '';
   const now = new Date().toISOString();
-  const history: HistoryEntry = { id: crypto.randomUUID(), action: 'spin', name: prize.name, type: prize.type, status: 'claimed', createdAt: now, source: 'account' };
-  return { ...current, points: Number(current.points || 0) + points, lastSpin: today, coupons: voucher ? [...(current.coupons || []), voucher] : (current.coupons || []), freeDeliveryCredits: Number(current.freeDeliveryCredits || 0) + (prize.type === 'free-delivery' ? 1 : 0), history: appendHistory(current, history) };
+  const rewardId = crypto.randomUUID();
+  const voucherReward: VoucherReward | null = prize.type === 'coupon' ? { id: rewardId, code: voucher, amount: Math.max(0, Number(prize.voucherAmount || 0)), name: prize.name, createdAt: now } : null;
+  const productReward: ProductReward | null = prize.type === 'product' ? { id: rewardId, productId: String(prize.productId || ''), name: prize.name, imageUrl: prize.imageUrl, status: 'pending', createdAt: now } : null;
+  const history: HistoryEntry = { id: rewardId, action: 'spin', name: prize.name, type: prize.type, status: 'claimed', createdAt: now, source: 'account' };
+  return { ...current, points: Number(current.points || 0) + points, lastSpin: today, coupons: voucher ? [...(current.coupons || []), voucher] : (current.coupons || []), vouchers: voucherReward ? [...(current.vouchers || []), voucherReward] : (current.vouchers || []), freeProducts: productReward ? [...(current.freeProducts || []), productReward] : (current.freeProducts || []), freeDeliveryCredits: Number(current.freeDeliveryCredits || 0) + (prize.type === 'free-delivery' ? 1 : 0), history: appendHistory(current, history) };
 }
 function applyCheckin(current: Wallet, settings: any, today: string): Wallet {
   if (current.lastCheckIn === today) throw new Error('Already checked in today.');
