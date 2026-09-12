@@ -43,6 +43,14 @@ export const getPublicCatalogSnapshot = unstable_cache(
   { revalidate: 3600, tags: ['public-catalog'] },
 );
 
+export async function getFreshPublicCatalogSnapshot() {
+  const result = await getDualCatalog({ cache: 'no-store', timeoutMs: PUBLIC_PRIMARY_TIMEOUT_MS });
+  if (result.source === 'empty' || result.products.length === 0) {
+    throw new Error(`Fresh public catalog unavailable (source: ${result.source}).`);
+  }
+  return result;
+}
+
 async function loadPublicProduct(productId: string) {
   const id = String(productId || '').trim();
   if (!id) return { product: null, source: 'empty' as const };
@@ -54,6 +62,12 @@ export const getPublicProductSnapshot = unstable_cache(
   ['primehub-public-product-dual-v2'],
   { revalidate: 60, tags: ['public-products'] },
 );
+
+export async function getFreshPublicProductSnapshot(productId: string) {
+  const id = String(productId || '').trim();
+  if (!id) return { product: null, source: 'empty' as const };
+  return getDualProduct(id, { cache: 'no-store', timeoutMs: PUBLIC_PRIMARY_TIMEOUT_MS });
+}
 
 async function loadStorefrontSettingsResult() {
   for (const delay of SETTINGS_RETRY_DELAYS_MS) {
