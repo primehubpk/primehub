@@ -22,6 +22,7 @@ import {
   isWholesalePriceBucket,
   matchesPriceBucket,
   matchesSaleMelaBucket,
+  saleMelaBucketLabel,
   saleMelaPriceRange,
   sortPriceBuckets,
 } from "@/lib/priceBucketUtils";
@@ -193,12 +194,18 @@ export default function HomeCollections({
               <div
                 id={anchor}
                 className={`home-sale-row scroll-mt-24 ${wholesale ? "home-sale-wholesale" : ""}`}
+                style={standalone ? { display: "block", marginBottom: "28px" } : undefined}
                 key={bucket.id}
               >
                 <Link
                   className="home-budget"
                   href={href}
                   prefetch={!standalone}
+                  style={standalone ? {
+                    width: "clamp(96px, 23vw, 145px)",
+                    padding: "0",
+                    marginBottom: "12px",
+                  } : undefined}
                   aria-label={`Browse ${bucket.title} in PrimeHubMall Sale Mela`}
                 >
                   <span className="home-budget-medallion">
@@ -211,12 +218,21 @@ export default function HomeCollections({
                       </>
                     )}
                   </span>
-                  <span className="home-budget-label">{bucket.title}</span>
+                  <span className="home-budget-label">
+                    {standalone && !wholesale ? saleMelaBucketLabel(amount) : bucket.title}
+                  </span>
                 </Link>
 
                 <div
                   className="home-sale-products [scrollbar-width:none]"
-                  style={{
+                  style={standalone ? {
+                    display: "grid",
+                    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+                    gap: "6px",
+                    overflow: "visible",
+                    paddingBottom: "3px",
+                    scrollSnapType: "none",
+                  } : {
                     display: "flex",
                     gridTemplateColumns: "none",
                     gap: "6px",
@@ -231,7 +247,9 @@ export default function HomeCollections({
                     matches.map((product) => (
                       <div
                         key={product.id}
-                        style={{
+                        style={standalone ? {
+                          minWidth: 0,
+                        } : {
                           flex: "0 0 calc((100% - 12px) / 3)",
                           minWidth: 0,
                           scrollSnapAlign: "start",
