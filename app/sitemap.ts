@@ -5,6 +5,7 @@ import { slugifyCategory } from '@/lib/categoryUtils';
 const staticRoutes = [
   '/',
   '/shop',
+  '/shop/sale-mela',
   '/new-arrivals',
   '/deals',
   '/weekly-deals',
@@ -24,8 +25,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   const entries: MetadataRoute.Sitemap = staticRoutes.map((path) => ({
     url: `${siteUrl}${path}`,
-    changeFrequency: path === '/' || path === '/shop' || path === '/new-arrivals' || path === '/deals' || path === '/weekly-deals' ? 'daily' : 'monthly',
-    priority: path === '/' ? 1 : path === '/shop' ? 0.9 : 0.6,
+    changeFrequency: path === '/' || path === '/shop' || path === '/shop/sale-mela' || path === '/new-arrivals' || path === '/deals' || path === '/weekly-deals' ? 'daily' : 'monthly',
+    priority: path === '/' ? 1 : path === '/shop' ? 0.9 : path === '/shop/sale-mela' ? 0.8 : 0.6,
   }));
 
   try {
