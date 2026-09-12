@@ -16,6 +16,14 @@ function score(id: string) {
   return Array.from(id).reduce((n, c) => ((n * 31 + c.charCodeAt(0)) >>> 0), 7);
 }
 
+function updatedTime(product: Product) {
+  const value = (product as Product & { updatedAt?: string; createdAt?: string }).updatedAt
+    || (product as Product & { createdAt?: string }).createdAt
+    || '';
+  const timestamp = Date.parse(value);
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
 type Props = {
   initialCategory?: string;
   initialQuery?: string;
@@ -49,6 +57,13 @@ export default function ShopCatalog({
 
   const picks = useMemo(
     () => [...shop.filtered].sort((a, b) => score(a.id) - score(b.id)),
+    [shop.filtered],
+  );
+
+  const categoryProducts = useMemo(
+    () => [...shop.filtered].sort(
+      (a, b) => updatedTime(b) - updatedTime(a) || score(a.id) - score(b.id),
+    ),
     [shop.filtered],
   );
 
@@ -96,8 +111,11 @@ export default function ShopCatalog({
     shop.setFiltersOpen(false);
   };
 
-  const primaryProducts =
-    categoryView || searchView || budgetView ? shop.filtered : picks;
+  const primaryProducts = categoryView
+    ? categoryProducts
+    : searchView || budgetView
+      ? shop.filtered
+      : picks;
 
   const selectedBucketTitle =
     shop.wholesaleOnly || bucketParam === 'wholesale'

@@ -7,7 +7,6 @@ import { useCartStore } from '@/lib/cartStore';
 import { categoryHref, categoryLabel, productMatchesCategory, slugifyCategory } from '@/lib/categoryUtils';
 import { smartSearchProducts } from '@/lib/smartSearch';
 import { isWholesaleProduct } from '@/lib/wholesale';
-import { shuffleProducts } from '@/lib/shuffleProducts';
 import { getEffectivePrice } from '@/lib/dealPricing';
 import { priceBucketRange } from '@/lib/priceBucketUtils';
 import { cacheCatalogForNavigation, readCachedCatalog } from '@/lib/productNavigationCache';
@@ -25,7 +24,7 @@ export function useShopCatalog(initialCategory?: string, initialQuery = '', init
   const numericBucket = Number(bucketParam);
   const urlMax = searchParams.get('max') || ([99, 299, 999].includes(numericBucket) ? String(numericBucket) : 'all');
   const hasServerData = initialProducts.length > 0 || initialCategories.length > 0;
-  const [products, setProducts] = useState<Product[]>(() => hasServerData ? shuffleProducts(initialProducts) : []);
+  const [products, setProducts] = useState<Product[]>(() => hasServerData ? initialProducts : []);
   const [categories, setCategories] = useState<Category[]>(initialCategories);
   const [search, setSearch] = useState(initialQuery || urlQuery);
   const [category, setCategory] = useState(initialCategory || 'all');
@@ -58,7 +57,7 @@ export function useShopCatalog(initialCategory?: string, initialQuery = '', init
     const cacheIsFresh = hasWarmCatalog && cacheAge <= NAVIGATION_CACHE_FRESH_MS;
 
     if (cached && cached.products.length > 0) {
-      setProducts(shuffleProducts(cached.products));
+      setProducts(cached.products);
       if (cached.categories.length > 0) setCategories(cached.categories);
       setLoading(false);
     }
@@ -73,7 +72,7 @@ export function useShopCatalog(initialCategory?: string, initialQuery = '', init
         const nextProducts = (Array.isArray(data?.products) ? data.products : []) as Product[];
         const nextCategories = (Array.isArray(data?.categories) ? data.categories : []) as Category[];
 
-        if (nextProducts.length > 0) setProducts(shuffleProducts(nextProducts));
+        if (nextProducts.length > 0) setProducts(nextProducts);
         if (nextCategories.length > 0) setCategories(nextCategories);
       } catch (error) {
         console.warn('shop dual catalog read unavailable', error);
