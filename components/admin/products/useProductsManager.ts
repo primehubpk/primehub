@@ -256,6 +256,7 @@ export function useProductsManager() {
     const current = Number(product.price ?? 0);
     const existingDeal = weeklyDeals.find(item => item.productId === product.id);
     const isBig = bigDeal?.productId === product.id;
+    const legacyStock = (product as any).stock ?? (product as any).quantity ?? (product as any).inventory;
     const normalizedImages: string[] = (
       Array.isArray(product.images) && product.images.length > 0
         ? product.images.map((img: any) => typeof img === 'string' ? img : (img?.url || '')).filter(Boolean)
@@ -270,7 +271,7 @@ export function useProductsManager() {
       discountPrice: current && current !== original ? String(current) : '',
       description: String(product.description || ''),
       category: String(product.category || ''),
-      stock: String(product.stock ?? 0),
+      stock: legacyStock == null ? '' : String(legacyStock),
       videoUrl: String((product as any).videoUrl || ''),
       images: normalizedImages,
       featured: Boolean((product as any).featured),
@@ -284,7 +285,7 @@ export function useProductsManager() {
         id: row.id || makeId(),
         color: row.color || String(row.label || '').split(' / ')[0] || '',
         size: row.size || String(row.label || '').split(' / ')[1] || '',
-        stock: String(row.stock ?? product.stock ?? 10),
+        stock: String(row.stock ?? legacyStock ?? 10),
         imageUrl: row.imageUrl || colorMap[row.color] || firstImg || '',
       }))
       : []);
@@ -369,7 +370,8 @@ export function useProductsManager() {
       const variantOptions = [{ id: 'color', name: 'Color', values: cleanColors.map(color => color.name) }, { id: 'size', name: 'Size', values: cleanSizes }];
       const colorImages = Object.fromEntries(cleanColors.map(color => [color.name, color.imageUrl]));
       const variantMatrix = variantRows.map(row => ({ id: row.id, label: `${row.color} / ${row.size}`, color: row.color, size: row.size, stock: Math.max(0, Number(row.stock || 0)), imageUrl: row.imageUrl || colorImages[row.color] || form.images[0] || '', sku: '', price: String(salePrice), salePrice: '', active: true }));
-      const payload = { title: form.title.trim(), slug: slugify(form.title), price: salePrice, originalPrice, description: form.description, category: form.category, stock: Math.max(0, Number(form.stock || 0)), videoUrl: form.videoUrl.trim(), imageUrl: form.images[0] || '', images: form.images, colorImages, variantColors: cleanColors, variantOptions, variantMatrix, featured: form.featured, published: form.published, isWholesale: form.isWholesale === true, priceBucketIds: bucketIds, updatedAt: new Date().toISOString() };
+      const stockValue = form.stock.trim();
+      const payload = { title: form.title.trim(), slug: slugify(form.title), price: salePrice, originalPrice, description: form.description, category: form.category, ...(stockValue !== '' ? { stock: Math.max(0, Number(stockValue)) } : {}), videoUrl: form.videoUrl.trim(), imageUrl: form.images[0] || '', images: form.images, colorImages, variantColors: cleanColors, variantOptions, variantMatrix, featured: form.featured, published: form.published, isWholesale: form.isWholesale === true, priceBucketIds: bucketIds, updatedAt: new Date().toISOString() };
       let productId = editing?.id || '';
       if (editing) await updateAdminDocument('products', editing.id, payload);
       else productId = (await createAdminDocument('products', { ...payload, isFlashSale: false, isWeekendSpecial: false, createdAt: new Date().toISOString() })).id;
