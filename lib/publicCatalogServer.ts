@@ -6,7 +6,7 @@ import { getWholesaleVideosSnapshot } from '@/lib/wholesaleVideosServer';
 
 const CATALOG_RETRY_DELAYS_MS = [0];
 const SETTINGS_RETRY_DELAYS_MS = [0];
-const PUBLIC_PRIMARY_TIMEOUT_MS = 900;
+const PUBLIC_PRIMARY_TIMEOUT_MS = 1800;
 const CATALOG_READ_CACHE = { revalidate: 3600, tags: ['public-catalog'], timeoutMs: PUBLIC_PRIMARY_TIMEOUT_MS };
 const PRODUCT_READ_CACHE = { revalidate: 60, tags: ['public-products'], timeoutMs: PUBLIC_PRIMARY_TIMEOUT_MS };
 const SETTINGS_READ_CACHE = { revalidate: 60, tags: ['storefront-settings'], timeoutMs: PUBLIC_PRIMARY_TIMEOUT_MS };
