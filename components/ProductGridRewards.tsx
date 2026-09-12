@@ -304,8 +304,10 @@ export default function ProductGridRewards({
         return Number(Boolean(b.isFlashSale)) - Number(Boolean(a.isFlashSale));
       });
     }
-    return filtered;
-  }, [products, selectedMaxPrice, wholesaleSelected, sort]);
+    // The homepage is a discovery surface, not the full catalog. Rendering all
+    // 500+ cards blocks the main thread and delays every bottom-nav click.
+    return homeLayout ? filtered.slice(0, 40) : filtered;
+  }, [products, selectedMaxPrice, wholesaleSelected, sort, homeLayout]);
 
   function add(p: Product) {
     const img = image(p);
