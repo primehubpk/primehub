@@ -10,6 +10,7 @@ type Props = {
   addProduct: (product: Product) => void;
   loading?: boolean;
   dense?: boolean;
+  premium?: boolean;
 };
 
 const DEFAULT_INITIAL_COUNT = 24;
@@ -22,10 +23,13 @@ export default function CatalogProductGrid({
   addProduct,
   loading,
   dense = false,
+  premium = false,
 }: Props) {
-  const grid = dense
-    ? 'grid grid-cols-3 gap-2 md:grid-cols-4'
-    : 'grid grid-cols-2 gap-3 md:grid-cols-4';
+  const grid = premium
+    ? 'grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4'
+    : dense
+      ? 'grid grid-cols-3 gap-2 md:grid-cols-4'
+      : 'grid grid-cols-2 gap-3 md:grid-cols-4';
   const initialCount = dense ? DENSE_INITIAL_COUNT : DEFAULT_INITIAL_COUNT;
   const [visibleCount, setVisibleCount] = useState(() => Math.min(products.length, initialCount));
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
@@ -84,6 +88,7 @@ export default function CatalogProductGrid({
             addedId={addedId}
             addProduct={addProduct}
             dense={dense}
+            premium={premium}
             priority={index < 8}
           />
         ))}
