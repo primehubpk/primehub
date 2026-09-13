@@ -2,7 +2,6 @@
 
 import Link from 'next/link';
 import { useMemo } from 'react';
-import { ChevronRight } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import HomeHeader from '@/components/home/HomeHeader';
 import './home/home.css';
@@ -34,6 +33,24 @@ function categoryLabel(category: Category) {
 
 function categoryValue(category: Category) {
   return slugifyCategory(category.title || category.name || category.slug || category.id || '');
+}
+
+function categoryWords(label: string) {
+  return slugifyCategory(label)
+    .split('-')
+    .filter((word) => word.length > 2 && !['collection', 'collections', 'deal', 'deals'].includes(word));
+}
+
+function relatedScore(selectedLabel: string, candidateLabel: string) {
+  const selected = new Set(categoryWords(selectedLabel));
+  const candidate = categoryWords(candidateLabel);
+  let scoreValue = candidate.reduce((total, word) => total + (selected.has(word) ? 4 : 0), 0);
+
+  if (selected.has('bangles') && candidate.includes('bangles')) scoreValue += 8;
+  if (selected.has('jewellery') && candidate.includes('jewellery')) scoreValue += 6;
+  if (selected.has('jewelry') && candidate.includes('jewelry')) scoreValue += 6;
+
+  return scoreValue;
 }
 
 type Props = {
@@ -114,10 +131,24 @@ export default function ShopCatalog({
     [categorySections],
   );
 
-  const followingSections = useMemo(
-    () => categorySections.filter((section) => !section.selected),
-    [categorySections],
-  );
+  const followingSections = useMemo(() => {
+    const remaining = categorySections.filter((section) => !section.selected);
+    if (!currentSection) return remaining;
+
+    const selectedLabel = categoryLabel(currentSection.category);
+    const sourceOrder = new Map(
+      categorySections.map((section, index) => [section.value, index]),
+    );
+
+    return [...remaining].sort((a, b) => {
+      const relationDifference =
+        relatedScore(selectedLabel, categoryLabel(b.category)) -
+        relatedScore(selectedLabel, categoryLabel(a.category));
+
+      if (relationDifference !== 0) return relationDifference;
+      return (sourceOrder.get(a.value) || 0) - (sourceOrder.get(b.value) || 0);
+    });
+  }, [categorySections, currentSection]);
 
   const recommendations = useMemo(() => {
     if (budgetView) {
@@ -170,44 +201,43 @@ export default function ShopCatalog({
     const selectedIcon = selectedCategory?.iconUrl || selectedCategory?.imageUrl || selectedCategory?.image;
 
     return (
-      <div className="home-storefront min-h-screen bg-[#F8F5EF] pb-28">
+      <div className="home-storefront min-h-screen bg-[#FFFCF7] pb-28">
         <HomeHeader />
 
-        <main className="mx-auto max-w-6xl px-3 pb-10 pt-4 sm:px-4 md:px-6">
-          <section className="rounded-[28px] border border-[#E9E1D5] bg-white/90 px-4 py-4 shadow-[0_12px_38px_rgba(70,52,29,0.07)] backdrop-blur sm:px-5">
-            <div className="flex items-end justify-between gap-3">
-              <div>
-                <p className="text-[8px] font-black uppercase tracking-[0.22em] text-[#A66B17]">Category collection</p>
-                <h1 className="mt-1 text-2xl font-black tracking-tight text-[#211B14] sm:text-3xl">{selectedLabel}</h1>
-                <p className="mt-1 text-[11px] font-semibold text-black/45">Browse every available product in this collection.</p>
-              </div>
-              <span className="shrink-0 rounded-full bg-[#FFF6E8] px-3 py-1.5 text-[10px] font-black text-[#8B5A12] ring-1 ring-[#ECD9B8]">
-                {selectedProducts.length} products
-              </span>
-            </div>
-
-            <div className="mt-4 flex">
-              <div className="flex w-[92px] flex-col items-center gap-2 text-center">
-                <span className="flex h-[78px] w-[78px] items-center justify-center overflow-hidden rounded-[24px] border border-[#C58A2A] bg-[#FFF9F0] p-1.5 shadow-[0_8px_24px_rgba(83,58,22,0.08)] ring-2 ring-[#C58A2A]/10">
+        <main className="mx-auto w-full max-w-[900px] px-3 pb-10 pt-2 sm:px-4 md:px-5">
+          <section className="flex min-h-[88px] items-center px-1 py-2" aria-label={`${selectedLabel} category`}>
+            {selectedCategory ? (
+              <Link
+                href={categoryHref(selectedCategory)}
+                prefetch={false}
+                className="group inline-flex items-center justify-center rounded-[24px] focus-visible:outline-none"
+                aria-label={`Open ${selectedLabel} category`}
+              >
+                <span className="flex h-[76px] w-[76px] items-center justify-center overflow-hidden rounded-[24px] border border-[#C58A2A] bg-[#FFF9F0] p-1.5 shadow-[0_8px_24px_rgba(83,58,22,0.09)] ring-2 ring-[#C58A2A]/10 transition group-active:scale-95">
                   {selectedIcon ? (
                     <img src={selectedIcon} alt="" className="h-full w-full rounded-[19px] object-cover" />
                   ) : (
                     <span className="text-2xl font-black text-[#A66B17]">{selectedLabel.charAt(0)}</span>
                   )}
                 </span>
-                <span className="line-clamp-2 text-[10px] font-black leading-3.5 text-[#8B5A12]">{selectedLabel}</span>
-              </div>
-            </div>
+              </Link>
+            ) : (
+              <span className="flex h-[76px] w-[76px] items-center justify-center rounded-[24px] border border-[#C58A2A] bg-[#FFF9F0] text-2xl font-black text-[#A66B17] shadow-[0_8px_24px_rgba(83,58,22,0.09)] ring-2 ring-[#C58A2A]/10">
+                {selectedLabel.charAt(0)}
+              </span>
+            )}
           </section>
 
-          <section className="mt-6">
-            <div className="mb-3 flex items-end justify-between gap-3">
-              <div>
-                <p className="text-[8px] font-black uppercase tracking-[0.2em] text-[#B7791F]">{selectedLabel}</p>
-                <h2 className="mt-0.5 text-xl font-black tracking-tight text-[#211B14] sm:text-2xl">All {selectedLabel} products</h2>
-              </div>
-              <span className="text-[10px] font-bold text-black/40">{selectedProducts.length} items</span>
+          <section className="mt-1">
+            <div className="mb-3 flex items-end justify-between gap-3 px-0.5">
+              <h1 className="text-[25px] font-black leading-none tracking-[-0.035em] text-[#211B14] sm:text-[30px]">
+                {selectedLabel}
+              </h1>
+              <span className="shrink-0 pb-0.5 text-[10px] font-bold text-black/45 sm:text-[11px]">
+                {selectedProducts.length} products
+              </span>
             </div>
+
             <CatalogProductGrid
               products={selectedProducts}
               addedId={shop.addedId}
@@ -217,51 +247,54 @@ export default function ShopCatalog({
             />
           </section>
 
-          {activeCategories.length > 0 && (
+          {activeCategories.length > 1 && (
             <CategoryFilter
               categories={activeCategories}
               category={shop.category}
-              title="Explore all categories"
+              title="Explore more categories"
             />
           )}
 
-          {followingSections.map((section, index) => {
+          {followingSections.map((section) => {
             const label = categoryLabel(section.category);
+            const icon = section.category.iconUrl || section.category.imageUrl || section.category.image;
+
             return (
-              <div key={section.category.id || section.value}>
-                <section className="mt-9 border-t border-[#E7DED1] pt-7">
-                  <div className="mb-3 flex items-end justify-between gap-3">
-                    <div>
-                      <p className="text-[8px] font-black uppercase tracking-[0.2em] text-[#0F6A5F]">Next collection</p>
-                      <h2 className="mt-0.5 text-xl font-black tracking-tight text-[#211B14] sm:text-2xl">{label}</h2>
-                      <p className="mt-1 text-[10px] font-semibold text-black/40">Continue exploring the PrimeHub collection.</p>
-                    </div>
-                    <Link
-                      href={categoryHref(section.category)}
-                      prefetch={false}
-                      className="flex shrink-0 items-center gap-0.5 rounded-full bg-white px-3 py-2 text-[9px] font-black text-[#74501B] shadow-sm ring-1 ring-black/5 transition active:scale-95"
-                    >
-                      Open category <ChevronRight size={13} />
-                    </Link>
-                  </div>
+              <section
+                key={section.category.id || section.value}
+                className="mt-9 border-t border-[#E7DED1]/80 pt-6"
+              >
+                <div className="mb-3 flex items-end justify-between gap-3 px-0.5">
+                  <Link
+                    href={categoryHref(section.category)}
+                    prefetch={false}
+                    className="group flex min-w-0 items-center gap-3 rounded-2xl focus-visible:outline-none"
+                    aria-label={`Open ${label} category`}
+                  >
+                    <span className="flex h-[58px] w-[58px] shrink-0 items-center justify-center overflow-hidden rounded-full border border-[#E7D8C0] bg-white p-1 shadow-[0_6px_18px_rgba(67,47,24,0.08)] transition group-active:scale-95">
+                      {icon ? (
+                        <img src={icon} alt="" className="h-full w-full rounded-full object-cover" />
+                      ) : (
+                        <span className="text-lg font-black text-[#9A681B]">{label.charAt(0)}</span>
+                      )}
+                    </span>
+                    <h2 className="truncate text-[22px] font-black leading-tight tracking-[-0.035em] text-[#211B14] sm:text-[27px]">
+                      {label}
+                    </h2>
+                  </Link>
+                  <span className="shrink-0 pb-1 text-[10px] font-bold text-black/45 sm:text-[11px]">
+                    {section.products.length} products
+                  </span>
+                </div>
 
-                  <CatalogProductGrid
-                    products={section.products}
-                    addedId={shop.addedId}
-                    addProduct={shop.addProduct}
-                    loading={shop.loading}
-                    premium
-                  />
-                </section>
-
-                {index < followingSections.length - 1 && activeCategories.length > 0 && (
-                  <CategoryFilter
-                    categories={activeCategories}
-                    category={section.value}
-                    title="Explore all categories"
-                  />
-                )}
-              </div>
+                <CatalogProductGrid
+                  products={section.products}
+                  addedId={shop.addedId}
+                  addProduct={shop.addProduct}
+                  loading={shop.loading}
+                  premium
+                />
+              </section>
             );
           })}
         </main>
