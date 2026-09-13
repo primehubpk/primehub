@@ -1,0 +1,297 @@
+'use client';
+
+import Link from 'next/link';
+import { useLayoutEffect, useState } from 'react';
+import {
+  ArrowLeft,
+  Heart,
+  PackageCheck,
+  RefreshCcw,
+  ShieldCheck,
+  ShoppingBag,
+  Truck,
+} from 'lucide-react';
+
+import ProductShareButton from '@/components/ProductShareButton';
+import DealConfetti from '@/components/product-detail/DealConfetti';
+import ProductBelowFold from '@/components/product-detail/ProductBelowFold';
+import ProductHero from '@/components/product-detail/ProductHero';
+import ProductPricing from '@/components/product-detail/ProductPricing';
+import ProductPurchasePanel from '@/components/product-detail/ProductPurchasePanel';
+import ProductVideoModal from '@/components/product-detail/ProductVideoModal';
+import VariantSelectorBottomSheet from '@/components/product-detail/VariantSelectorBottomSheet';
+import { useProductDetail } from '@/components/product-detail/useProductDetail';
+import { cacheProductForNavigation } from '@/lib/productNavigationCache';
+import type { Product } from '@/components/product-detail/ProductDetailTypes';
+
+type Props = {
+  initialProduct?: Product | null;
+};
+
+function ProductRouteLoading() {
+  return (
+    <main className="min-h-screen bg-[#F4F4F1] px-4 pb-28 pt-4">
+      <div className="mx-auto max-w-6xl">
+        <div className="mb-4 h-10 w-10 animate-pulse rounded-full bg-black/8" />
+        <div className="grid gap-4 md:grid-cols-[1.05fr_.95fr]">
+          <div className="aspect-square animate-pulse rounded-[30px] bg-white md:aspect-[4/3]" />
+          <div className="rounded-[30px] bg-white p-6">
+            <div className="h-8 w-4/5 animate-pulse rounded bg-black/8" />
+            <div className="mt-5 h-16 w-1/2 animate-pulse rounded bg-black/8" />
+            <div className="mt-5 h-28 animate-pulse rounded-2xl bg-black/8" />
+          </div>
+        </div>
+      </div>
+    </main>
+  );
+}
+
+export default function ProductDetailPageClient({ initialProduct = null }: Props) {
+  const seedKey = String(initialProduct?.id || '__no-server-seed__');
+  const [seededKey, setSeededKey] = useState('');
+
+  useLayoutEffect(() => {
+    if (initialProduct) cacheProductForNavigation(initialProduct);
+    setSeededKey(seedKey);
+  }, [initialProduct, seedKey]);
+
+  // Keep the server and first hydration render identical. Immediately after
+  // hydration the server-provided product is copied into the existing navigation
+  // cache, so useProductDetail can paint it without waiting for another API round trip.
+  if (seededKey !== seedKey) return <ProductRouteLoading />;
+
+  return <ProductDetailContent />;
+}
+
+function ProductDetailContent() {
+  const model = useProductDetail();
+  const {
+    product,
+    weeklyProducts,
+    loading,
+    activeImage,
+    quantity,
+    wished,
+    videoOpen,
+    added,
+    nowTick,
+    images,
+    regularPrice,
+    productOriginal,
+    stock,
+    rating,
+    reviews,
+    weeklyDeals,
+    currentDeal,
+    liveDeal,
+    bigDealActive,
+    dealPrice,
+    normalForDeal,
+    savingsAmount,
+    currentPrice,
+    maxQuantity,
+    stockProgress,
+    variantRows,
+    variantModalOpen,
+    variantMode,
+    setActiveImage,
+    setQuantity,
+    setWished,
+    setVideoOpen,
+    addProduct,
+    orderNow,
+    buyWhatsApp,
+    closeVariantSelector,
+    confirmVariant,
+  } = model;
+
+  if (loading) return <ProductRouteLoading />;
+
+  // If a fresh background read fails but we already have a server/navigation
+  // product, keep the usable product visible. A real missing product is still
+  // handled because product remains null.
+  if (!product) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[#F4F4F1] px-5">
+        <div className="w-full max-w-sm rounded-[28px] bg-white p-8 text-center shadow-sm">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-black/5">
+            <ShoppingBag size={22} className="text-black/35" />
+          </div>
+          <h1 className="mt-4 text-lg font-black">Product not found</h1>
+          <p className="mt-1 text-xs leading-5 text-black/45">
+            This deal may have been removed or is no longer available.
+          </p>
+          <Link
+            href="/"
+            className="mt-5 inline-flex rounded-full bg-[#14140F] px-5 py-3 text-[10px] font-black text-white"
+          >
+            Back to Deals
+          </Link>
+        </div>
+      </main>
+    );
+  }
+
+  return (
+    <main className="min-h-screen bg-[#F4F4F1] pb-28">
+      <DealConfetti liveDeal={liveDeal} />
+
+      <div className="mx-auto max-w-6xl">
+        <header className="sticky top-0 z-30 flex items-center justify-between bg-[#F4F4F1]/92 px-3 py-3 backdrop-blur md:px-5">
+          <Link
+            href="/"
+            className="flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-sm"
+            aria-label="Back to home"
+          >
+            <ArrowLeft size={17} />
+          </Link>
+          <span className="text-[10px] font-black uppercase tracking-[0.24em] text-black/40">
+            PrimeHub Product
+          </span>
+          <div className="flex items-center gap-2">
+            <ProductShareButton
+              productId={product.id}
+              title={product.title}
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-sm"
+            />
+            <button
+              type="button"
+              onClick={() => setWished((value) => !value)}
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-sm"
+              aria-label={wished ? 'Remove from wishlist' : 'Add to wishlist'}
+            >
+              <Heart
+                size={17}
+                className={wished ? 'text-[#E1352B]' : 'text-[#14140F]'}
+                fill={wished ? 'currentColor' : 'none'}
+              />
+            </button>
+          </div>
+        </header>
+
+        <div className="grid gap-5 px-3 md:grid-cols-[1.04fr_.96fr] md:px-5 md:pt-3">
+          <ProductHero
+            product={product}
+            images={images}
+            activeImage={activeImage}
+            savingsAmount={savingsAmount}
+            liveDeal={liveDeal}
+            bigDealActive={bigDealActive}
+            onImageChange={setActiveImage}
+            onVideoOpen={() => setVideoOpen(true)}
+          />
+
+          <section className="rounded-[30px] border border-black/7 bg-white p-4 shadow-sm sm:p-6 md:p-7">
+            <div className="overflow-hidden rounded-2xl border border-[#E1352B]/15 bg-[#E1352B]/[0.04]">
+              <div className="flex items-center justify-between gap-3 px-3 py-2.5">
+                <span className="flex items-center gap-2 text-[10px] font-black text-[#E1352B]">
+                  <span>⚡</span>
+                  {stock > 0
+                    ? '🔥 Selling Fast! Popular item.'
+                    : 'Stock is limited — check availability before ordering.'}
+                </span>
+                <span className="shrink-0 text-[8px] font-black uppercase tracking-wider text-black/35">
+                  Limited
+                </span>
+              </div>
+              {stock > 0 && (
+                <div className="h-1.5 bg-black/5">
+                  <div
+                    className="h-full rounded-full bg-[#E1352B] transition-[width] duration-500"
+                    style={{ width: `${stockProgress}%` }}
+                  />
+                </div>
+              )}
+            </div>
+
+            <ProductPricing
+              product={product}
+              rating={rating}
+              reviews={reviews}
+              currentDeal={currentDeal}
+              activeDeal={liveDeal && !currentDeal}
+              liveDeal={liveDeal}
+              dealPrice={dealPrice}
+              regularPrice={regularPrice}
+              productOriginal={productOriginal}
+              normalForDeal={normalForDeal}
+              savingsAmount={savingsAmount}
+              afterPricing={
+                <>
+                  <ProductPurchasePanel
+                    quantity={quantity}
+                    maxQuantity={maxQuantity}
+                    stock={stock}
+                    currentPrice={currentPrice}
+                    liveDeal={liveDeal}
+                    added={added}
+                    onQuantityChange={setQuantity}
+                    onOrderNow={orderNow}
+                    onAddProduct={addProduct}
+                    onWhatsApp={buyWhatsApp}
+                  />
+
+                  <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    {[
+                      { icon: <PackageCheck size={16} />, label: 'Cash on Delivery' },
+                      { icon: <Truck size={16} />, label: 'Fast Delivery' },
+                      {
+                        icon: <ShieldCheck size={16} />,
+                        label: '100% Quality Guaranteed',
+                      },
+                      { icon: <RefreshCcw size={16} />, label: 'Easy Returns' },
+                    ].map((benefit) => (
+                      <div
+                        key={benefit.label}
+                        className="flex min-h-[68px] flex-col items-center justify-center gap-1 rounded-2xl bg-[#F4F4F1] px-2 text-center"
+                      >
+                        <span className="text-[#0F6A5F]">{benefit.icon}</span>
+                        <span className="text-[8px] font-black leading-3 text-black/55">
+                          {benefit.label}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {product.description && (
+                    <div className="mt-5">
+                      <h2 className="text-xs font-black uppercase tracking-[0.15em]">
+                        About this product
+                      </h2>
+                      <p className="mt-2 whitespace-pre-line text-xs leading-5 text-black/55">
+                        {product.description}
+                      </p>
+                    </div>
+                  )}
+                </>
+              }
+            />
+          </section>
+        </div>
+      </div>
+
+      <ProductBelowFold
+        productId={product.id}
+        weeklyDeals={weeklyDeals}
+        weeklyProducts={weeklyProducts}
+        nowTick={nowTick}
+      />
+      <ProductVideoModal
+        product={product}
+        open={videoOpen}
+        onClose={() => setVideoOpen(false)}
+      />
+      <VariantSelectorBottomSheet
+        product={product}
+        rows={variantRows}
+        open={variantModalOpen}
+        mode={variantMode}
+        quantity={quantity}
+        currentPrice={currentPrice}
+        originalPrice={normalForDeal}
+        onClose={closeVariantSelector}
+        onConfirm={confirmVariant}
+      />
+    </main>
+  );
+}
