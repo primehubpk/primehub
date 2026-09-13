@@ -15,11 +15,14 @@ type Props = {
   quantity: number;
   currentPrice: number;
   originalPrice: number;
+  preferredImage?: string;
   onClose: () => void;
   onConfirm: (selection: ProductVariantSelection, quantity: number) => void;
 };
 
 const warmedImages = new Map<string, HTMLImageElement>();
+const warmingImages = new Map<string, Promise<void>>();
+const readyImages = new Set<string>();
 
 function stockOf(row?: ProductVariantRow) {
   return Math.max(0, Number(row?.stock ?? 0));
@@ -42,16 +45,44 @@ function safeImage(value: unknown): string {
   return normalizeImageUrl(imageValue(value));
 }
 
-function warmImage(src: string) {
-  if (!src || typeof window === 'undefined' || warmedImages.has(src)) return;
+function warmImage(src: string): Promise<void> {
+  if (!src || typeof window === 'undefined') return Promise.resolve();
+  if (readyImages.has(src)) return Promise.resolve();
+
+  const existing = warmingImages.get(src);
+  if (existing) return existing;
+
   const image = new window.Image();
-  image.decoding = 'sync';
+  image.decoding = 'async';
   image.fetchPriority = 'high';
-  image.src = src;
+
+  const promise = new Promise<void>((resolve) => {
+    let settled = false;
+    const finish = (ready: boolean) => {
+      if (settled) return;
+      settled = true;
+      if (ready) readyImages.add(src);
+      resolve();
+    };
+    const decodeLoadedImage = () => {
+      if (settled) return;
+      if (typeof image.decode === 'function') {
+        void image.decode().then(() => finish(true)).catch(() => finish(image.naturalWidth > 0));
+      } else {
+        finish(image.naturalWidth > 0);
+      }
+    };
+
+    image.onload = decodeLoadedImage;
+    image.onerror = () => finish(false);
+    image.src = src;
+
+    if (image.complete && image.naturalWidth > 0) decodeLoadedImage();
+  });
+
   warmedImages.set(src, image);
-  if (typeof image.decode === 'function') {
-    void image.decode().catch(() => undefined);
-  }
+  warmingImages.set(src, promise);
+  return promise;
 }
 
 export default function VariantSelectorBottomSheet({
@@ -62,6 +93,7 @@ export default function VariantSelectorBottomSheet({
   quantity,
   currentPrice,
   originalPrice,
+  preferredImage,
   onClose,
   onConfirm,
 }: Props) {
@@ -76,10 +108,11 @@ export default function VariantSelectorBottomSheet({
   const colorNames = useMemo(() => colors.map((item) => item.name), [colors]);
   const fallbackImage = useMemo(
     () =>
+      safeImage(preferredImage) ||
+      safeImage(product.images?.[0]) ||
       safeImage(product.imageUrl) ||
-      safeImage(product.image) ||
-      safeImage(product.images?.[0]),
-    [product.imageUrl, product.image, product.images],
+      safeImage(product.image),
+    [preferredImage, product.images, product.imageUrl, product.image],
   );
 
   const imageForColor = useMemo(() => {
@@ -113,9 +146,27 @@ export default function VariantSelectorBottomSheet({
     return Array.from(new Set(urls));
   }, [effectiveRows, fallbackImage, imageForColor]);
 
+  const [, setImageReadyVersion] = useState(0);
+
   useEffect(() => {
-    preloadImages.forEach(warmImage);
+    let active = true;
+    preloadImages.forEach((src) => {
+      void warmImage(src).then(() => {
+        if (active && readyImages.has(src)) {
+          setImageReadyVersion((value) => value + 1);
+        }
+      });
+    });
+    return () => {
+      active = false;
+    };
   }, [preloadImages]);
+
+  const displayReadyImage = (target: string) => {
+    if (!target) return fallbackImage;
+    if (target === fallbackImage || readyImages.has(target)) return target;
+    return fallbackImage || target;
+  };
 
   const [color, setColor] = useState('');
   const [size, setSize] = useState('');
@@ -152,6 +203,7 @@ export default function VariantSelectorBottomSheet({
     safeImage(selectedColor?.imageUrl) ||
     imageForColor.get(normalize(color)) ||
     fallbackImage;
+  const visibleSelectedImage = displayReadyImage(selectedImage);
   const valid = Boolean(selected && stock > 0 && displayPrice > 0);
   const safeQty = Math.min(Math.max(1, qty), Math.max(1, stock));
 
@@ -167,7 +219,7 @@ export default function VariantSelectorBottomSheet({
             src={src}
             alt=""
             loading="eager"
-            decoding="sync"
+            decoding="async"
             fetchPriority="high"
             className="h-14 w-14 object-cover"
           />
@@ -191,9 +243,9 @@ export default function VariantSelectorBottomSheet({
 
         <div className="flex items-center gap-3 border-b border-black/7 pb-4">
           <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-2xl bg-[#F4F4F1]">
-            {selectedImage ? (
+            {visibleSelectedImage ? (
               <img
-                src={selectedImage}
+                src={visibleSelectedImage}
                 alt=""
                 loading="eager"
                 decoding="sync"
@@ -228,6 +280,7 @@ export default function VariantSelectorBottomSheet({
                   (row) => normalize(row.color) === normalize(item.name) && stockOf(row) > 0,
                 );
                 const itemImage = imageForColor.get(normalize(item.name)) || fallbackImage;
+                const visibleItemImage = displayReadyImage(itemImage);
 
                 return (
                   <button
@@ -249,9 +302,9 @@ export default function VariantSelectorBottomSheet({
                     className={`flex min-h-16 items-center gap-2 rounded-2xl border px-2.5 py-2 text-left transition-all duration-200 ${active ? 'border-[#0F6A5F] bg-[#0F6A5F]/[0.06] text-[#0F6A5F] ring-2 ring-[#0F6A5F] ring-offset-2' : 'border-black/10 bg-white text-black/70'} disabled:cursor-not-allowed disabled:opacity-30`}
                   >
                     <span className="relative h-10 w-10 shrink-0 overflow-hidden rounded-xl bg-[#F4F4F1]">
-                      {itemImage ? (
+                      {visibleItemImage ? (
                         <img
-                          src={itemImage}
+                          src={visibleItemImage}
                           alt=""
                           loading="eager"
                           decoding="sync"

@@ -2,6 +2,10 @@ import type { Metadata } from 'next';
 import { Suspense } from 'react';
 import ShopCatalog from '@/components/ShopCatalog';
 import { slugifyCategory } from '@/lib/categoryUtils';
+import { SettingsProvider } from '@/lib/useSettings';
+import { getPublicCatalogSnapshot, getStorefrontSettingsSnapshot } from '@/lib/publicCatalogServer';
+import type { SiteSettings } from '@/lib/types';
+import type { Product, Category } from '@/components/shop/ShopTypes';
 
 export const revalidate = 300;
 
@@ -64,6 +68,30 @@ function CategoryLoadingState() {
   );
 }
 
+async function SeededCategoryCatalog({ slug }: { slug: string }) {
+  const [catalogResult, settingsResult] = await Promise.allSettled([
+    getPublicCatalogSnapshot(),
+    getStorefrontSettingsSnapshot(),
+  ]);
+
+  const catalog = catalogResult.status === 'fulfilled'
+    ? catalogResult.value
+    : { products: [], categories: [] };
+  const initialSettings = settingsResult.status === 'fulfilled'
+    ? settingsResult.value
+    : {};
+
+  return (
+    <SettingsProvider initialSettings={initialSettings as Partial<SiteSettings>}>
+      <ShopCatalog
+        initialCategory={slug}
+        initialProducts={catalog.products as Product[]}
+        initialCategories={catalog.categories as Category[]}
+      />
+    </SettingsProvider>
+  );
+}
+
 export default async function CategoryPage({
   params,
 }: {
@@ -75,7 +103,7 @@ export default async function CategoryPage({
 
   return (
     <Suspense fallback={<CategoryLoadingState />}>
-      <ShopCatalog initialCategory={slug} />
+      <SeededCategoryCatalog slug={slug} />
     </Suspense>
   );
 }
