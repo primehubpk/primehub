@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { Check, ShoppingBag } from 'lucide-react';
+import { Check, Eye, ShoppingBag, Star } from 'lucide-react';
 import FastProductLink from '@/components/FastProductLink';
 import WholesaleBadge from '@/components/WholesaleBadge';
 import { useCartStore } from '@/lib/cartStore';
@@ -28,6 +28,8 @@ export default function CatalogProductCard({ product, addedId, addProduct, compa
   const stock = availableStockOf(product);
   const unavailable = stock <= 0;
   const added = addedId === product.id;
+  const rating = Math.max(0, Math.min(5, Number(product.rating || 0)));
+  const reviews = Math.max(0, Number(product.reviews || product.reviewCount || 0));
 
   function handleAdd() {
     if (unavailable) return;
@@ -99,9 +101,9 @@ export default function CatalogProductCard({ product, addedId, addProduct, compa
   }
 
   return (
-    <article className={`group overflow-hidden ${dense ? 'rounded-[16px] sm:rounded-[22px]' : 'rounded-[22px]'} border border-black/6 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg ${compact ? 'w-[168px] shrink-0 snap-start sm:w-[186px]' : 'w-full'}`}>
+    <article className={`group flex h-full flex-col overflow-hidden ${dense ? 'rounded-[16px] sm:rounded-[20px]' : 'rounded-[22px]'} border border-[#e6ded2] bg-white shadow-[0_6px_18px_rgba(35,29,20,0.06)] transition hover:-translate-y-0.5 hover:shadow-[0_12px_30px_rgba(35,29,20,0.12)] ${compact ? 'w-[168px] shrink-0 snap-start sm:w-[186px]' : 'w-full'}`}>
       <FastProductLink product={product} className="block">
-        <div className="relative aspect-square overflow-hidden bg-[#F4F4F1]">
+        <div className={`relative overflow-hidden bg-[#f3eee7] ${dense ? 'aspect-[1.22/1]' : 'aspect-square'}`}>
           {image ? (
             <Image
               src={image}
@@ -110,30 +112,39 @@ export default function CatalogProductCard({ product, addedId, addProduct, compa
               priority={priority}
               loading={priority ? 'eager' : 'lazy'}
               fetchPriority={priority ? 'high' : 'auto'}
-              sizes={dense ? '(max-width: 767px) 33vw, 25vw' : '(max-width: 767px) 50vw, 25vw'}
+              sizes={dense ? '(max-width: 639px) 50vw, (max-width: 1279px) 33vw, 25vw' : '(max-width: 767px) 50vw, 25vw'}
               className="object-cover transition duration-500 group-hover:scale-[1.03]"
             />
           ) : (
             <div className="flex h-full items-center justify-center text-[10px] font-bold text-black/25">No image</div>
           )}
-          {discount > 0 && <span className="absolute left-2 top-2 rounded-full bg-[#E1352B] px-2 py-1 text-[8px] font-black text-white">-{discount}%</span>}
-          {product.isFlashSale && <span className="absolute right-2 top-2 rounded-full bg-[#14140F] px-2 py-1 text-[8px] font-black text-white">FLASH</span>}
+          {discount > 0 && <span className="absolute left-2 top-2 rounded-lg bg-[#ec1626] px-2 py-1 text-[8px] font-black text-white shadow-sm sm:text-[9px]">{discount}% OFF</span>}
+          {product.isFlashSale && <span className="absolute left-2 top-9 rounded-lg bg-[#c18300] px-2 py-1 text-[7px] font-black text-white">FLASH DEAL</span>}
           {isWholesaleProduct(product) && <WholesaleBadge />}
+          <span className="absolute bottom-2 right-2 flex h-8 w-8 items-center justify-center rounded-full bg-white/95 text-[#17221f] shadow-md" aria-hidden="true"><Eye size={15} /></span>
         </div>
-        <div className={dense ? "p-2 pb-1 sm:p-3" : "p-3 pb-1"}>
-          <p className={dense ? "line-clamp-2 min-h-[26px] text-[9px] font-black leading-[13px] sm:text-[11px] sm:leading-4" : "line-clamp-2 min-h-[30px] text-[11px] font-black leading-4"}>{titleOf(product)}</p>
+        <div className={dense ? "p-2.5 pb-1 sm:p-3" : "p-3 pb-1"}>
+          <p className={dense ? "line-clamp-2 min-h-[32px] text-[10px] font-black leading-4 text-[#17221f] sm:text-[12px]" : "line-clamp-2 min-h-[30px] text-[11px] font-black leading-4"}>{titleOf(product)}</p>
+          {rating > 0 && (
+            <div className="mt-1 flex items-center gap-1 text-[8px] font-bold text-black/45 sm:text-[9px]">
+              <span className="flex items-center text-[#e7a814]"><Star size={11} fill="currentColor" /></span>
+              <span>{rating.toFixed(1)}</span>
+              {reviews > 0 && <span>({reviews})</span>}
+            </div>
+          )}
           <div className="mt-2 flex flex-wrap items-end gap-1.5">
-            <span className={dense ? "font-[family-name:var(--font-mono)] text-[10px] font-black text-[#E1352B] sm:text-sm" : "font-[family-name:var(--font-mono)] text-sm font-black text-[#E1352B]"}>Rs. {price.toLocaleString()}</span>
+            <span className={dense ? "text-[14px] font-black leading-none text-[#062d27] sm:text-[17px]" : "font-[family-name:var(--font-mono)] text-sm font-black text-[#E1352B]"}>Rs. {price.toLocaleString()}</span>
             {original > price && <span className="text-[9px] text-black/30 line-through">Rs. {original.toLocaleString()}</span>}
+            {discount > 0 && <span className="ml-auto rounded-md bg-[#cceedd] px-1.5 py-1 text-[7px] font-black text-[#075447] sm:text-[8px]">SAVE {discount}%</span>}
           </div>
         </div>
       </FastProductLink>
-      <div className={dense ? "px-2 pb-2 pt-1.5 sm:px-3 sm:pb-3" : "px-3 pb-3 pt-2"}>
+      <div className={dense ? "mt-auto px-2.5 pb-2.5 pt-2 sm:px-3 sm:pb-3" : "mt-auto px-3 pb-3 pt-2"}>
         <button
           type="button"
           disabled={unavailable}
           onClick={handleAdd}
-          className={`flex w-full min-w-0 items-center justify-center gap-1.5 rounded-xl py-2 text-[8px] sm:py-2.5 sm:text-[9px] font-black transition active:scale-[0.98] ${unavailable ? 'cursor-not-allowed bg-black/5 text-black/25' : added ? 'bg-[#0F6A5F] text-white' : 'bg-[#14140F] text-white hover:bg-[#E1352B]'}`}
+          className={`flex min-h-10 w-full min-w-0 items-center justify-center gap-1.5 rounded-xl px-2 py-2 text-[8px] font-black transition active:scale-[0.98] sm:text-[10px] ${unavailable ? 'cursor-not-allowed bg-black/5 text-black/25' : added ? 'bg-[#0F6A5F] text-white' : 'bg-[#005448] text-white hover:bg-[#063f37]'}`}
         >
           {unavailable ? 'Unavailable' : added ? <><Check size={13} />Added to Cart</> : <><ShoppingBag size={13} />Add to Cart</>}
         </button>

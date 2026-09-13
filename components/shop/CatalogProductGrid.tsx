@@ -28,7 +28,7 @@ export default function CatalogProductGrid({
   const grid = premium
     ? 'grid grid-cols-2 gap-2.5 sm:gap-3'
     : dense
-      ? 'grid grid-cols-3 gap-2 md:grid-cols-4'
+      ? 'grid grid-cols-2 gap-2.5 sm:gap-3 xl:grid-cols-4'
       : 'grid grid-cols-2 gap-3 md:grid-cols-4';
   const initialCount = dense ? DENSE_INITIAL_COUNT : DEFAULT_INITIAL_COUNT;
   const [visibleCount, setVisibleCount] = useState(() => Math.min(products.length, initialCount));
@@ -64,7 +64,7 @@ export default function CatalogProductGrid({
     return (
       <div className={grid}>
         {Array.from({ length: 6 }).map((_, index) => (
-          <div key={index} className="aspect-[1.45/1] animate-pulse rounded-[18px] bg-white" />
+          <div key={index} className="aspect-[0.78/1] animate-pulse rounded-[18px] bg-white" />
         ))}
       </div>
     );

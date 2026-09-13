@@ -1,19 +1,20 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo } from 'react';
+import Image from 'next/image';
+import { useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { ArrowRight, Boxes, Flame, Grid2X2, SlidersHorizontal, Star, Tag, Zap } from 'lucide-react';
 import HomeHeader from '@/components/home/HomeHeader';
 import './home/home.css';
+import './shop/shop.css';
 import { useShopCatalog } from './shop/useShopCatalog';
-import CatalogHeader from './shop/CatalogHeader';
-import BudgetBuckets from './shop/BudgetBuckets';
 import CategoryFilter from './shop/CategoryFilter';
-import { FilterDrawer } from './shop/CatalogFilters';
+import { FilterDrawer, ShopFilterPanel } from './shop/CatalogFilters';
 import CatalogProductGrid from './shop/CatalogProductGrid';
-import CompactCategoryStrip from './shop/CompactCategoryStrip';
+import FastProductLink from '@/components/FastProductLink';
 import { categoryHref, productMatchesCategory, slugifyCategory } from '@/lib/categoryUtils';
-import type { Product, Category } from './shop/ShopTypes';
+import { discountOf, imageOf, titleOf, type Product, type Category } from './shop/ShopTypes';
 
 function score(id: string) {
   return Array.from(id).reduce((n, c) => ((n * 31 + c.charCodeAt(0)) >>> 0), 7);
@@ -25,6 +26,13 @@ function updatedTime(product: Product) {
     || '';
   const timestamp = Date.parse(value);
   return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+function bestSellerScore(product: Product) {
+  return Number(product.soldCount || product.salesCount || product.orders || 0) * 20
+    + Number(product.rating || 0) * 10
+    + (product.isBestSeller || product.bestseller ? 1000 : 0)
+    + discountOf(product);
 }
 
 function categoryLabel(category: Category) {
@@ -73,6 +81,8 @@ export default function ShopCatalog({
     initialCategories,
   );
   const searchParams = useSearchParams();
+  const [sortMode, setSortMode] = useState('featured');
+  const [merchMode, setMerchMode] = useState<'all' | 'best'>('all');
   const bucketParam = searchParams.get('bucket') || '';
   const numericBucket = Number(bucketParam);
   const categoryView = Boolean(initialCategory);
@@ -87,6 +97,24 @@ export default function ShopCatalog({
   const picks = useMemo(
     () => [...shop.filtered].sort((a, b) => score(a.id) - score(b.id)),
     [shop.filtered],
+  );
+
+  const sortedProducts = useMemo(() => {
+    const products = [...shop.filtered];
+    if (merchMode === 'best') products.sort((a, b) => bestSellerScore(b) - bestSellerScore(a) || score(a.id) - score(b.id));
+    else if (sortMode === 'newest') products.sort((a, b) => updatedTime(b) - updatedTime(a));
+    else if (sortMode === 'price-low') products.sort((a, b) => Number(a.price || 0) - Number(b.price || 0));
+    else if (sortMode === 'price-high') products.sort((a, b) => Number(b.price || 0) - Number(a.price || 0));
+    else products.sort((a, b) => score(a.id) - score(b.id));
+    return products;
+  }, [merchMode, shop.filtered, sortMode]);
+
+  const dealProducts = useMemo(
+    () => shop.products
+      .filter((product) => product.published !== false && (product.isFlashSale || discountOf(product) > 0) && imageOf(product))
+      .sort((a, b) => Number(Boolean(b.isFlashSale)) - Number(Boolean(a.isFlashSale)) || discountOf(b) - discountOf(a))
+      .slice(0, 3),
+    [shop.products],
   );
 
   const categoryProducts = useMemo(
@@ -171,9 +199,11 @@ export default function ShopCatalog({
     shop.setOnlyDeals(false);
     shop.setWholesaleOnly(false);
     shop.setFiltersOpen(false);
+    setMerchMode('all');
+    setSortMode('featured');
   };
 
-  const primaryProducts = searchView || budgetView ? shop.filtered : picks;
+  const primaryProducts = searchView || budgetView || merchMode !== 'all' || sortMode !== 'featured' ? sortedProducts : picks;
 
   const selectedBucketTitle =
     shop.wholesaleOnly || bucketParam === 'wholesale'
@@ -186,13 +216,17 @@ export default function ShopCatalog({
     ? 'Smart search'
     : budgetView
       ? 'Budget collection'
-      : 'Picked for you';
+      : merchMode === 'best'
+        ? 'Customer favourites'
+        : 'Picked for you';
 
   const heading = searchView
     ? `${shop.filtered.length} result${shop.filtered.length === 1 ? '' : 's'} for “${shop.search.trim()}”`
     : budgetView
       ? selectedBucketTitle
-      : '✨ Just For You';
+      : merchMode === 'best'
+        ? 'Best Sellers'
+        : 'All Products';
 
   if (categoryView) {
     const selectedCategory = currentSection?.category;
@@ -313,77 +347,95 @@ export default function ShopCatalog({
     );
   }
 
+  const allProductsActive = merchMode === 'all' && !shop.onlyDeals && !shop.wholesaleOnly && shop.maxPrice === 'all' && shop.category === 'all';
+
   return (
-    <main className="min-h-screen bg-[#F4F4F1] pb-28">
-      <div className="mx-auto max-w-6xl px-4 py-5 md:px-6">
-        <CatalogHeader
-          search={shop.search}
-          count={shop.filtered.length}
-          setSearch={shop.setSearch}
-          setFiltersOpen={shop.setFiltersOpen}
-          onlyDeals={shop.onlyDeals}
-          setOnlyDeals={shop.setOnlyDeals}
-        />
+    <main className="shop-storefront min-h-screen pb-28">
+      <HomeHeader />
+      <div className="shop-page-shell">
+        <nav className="shop-quick-filters" aria-label="Featured product filters">
+          <button type="button" className={allProductsActive ? 'is-active' : ''} onClick={clearAll}><Grid2X2 /> All Products</button>
+          <button type="button" className={merchMode === 'best' ? 'is-active' : ''} onClick={() => setMerchMode(merchMode === 'best' ? 'all' : 'best')}><Flame /> Best Sellers</button>
+          <Link href="/new-arrivals" prefetch><Star /> New Arrivals</Link>
+          <button type="button" className={shop.maxPrice === '299' && !shop.wholesaleOnly ? 'is-active' : ''} onClick={() => { shop.setWholesaleOnly(false); shop.setMaxPrice(shop.maxPrice === '299' ? 'all' : '299'); }}><Tag /> Under Rs. 299</button>
+          <button type="button" className={shop.maxPrice === '999' && !shop.wholesaleOnly ? 'is-active' : ''} onClick={() => { shop.setWholesaleOnly(false); shop.setMaxPrice(shop.maxPrice === '999' ? 'all' : '999'); }}><Tag /> Under Rs. 999</button>
+          <button type="button" className={shop.wholesaleOnly ? 'is-active' : ''} onClick={() => { shop.setWholesaleOnly(!shop.wholesaleOnly); shop.setMaxPrice('all'); }}><Boxes /> Wholesale Deals</button>
+        </nav>
 
-        <CompactCategoryStrip categories={shop.categories} />
-
-        <BudgetBuckets
-          buckets={shop.buckets}
-          maxPrice={shop.maxPrice}
-          setMaxPrice={shop.setMaxPrice}
-          wholesaleOnly={shop.wholesaleOnly}
-          setWholesaleOnly={shop.setWholesaleOnly}
-        />
-
-        <section className="mt-6">
-          <div className="mb-3">
-            <p className="text-[9px] font-black uppercase tracking-[0.2em] text-[#E1352B]">
-              {eyebrow}
-            </p>
-            <h2 className="mt-0.5 text-xl font-black tracking-tight">
-              {heading}
-            </h2>
-            {searchView && shop.filtered.length === 0 && (
-              <p className="mt-1 text-xs font-semibold text-black/45">
-                Try a shorter word, category name, or a similar spelling.
-              </p>
-            )}
+        <section className="shop-deal-banner" aria-label="Today's deals">
+          <div className="shop-deal-copy">
+            <Zap aria-hidden="true" />
+            <div><h1>Today&apos;s Deals</h1><p>Premium products at special prices</p></div>
           </div>
-
-          <CatalogProductGrid
-            products={primaryProducts}
-            addedId={shop.addedId}
-            addProduct={shop.addProduct}
-            loading={shop.loading}
-            dense
-          />
+          {dealProducts.length > 0 && (
+            <div className="shop-deal-products" aria-label="Deal product previews">
+              {dealProducts.map((product) => (
+                <FastProductLink key={product.id} product={product} aria-label={`View ${titleOf(product)}`}>
+                  <Image src={imageOf(product)} alt={titleOf(product)} fill sizes="110px" />
+                </FastProductLink>
+              ))}
+            </div>
+          )}
+          <Link href="/weekly-deals" prefetch className="shop-deal-link">View All Deals <ArrowRight /></Link>
         </section>
 
-        {budgetView && recommendations.length > 0 && (
-          <section className="mt-10 border-t border-black/5 pt-7">
-            <div className="mb-3">
-              <p className="text-[9px] font-black uppercase tracking-[0.2em] text-[#0F6A5F]">More products</p>
-              <h2 className="mt-0.5 text-xl font-black tracking-tight">✨ More to Explore</h2>
-            </div>
-            <CatalogProductGrid
-              products={recommendations}
-              addedId={shop.addedId}
-              addProduct={shop.addProduct}
-              loading={shop.loading}
-              dense
+        <div className="shop-catalog-layout">
+          <aside className="shop-desktop-filters" aria-label="Product filters">
+            <ShopFilterPanel
+              categories={shop.categories}
+              category={shop.category}
+              setCategory={shop.setCategory}
+              maxPrice={shop.maxPrice}
+              setMaxPrice={shop.setMaxPrice}
+              onlyDeals={shop.onlyDeals}
+              setOnlyDeals={shop.setOnlyDeals}
+              wholesaleOnly={shop.wholesaleOnly}
+              setWholesaleOnly={shop.setWholesaleOnly}
+              clearAll={clearAll}
+              productCount={shop.filtered.length}
             />
+          </aside>
+
+          <section className="shop-results">
+            <div className="shop-results-toolbar">
+              <div>
+                <p>{eyebrow}</p>
+                <h2>{heading} <span>— {shop.filtered.length} products</span></h2>
+              </div>
+              <div className="shop-toolbar-actions">
+                <button type="button" className="shop-mobile-filter" onClick={() => shop.setFiltersOpen(true)}><SlidersHorizontal /> Filters</button>
+                <label>Sort by:<select value={sortMode} onChange={(event) => setSortMode(event.target.value)}><option value="featured">Best Selling</option><option value="newest">Newest</option><option value="price-low">Price: Low to High</option><option value="price-high">Price: High to Low</option></select></label>
+              </div>
+            </div>
+
+            {searchView && shop.filtered.length === 0 && <p className="shop-empty-tip">Try a shorter word, category name, or a similar spelling.</p>}
+
+            <CatalogProductGrid products={primaryProducts} addedId={shop.addedId} addProduct={shop.addProduct} loading={shop.loading} dense />
+
+            {budgetView && recommendations.length > 0 && (
+              <section className="mt-10 border-t border-black/5 pt-7">
+                <div className="mb-3"><p className="text-[9px] font-black uppercase tracking-[0.2em] text-[#0F6A5F]">More products</p><h2 className="mt-0.5 text-xl font-black tracking-tight">More to Explore</h2></div>
+                <CatalogProductGrid products={recommendations} addedId={shop.addedId} addProduct={shop.addProduct} loading={shop.loading} dense />
+              </section>
+            )}
           </section>
-        )}
+        </div>
       </div>
 
       <FilterDrawer
         filtersOpen={shop.filtersOpen}
         setFiltersOpen={shop.setFiltersOpen}
+        categories={shop.categories}
+        category={shop.category}
+        setCategory={shop.setCategory}
         maxPrice={shop.maxPrice}
         setMaxPrice={shop.setMaxPrice}
         onlyDeals={shop.onlyDeals}
         setOnlyDeals={shop.setOnlyDeals}
+        wholesaleOnly={shop.wholesaleOnly}
+        setWholesaleOnly={shop.setWholesaleOnly}
         clearAll={clearAll}
+        productCount={shop.filtered.length}
       />
     </main>
   );
