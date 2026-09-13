@@ -204,38 +204,46 @@ export default function ShopCatalog({
       <div className="home-storefront min-h-screen bg-[#FFFCF7] pb-28">
         <HomeHeader />
 
-        <main className="mx-auto w-full max-w-[900px] px-3 pb-10 pt-2 sm:px-4 md:px-5">
-          <section className="flex min-h-[88px] items-center px-1 py-2" aria-label={`${selectedLabel} category`}>
-            {selectedCategory ? (
-              <Link
-                href={categoryHref(selectedCategory)}
-                prefetch={false}
-                className="group inline-flex items-center justify-center rounded-[24px] focus-visible:outline-none"
-                aria-label={`Open ${selectedLabel} category`}
-              >
-                <span className="flex h-[76px] w-[76px] items-center justify-center overflow-hidden rounded-[24px] border border-[#C58A2A] bg-[#FFF9F0] p-1.5 shadow-[0_8px_24px_rgba(83,58,22,0.09)] ring-2 ring-[#C58A2A]/10 transition group-active:scale-95">
-                  {selectedIcon ? (
-                    <img src={selectedIcon} alt="" className="h-full w-full rounded-[19px] object-cover" />
-                  ) : (
-                    <span className="text-2xl font-black text-[#A66B17]">{selectedLabel.charAt(0)}</span>
-                  )}
-                </span>
-              </Link>
-            ) : (
-              <span className="flex h-[76px] w-[76px] items-center justify-center rounded-[24px] border border-[#C58A2A] bg-[#FFF9F0] text-2xl font-black text-[#A66B17] shadow-[0_8px_24px_rgba(83,58,22,0.09)] ring-2 ring-[#C58A2A]/10">
-                {selectedLabel.charAt(0)}
-              </span>
-            )}
-          </section>
+        <main className="mx-auto w-full max-w-[900px] px-3 pb-10 pt-3 sm:px-4 md:px-5">
+          <Link
+            href="/"
+            prefetch
+            className="mb-4 inline-flex items-center rounded-full bg-white px-3 py-2 text-[10px] font-black text-[#0F6A5F] shadow-sm ring-1 ring-black/5 transition active:scale-95"
+          >
+            ← Back to Home
+          </Link>
 
-          <section className="mt-1">
-            <div className="mb-3 flex items-end justify-between gap-3 px-0.5">
-              <h1 className="text-[25px] font-black leading-none tracking-[-0.035em] text-[#211B14] sm:text-[30px]">
-                {selectedLabel}
-              </h1>
-              <span className="shrink-0 pb-0.5 text-[10px] font-bold text-black/45 sm:text-[11px]">
-                {selectedProducts.length} products
-              </span>
+          <section aria-label={`${selectedLabel} category`}>
+            <div className="mb-3 px-0.5">
+              {selectedCategory ? (
+                <Link
+                  href={categoryHref(selectedCategory)}
+                  prefetch
+                  className="group inline-flex items-center justify-center rounded-[24px] focus-visible:outline-none"
+                  aria-label={`Open ${selectedLabel} category`}
+                >
+                  <span className="flex h-[76px] w-[76px] items-center justify-center overflow-hidden rounded-[24px] border border-[#C58A2A] bg-[#FFF9F0] p-1.5 shadow-[0_8px_24px_rgba(83,58,22,0.09)] ring-2 ring-[#C58A2A]/10 transition group-active:scale-95">
+                    {selectedIcon ? (
+                      <img src={selectedIcon} alt="" className="h-full w-full rounded-[19px] object-cover" />
+                    ) : (
+                      <span className="text-2xl font-black text-[#A66B17]">{selectedLabel.charAt(0)}</span>
+                    )}
+                  </span>
+                </Link>
+              ) : (
+                <span className="flex h-[76px] w-[76px] items-center justify-center rounded-[24px] border border-[#C58A2A] bg-[#FFF9F0] text-2xl font-black text-[#A66B17] shadow-[0_8px_24px_rgba(83,58,22,0.09)] ring-2 ring-[#C58A2A]/10">
+                  {selectedLabel.charAt(0)}
+                </span>
+              )}
+
+              <div className="mt-3 flex items-end justify-between gap-3">
+                <h1 className="text-[25px] font-black leading-none tracking-[-0.035em] text-[#211B14] sm:text-[30px]">
+                  {selectedLabel}
+                </h1>
+                <span className="shrink-0 pb-0.5 text-[10px] font-bold text-black/45 sm:text-[11px]">
+                  {selectedProducts.length} products
+                </span>
+              </div>
             </div>
 
             <CatalogProductGrid
@@ -251,7 +259,7 @@ export default function ShopCatalog({
             <CategoryFilter
               categories={activeCategories}
               category={shop.category}
-              title="Explore more categories"
+              title="Shop by Category"
             />
           )}
 
@@ -264,27 +272,30 @@ export default function ShopCatalog({
                 key={section.category.id || section.value}
                 className="mt-9 border-t border-[#E7DED1]/80 pt-6"
               >
-                <div className="mb-3 flex items-end justify-between gap-3 px-0.5">
+                <div className="mb-3 px-0.5">
                   <Link
                     href={categoryHref(section.category)}
-                    prefetch={false}
-                    className="group flex min-w-0 items-center gap-3 rounded-2xl focus-visible:outline-none"
+                    prefetch
+                    className="group inline-flex items-center justify-center rounded-[24px] focus-visible:outline-none"
                     aria-label={`Open ${label} category`}
                   >
-                    <span className="flex h-[58px] w-[58px] shrink-0 items-center justify-center overflow-hidden rounded-full border border-[#E7D8C0] bg-white p-1 shadow-[0_6px_18px_rgba(67,47,24,0.08)] transition group-active:scale-95">
+                    <span className="flex h-[76px] w-[76px] items-center justify-center overflow-hidden rounded-[24px] border border-[#C58A2A] bg-[#FFF9F0] p-1.5 shadow-[0_8px_24px_rgba(83,58,22,0.09)] ring-2 ring-[#C58A2A]/10 transition group-active:scale-95">
                       {icon ? (
-                        <img src={icon} alt="" className="h-full w-full rounded-full object-cover" />
+                        <img src={icon} alt="" className="h-full w-full rounded-[19px] object-cover" />
                       ) : (
-                        <span className="text-lg font-black text-[#9A681B]">{label.charAt(0)}</span>
+                        <span className="text-2xl font-black text-[#A66B17]">{label.charAt(0)}</span>
                       )}
                     </span>
-                    <h2 className="truncate text-[22px] font-black leading-tight tracking-[-0.035em] text-[#211B14] sm:text-[27px]">
+                  </Link>
+
+                  <div className="mt-3 flex items-end justify-between gap-3">
+                    <h2 className="min-w-0 text-[25px] font-black leading-none tracking-[-0.035em] text-[#211B14] sm:text-[30px]">
                       {label}
                     </h2>
-                  </Link>
-                  <span className="shrink-0 pb-1 text-[10px] font-bold text-black/45 sm:text-[11px]">
-                    {section.products.length} products
-                  </span>
+                    <span className="shrink-0 pb-0.5 text-[10px] font-bold text-black/45 sm:text-[11px]">
+                      {section.products.length} products
+                    </span>
+                  </div>
                 </div>
 
                 <CatalogProductGrid
