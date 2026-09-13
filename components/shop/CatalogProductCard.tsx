@@ -37,9 +37,9 @@ export default function CatalogProductCard({ product, addedId, addProduct, compa
 
   if (premium) {
     return (
-      <article className="group overflow-hidden rounded-[22px] border border-[#EAE4DA] bg-white shadow-[0_8px_26px_rgba(56,43,27,0.07)] transition hover:-translate-y-0.5 hover:shadow-[0_12px_30px_rgba(56,43,27,0.12)]">
+      <article className="group overflow-hidden rounded-[18px] border border-[#E9E2D8] bg-white shadow-[0_7px_22px_rgba(56,43,27,0.075)] transition hover:-translate-y-0.5 hover:shadow-[0_11px_28px_rgba(56,43,27,0.12)] sm:rounded-[20px]">
         <FastProductLink product={product} className="block">
-          <div className="relative aspect-[1.08/1] overflow-hidden bg-[#F7F2EA]">
+          <div className="relative aspect-[1.5/1] overflow-hidden bg-[#F7F2EA] sm:aspect-[1.58/1]">
             {image ? (
               <Image
                 src={image}
@@ -48,8 +48,8 @@ export default function CatalogProductCard({ product, addedId, addProduct, compa
                 priority={priority}
                 loading={priority ? 'eager' : 'lazy'}
                 fetchPriority={priority ? 'high' : 'auto'}
-                sizes="(max-width: 767px) 50vw, (max-width: 1023px) 33vw, 25vw"
-                className="object-cover transition duration-500 group-hover:scale-[1.035]"
+                sizes="(max-width: 900px) 50vw, 430px"
+                className="object-cover transition duration-500 group-hover:scale-[1.03]"
               />
             ) : (
               <div className="flex h-full items-center justify-center text-[10px] font-bold text-black/25">No image</div>
@@ -65,23 +65,33 @@ export default function CatalogProductCard({ product, addedId, addProduct, compa
             {isWholesaleProduct(product) && <WholesaleBadge />}
           </div>
         </FastProductLink>
-        <div className="flex min-h-[90px] items-end gap-2 p-3 pt-2.5">
+
+        <div className="flex min-h-[86px] items-end gap-2 px-2.5 pb-2.5 pt-2 sm:min-h-[96px] sm:px-3 sm:pb-3 sm:pt-2.5">
           <FastProductLink product={product} className="min-w-0 flex-1 self-stretch">
-            <p className="line-clamp-2 min-h-[32px] text-[11px] font-black leading-4 text-[#252018] sm:text-xs">{titleOf(product)}</p>
-            <div className="mt-2 flex flex-wrap items-baseline gap-1.5">
-              <span className="text-sm font-black text-[#17130E] sm:text-base">Rs. {price.toLocaleString()}</span>
-              {original > price && <span className="text-[9px] font-semibold text-black/30 line-through">Rs. {original.toLocaleString()}</span>}
+            <p className="line-clamp-2 min-h-[31px] text-[11px] font-extrabold leading-[15px] text-[#252018] sm:min-h-[36px] sm:text-[13px] sm:leading-[18px]">
+              {titleOf(product)}
+            </p>
+            <div className="mt-1.5 flex flex-wrap items-baseline gap-1.5 sm:mt-2">
+              <span className="text-[14px] font-black leading-none text-[#17130E] sm:text-[17px]">
+                Rs. {price.toLocaleString()}
+              </span>
+              {original > price && (
+                <span className="text-[8px] font-semibold text-black/30 line-through sm:text-[9px]">
+                  Rs. {original.toLocaleString()}
+                </span>
+              )}
             </div>
           </FastProductLink>
+
           <button
             type="button"
             disabled={unavailable}
             onClick={handleAdd}
             aria-label={unavailable ? `${titleOf(product)} unavailable` : added ? `${titleOf(product)} added to cart` : `Add ${titleOf(product)} to cart`}
             title={unavailable ? 'Unavailable' : added ? 'Added to cart' : 'Add to cart'}
-            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition active:scale-95 ${unavailable ? 'cursor-not-allowed bg-black/5 text-black/25' : added ? 'bg-[#0F6A5F] text-white' : 'bg-[#FFF3DF] text-[#8B5A12] ring-1 ring-[#EAD7B6] hover:bg-[#F7E4C4]'}`}
+            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition active:scale-95 sm:h-10 sm:w-10 ${unavailable ? 'cursor-not-allowed bg-black/5 text-black/25' : added ? 'bg-[#0F6A5F] text-white' : 'bg-[#FFF8EC] text-[#8B5A12] shadow-sm ring-1 ring-[#EAD7B6] hover:bg-[#F7E4C4]'}`}
           >
-            {added ? <Check size={16} /> : <ShoppingBag size={16} />}
+            {added ? <Check size={15} /> : <ShoppingBag size={15} />}
           </button>
         </div>
       </article>
