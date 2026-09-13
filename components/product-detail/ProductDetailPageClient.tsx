@@ -289,6 +289,7 @@ function ProductDetailContent() {
         quantity={quantity}
         currentPrice={currentPrice}
         originalPrice={normalForDeal}
+        preferredImage={images[activeImage] || images[0] || ''}
         onClose={closeVariantSelector}
         onConfirm={confirmVariant}
       />
