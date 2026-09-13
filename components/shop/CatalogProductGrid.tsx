@@ -26,7 +26,7 @@ export default function CatalogProductGrid({
   premium = false,
 }: Props) {
   const grid = premium
-    ? 'grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4'
+    ? 'grid grid-cols-2 gap-2.5 sm:gap-3'
     : dense
       ? 'grid grid-cols-3 gap-2 md:grid-cols-4'
       : 'grid grid-cols-2 gap-3 md:grid-cols-4';
@@ -53,18 +53,18 @@ export default function CatalogProductGrid({
         if (!entries.some((entry) => entry.isIntersecting)) return;
         setVisibleCount((current) => Math.min(products.length, current + LOAD_BATCH_SIZE));
       },
-      { rootMargin: '700px 0px', threshold: 0.01 },
+      { rootMargin: premium ? '1100px 0px' : '700px 0px', threshold: 0.01 },
     );
 
     observer.observe(target);
     return () => observer.disconnect();
-  }, [hasMore, products.length]);
+  }, [hasMore, premium, products.length]);
 
   if (loading) {
     return (
       <div className={grid}>
         {Array.from({ length: 6 }).map((_, index) => (
-          <div key={index} className="aspect-square animate-pulse rounded-2xl bg-white" />
+          <div key={index} className="aspect-[1.45/1] animate-pulse rounded-[18px] bg-white" />
         ))}
       </div>
     );
@@ -89,20 +89,22 @@ export default function CatalogProductGrid({
             addProduct={addProduct}
             dense={dense}
             premium={premium}
-            priority={index < 8}
+            priority={index < (premium ? 4 : 8)}
           />
         ))}
       </div>
 
       {hasMore && (
-        <div ref={loadMoreRef} className="flex justify-center pt-5">
-          <button
-            type="button"
-            onClick={() => setVisibleCount((current) => Math.min(products.length, current + LOAD_BATCH_SIZE))}
-            className="rounded-full border border-black/8 bg-white px-5 py-2.5 text-[10px] font-black shadow-sm transition active:scale-[0.98]"
-          >
-            Load more products
-          </button>
+        <div ref={loadMoreRef} className={premium ? 'h-px w-full' : 'flex justify-center pt-5'}>
+          {!premium && (
+            <button
+              type="button"
+              onClick={() => setVisibleCount((current) => Math.min(products.length, current + LOAD_BATCH_SIZE))}
+              className="rounded-full border border-black/8 bg-white px-5 py-2.5 text-[10px] font-black shadow-sm transition active:scale-[0.98]"
+            >
+              Load more products
+            </button>
+          )}
         </div>
       )}
     </>
