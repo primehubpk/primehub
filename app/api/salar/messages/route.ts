@@ -49,7 +49,7 @@ type StoredMessage = { id?: string; role?: string; text?: string; attachments?: 
 type WorkerProduct = { id: string; name: string; price: number; image_url?: string | null; url?: string; size?: string | null; material?: string | null; collection_names?: string[] };
 type Draft = { stage?: 'awaiting_advance'|'collecting_details'|'complete'; items?: Array<{ productId: string; quantity: number }>; advance_amount?: number; advance_status?: string; advance_screenshot_url?: string; advance_screenshot_at?: string; next_field?: 'name'|'city'|'phone'|'address'|null; customer?: { name?: string; city?: string; phone?: string; address?: string }; order_id?: string; whatsapp_url?: string };
 
-function historyForModel(messages: StoredMessage[]): SalarLlmMessage[] { return messages.slice(-20).filter((m) => m.role === 'user' || m.role === 'assistant').map((m) => ({ role: m.role as 'user'|'assistant', content: String(m.text || '') })); }
+function historyForModel(messages: StoredMessage[]): SalarLlmMessage[] { return messages.slice(-12).filter((m) => m.role === 'user' || m.role === 'assistant').map((m) => ({ role: m.role as 'user'|'assistant', content: String(m.text || '').slice(0,2000) })); }
 function safeArgs(value: unknown) { return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, any> : {}; }
 function shoppingLike(text: string) { return /bangle|churi|choori|kangan|jewel|watch|product|item|dikha|show|collection|shop|shopping/i.test(text); }
 function orderIntent(text: string) { return /\b(order|buy|purchase|confirm)\b|mangwa|mangwana|manga do|le(?:na|ni)\s+hai|chahiye|checkout/i.test(text); }
@@ -144,7 +144,7 @@ export async function POST(request:Request){
 
     let assistantText='';let products:WorkerProduct[]=[];let links:Array<{title:string;url:string}>=[];let orderSummary:any=null;let successfulTool=false;let failedTool=false;
     try{
-      const brain=await buildSalarBrainPrompt();const recent=recentProducts(stored).map((product)=>({id:product.id,name:product.name,price:product.price,size:product.size||null,material:product.material||null,collections:product.collection_names||[]}));
+      const brain=await buildSalarBrainPrompt(16000);const recent=recentProducts(stored).map((product)=>({id:product.id,name:product.name,price:product.price}));
       const latest=await conversation.ref.get();const currentDraft:Draft=latest.data()?.order_draft||{};const privateContext={currentOrder:{state:currentDraft.stage||'not_started',nextField:currentDraft.next_field||null,hasAdvanceScreenshot:Boolean(currentDraft.advance_screenshot_url),customerFields:Object.keys(currentDraft.customer||{})},recentProductCards:recent,uploadedImageAvailable:Boolean(imageUrl),quickArea:topic||null};
       const systemPrompt=brain+'\n\n# Live runtime contract\nReason from the full conversation before replying. Compose a fresh, natural answer for this exact customer; never use a canned introduction. Use catalogue for every product fact and knowledge for every PrimeHub website fact. Use inspect_image when an uploaded image needs understanding. Use order only when the customer clearly intends the corresponding action. If an order is collecting a field but the customer asks another question, answer the question and do not save it as a field. Tool results are authoritative; never invent missing facts. Product cards and order buttons are rendered separately, so introduce them naturally without dumping JSON. Keep internal context private.\n\nCurrent private context: '+JSON.stringify(privateContext);
       const llmMessages:SalarLlmMessage[]=[{role:'system',content:systemPrompt},...historyForModel(stored)];
@@ -156,7 +156,7 @@ export async function POST(request:Request){
           let executed:AgentToolExecution;try{executed=await executeAgentTool(request,conversation,call,stored,text,imageUrl);}catch(error){executed={result:{ok:false,reason:error instanceof Error?error.message:'Tool failed.'}};}
           const ok=executed.result?.found!==false&&executed.result?.ok!==false;if(ok)successfulTool=true;else failedTool=true;
           if(executed.products)products=executed.products;if(executed.links)links=executed.links;if(executed.orderSummary)orderSummary=executed.orderSummary;
-          llmMessages.push({role:'tool',name:call.name,tool_call_id:call.id,content:JSON.stringify(executed.result)});
+          const modelResult=executed.products&&executed.result?.type==='products'?{...executed.result,products:executed.products.map((product)=>({id:product.id,name:product.name,price:product.price})),resultNote:'Full verified cards are rendered in the customer UI.'}:executed.result;llmMessages.push({role:'tool',name:call.name,tool_call_id:call.id,content:JSON.stringify(modelResult)});
         }
       }
       if(!assistantText)assistantText=failedTool&&!successfulTool?noVerifiedResult():SALAR_SAFE_ERROR_MESSAGE;
