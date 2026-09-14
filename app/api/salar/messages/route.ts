@@ -81,7 +81,7 @@ async function updateDraft(conversation:any,draft:Draft){const now=new Date().to
 async function saveAssistant(conversation:any,text:string,attachments:any,type='message'){const db=getAdminDb();const conversationRef=db.collection('salar_conversations').doc(String(conversation.id));const ref=db.collection('salar_messages').doc();const createdAt=new Date().toISOString();await db.runTransaction(async tx=>{const snap=await tx.get(conversationRef);if(!snap.exists||snap.data()?.blocked===true)throw new Error('SALAR_BLOCKED');tx.set(ref,{id:ref.id,conversation_id:conversation.id,role:'assistant',type,text,attachments,created_at:createdAt});tx.set(conversationRef,{updated_at:createdAt,last_message_at:createdAt,last_message_preview:text.slice(0,160)},{merge:true});});return{id:ref.id,conversation_id:conversation.id,role:'assistant' as const,type,text,attachments,created_at:createdAt};}
 
 type AgentToolExecution = { result: any; products?: WorkerProduct[]; links?: Array<{title:string;url:string}>; orderSummary?: any };
-async function executeAgentTool(request:Request,conversation:any,call:{name:string;arguments:Record<string,any>},stored:StoredMessage[],customerText:string,imageUrl:string):Promise<AgentToolExecution>{
+async function executeAgentTool(request:Request,conversation:any,call:{name:string;arguments:Record<string,any>},stored:StoredMessage[],customerText:string,imageUrl:string,liveProducts:WorkerProduct[]=[]):Promise<AgentToolExecution>{
   const args=safeArgs(call.arguments);
   if(call.name==='catalogue'){
     const result:any=await runCustomerWorker(request,{job:'catalogue',payload:args,conversationId:conversation.id});
@@ -94,7 +94,7 @@ async function executeAgentTool(request:Request,conversation:any,call:{name:stri
   }
   if(call.name==='inspect_image'){
     if(!imageUrl)return{result:{ok:false,reason:'No customer image is available in this turn.'}};
-    const candidates=recentProducts(stored);const vision:any=await runWorker({job:'vision',payload:{imageUrl,question:String(args.question||customerText),productCandidates:candidates},conversationId:conversation.id});
+    const candidates=liveProducts.length?liveProducts:recentProducts(stored);const vision:any=await runWorker({job:'vision',payload:{imageUrl,question:String(args.question||customerText),productCandidates:candidates},conversationId:conversation.id});
     if(vision?.ok===true&&vision.matchProductId){const exact:any=await runCustomerWorker(request,{job:'catalogue',payload:{productId:vision.matchProductId},conversationId:conversation.id});if(exact?.type==='product'&&exact.product)return{result:{...vision,verifiedProduct:exact.product},products:[exact.product]};}
     return{result:vision};
   }
@@ -102,7 +102,7 @@ async function executeAgentTool(request:Request,conversation:any,call:{name:stri
     const latest=await conversation.ref.get();const draft:Draft=latest.data()?.order_draft||{};const action=String(args.action||'status');
     if(action==='status')return{result:{ok:true,state:draft.stage||'not_started',nextField:draft.next_field||null,hasAdvance:Boolean(draft.advance_screenshot_url),customer:draft.customer||{}}};
     if(action==='start'){
-      const candidates=recentProducts(stored);const wantedId=String(args.productId||'').trim();const wantedName=normalizeHint(args.productName);const selected=candidates.find((product)=>product.id===wantedId)||candidates.find((product)=>wantedName&&normalizeHint(product.name).includes(wantedName))||(candidates.length===1?candidates[0]:null);
+      const candidates=liveProducts.length?liveProducts:recentProducts(stored);const wantedId=String(args.productId||'').trim();const wantedName=normalizeHint(args.productName);const selected=candidates.find((product)=>product.id===wantedId)||candidates.find((product)=>wantedName&&normalizeHint(product.name).includes(wantedName))||(candidates.length===1?candidates[0]:null);
       if(!selected)return{result:{ok:false,reason:'A verified recent product card must be selected before starting an order.'}};
       const next:Draft={stage:'awaiting_advance',items:[{productId:selected.id,quantity:Math.max(1,Math.min(50,Math.floor(Number(args.quantity)||1)))}],advance_amount:ADVANCE,advance_status:'awaiting_screenshot',customer:{}};await updateDraft(conversation,next);
       return{result:{ok:true,state:'awaiting_advance',advanceAmount:ADVANCE,paymentStatus:'not_received',nextStep:'Ask for the advance screenshot, then explain video-before-remaining-payment policy naturally.'},products:[selected]};
@@ -153,7 +153,7 @@ export async function POST(request:Request){
         if(!completion.toolCalls.length){assistantText=completion.text.trim();break;}
         llmMessages.push({role:'assistant',content:completion.text||'',tool_calls:completion.toolCalls.map((toolCall)=>({id:toolCall.id,type:'function',function:{name:toolCall.name,arguments:toolCall.rawArguments||JSON.stringify(toolCall.arguments)}}))});
         for(const call of completion.toolCalls){
-          let executed:AgentToolExecution;try{executed=await executeAgentTool(request,conversation,call,stored,text,imageUrl);}catch(error){executed={result:{ok:false,reason:error instanceof Error?error.message:'Tool failed.'}};}
+          let executed:AgentToolExecution;try{executed=await executeAgentTool(request,conversation,call,stored,text,imageUrl,products);}catch(error){executed={result:{ok:false,reason:error instanceof Error?error.message:'Tool failed.'}};}
           const ok=executed.result?.found!==false&&executed.result?.ok!==false;if(ok)successfulTool=true;else failedTool=true;
           if(executed.products)products=executed.products;if(executed.links)links=executed.links;if(executed.orderSummary)orderSummary=executed.orderSummary;
           const modelResult=executed.products&&executed.result?.type==='products'?{type:'products',collection:executed.result.collection,productCount:executed.products.length,priceRange:{min:Math.min(...executed.products.map((product)=>Number(product.price||0))),max:Math.max(...executed.products.map((product)=>Number(product.price||0)))},resultNote:'Full verified cards are rendered in the customer UI; introduce them briefly without listing them.'}:executed.result;llmMessages.push({role:'tool',name:call.name,tool_call_id:call.id,content:JSON.stringify(modelResult)});
