@@ -29,13 +29,13 @@ function categoryRefs(p:any, map:Map<string,any>) {
   return { ids:[...new Set(ids)], names:[...new Set(names)] };
 }
 async function replaceCollection(name:string, rows:any[]) { const db=getAdminDb(); const old=await db.collection(name).get(); for(let i=0;i<old.docs.length;i+=400){const b=db.batch(); old.docs.slice(i,i+400).forEach((d)=>b.delete(d.ref)); await b.commit();} for(let i=0;i<rows.length;i+=400){const b=db.batch(); rows.slice(i,i+400).forEach((row)=>b.set(db.collection(name).doc(String(row.id)),row)); await b.commit();} }
-function pageId(pathname:string){ return pathname==='/'?'home':`page-${pathname.replace(/^\\/+|\\/+$/g,'').replace(/[^a-z0-9]+/gi,'-').toLowerCase()}`.slice(0,180); }
+function pageId(pathname:string){ return pathname==='/'?'home':`page-${pathname.replace(/^\/+|\/+$/g,'').replace(/[^a-z0-9]+/gi,'-').toLowerCase()}`.slice(0,180); }
 async function discoverPublicPages(origin:string){
   const seeded=PAGE_ROUTES.map(([key,title,url])=>({key,title,url})); const seen=new Set(seeded.map((row)=>row.url));
   try{
     const response=await fetch(`${origin}/sitemap.xml`,{cache:'no-store'}); const xml=response.ok?await response.text():'';
-    for(const match of xml.matchAll(/<loc>([^<]+)<\\/loc>/gi)){
-      try{const parsed=new URL(match[1].replace(/&amp;/g,'&'));if(parsed.origin!==origin)continue;const url=parsed.pathname.replace(/\\/$/,'')||'/';if(seen.has(url)||/^\\/(api|admin|product|category)(\\/|$)/i.test(url))continue;seen.add(url);seeded.push({key:pageId(url),title:url.split('/').filter(Boolean).pop()?.replace(/[-_]+/g,' ')||'PrimeHub Mall',url});}catch{}
+    for(const match of xml.matchAll(/<loc>([^<]+)<\/loc>/gi)){
+      try{const parsed=new URL(match[1].replace(/&amp;/g,'&'));if(parsed.origin!==origin)continue;const url=parsed.pathname.replace(/\/$/,'')||'/';if(seen.has(url)||/^\/(api|admin|product|category)(\/|$)/i.test(url))continue;seen.add(url);seeded.push({key:pageId(url),title:url.split('/').filter(Boolean).pop()?.replace(/[-_]+/g,' ')||'PrimeHub Mall',url});}catch{}
     }
   }catch{}
   return seeded.slice(0,120);
