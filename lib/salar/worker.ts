@@ -32,8 +32,8 @@ function mappedProduct(p: any) { return { id: String(p.source_id || p.id), name:
 async function catalogue(payload: Record<string, any>) {
   const q = String(payload.q || '').trim(); const requestedId = String(payload.collectionId || '').trim(); const requestedCollection = String(payload.collection || '').trim(); const requestedProductId = String(payload.productId || '').trim(); const limit = Math.min(100, Math.max(1, Number(payload.limit) || 30));
   const requestKey = `catalogue|q:${norm(q)}|cid:${requestedId}|c:${norm(requestedCollection)}|pid:${requestedProductId}|l:${limit}`;
-  const cached = await readFreshCache(requestKey); if (cached) return { ...cached, cached: true };
   const state = await indexState(); if (state.stale) return refreshRequired('Catalogue index is stale or missing.');
+  const cached = await readFreshCache(requestKey); if (cached) return { ...cached, cached: true };
   const db = getAdminDb(); const [collectionSnap, productSnap] = await Promise.all([db.collection('salar_index_collections').get(), db.collection('salar_index_products').get()]);
   const collections = collectionSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() } as any)); const products = productSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() } as any));
   if (!collections.length && !products.length) return refreshRequired('Catalogue index is empty.');
@@ -65,8 +65,8 @@ async function catalogue(payload: Record<string, any>) {
 const TOPIC_ALIASES: Record<string, string[]> = { reseller_club: ['reseller_club', 'reseller club', 'reseller'], prime_skill: ['prime_skill', 'prime skill', 'skills'], shopping: ['shopping', 'shop'], delivery: ['delivery'], payment: ['payment', 'payment_info', 'checkout'], about: ['about'], contact: ['contact', 'contact_settings'] };
 async function knowledge(payload: Record<string, any>) {
   const topic = String(payload.topic || '').trim(); if (!topic) return { found: false, reason: 'Provide a knowledge topic.' };
-  const key = `know:${norm(topic)}`; const cached = await readFreshCache(key); if (cached) return { ...cached, cached: true };
-  const state = await indexState(); if (state.stale) return refreshRequired('Knowledge index is stale or missing.');
+  const key = `know:${norm(topic)}`; const state = await indexState(); if (state.stale) return refreshRequired('Knowledge index is stale or missing.');
+  const cached = await readFreshCache(key); if (cached) return { ...cached, cached: true };
   const snap = await getAdminDb().collection('salar_index_pages').get(); const pages = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() } as any)); if (!pages.length) return refreshRequired('Knowledge index is empty.');
   const aliases = TOPIC_ALIASES[norm(topic).replace(/ /g, '_')] || [topic]; const qTerms = [...new Set(aliases.flatMap(terms))]; const ranked = pages.map((p) => ({ p, score: Math.max(scoreText(p.key, qTerms) * 2, scoreText(p.title, qTerms) * 2, scoreText(p.text_excerpt, qTerms)) })).filter((x) => x.score > 0).sort((a, b) => b.score - a.score);
   if (!ranked.length) return { found: false, reason: `No indexed page matched "${topic}".` };
