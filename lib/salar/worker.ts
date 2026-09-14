@@ -10,6 +10,7 @@ export type SalarWorkerInput = { job: SalarWorkerJob | string; payload?: Record<
 
 const CACHE_MAX_AGE_MS = 15 * 60 * 1000;
 const INDEX_STALE_MS = 24 * 60 * 60 * 1000;
+export const SALAR_INDEX_SCHEMA_VERSION = 2;
 const COMMON_SYNONYMS: Record<string, string[]> = {
   bangles: ['bangle', 'bangles', 'churi', 'churiyan', 'choori', 'chooriyan', 'kangan'],
   bangle: ['bangle', 'bangles', 'churi', 'churiyan', 'choori', 'chooriyan', 'kangan'],
@@ -24,7 +25,7 @@ function cacheDocId(key: string) { return encodeURIComponent(key).replace(/\./g,
 async function readFreshCache(key: string) { const snap = await getAdminDb().collection('salar_cache').doc(cacheDocId(key)).get(); if (!snap.exists) return null; const data: any = snap.data() || {}; const created = Date.parse(String(data.created_at || '')); if (!Number.isFinite(created) || Date.now() - created > CACHE_MAX_AGE_MS) return null; return data.value ?? null; }
 async function writeCache(key: string, value: unknown) { await getAdminDb().collection('salar_cache').doc(cacheDocId(key)).set({ key, value, created_at: new Date().toISOString() }); }
 export async function clearSalarCache() { const db = getAdminDb(); const snap = await db.collection('salar_cache').get(); for (let i = 0; i < snap.docs.length; i += 400) { const batch = db.batch(); snap.docs.slice(i, i + 400).forEach((doc) => batch.delete(doc.ref)); await batch.commit(); } }
-async function indexState() { const snap = await getAdminDb().collection('salar_index_meta').doc('current').get(); const refreshedAt = snap.exists ? Date.parse(String(snap.data()?.refreshed_at || '')) : NaN; const stale = !Number.isFinite(refreshedAt) || Date.now() - refreshedAt > INDEX_STALE_MS; return { stale, refreshedAt: Number.isFinite(refreshedAt) ? new Date(refreshedAt).toISOString() : null }; }
+async function indexState() { const snap = await getAdminDb().collection('salar_index_meta').doc('current').get(); const data = snap.exists ? snap.data() : null; const refreshedAt = data ? Date.parse(String(data.refreshed_at || '')) : NaN; const versionOk = Number(data?.schema_version || 0) === SALAR_INDEX_SCHEMA_VERSION; const stale = !versionOk || !Number.isFinite(refreshedAt) || Date.now() - refreshedAt > INDEX_STALE_MS; return { stale, refreshedAt: Number.isFinite(refreshedAt) ? new Date(refreshedAt).toISOString() : null }; }
 function refreshRequired(reason: string) { return { found: false, reason, refreshNeeded: true, internal: 'Catalogue Refresh is required in Salar admin.', customerFallback: '03238878009' }; }
 function mappedProduct(p: any) { return { id: String(p.source_id || p.id), name: String(p.name || p.title || p.id), price: Number(p.price) || 0, image_url: list(p.image_urls)[0] || p.imageUrl || null, size: list(p.sizes).join(', ') || p.size || null, material: p.material ? String(p.material) : null, url: String(p.product_url || `/product/${encodeURIComponent(String(p.source_id || p.id))}`), collection_names: list(p.collection_names).map(String) }; }
 
