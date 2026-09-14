@@ -90,6 +90,9 @@ export async function ensureBrainSeed() {
   if (!naturalSnap.exists) {
     const now = new Date().toISOString();
     await naturalRef.set({ id: 'natural-sales-v2', filename: 'brain-natural-sales-v2.md', title: 'Natural Senior Salesman', body: SALAR_NATURAL_AGENT_SEED, updated_at: now, updated_by: 'system', created_at: now });
+  } else if (!String(naturalSnap.data()?.body || '').includes('If a customer names a product or asks for its tasveer/photo/image')) {
+    const now = new Date().toISOString();
+    await naturalRef.set({ body: `${String(naturalSnap.data()?.body || '').trim()}\n\n- If a customer names a product or asks for its tasveer/photo/image, search the exact wording in the live catalogue and show the real product card with its image. Never replace a requested product image with a generic text description or a WhatsApp-only promise.\n- For a specific named category or style, prefer matching live product cards; only give a collection overview when the customer’s request is genuinely broad.`, updated_at: now, updated_by: 'system' }, { merge: true });
   }
 }
 
