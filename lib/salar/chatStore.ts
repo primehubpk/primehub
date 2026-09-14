@@ -64,3 +64,18 @@ export async function listConversationMessages(conversationId: string) {
   const snap = await getAdminDb().collection('salar_messages').where('conversation_id', '==', conversationId).get();
   return snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })).sort((a: any, b: any) => String(a.created_at || '').localeCompare(String(b.created_at || ''))).slice(-200);
 }
+
+export async function deleteConversationAndMessages(conversationId: string) {
+  const id = String(conversationId || '').trim();
+  if (!id) return;
+  const db = getAdminDb();
+  const messages = await db.collection('salar_messages').where('conversation_id', '==', id).get();
+  for (let index = 0; index < messages.docs.length; index += 400) {
+    const batch = db.batch();
+    messages.docs.slice(index, index + 400).forEach((document) => batch.delete(document.ref));
+    await batch.commit();
+  }
+  await db.collection('salar_conversations').doc(id).delete();
+  messageBuckets.delete(id);
+  uploadBuckets.delete(id);
+}
