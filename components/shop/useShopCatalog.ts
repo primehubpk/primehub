@@ -8,7 +8,7 @@ import { categoryHref, categoryLabel, productMatchesCategory, slugifyCategory } 
 import { smartSearchProducts } from '@/lib/smartSearch';
 import { isWholesaleProduct } from '@/lib/wholesale';
 import { getEffectivePrice } from '@/lib/dealPricing';
-import { priceBucketRange } from '@/lib/priceBucketUtils';
+import { matchesSaleMelaBucket } from '@/lib/priceBucketUtils';
 import { cacheCatalogForNavigation, readCachedCatalog } from '@/lib/productNavigationCache';
 import { Product, Category, ShopCatalogModel, imageOf, priceOf, originalOf, productHasVariants, titleOf } from './ShopTypes';
 
@@ -104,20 +104,17 @@ export function useShopCatalog(initialCategory?: string, initialQuery = '', init
     [settings.priceBuckets],
   );
 
-  const selectedBudgetRange = useMemo(() => {
+  const selectedSaleMelaBucket = useMemo(() => {
     if (maxPrice === 'all') return null;
     const amount = Number(maxPrice);
-    if (!amount) return null;
-
-    const isKnownBucket = [99, 299, 999].includes(amount);
-    return isKnownBucket ? priceBucketRange(buckets, amount) : null;
-  }, [buckets, maxPrice]);
+    return [99, 299, 999].includes(amount) ? amount : null;
+  }, [maxPrice]);
 
   const filtered = useMemo(() => {
     const searchable = smartSearchProducts(products.filter((p) => p.published !== false), search);
     return searchable.filter((p) => {
       const selectedCat = wholesaleOnly || productMatchesCategory(category, p, categories);
-      const effectivePrice = selectedBudgetRange
+      const effectivePrice = selectedSaleMelaBucket
         ? getEffectivePrice({
             price: Number(p.normalPrice || p.price || 0),
             dealPrice: Number(p.dealPrice || 0),
@@ -128,19 +125,18 @@ export function useShopCatalog(initialCategory?: string, initialQuery = '', init
         wholesaleOnly ||
         maxPrice === 'all' ||
         !Number(maxPrice) ||
-        (selectedBudgetRange
-          ? effectivePrice > selectedBudgetRange.minExclusive &&
-            effectivePrice <= selectedBudgetRange.maxInclusive
+        (selectedSaleMelaBucket
+          ? matchesSaleMelaBucket(effectivePrice, selectedSaleMelaBucket)
           : effectivePrice <= Number(maxPrice));
       const matchesDeal = !onlyDeals || Boolean(p.isFlashSale);
       const matchesWholesale = wholesaleOnly
         ? isWholesaleProduct(p)
-        : selectedBudgetRange
+        : selectedSaleMelaBucket
           ? !isWholesaleProduct(p)
           : true;
       return selectedCat && matchesPrice && matchesDeal && matchesWholesale;
     });
-  }, [products, categories, search, category, maxPrice, onlyDeals, wholesaleOnly, selectedBudgetRange]);
+  }, [products, categories, search, category, maxPrice, onlyDeals, wholesaleOnly, selectedSaleMelaBucket]);
 
   const rails = useMemo(() => {
     const used = new Set<string>();
