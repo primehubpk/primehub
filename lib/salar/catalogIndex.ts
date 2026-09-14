@@ -13,7 +13,21 @@ function arr(value: unknown) { return Array.isArray(value) ? value : []; }
 function imageUrls(p:any) { const values:any[] = [p.imageUrl,p.image,...arr(p.images).map((x:any)=>typeof x==='string'?x:x?.url),...arr(p.imageUrls)]; return [...new Set(values.map((x)=>String(x||'').trim()).filter(Boolean))]; }
 function sizes(p:any) { const values:any[]=[...arr(p.sizes),...arr(p.variants).map((v:any)=>v?.size ?? v?.name),...arr(p.variantMatrix).map((v:any)=>v?.size)]; return [...new Set(values.map((x)=>String(x||'').trim()).filter(Boolean))]; }
 function shortDescription(p:any){ return text(p.description ?? p.shortDescription ?? '', 1200); }
-function categoryRefs(p:any, map:Map<string,any>) { const ids = [...arr(p.categoryIds), p.categoryId].map((x)=>String(x||'').trim()).filter(Boolean); const names = [...arr(p.categories), p.category].map((x)=>typeof x==='string'?x:x?.name).map((x)=>String(x||'').trim()).filter(Boolean); for (const id of ids) { const c=map.get(id); if(c) names.push(String(c.name||c.title||c.slug||id)); } return { ids:[...new Set(ids)], names:[...new Set(names)] }; }
+function categoryRefs(p:any, map:Map<string,any>) {
+  const ids = [...arr(p.categoryIds), p.categoryId].map((x)=>String(x||'').trim()).filter(Boolean);
+  const names:string[] = [];
+  const mixed = [...arr(p.categories), p.category];
+  for (const value of mixed) {
+    const raw = typeof value === 'string' ? value.trim() : String(value?.id || value?.name || '').trim();
+    if (!raw) continue;
+    if (map.has(raw)) ids.push(raw); else names.push(raw);
+  }
+  for (const id of ids) {
+    const category=map.get(id);
+    if(category) names.push(String(category.name||category.title||category.slug||id));
+  }
+  return { ids:[...new Set(ids)], names:[...new Set(names)] };
+}
 async function replaceCollection(name:string, rows:any[]) { const db=getAdminDb(); const old=await db.collection(name).get(); for(let i=0;i<old.docs.length;i+=400){const b=db.batch(); old.docs.slice(i,i+400).forEach((d)=>b.delete(d.ref)); await b.commit();} for(let i=0;i<rows.length;i+=400){const b=db.batch(); rows.slice(i,i+400).forEach((row)=>b.set(db.collection(name).doc(String(row.id)),row)); await b.commit();} }
 
 export async function readIndexMeta(){ const snap=await getAdminDb().collection('salar_index_meta').doc('current').get(); return snap.exists ? snap.data() : { status:'never', stats:{collections:0,products:0,pages:0}, refreshed_at:null, error:null }; }
