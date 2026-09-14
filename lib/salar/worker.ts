@@ -30,7 +30,7 @@ function refreshRequired(reason: string) { return { found: false, reason, refres
 function mappedProduct(p: any) { return { id: String(p.source_id || p.id), name: String(p.name || p.title || p.id), price: Number(p.price) || 0, image_url: list(p.image_urls)[0] || p.imageUrl || null, size: list(p.sizes).join(', ') || p.size || null, material: p.material ? String(p.material) : null, url: String(p.product_url || `/product/${encodeURIComponent(String(p.source_id || p.id))}`), collection_names: list(p.collection_names).map(String) }; }
 
 async function catalogue(payload: Record<string, any>) {
-  const q = String(payload.q || '').trim(); const requestedId = String(payload.collectionId || '').trim(); const requestedCollection = String(payload.collection || '').trim(); const requestedProductId = String(payload.productId || '').trim(); const limit = Math.min(100, Math.max(1, Number(payload.limit) || 30));
+  const q = String(payload.q || '').trim(); const requestedId = String(payload.collectionId || '').trim(); const requestedCollection = String(payload.collection || '').trim(); const requestedProductId = String(payload.productId || '').trim(); const limit = requestedProductId ? 1 : 30;
   const requestKey = `catalogue|q:${norm(q)}|cid:${requestedId}|c:${norm(requestedCollection)}|pid:${requestedProductId}|l:${limit}`;
   const state = await indexState(); if (state.stale) return refreshRequired('Catalogue index is stale or missing.');
   const cached = await readFreshCache(requestKey); if (cached) return { ...cached, cached: true };
