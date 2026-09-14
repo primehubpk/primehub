@@ -67,7 +67,9 @@ async function attemptProvider(provider:Provider,keys:string[],models:string[],m
           break;
         }
         console.warn('[salar-provider] attempt failed',{provider,model,keySlot:index+1,status:null,code:error instanceof Error?error.name:'unknown',keyRejected:false});
-        break;
+        // A transport timeout/fetch failure can be transient or isolated to one attempt.
+        // Continue through the remaining key slots before falling back to another provider.
+        continue;
       }
     }
   }
@@ -76,7 +78,7 @@ async function attemptProvider(provider:Provider,keys:string[],models:string[],m
 async function runCompletion(messages:SalarLlmMessage[],purpose:SalarPurpose,maxTokens:number,tools:SalarToolDefinition[]):Promise<CompletionResult>{
   const providers:Array<{provider:Provider;keys:string[];models:string[]}>= [
     {provider:'groq',keys:envList('GROQ_API_KEYS','GROQ_API_KEY'),models:modelList(['GROQ_MODELS','GROQ_MODEL'],['openai/gpt-oss-120b','openai/gpt-oss-20b'])},
-    {provider:'gemini',keys:envList('GEMINI_API_KEYS','GEMINI_API_KEY'),models:modelList(['GEMINI_MODELS','GEMINI_MODEL'],['gemini-2.5-flash'])},
+    {provider:'gemini',keys:envList('GEMINI_API_KEYS','GEMINI_API_KEY'),models:modelList(['GEMINI_MODELS','GEMINI_MODEL'],['gemini-2.5-flash','gemini-2.5-flash-lite','gemini-3.1-flash-lite'])},
     {provider:'openrouter',keys:envList('OPENROUTER_API_KEYS','OPENROUTER_API_KEY'),models:modelList(['OPENROUTER_MODELS','OPENROUTER_MODEL'],['openrouter/auto'])},
   ];
   for(const item of providers){const result=await attemptProvider(item.provider,item.keys,item.models,messages,purpose,maxTokens,tools);if(result)return result;}
