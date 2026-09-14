@@ -1,18 +1,18 @@
 # Salar — Admin Testing Guide
 
-Salar is implemented inside the existing PrimeHub website as ONE Salar talker + ONE Worker. The `feature/salar` branch is for admin testing only. Public visibility is hard-locked OFF in this branch.
+Salar is implemented inside the existing PrimeHub website as ONE Salar talker + ONE Worker. The `feature/salar` Vercel preview is intentionally public for customer-flow QA; `main` and production remain unchanged until human merge/release approval.
 
 ## Environment variable names
 
 Server-only unless explicitly marked otherwise. Never commit real values.
 
 ### Salar AI providers
-- `GROQ_API_KEYS` — comma-separated Groq keys, tried in configured order.
-- `GROQ_MODEL`
-- `GEMINI_API_KEYS` — comma-separated Gemini keys, used after Groq is unavailable.
-- `GEMINI_MODEL`
-- `OPENROUTER_API_KEYS` — optional fallback.
-- `OPENROUTER_MODEL`
+- `GROQ_API_KEY` or `GROQ_API_KEYS` — one key or a comma-separated pool, tried in configured order.
+- `GROQ_MODEL` or `GROQ_MODELS` — configured models first, then current supported fallbacks.
+- `GEMINI_API_KEY` or `GEMINI_API_KEYS` — one key or a comma-separated pool, used after Groq is unavailable.
+- `GEMINI_MODEL` or `GEMINI_MODELS`
+- `OPENROUTER_API_KEY` or `OPENROUTER_API_KEYS` — optional fallback.
+- `OPENROUTER_MODEL` or `OPENROUTER_MODELS`
 
 ### Salar order / media dependencies
 - `WHATSAPP_BUSINESS_NUMBER` — optional. If absent, Salar uses the existing PrimeHub site WhatsApp setting.
@@ -68,7 +68,7 @@ Admin testing should verify: real product → Rs 300 advance instruction → scr
 
 ## Admin test steps
 
-1. Keep `salar_public_enabled` false. Open PrimeHub Admin and confirm Salar says **Admin testing only**.
+1. Open the exact `feature/salar` Vercel preview in a logged-out browser and confirm Salar is visible. Confirm production/main are unchanged.
 2. From the homepage while admin is logged in, open Salar and test launcher, minimize, maximize, close, hamburger/admin drawer, quick-area dropdown, image upload, product cards and Place Order on desktop and a narrow mobile viewport.
 3. Run **Catalogue Refresh**, then search a broad category, choose a collection and open products. Confirm a second identical request is cache-backed and no full index is shown in chat/prompt output.
 4. Test provider ping with valid server env configuration. Confirm customer UI never displays provider names or key values.
@@ -81,6 +81,6 @@ Admin testing should verify: real product → Rs 300 advance instruction → scr
 
 ## Release gate
 
-**PUBLIC ON ONLY AFTER HUMANS MERGE.**
+**PREVIEW PUBLIC; PRODUCTION ONLY AFTER HUMAN MERGE.**
 
-Do not enable `salar_public_enabled` on `feature/salar`. Do not merge this branch automatically. Public visibility requires human QA, explicit human merge/release approval, and a later intentional change that removes the admin-testing lock. Vercel deployment for this branch should remain disabled until the user explicitly approves deployment after all Salar phases are complete.
+The user explicitly approved public visibility and Vercel deployment for the exact `feature/salar` preview. Do not merge this branch automatically. Production visibility still requires human QA and explicit human merge/release approval.

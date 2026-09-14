@@ -1,4 +1,4 @@
-name: Salar Phase 8 Admin Testing CI
+name: Salar Public Preview CI
 
 on:
   push:
@@ -42,8 +42,8 @@ jobs:
             echo 'Possible committed API key prefix found.' >&2
             exit 1
           fi
-      - name: Verify Salar branch deploy remains disabled
-        run: node -e "const v=require('./vercel.json'); if(v?.git?.deploymentEnabled?.['feature/salar']!==false) process.exit(1)"
+      - name: Verify Salar preview deployment is enabled
+        run: node -e "const v=require('./vercel.json'); if(v?.git?.deploymentEnabled?.['feature/salar']!==true) process.exit(1)"
       - name: Type check
         run: npx tsc --noEmit
       - name: Build
