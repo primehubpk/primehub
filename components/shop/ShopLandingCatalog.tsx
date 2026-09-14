@@ -185,16 +185,16 @@ export default function ShopLandingCatalog({
   };
   const setMaxPrice = (value: string) => {
     setQuickView('all');
-    shop.setWholesaleOnly(false);
     shop.setMaxPrice(value);
   };
-  const setOnlyDeals = (value: boolean) => {
+  const setOnlyDeals = (value: boolean | ((current: boolean) => boolean)) => {
     setQuickView('all');
-    shop.setOnlyDeals(value);
+    shop.setOnlyDeals(
+      typeof value === 'function' ? value(shop.onlyDeals) : value,
+    );
   };
   const setWholesaleOnly = (value: boolean) => {
     setQuickView('all');
-    shop.setMaxPrice('all');
     shop.setWholesaleOnly(value);
   };
 
