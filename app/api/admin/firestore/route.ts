@@ -31,6 +31,10 @@ function normalize(name: string, value: Record<string, any>) {
   return { ...value, imageUrl, iconUrl: typeof value.iconUrl === 'string' ? value.iconUrl : imageUrl };
 }
 
+function hasProductIdentity(value: Record<string, any>) {
+  return String(value?.title || value?.name || '').trim().length > 0;
+}
+
 function refreshCachesForCollection(name: string) {
   if (name === 'products' || name === 'categories') {
     revalidateTag('public-catalog');
@@ -64,6 +68,10 @@ async function currentPrimaryData(name: string, id: string) {
 }
 
 async function writeSupabaseFirst(name: string, id: string, data: Record<string, any>) {
+  if (name === 'products' && !hasProductIdentity(data)) {
+    throw new Error('Product write rejected because the product name is missing.');
+  }
+
   const row = mapDocumentToSupabase(name, id, data, 'supabase');
   if (!row) throw new Error(`Supabase primary mapping is unavailable for ${name}.`);
   await supabasePrimaryUpsert({ table: name, row });
@@ -142,8 +150,11 @@ export async function POST(request: Request) {
       const patch = normalize(name, body.value || {});
 
       if (supabasePrimary) {
-        const existing = await currentPrimaryData(name, id) || {};
-        const data = { ...existing, ...patch };
+        const existing = await currentPrimaryData(name, id);
+        if (name === 'products' && !existing) {
+          return NextResponse.json({ error: 'Product not found. Use product creation for a new product.' }, { status: 404 });
+        }
+        const data = { ...(existing || {}), ...patch };
         const mirrorWarning = await writeSupabaseFirst(name, id, data);
         refreshCachesForCollection(name);
         return NextResponse.json({ success: true, id, primary: 'supabase', mirrorWarning });
