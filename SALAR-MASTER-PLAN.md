@@ -96,3 +96,12 @@ The exact feature/salar preview may be public for QA. Main/production remain unc
 - admin chat list/delete/block/unblock;
 - rate limits and unsafe-request refusal;
 - no provider keys/prompts in logs and no production branch change.
+
+
+## Product-name and image resolution (implemented)
+
+- Specific customer wording is searched against the live indexed product name, description, and collection names before broad collection matching.
+- Generic requests such as “bangles” still return the collection overview; a specific style/name such as “jelly bangles” or a named deal returns verified product cards.
+- A named photo/image request returns the same product card attachment used by the storefront, including the real image URL, price, and link. Singular exact-product tool results are normalized into the UI card shape.
+- Catalogue query-cache keys are versioned so old broad-category answers cannot mask a newer matching rule.
+- Existing natural-sales-v2 admin brain data is migrated once with the product-image rule; admin edits remain the source of future training updates.
