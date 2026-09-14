@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
-import ShopCatalog from '@/components/ShopCatalog';
+import ShopLandingCatalog from '@/components/shop/ShopLandingCatalog';
 import ShopRouteLoading from '@/components/shop/ShopRouteLoading';
 import { SettingsProvider } from '@/lib/useSettings';
 import { getPublicCatalogSnapshot, getStorefrontSettingsSnapshot } from '@/lib/publicCatalogServer';
@@ -36,7 +36,7 @@ async function SeededShopCatalog() {
 
   return (
     <SettingsProvider initialSettings={initialSettings as Partial<SiteSettings>}>
-      <ShopCatalog
+      <ShopLandingCatalog
         initialProducts={catalog.products as Product[]}
         initialCategories={catalog.categories as Category[]}
       />
