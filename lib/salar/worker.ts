@@ -61,6 +61,8 @@ async function catalogue(payload: Record<string, any>) {
     if (productSearch.length && (qTokens.length >= 2 || productSearch[0].allTermsMatch)) {
       const rows = productSearch.slice(0, limit).map(({ p }) => mappedProduct(p));
       value = { type: 'products', query: q, collection: { id: 'search', name: `Search results for ${q}` }, products: rows, cached: false };
+    } else if (hasSpecificToken) {
+      return { found: false, reason: `No indexed products matched "${q}".` };
     } else {
       const matchingProductCollectionIds = new Set<string>();
     for (const p of products) { const scores = [scoreText(p.name, qTerms), scoreText(p.description, qTerms), ...list(p.collection_names).map((name) => scoreText(name, qTerms))]; if (Math.max(...scores) > 0) list(p.collection_ids).forEach((id) => matchingProductCollectionIds.add(String(id))); }
