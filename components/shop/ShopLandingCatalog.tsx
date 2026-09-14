@@ -39,7 +39,21 @@ type Props = {
 };
 
 type QuickView = 'all' | 'best' | 'new' | '99' | '299' | '999' | 'wholesale';
+type SaleMelaView = '99' | '299' | '999' | 'wholesale';
 type SortMode = 'featured' | 'newest' | 'price-low' | 'price-high';
+
+const NEXT_SALE_MELA_VIEW: Partial<Record<SaleMelaView, SaleMelaView>> = {
+  '99': '299',
+  '299': '999',
+  '999': 'wholesale',
+};
+
+function saleMelaLabel(view: SaleMelaView) {
+  if (view === '99') return 'Rs. 1 – 298';
+  if (view === '299') return 'Rs. 299 – 998';
+  if (view === '999') return 'Rs. 999 & Above';
+  return 'Wholesale Deals';
+}
 
 function score(id: string) {
   return Array.from(id).reduce(
@@ -151,13 +165,42 @@ export default function ShopLandingCatalog({
     ? sortedProducts.slice(12)
     : [];
 
-  const recommendations = useMemo(() => {
-    if (!['99', '299', '999', 'wholesale'].includes(quickView) || searchView) return [];
-    const selectedIds = new Set(quickProducts.map((product) => product.id));
-    return publishedProducts
-      .filter((product) => !selectedIds.has(product.id))
-      .sort((a, b) => score(a.id) - score(b.id));
-  }, [publishedProducts, quickProducts, quickView, searchView]);
+  const activeSaleMelaView = useMemo<SaleMelaView | null>(() => {
+    if (searchView) return null;
+    if (quickView === '99' || quickView === '299' || quickView === '999' || quickView === 'wholesale') {
+      return quickView;
+    }
+    if (quickView !== 'all' || shop.category !== 'all') return null;
+    if (shop.wholesaleOnly) return 'wholesale';
+    if (shop.maxPrice === '99' || shop.maxPrice === '299' || shop.maxPrice === '999') {
+      return shop.maxPrice;
+    }
+    return null;
+  }, [quickView, searchView, shop.category, shop.maxPrice, shop.wholesaleOnly]);
+
+  const nextSaleMelaCollection = useMemo(() => {
+    if (!activeSaleMelaView) return null;
+    const nextView = NEXT_SALE_MELA_VIEW[activeSaleMelaView];
+    if (!nextView) return null;
+
+    const products = nextView === 'wholesale'
+      ? publishedProducts
+          .filter(isWholesaleProduct)
+          .sort((a, b) => salePrice(a) - salePrice(b) || score(a.id) - score(b.id))
+      : publishedProducts
+          .filter(
+            (product) =>
+              !isWholesaleProduct(product) &&
+              matchesSaleMelaBucket(salePrice(product), Number(nextView)),
+          )
+          .sort((a, b) => salePrice(a) - salePrice(b) || score(a.id) - score(b.id));
+
+    return {
+      view: nextView,
+      heading: saleMelaLabel(nextView),
+      products,
+    };
+  }, [activeSaleMelaView, publishedProducts]);
 
   const resetShopFilters = () => {
     shop.setSearch('');
@@ -204,15 +247,9 @@ export default function ShopLandingCatalog({
       ? 'New Arrivals'
       : quickView === 'best'
         ? 'Best Sellers'
-        : quickView === 'wholesale'
-          ? 'Wholesale Deals'
-          : quickView === '99'
-            ? 'Under Rs. 99'
-            : quickView === '299'
-              ? 'Under Rs. 299'
-              : quickView === '999'
-                ? 'Under Rs. 999'
-                : 'All Products';
+        : activeSaleMelaView
+          ? saleMelaLabel(activeSaleMelaView)
+          : 'All Products';
 
   const eyebrow = searchView
     ? 'Smart search'
@@ -220,7 +257,7 @@ export default function ShopLandingCatalog({
       ? 'Latest products first'
       : quickView === 'best'
         ? 'Customer favourites'
-        : ['99', '299', '999', 'wholesale'].includes(quickView)
+        : activeSaleMelaView
           ? 'PrimeHubMall Sale Mela'
           : 'Picked for you';
 
@@ -257,21 +294,21 @@ export default function ShopLandingCatalog({
             className={!searchView && quickView === '99' ? 'is-active' : ''}
             onClick={() => selectQuickView('99')}
           >
-            <Tag /> Under Rs. 99
+            <Tag /> Rs. 1 – 298
           </button>
           <button
             type="button"
             className={!searchView && quickView === '299' ? 'is-active' : ''}
             onClick={() => selectQuickView('299')}
           >
-            <Tag /> Under Rs. 299
+            <Tag /> Rs. 299 – 998
           </button>
           <button
             type="button"
             className={!searchView && quickView === '999' ? 'is-active' : ''}
             onClick={() => selectQuickView('999')}
           >
-            <Tag /> Under Rs. 999
+            <Tag /> Rs. 999 &amp; Above
           </button>
           <button
             type="button"
@@ -393,16 +430,18 @@ export default function ShopLandingCatalog({
               </section>
             )}
 
-            {recommendations.length > 0 && (
+            {nextSaleMelaCollection && nextSaleMelaCollection.products.length > 0 && (
               <section className="mt-10 border-t border-black/5 pt-7">
                 <div className="mb-3">
                   <p className="text-[9px] font-black uppercase tracking-[0.2em] text-[#0F6A5F]">
-                    More products
+                    PrimeHubMall Sale Mela
                   </p>
-                  <h2 className="mt-0.5 text-xl font-black tracking-tight">More to Explore</h2>
+                  <h2 className="mt-0.5 text-xl font-black tracking-tight">
+                    {nextSaleMelaCollection.heading}
+                  </h2>
                 </div>
                 <CatalogProductGrid
-                  products={recommendations}
+                  products={nextSaleMelaCollection.products}
                   addedId={shop.addedId}
                   addProduct={shop.addProduct}
                   loading={shop.loading}
