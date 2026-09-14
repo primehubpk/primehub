@@ -14,7 +14,7 @@ type Props = {
 };
 
 const DEFAULT_INITIAL_COUNT = 24;
-const DENSE_INITIAL_COUNT = 28;
+const DENSE_INITIAL_COUNT = 30;
 const LOAD_BATCH_SIZE = 24;
 
 export default function CatalogProductGrid({
@@ -28,8 +28,8 @@ export default function CatalogProductGrid({
   const grid = premium
     ? 'grid grid-cols-2 gap-2.5 sm:gap-3'
     : dense
-      ? 'grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-3 xl:grid-cols-4'
-      : 'grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-4';
+      ? 'grid grid-cols-2 gap-2.5 sm:gap-3 xl:grid-cols-4'
+      : 'grid grid-cols-2 gap-3 md:grid-cols-4';
   const initialCount = dense ? DENSE_INITIAL_COUNT : DEFAULT_INITIAL_COUNT;
   const [visibleCount, setVisibleCount] = useState(() => Math.min(products.length, initialCount));
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
@@ -53,7 +53,7 @@ export default function CatalogProductGrid({
         if (!entries.some((entry) => entry.isIntersecting)) return;
         setVisibleCount((current) => Math.min(products.length, current + LOAD_BATCH_SIZE));
       },
-      { rootMargin: premium ? '1100px 0px' : '800px 0px', threshold: 0.01 },
+      { rootMargin: premium ? '1100px 0px' : '700px 0px', threshold: 0.01 },
     );
 
     observer.observe(target);
@@ -63,8 +63,8 @@ export default function CatalogProductGrid({
   if (loading) {
     return (
       <div className={grid}>
-        {Array.from({ length: 8 }).map((_, index) => (
-          <div key={index} className="aspect-[0.78/1] animate-pulse rounded-[18px] bg-white shadow-sm" />
+        {Array.from({ length: 6 }).map((_, index) => (
+          <div key={index} className="aspect-[0.78/1] animate-pulse rounded-[18px] bg-white" />
         ))}
       </div>
     );
@@ -72,9 +72,8 @@ export default function CatalogProductGrid({
 
   if (!products.length) {
     return (
-      <div className="rounded-[24px] border border-[#E9E2D8] bg-white p-10 text-center shadow-sm">
-        <h2 className="font-black text-[#28231D]">No products found</h2>
-        <p className="mt-1 text-[11px] font-semibold text-black/45">Try another category, price range, or search.</p>
+      <div className="rounded-[28px] bg-white p-10 text-center">
+        <h2 className="font-black">No products found</h2>
       </div>
     );
   }
@@ -96,12 +95,12 @@ export default function CatalogProductGrid({
       </div>
 
       {hasMore && (
-        <div ref={loadMoreRef} className={premium ? 'h-px w-full' : 'flex justify-center pt-6'}>
+        <div ref={loadMoreRef} className={premium ? 'h-px w-full' : 'flex justify-center pt-5'}>
           {!premium && (
             <button
               type="button"
               onClick={() => setVisibleCount((current) => Math.min(products.length, current + LOAD_BATCH_SIZE))}
-              className="rounded-full border border-[#DED5C8] bg-white px-5 py-2.5 text-[10px] font-black text-[#2A241D] shadow-sm transition hover:border-[#CDBA9B] active:scale-[0.98]"
+              className="rounded-full border border-black/8 bg-white px-5 py-2.5 text-[10px] font-black shadow-sm transition active:scale-[0.98]"
             >
               Load more products
             </button>

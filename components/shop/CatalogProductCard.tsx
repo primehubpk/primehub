@@ -1,8 +1,9 @@
 'use client';
 
 import Image from 'next/image';
-import { Check, Eye, ShoppingCart, Star } from 'lucide-react';
+import { Check, Eye, ShoppingBag, Star } from 'lucide-react';
 import FastProductLink from '@/components/FastProductLink';
+import WholesaleBadge from '@/components/WholesaleBadge';
 import { useCartStore } from '@/lib/cartStore';
 import { isWholesaleProduct } from '@/lib/wholesale';
 import { Product, availableStockOf, discountOf, imageOf, originalOf, priceOf, productHasVariants, titleOf } from './ShopTypes';
@@ -27,11 +28,8 @@ export default function CatalogProductCard({ product, addedId, addProduct, compa
   const stock = availableStockOf(product);
   const unavailable = stock <= 0;
   const added = addedId === product.id;
-  const wholesale = isWholesaleProduct(product);
-  const rating = Number(product.rating ?? product.averageRating ?? 0);
-  const reviewCount = Number(product.reviewCount ?? product.reviewsCount ?? product.totalReviews ?? 0);
-  const bestSeller = Boolean(product.isBestSeller ?? product.bestSeller ?? product.bestseller);
-  const newArrival = Boolean(product.isNewArrival ?? product.newArrival ?? product.isNew);
+  const rating = Math.max(0, Math.min(5, Number(product.rating || 0)));
+  const reviews = Math.max(0, Number(product.reviews || product.reviewCount || 0));
 
   function handleAdd() {
     if (unavailable) return;
@@ -45,45 +43,67 @@ export default function CatalogProductCard({ product, addedId, addProduct, compa
         <FastProductLink product={product} className="block">
           <div className="relative aspect-[1.5/1] overflow-hidden bg-[#F7F2EA] sm:aspect-[1.58/1]">
             {image ? (
-              <Image src={image} alt={titleOf(product)} fill priority={priority} loading={priority ? 'eager' : 'lazy'} fetchPriority={priority ? 'high' : 'auto'} sizes="(max-width: 900px) 50vw, 430px" className="object-cover transition duration-500 group-hover:scale-[1.03]" />
+              <Image
+                src={image}
+                alt={titleOf(product)}
+                fill
+                priority={priority}
+                loading={priority ? 'eager' : 'lazy'}
+                fetchPriority={priority ? 'high' : 'auto'}
+                sizes="(max-width: 900px) 50vw, 430px"
+                className="object-cover transition duration-500 group-hover:scale-[1.03]"
+              />
             ) : (
               <div className="flex h-full items-center justify-center text-[10px] font-bold text-black/25">No image</div>
             )}
-            {discount > 0 && <span className="absolute left-2 top-2 rounded-full bg-[#E53935] px-2 py-1 text-[8px] font-black text-white shadow-sm">{discount}% OFF</span>}
+            {discount > 0 && (
+              <span className="absolute left-2 top-2 rounded-full bg-[#FFF7E8]/95 px-2 py-1 text-[8px] font-black text-[#9A650F] shadow-sm backdrop-blur">
+                {discount}% OFF
+              </span>
+            )}
+            {product.isFlashSale && (
+              <span className="absolute right-2 top-2 rounded-full bg-[#14140F]/90 px-2 py-1 text-[8px] font-black text-white backdrop-blur">FLASH</span>
+            )}
+            {isWholesaleProduct(product) && <WholesaleBadge />}
           </div>
         </FastProductLink>
+
         <div className="flex min-h-[86px] items-end gap-2 px-2.5 pb-2.5 pt-2 sm:min-h-[96px] sm:px-3 sm:pb-3 sm:pt-2.5">
           <FastProductLink product={product} className="min-w-0 flex-1 self-stretch">
-            <p className="line-clamp-2 min-h-[31px] text-[11px] font-extrabold leading-[15px] text-[#252018] sm:min-h-[36px] sm:text-[13px] sm:leading-[18px]">{titleOf(product)}</p>
+            <p className="line-clamp-2 min-h-[31px] text-[11px] font-extrabold leading-[15px] text-[#252018] sm:min-h-[36px] sm:text-[13px] sm:leading-[18px]">
+              {titleOf(product)}
+            </p>
             <div className="mt-1.5 flex flex-wrap items-baseline gap-1.5 sm:mt-2">
-              <span className="text-[14px] font-black leading-none text-[#17130E] sm:text-[17px]">Rs. {price.toLocaleString()}</span>
-              {original > price && <span className="text-[8px] font-semibold text-black/30 line-through sm:text-[9px]">Rs. {original.toLocaleString()}</span>}
+              <span className="text-[14px] font-black leading-none text-[#17130E] sm:text-[17px]">
+                Rs. {price.toLocaleString()}
+              </span>
+              {original > price && (
+                <span className="text-[8px] font-semibold text-black/30 line-through sm:text-[9px]">
+                  Rs. {original.toLocaleString()}
+                </span>
+              )}
             </div>
           </FastProductLink>
-          <button type="button" disabled={unavailable} onClick={handleAdd} aria-label={unavailable ? `${titleOf(product)} unavailable` : `Add ${titleOf(product)} to cart`} className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition active:scale-95 sm:h-10 sm:w-10 ${unavailable ? 'cursor-not-allowed bg-black/5 text-black/25' : added ? 'bg-[#0F6A5F] text-white' : 'bg-[#FFF8EC] text-[#8B5A12] shadow-sm ring-1 ring-[#EAD7B6] hover:bg-[#F7E4C4]'}`}>
-            {added ? <Check size={15} /> : <ShoppingCart size={15} />}
+
+          <button
+            type="button"
+            disabled={unavailable}
+            onClick={handleAdd}
+            aria-label={unavailable ? `${titleOf(product)} unavailable` : added ? `${titleOf(product)} added to cart` : `Add ${titleOf(product)} to cart`}
+            title={unavailable ? 'Unavailable' : added ? 'Added to cart' : 'Add to cart'}
+            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition active:scale-95 sm:h-10 sm:w-10 ${unavailable ? 'cursor-not-allowed bg-black/5 text-black/25' : added ? 'bg-[#0F6A5F] text-white' : 'bg-[#FFF8EC] text-[#8B5A12] shadow-sm ring-1 ring-[#EAD7B6] hover:bg-[#F7E4C4]'}`}
+          >
+            {added ? <Check size={15} /> : <ShoppingBag size={15} />}
           </button>
         </div>
       </article>
     );
   }
 
-  const badge = wholesale
-    ? { label: 'Wholesale', className: 'bg-[#6C42D9] text-white' }
-    : product.isFlashSale
-      ? { label: discount > 0 ? `${discount}% OFF` : 'Deal', className: 'bg-[#E53935] text-white' }
-      : bestSeller
-        ? { label: 'Bestseller', className: 'bg-[#B77B08] text-white' }
-        : newArrival
-          ? { label: 'New Arrival', className: 'bg-[#0F6A5F] text-white' }
-          : discount > 0
-            ? { label: `${discount}% OFF`, className: 'bg-[#E53935] text-white' }
-            : null;
-
   return (
-    <article className={`group min-w-0 overflow-hidden rounded-[18px] border border-[#E7DED2] bg-white shadow-[0_6px_20px_rgba(51,42,31,0.07)] transition hover:-translate-y-0.5 hover:shadow-[0_10px_28px_rgba(51,42,31,0.11)] sm:rounded-[20px] ${compact ? 'w-[168px] shrink-0 snap-start sm:w-[186px]' : 'w-full'}`}>
+    <article className={`group flex h-full flex-col overflow-hidden ${dense ? 'rounded-[16px] sm:rounded-[20px]' : 'rounded-[22px]'} border border-[#e6ded2] bg-white shadow-[0_6px_18px_rgba(35,29,20,0.06)] transition hover:-translate-y-0.5 hover:shadow-[0_12px_30px_rgba(35,29,20,0.12)] ${compact ? 'w-[168px] shrink-0 snap-start sm:w-[186px]' : 'w-full'}`}>
       <FastProductLink product={product} className="block">
-        <div className="relative aspect-[1.05/1] overflow-hidden bg-[#F6F1EA] sm:aspect-square">
+        <div className={`relative overflow-hidden bg-[#f3eee7] ${dense ? 'aspect-[1.22/1]' : 'aspect-square'}`}>
           {image ? (
             <Image
               src={image}
@@ -92,46 +112,41 @@ export default function CatalogProductCard({ product, addedId, addProduct, compa
               priority={priority}
               loading={priority ? 'eager' : 'lazy'}
               fetchPriority={priority ? 'high' : 'auto'}
-              sizes="(max-width: 639px) 50vw, (max-width: 1199px) 33vw, 25vw"
-              className="object-cover transition duration-500 group-hover:scale-[1.035]"
+              sizes={dense ? '(max-width: 639px) 50vw, (max-width: 1279px) 33vw, 25vw' : '(max-width: 767px) 50vw, 25vw'}
+              className="object-cover transition duration-500 group-hover:scale-[1.03]"
             />
           ) : (
             <div className="flex h-full items-center justify-center text-[10px] font-bold text-black/25">No image</div>
           )}
-
-          {badge && <span className={`absolute left-2 top-2 rounded-full px-2 py-1 text-[7px] font-black shadow-sm sm:text-[8px] ${badge.className}`}>{badge.label}</span>}
-
-          <span className="absolute bottom-2 right-2 flex h-8 w-8 items-center justify-center rounded-full bg-white/95 text-[#28231D] shadow-md ring-1 ring-black/5 backdrop-blur" aria-hidden="true">
-            <Eye size={14} />
-          </span>
+          {discount > 0 && <span className="absolute left-2 top-2 rounded-lg bg-[#ec1626] px-2 py-1 text-[8px] font-black text-white shadow-sm sm:text-[9px]">{discount}% OFF</span>}
+          {product.isFlashSale && <span className="absolute left-2 top-9 rounded-lg bg-[#c18300] px-2 py-1 text-[7px] font-black text-white">FLASH DEAL</span>}
+          {isWholesaleProduct(product) && <WholesaleBadge />}
+          <span className="absolute bottom-2 right-2 flex h-8 w-8 items-center justify-center rounded-full bg-white/95 text-[#17221f] shadow-md" aria-hidden="true"><Eye size={15} /></span>
         </div>
-
-        <div className={dense ? 'px-2.5 pb-2 pt-2.5 sm:px-3 sm:pb-2.5' : 'p-3 pb-2'}>
-          <p className="line-clamp-2 min-h-[32px] text-[10px] font-black leading-[15px] text-[#27221C] sm:min-h-[36px] sm:text-[12px] sm:leading-[18px]">{titleOf(product)}</p>
-
+        <div className={dense ? "p-2.5 pb-1 sm:p-3" : "p-3 pb-1"}>
+          <p className={dense ? "line-clamp-2 min-h-[32px] text-[10px] font-black leading-4 text-[#17221f] sm:text-[12px]" : "line-clamp-2 min-h-[30px] text-[11px] font-black leading-4"}>{titleOf(product)}</p>
           {rating > 0 && (
             <div className="mt-1 flex items-center gap-1 text-[8px] font-bold text-black/45 sm:text-[9px]">
-              <span className="inline-flex items-center gap-0.5 text-[#D7920B]"><Star size={11} fill="currentColor" /> {rating.toFixed(1)}</span>
-              {reviewCount > 0 && <span>({reviewCount.toLocaleString()})</span>}
+              <span className="flex items-center text-[#e7a814]"><Star size={11} fill="currentColor" /></span>
+              <span>{rating.toFixed(1)}</span>
+              {reviews > 0 && <span>({reviews})</span>}
             </div>
           )}
-
-          <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
-            <span className="text-[14px] font-black leading-none text-[#17130E] sm:text-[17px]">Rs. {price.toLocaleString()}</span>
-            {original > price && <span className="text-[8px] font-semibold text-black/30 line-through sm:text-[9px]">Rs. {original.toLocaleString()}</span>}
-            {discount > 0 && <span className="rounded-md bg-[#CFF0E3] px-1.5 py-0.5 text-[7px] font-black text-[#0A6B55] sm:text-[8px]">{discount}% OFF</span>}
+          <div className="mt-2 flex flex-wrap items-end gap-1.5">
+            <span className={dense ? "text-[14px] font-black leading-none text-[#062d27] sm:text-[17px]" : "font-[family-name:var(--font-mono)] text-sm font-black text-[#E1352B]"}>Rs. {price.toLocaleString()}</span>
+            {original > price && <span className="text-[9px] text-black/30 line-through">Rs. {original.toLocaleString()}</span>}
+            {discount > 0 && <span className="ml-auto rounded-md bg-[#cceedd] px-1.5 py-1 text-[7px] font-black text-[#075447] sm:text-[8px]">SAVE {discount}%</span>}
           </div>
         </div>
       </FastProductLink>
-
-      <div className="px-2.5 pb-2.5 sm:px-3 sm:pb-3">
+      <div className={dense ? "mt-auto px-2.5 pb-2.5 pt-2 sm:px-3 sm:pb-3" : "mt-auto px-3 pb-3 pt-2"}>
         <button
           type="button"
           disabled={unavailable}
           onClick={handleAdd}
-          className={`flex w-full min-w-0 items-center justify-center gap-1.5 rounded-xl py-2.5 text-[8px] font-black transition active:scale-[0.98] sm:text-[10px] ${unavailable ? 'cursor-not-allowed bg-black/5 text-black/25' : added ? 'bg-[#0F6A5F] text-white' : 'bg-[#075C4E] text-white hover:bg-[#064B40]'}`}
+          className={`flex min-h-10 w-full min-w-0 items-center justify-center gap-1.5 rounded-xl px-2 py-2 text-[8px] font-black transition active:scale-[0.98] sm:text-[10px] ${unavailable ? 'cursor-not-allowed bg-black/5 text-black/25' : added ? 'bg-[#0F6A5F] text-white' : 'bg-[#005448] text-white hover:bg-[#063f37]'}`}
         >
-          {unavailable ? 'Unavailable' : added ? <><Check size={13} /> Added to Cart</> : <><ShoppingCart size={13} /> Add to Cart</>}
+          {unavailable ? 'Unavailable' : added ? <><Check size={13} />Added to Cart</> : <><ShoppingBag size={13} />Add to Cart</>}
         </button>
       </div>
     </article>
