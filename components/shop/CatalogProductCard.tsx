@@ -6,6 +6,7 @@ import FastProductLink from '@/components/FastProductLink';
 import WholesaleBadge from '@/components/WholesaleBadge';
 import { useCartStore } from '@/lib/cartStore';
 import { isWholesaleProduct } from '@/lib/wholesale';
+import { isDirectStorefrontImage } from '@/lib/imageUrl';
 import { Product, availableStockOf, discountOf, imageOf, originalOf, priceOf, productHasVariants, titleOf } from './ShopTypes';
 
 type Props = {
@@ -50,6 +51,7 @@ export default function CatalogProductCard({ product, addedId, addProduct, compa
                 priority={priority}
                 loading={priority ? 'eager' : 'lazy'}
                 fetchPriority={priority ? 'high' : 'auto'}
+                unoptimized={isDirectStorefrontImage(image)}
                 sizes="(max-width: 900px) 50vw, 430px"
                 className="object-cover transition duration-500 group-hover:scale-[1.03]"
               />
@@ -112,6 +114,7 @@ export default function CatalogProductCard({ product, addedId, addProduct, compa
               priority={priority}
               loading={priority ? 'eager' : 'lazy'}
               fetchPriority={priority ? 'high' : 'auto'}
+              unoptimized={isDirectStorefrontImage(image)}
               sizes={dense ? '(max-width: 639px) 50vw, (max-width: 1279px) 33vw, 25vw' : '(max-width: 767px) 50vw, 25vw'}
               className="object-cover transition duration-500 group-hover:scale-[1.03]"
             />

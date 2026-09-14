@@ -10,3 +10,12 @@ export function normalizeImageUrl(value?: string | null) {
   }
   return url;
 }
+
+export function isDirectStorefrontImage(value?: string | null) {
+  const url = String(value || '').trim();
+  return (
+    url.startsWith(`${CUSTOM_R2_BASE}/`) ||
+    url.startsWith(`${LEGACY_R2_BASE}/`) ||
+    url.startsWith('https://i.ibb.co/')
+  );
+}

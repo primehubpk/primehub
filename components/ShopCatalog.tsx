@@ -14,6 +14,7 @@ import { FilterDrawer, ShopFilterPanel } from './shop/CatalogFilters';
 import CatalogProductGrid from './shop/CatalogProductGrid';
 import FastProductLink from '@/components/FastProductLink';
 import { categoryHref, productMatchesCategory, slugifyCategory } from '@/lib/categoryUtils';
+import { isDirectStorefrontImage } from '@/lib/imageUrl';
 import { discountOf, imageOf, titleOf, type Product, type Category } from './shop/ShopTypes';
 
 function score(id: string) {
@@ -371,7 +372,7 @@ export default function ShopCatalog({
             <div className="shop-deal-products" aria-label="Deal product previews">
               {dealProducts.map((product) => (
                 <FastProductLink key={product.id} product={product} aria-label={`View ${titleOf(product)}`}>
-                  <Image src={imageOf(product)} alt={titleOf(product)} fill sizes="110px" />
+                  <Image src={imageOf(product)} alt={titleOf(product)} fill sizes="110px" unoptimized={isDirectStorefrontImage(imageOf(product))} />
                 </FastProductLink>
               ))}
             </div>

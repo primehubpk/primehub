@@ -2,6 +2,7 @@
 import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import { Sparkles, ChevronLeft, ChevronRight, Play, X, ZoomIn } from 'lucide-react';
+import { isDirectStorefrontImage } from '@/lib/imageUrl';
 import { money, titleOf, videoOf, type Product } from './ProductDetailTypes';
 
 type Props = {
@@ -16,12 +17,7 @@ type Props = {
 };
 
 function shouldUseDirectStorefrontImage(url: string, bigDealActive: boolean) {
-  if (bigDealActive) return true;
-  return (
-    url.startsWith('https://images.primehubmall.com/') ||
-    url.startsWith('https://pub-157b90419bf04016bdea666e4cbce181.r2.dev/') ||
-    url.startsWith('https://i.ibb.co/')
-  );
+  return bigDealActive || isDirectStorefrontImage(url);
 }
 
 export default function ProductHero({ product, images, activeImage, savingsAmount, liveDeal, bigDealActive, onImageChange, onVideoOpen }: Props) {

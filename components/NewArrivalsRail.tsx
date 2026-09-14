@@ -11,7 +11,7 @@ import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useCartStore } from '@/lib/cartStore';
 import { imageOf, originalOf, priceOf, productHasVariants, titleOf, type Product } from '@/components/shop/ShopTypes';
-import { normalizeImageUrl } from '@/lib/imageUrl';
+import { isDirectStorefrontImage, normalizeImageUrl } from '@/lib/imageUrl';
 
 function timeOf(p: Product) {
   const value = p.createdAt || p.updatedAt;
@@ -110,6 +110,7 @@ export default function NewArrivalsRail({
                       priority={index < 3}
                       loading={index < 3 ? 'eager' : 'lazy'}
                       fetchPriority={index < 3 ? 'high' : 'auto'}
+                      unoptimized={isDirectStorefrontImage(src)}
                       sizes="(max-width: 640px) 132px, 160px"
                       quality={72}
                       className="object-cover"

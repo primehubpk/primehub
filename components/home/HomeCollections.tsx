@@ -16,6 +16,7 @@ import {
   titleOf,
   type Product,
 } from "@/components/shop/ShopTypes";
+import { isDirectStorefrontImage } from "@/lib/imageUrl";
 import { getEffectivePrice } from "@/lib/dealPricing";
 import { isWholesaleProduct } from "@/lib/wholesale";
 import {
@@ -85,6 +86,7 @@ export function HomeProductCard({
             src={src}
             alt={titleOf(product)}
             fill
+            unoptimized={isDirectStorefrontImage(src)}
             sizes="(max-width: 600px) 40vw, 300px"
             className="object-cover"
           />
