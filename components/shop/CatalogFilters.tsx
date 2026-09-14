@@ -23,6 +23,13 @@ function labelOf(category: Category) {
   return category.title || category.name || category.id || 'Category';
 }
 
+const PRICE_OPTIONS = [
+  ['all', 'Any price'],
+  ['99', 'Rs. 1 – 298'],
+  ['299', 'Rs. 299 – 998'],
+  ['999', 'Rs. 999 & Above'],
+] as const;
+
 export function ShopFilterPanel({
   categories,
   category,
@@ -60,7 +67,10 @@ export function ShopFilterPanel({
           <span>All products</span>
         </button>
         {activeCategories.map((item) => {
-          const value = slugifyCategory(item.slug || item.title || item.name || item.id || '');
+          const label = labelOf(item);
+          const value =
+            slugifyCategory(label) ||
+            slugifyCategory(item.slug || item.id || '');
           const selected = category === value && !wholesaleOnly;
           return (
             <button
@@ -73,7 +83,7 @@ export function ShopFilterPanel({
               className={selected ? 'is-selected' : ''}
             >
               <span className="shop-check" />
-              <span>{labelOf(item)}</span>
+              <span>{label}</span>
             </button>
           );
         })}
@@ -82,7 +92,7 @@ export function ShopFilterPanel({
       <fieldset className="shop-filter-group">
         <legend>Price range</legend>
         <div className="shop-price-options">
-          {[['all', 'Any price'], ['99', 'Under Rs. 99'], ['299', 'Under Rs. 299'], ['999', 'Under Rs. 999']].map(([value, label]) => {
+          {PRICE_OPTIONS.map(([value, label]) => {
             const selected = maxPrice === value && !wholesaleOnly;
             return (
               <button
@@ -134,7 +144,6 @@ export function FilterDrawer({ filtersOpen, setFiltersOpen, ...panelProps }: Pro
   if (!filtersOpen) return null;
 
   const startDrag = (event: TouchEvent<HTMLDivElement>) => {
-    if ((drawerRef.current?.scrollTop || 0) > 0) return;
     dragStartY.current = event.touches[0]?.clientY ?? null;
     setDragging(dragStartY.current !== null);
   };
@@ -143,11 +152,13 @@ export function FilterDrawer({ filtersOpen, setFiltersOpen, ...panelProps }: Pro
     if (dragStartY.current === null) return;
     const currentY = event.touches[0]?.clientY;
     if (currentY == null) return;
-    setDragOffset(Math.max(0, currentY - dragStartY.current));
+    const nextOffset = Math.max(0, currentY - dragStartY.current);
+    if (nextOffset > 0) event.preventDefault();
+    setDragOffset(nextOffset);
   };
 
   const finishDrag = () => {
-    const shouldClose = dragOffset >= 90;
+    const shouldClose = dragOffset >= 80;
     dragStartY.current = null;
     setDragging(false);
     setDragOffset(0);
@@ -155,30 +166,65 @@ export function FilterDrawer({ filtersOpen, setFiltersOpen, ...panelProps }: Pro
   };
 
   return (
-    <div className="fixed inset-0 z-[100] lg:hidden">
-      <button type="button" className="absolute inset-0 bg-black/50" onClick={() => setFiltersOpen(false)} aria-label="Close Shop By" />
+    <div
+      className="fixed inset-0 z-[100] lg:hidden"
+      style={{ overscrollBehavior: 'none' }}
+    >
+      <button
+        type="button"
+        className="absolute inset-0 bg-black/50"
+        onClick={() => setFiltersOpen(false)}
+        aria-label="Close Shop By"
+      />
       <div
         ref={drawerRef}
-        className="absolute bottom-0 left-0 right-0 max-h-[88dvh] overflow-y-auto rounded-t-[28px] bg-[#fffdf8] p-5 shadow-2xl"
+        className="absolute bottom-0 left-0 right-0 flex max-h-[88dvh] flex-col overflow-hidden rounded-t-[28px] bg-[#fffdf8] shadow-2xl"
         style={{
           transform: `translateY(${dragOffset}px)`,
           transition: dragging ? 'none' : 'transform 180ms ease',
+          overscrollBehaviorY: 'contain',
         }}
-        onTouchStart={startDrag}
-        onTouchMove={moveDrag}
-        onTouchEnd={finishDrag}
-        onTouchCancel={finishDrag}
       >
-        <div className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-black/15" aria-hidden="true" />
-        <div className="mb-4 flex items-center justify-between">
-          <div>
-            <p className="text-[9px] font-black uppercase tracking-[0.2em] text-[#0F6A5F]">Find products</p>
-            <h2 className="mt-1 text-lg font-black">Shop By</h2>
+        <div
+          className="shrink-0 px-5 pt-4"
+          style={{ touchAction: 'none' }}
+          onTouchStart={startDrag}
+          onTouchMove={moveDrag}
+          onTouchEnd={finishDrag}
+          onTouchCancel={finishDrag}
+        >
+          <div className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-black/15" aria-hidden="true" />
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <p className="text-[9px] font-black uppercase tracking-[0.2em] text-[#0F6A5F]">Find products</p>
+              <h2 className="mt-1 text-lg font-black">Shop By</h2>
+            </div>
+            <button
+              type="button"
+              onClick={() => setFiltersOpen(false)}
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-black/5"
+              aria-label="Close Shop By"
+            >
+              <X size={17} />
+            </button>
           </div>
-          <button type="button" onClick={() => setFiltersOpen(false)} className="flex h-10 w-10 items-center justify-center rounded-full bg-black/5" aria-label="Close Shop By"><X size={17} /></button>
         </div>
-        <ShopFilterPanel {...panelProps} />
-        <button type="button" onClick={() => setFiltersOpen(false)} className="mt-4 w-full rounded-2xl bg-[#005448] py-3.5 text-xs font-black text-white">Show {panelProps.productCount} products</button>
+
+        <div
+          className="min-h-0 flex-1 overflow-y-auto px-5 pb-5"
+          style={{ overscrollBehaviorY: 'contain' }}
+        >
+          <ShopFilterPanel {...panelProps} />
+          <div className="sticky bottom-0 z-10 -mx-5 mt-4 border-t border-black/5 bg-[#fffdf8]/95 px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur-sm">
+            <button
+              type="button"
+              onClick={() => setFiltersOpen(false)}
+              className="w-full rounded-2xl bg-[#005448] py-3.5 text-xs font-black text-white"
+            >
+              Show {panelProps.productCount} products
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );
