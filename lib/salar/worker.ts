@@ -30,8 +30,8 @@ function refreshRequired(reason: string) { return { found: false, reason, refres
 function mappedProduct(p: any) { return { id: String(p.source_id || p.id), name: String(p.name || p.title || p.id), price: Number(p.price) || 0, image_url: list(p.image_urls)[0] || p.imageUrl || null, size: list(p.sizes).join(', ') || p.size || null, material: p.material ? String(p.material) : null, url: String(p.product_url || `/product/${encodeURIComponent(String(p.source_id || p.id))}`), collection_names: list(p.collection_names).map(String) }; }
 
 async function catalogue(payload: Record<string, any>) {
-  const q = String(payload.q || '').trim(); const requestedId = String(payload.collectionId || '').trim(); const requestedCollection = String(payload.collection || '').trim(); const requestedProductId = String(payload.productId || '').trim(); const limit = requestedProductId ? 1 : 30;
-  const requestKey = `catalogue|q:${norm(q)}|cid:${requestedId}|c:${norm(requestedCollection)}|pid:${requestedProductId}|l:${limit}`;
+  const q = String(payload.q || '').trim(); const requestedId = String(payload.collectionId || '').trim(); const requestedCollection = String(payload.collection || '').trim(); const requestedProductId = String(payload.productId || '').trim(); const limit = requestedProductId ? 1 : 30; const sort = String(payload.sort || '').trim();
+  const requestKey = `catalogue|q:${norm(q)}|cid:${requestedId}|c:${norm(requestedCollection)}|pid:${requestedProductId}|l:${limit}|s:${sort}`;
   const state = await indexState(); if (state.stale) return refreshRequired('Catalogue index is stale or missing.');
   const cached = await readFreshCache(requestKey); if (cached) return { ...cached, cached: true };
   const db = getAdminDb(); const [collectionSnap, productSnap] = await Promise.all([db.collection('salar_index_collections').get(), db.collection('salar_index_products').get()]);
@@ -55,7 +55,7 @@ async function catalogue(payload: Record<string, any>) {
     if (requestedId) collection = collections.find((c) => String(c.id) === requestedId || String(c.source_id || '') === requestedId) || null;
     if (!collection && requestedCollection) { const wanted = norm(requestedCollection); collection = collections.find((c) => norm(c.name) === wanted || norm(c.slug) === wanted) || [...collections].sort((a, b) => scoreText(b.name, [wanted]) - scoreText(a.name, [wanted])).find((c) => scoreText(c.name, [wanted]) > 0) || null; }
     if (!collection) return { found: false, reason: 'Requested collection was not found in the index.' };
-    const rows = products.filter((p) => list(p.collection_ids).map(String).includes(String(collection.id)) || list(p.collection_names).some((name) => norm(name) === norm(collection.name))).slice(0, limit);
+    const matchedRows = products.filter((p) => list(p.collection_ids).map(String).includes(String(collection.id)) || list(p.collection_names).some((name) => norm(name) === norm(collection.name))); const rows = [...matchedRows].sort((a,b) => sort === 'price_asc' ? Number(a.price || 0) - Number(b.price || 0) : sort === 'price_desc' ? Number(b.price || 0) - Number(a.price || 0) : 0).slice(0, limit);
     if (!rows.length) return { found: false, reason: `Collection "${collection.name}" has no indexed products.` };
     value = { type: 'products', query: q, collection: { id: String(collection.id), name: String(collection.name) }, products: rows.map(mappedProduct), cached: false };
   }
