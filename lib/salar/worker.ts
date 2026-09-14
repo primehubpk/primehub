@@ -9,6 +9,7 @@ export type SalarWorkerJob = 'catalogue' | 'knowledge' | 'vision' | 'order' | 'm
 export type SalarWorkerInput = { job: SalarWorkerJob | string; payload?: Record<string, any>; conversationId?: string | null };
 
 const CACHE_MAX_AGE_MS = 15 * 60 * 1000;
+const CATALOGUE_QUERY_SCHEMA_VERSION = 2;
 const INDEX_STALE_MS = 24 * 60 * 60 * 1000;
 export const SALAR_INDEX_SCHEMA_VERSION = 3;
 const COMMON_SYNONYMS: Record<string, string[]> = {
@@ -31,7 +32,7 @@ function mappedProduct(p: any) { return { id: String(p.source_id || p.id), name:
 
 async function catalogue(payload: Record<string, any>) {
   const q = String(payload.q || '').trim(); const requestedId = String(payload.collectionId || '').trim(); const requestedCollection = String(payload.collection || '').trim(); const requestedProductId = String(payload.productId || '').trim(); const limit = requestedProductId ? 1 : 30; const sort = String(payload.sort || '').trim();
-  const requestKey = `catalogue|q:${norm(q)}|cid:${requestedId}|c:${norm(requestedCollection)}|pid:${requestedProductId}|l:${limit}|s:${sort}`;
+  const requestKey = `catalogue:v${CATALOGUE_QUERY_SCHEMA_VERSION}|q:${norm(q)}|cid:${requestedId}|c:${norm(requestedCollection)}|pid:${requestedProductId}|l:${limit}|s:${sort}`;
   const state = await indexState(); if (state.stale) return refreshRequired('Catalogue index is stale or missing.');
   const cached = await readFreshCache(requestKey); if (cached) return { ...cached, cached: true };
   const db = getAdminDb(); const [collectionSnap, productSnap] = await Promise.all([db.collection('salar_index_collections').get(), db.collection('salar_index_products').get()]);
