@@ -344,7 +344,7 @@ export default function ShopLandingCatalog({
                   className="shop-mobile-filter"
                   onClick={() => shop.setFiltersOpen(true)}
                 >
-                  <SlidersHorizontal /> Filters
+                  <SlidersHorizontal /> Shop By
                 </button>
                 <label>
                   Sort by:
