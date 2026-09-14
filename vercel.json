@@ -11,7 +11,7 @@
       "fix/instant-home-shop-navigation-phase1": true,
       "fix/bottom-nav-instant-phase-1": true,
       "fix/homepage-refresh-phase-1": false,
-      "reseller-cards-white": false
+      "reseller-cards-white": true
     }
   }
 }
