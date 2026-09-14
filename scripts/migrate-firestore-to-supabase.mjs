@@ -238,22 +238,6 @@ const mappings = {
     status: d.status ?? null,
     ...common(d),
   }),
-  salaar_conversations: (id, d) => ({
-    session_id: id,
-    status: d.status || 'AUTO',
-    hold_type: d.holdType ?? null,
-    soft_hold_until: iso(d.softHoldUntil),
-    need_you: d.needYou === true,
-    order_stage: d.orderStage ?? null,
-    advance_required: num(d.advanceRequired),
-    cart_summary: jsonSafe(d.cartSummary ?? null),
-    pending_customer_message: d.pendingCustomerMessage ?? null,
-    pending_shown_product_ids: jsonSafe(Array.isArray(d.pendingShownProductIds) ? d.pendingShownProductIds : []),
-    pending_message_doc_id: d.pendingMessageDocId ?? null,
-    last_message: d.lastMessage ?? null,
-    last_role: d.lastRole ?? null,
-    ...common(d),
-  }),
 };
 
 const collections = [
@@ -261,7 +245,6 @@ const collections = [
   'reward_gifts', 'user_rewards', 'reward_redemptions', 'reseller_profiles',
   'reseller_withdrawals', 'reseller_reward_ledger', 'reseller_task_claims',
   'reseller_point_ledger', 'reseller_task_events', 'reseller_whatsapp_orders',
-  'salaar_conversations',
 ];
 
 async function supabaseUpsert(table, rows, conflictColumn) {
@@ -302,37 +285,11 @@ async function migrateCollection(name) {
   if (!mapper) throw new Error(`Missing mapper for ${name}`);
   const snap = await db.collection(name).get();
   const rows = snap.docs.map((doc) => mapper(doc.id, doc.data()));
-  const conflict = name === 'reseller_profiles' ? 'user_id' : name === 'salaar_conversations' ? 'session_id' : 'id';
+  const conflict = name === 'reseller_profiles' ? 'user_id' : 'id';
   for (let i = 0; i < rows.length; i += BATCH_SIZE) {
     await supabaseUpsert(name, rows.slice(i, i + BATCH_SIZE), conflict);
   }
   return { firebase: rows.length, supabase: DRY_RUN ? null : await supabaseCount(name) };
-}
-
-async function migrateSalaarMessages() {
-  let firebaseCount = 0;
-  const rows = [];
-  const conversations = await db.collection('salaar_conversations').get();
-  for (const convo of conversations.docs) {
-    const messages = await convo.ref.collection('messages').get();
-    for (const message of messages.docs) {
-      const d = message.data() || {};
-      rows.push({
-        id: message.id,
-        session_id: convo.id,
-        role: d.role === 'customer' ? 'customer' : 'salaar',
-        text: d.text ?? null,
-        pending: d.pending === true,
-        ...common(d),
-      });
-      firebaseCount++;
-      if (rows.length >= BATCH_SIZE) {
-        await supabaseUpsert('salaar_messages', rows.splice(0, rows.length), 'id');
-      }
-    }
-  }
-  if (rows.length) await supabaseUpsert('salaar_messages', rows, 'id');
-  return { firebase: firebaseCount, supabase: DRY_RUN ? null : await supabaseCount('salaar_messages') };
 }
 
 async function writeMigrationState(report) {
@@ -358,9 +315,6 @@ async function main() {
     report[name] = await migrateCollection(name);
     console.log(`${report[name].firebase} Firebase docs -> ${DRY_RUN ? 'dry-run' : `${report[name].supabase} Supabase rows`}`);
   }
-  process.stdout.write('- salaar_messages: ');
-  report.salaar_messages = await migrateSalaarMessages();
-  console.log(`${report.salaar_messages.firebase} Firebase docs -> ${DRY_RUN ? 'dry-run' : `${report.salaar_messages.supabase} Supabase rows`}`);
 
   const mismatches = Object.entries(report).filter(([, v]) => !DRY_RUN && v.supabase < v.firebase);
   if (mismatches.length) {

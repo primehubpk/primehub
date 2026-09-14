@@ -17,7 +17,6 @@ import RewardsManager from '@/components/admin/RewardsManager';
 import RewardsTermsManager from '@/components/admin/RewardsTermsManager';
 import ResellerWhatsAppRequests from '@/components/admin/ResellerWhatsAppRequests';
 import WhatsAppCoexistenceSetup from '@/components/admin/WhatsAppCoexistenceSetup';
-import SalaarInbox from '@/components/admin/SalaarInbox';
 import WholesaleVideoManager from '@/components/admin/WholesaleVideoManager';
 
 type SectionDefinition = {
@@ -81,12 +80,6 @@ const SECTIONS: Record<string, SectionDefinition> = {
     eyebrow: 'Orders',
     description: 'Review and manage customer orders.',
     content: <OrdersManager />,
-  },
-  'salaar-inbox': {
-    title: 'Salaar Inbox',
-    eyebrow: 'Assistant',
-    description: 'Review Salaar inbox activity.',
-    content: <SalaarInbox />,
   },
   'reseller-whatsapp': {
     title: 'Reseller WhatsApp',
