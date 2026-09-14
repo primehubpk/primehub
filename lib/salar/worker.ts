@@ -54,9 +54,10 @@ async function catalogue(payload: Record<string, any>) {
     const productSearch = products.map((p) => {
       const combined = [p.name, p.description, ...list(p.collection_names)].map(norm).filter(Boolean).join(' ');
       const allTermsMatch = qTokens.length >= 2 && qTokens.every((token) => combined.includes(token));
+      const specificMatch = qTokens.filter((token) => !broadTokens.has(token)).some((token) => combined.includes(token));
       const score = Math.max(scoreText(p.name, qTerms) * 3, scoreText(p.description, qTerms), ...list(p.collection_names).map((name) => scoreText(name, qTerms)));
-      return { p, score, allTermsMatch };
-    }).filter((item) => item.score > 0 && (item.allTermsMatch || (hasSpecificToken && item.score >= 60))).sort((a, b) => b.score - a.score || String(a.p.name || '').localeCompare(String(b.p.name || '')));
+      return { p, score, allTermsMatch, specificMatch };
+    }).filter((item) => item.score > 0 && (item.allTermsMatch || (hasSpecificToken && item.specificMatch))).sort((a, b) => b.score - a.score || String(a.p.name || '').localeCompare(String(b.p.name || '')));
     if (productSearch.length && (qTokens.length >= 2 || productSearch[0].allTermsMatch)) {
       const rows = productSearch.slice(0, limit).map(({ p }) => mappedProduct(p));
       value = { type: 'products', query: q, collection: { id: 'search', name: `Search results for ${q}` }, products: rows, cached: false };
