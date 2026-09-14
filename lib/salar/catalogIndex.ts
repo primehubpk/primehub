@@ -5,7 +5,7 @@ import { BASE_DELIVERY_CHARGE, WHOLESALE_ITEM_DELIVERY_CHARGE } from '@/lib/deli
 import { clearSalarCache, SALAR_INDEX_SCHEMA_VERSION } from '@/lib/salar/worker';
 
 const PAGE_ROUTES = [
-  ['shopping','Shopping','/shop'],['reseller_club','Reseller Club','/reseller'],['prime_skill','Prime Skill','/skills'],['checkout','Checkout / Payment','/checkout'],['contact','Contact','/contact'],['privacy','Privacy Policy','/privacy-policy'],['returns','Return Policy','/return-policy'],['terms','Terms','/terms'],
+  ['home','PrimeHub Mall Home','/'],['shopping','Shopping','/shop'],['sale_mela','Sale Mela','/sale-mela'],['weekly_deals','Weekly Deals','/weekly-deals'],['deals','Deals','/deals'],['rewards','Rewards','/rewards'],['reseller_club','Reseller Club','/reseller'],['prime_skill','Prime Skill','/skills'],['checkout','Checkout / Payment','/checkout'],['contact','Contact','/contact'],['privacy','Privacy Policy','/privacy-policy'],['returns','Return Policy','/return-policy'],['terms','Terms','/terms'],
 ] as const;
 
 function text(value: unknown, max=12000) { return String(value ?? '').replace(/<script[\s\S]*?<\/script>/gi,' ').replace(/<style[\s\S]*?<\/style>/gi,' ').replace(/<[^>]+>/g,' ').replace(/&nbsp;/g,' ').replace(/&amp;/g,'&').replace(/&#x27;/g,"'").replace(/&quot;/g,'"').replace(/\s+/g,' ').trim().slice(0,max); }
@@ -29,6 +29,17 @@ function categoryRefs(p:any, map:Map<string,any>) {
   return { ids:[...new Set(ids)], names:[...new Set(names)] };
 }
 async function replaceCollection(name:string, rows:any[]) { const db=getAdminDb(); const old=await db.collection(name).get(); for(let i=0;i<old.docs.length;i+=400){const b=db.batch(); old.docs.slice(i,i+400).forEach((d)=>b.delete(d.ref)); await b.commit();} for(let i=0;i<rows.length;i+=400){const b=db.batch(); rows.slice(i,i+400).forEach((row)=>b.set(db.collection(name).doc(String(row.id)),row)); await b.commit();} }
+function pageId(pathname:string){ return pathname==='/'?'home':`page-${pathname.replace(/^\\/+|\\/+$/g,'').replace(/[^a-z0-9]+/gi,'-').toLowerCase()}`.slice(0,180); }
+async function discoverPublicPages(origin:string){
+  const seeded=PAGE_ROUTES.map(([key,title,url])=>({key,title,url})); const seen=new Set(seeded.map((row)=>row.url));
+  try{
+    const response=await fetch(`${origin}/sitemap.xml`,{cache:'no-store'}); const xml=response.ok?await response.text():'';
+    for(const match of xml.matchAll(/<loc>([^<]+)<\\/loc>/gi)){
+      try{const parsed=new URL(match[1].replace(/&amp;/g,'&'));if(parsed.origin!==origin)continue;const url=parsed.pathname.replace(/\\/$/,'')||'/';if(seen.has(url)||/^\\/(api|admin|product|category)(\\/|$)/i.test(url))continue;seen.add(url);seeded.push({key:pageId(url),title:url.split('/').filter(Boolean).pop()?.replace(/[-_]+/g,' ')||'PrimeHub Mall',url});}catch{}
+    }
+  }catch{}
+  return seeded.slice(0,120);
+}
 
 export async function readIndexMeta(){ const snap=await getAdminDb().collection('salar_index_meta').doc('current').get(); return snap.exists ? snap.data() : { status:'never', stats:{collections:0,products:0,pages:0}, refreshed_at:null, error:null }; }
 
@@ -40,8 +51,8 @@ export async function refreshSalarCatalogue(request: Request) {
     const collections=arr(catalog.categories).map((c:any)=>{const id=String(c.id); categoryMap.set(id,c); return {id,source_id:id,name:String(c.name??c.title??c.slug??id),slug:String(c.slug??''),parent:c.parentId??c.parent??null,extra:{active:c.active,sortOrder:c.sortOrder??c.order,imageUrl:c.imageUrl??c.iconUrl??null}}});
     const products=arr(catalog.products).map((p:any)=>{const sourceId=String(p.id); const refs=categoryRefs(p,categoryMap); const stock=Number(p.stock ?? p.quantity); return {id:sourceId,source_id:sourceId,name:String(p.title??p.name??sourceId),collection_ids:refs.ids,collection_names:refs.names,price:Number(p.price)||0,currency:String(p.currency||'PKR'),sizes:sizes(p),material:String(p.material??p.materials??''),description:shortDescription(p),image_urls:imageUrls(p),product_url:`/product/${encodeURIComponent(sourceId)}`,in_stock:Number.isFinite(stock)?stock>0:null,raw:{originalPrice:p.originalPrice??null,stock:Number.isFinite(stock)?stock:null,active:p.active??null,variants:arr(p.variants),variantMatrix:arr(p.variantMatrix)}}});
     const origin=(process.env.NEXT_PUBLIC_SITE_URL||new URL(request.url).origin).replace(/\/$/,'');
-    const pageRows:any[]=[];
-    for(const [key,title,url] of PAGE_ROUTES){ let excerpt=''; try{const res=await fetch(`${origin}${url}`,{cache:'no-store'}); if(res.ok) excerpt=text(await res.text());}catch{} pageRows.push({id:key,key,title,url,text_excerpt:excerpt}); }
+    const pageRows:any[]=[]; const publicPages=await discoverPublicPages(origin);
+    for(let i=0;i<publicPages.length;i+=8){const batch=publicPages.slice(i,i+8);const rows=await Promise.all(batch.map(async ({key,title,url})=>{let excerpt='';try{const res=await fetch(`${origin}${url}`,{cache:'no-store'});if(res.ok)excerpt=text(await res.text());}catch{}return{id:key,key,title,url,text_excerpt:excerpt};}));pageRows.push(...rows);}
     const docs:any=(settings as any).documents||{}; const main=docs.main||{}; const contact=docs.contact||{}; const policy=docs.policy||{};
     pageRows.push({id:'delivery',key:'delivery',title:'Delivery',url:'/checkout',text_excerpt:text(`Base delivery charge: Rs ${BASE_DELIVERY_CHARGE}. Wholesale surcharge: Rs ${WHOLESALE_ITEM_DELIVERY_CHARGE} per wholesale item. ${main.storePolicyInfo||''} ${main.freeDelivery?.message||''}`)});
     pageRows.push({id:'payment_info',key:'payment_info',title:'Payment Information',url:'/checkout',text_excerpt:text([main.paymentInfo,main.paymentDetails,main.advancePaymentInfo,docs.payment?.text].filter(Boolean).join(' '))});
