@@ -44,12 +44,29 @@ async function catalogue(payload: Record<string, any>) {
     value = { type: 'product', product: mappedProduct(product), cached: false };
   } else if (!requestedId && !requestedCollection) {
     if (!q) return { found: false, reason: 'Provide q, collection, collectionId, or productId.' };
-    const qTerms = terms(q); const matchingProductCollectionIds = new Set<string>();
+    const qTerms = terms(q);
+    // Resolve specific product-name requests before falling back to broad collections.
+    // This stays catalogue-driven: no product titles or category aliases are embedded here.
+    const qTokens = norm(q).split(' ').filter((token) => token.length >= 3);
+    const broadTokens = new Set(['bangle', 'bangles', 'churi', 'churiyan', 'choori', 'chooriyan', 'kangan', 'jewel', 'jewelry', 'product', 'products', 'item', 'items', 'collection', 'collections', 'shop', 'shopping']);
+    const hasSpecificToken = qTokens.some((token) => !broadTokens.has(token));
+    const productSearch = products.map((p) => {
+      const combined = [p.name, p.description, ...list(p.collection_names)].map(norm).filter(Boolean).join(' ');
+      const allTermsMatch = qTokens.length >= 2 && qTokens.every((token) => combined.includes(token));
+      const score = Math.max(scoreText(p.name, qTerms) * 3, scoreText(p.description, qTerms), ...list(p.collection_names).map((name) => scoreText(name, qTerms)));
+      return { p, score, allTermsMatch };
+    }).filter((item) => item.score > 0 && (item.allTermsMatch || (hasSpecificToken && item.score >= 60))).sort((a, b) => b.score - a.score || String(a.p.name || '').localeCompare(String(b.p.name || '')));
+    if (productSearch.length && (qTokens.length >= 2 || productSearch[0].allTermsMatch)) {
+      const rows = productSearch.slice(0, limit).map(({ p }) => mappedProduct(p));
+      value = { type: 'products', query: q, collection: { id: 'search', name: `Search results for ${q}` }, products: rows, cached: false };
+    } else {
+      const matchingProductCollectionIds = new Set<string>();
     for (const p of products) { const scores = [scoreText(p.name, qTerms), scoreText(p.description, qTerms), ...list(p.collection_names).map((name) => scoreText(name, qTerms))]; if (Math.max(...scores) > 0) list(p.collection_ids).forEach((id) => matchingProductCollectionIds.add(String(id))); }
     const directIds = new Set(collections.filter((c) => Math.max(scoreText(c.name, qTerms), scoreText(c.slug, qTerms)) > 0).map((c) => String(c.id))); const childIds = new Set(collections.filter((c) => directIds.has(String(c.parent || ''))).map((c) => String(c.id)));
     const matched = collections.map((c) => { const structural = directIds.has(String(c.id)) ? 80 : childIds.has(String(c.id)) ? 50 : matchingProductCollectionIds.has(String(c.id)) ? 20 : 0; const score = Math.max(scoreText(c.name, qTerms), scoreText(c.slug, qTerms), structural); const productCount = products.filter((p) => list(p.collection_ids).map(String).includes(String(c.id)) || list(p.collection_names).some((name) => norm(name) === norm(c.name))).length; return { id: String(c.id), name: String(c.name || c.slug || c.id), productCount, score }; }).filter((c) => c.score > 0).sort((a, b) => b.score - a.score || a.name.localeCompare(b.name)).slice(0, 50);
     if (!matched.length) return { found: false, reason: `No indexed collections matched "${q}".` };
     value = { type: 'collections', query: q, collections: matched.map(({ score, ...item }) => item), cached: false };
+    }
   } else {
     let collection: any = null;
     if (requestedId) collection = collections.find((c) => String(c.id) === requestedId || String(c.source_id || '') === requestedId) || null;
