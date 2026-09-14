@@ -15,7 +15,7 @@ const PHONE = '03238878009';
 const ADVANCE = 300;
 const ALLOWED_TOPICS = new Set(['reseller_club', 'prime_skill', 'shopping']);
 const TOOLS: SalarToolDefinition[] = [
-  { name: 'catalogue', description: 'Search the verified PrimeHub catalogue for collections or products. Use q for a broad need, collection for a chosen collection, and productId for one exact recent card.', parameters: { type: 'object', properties: { q: { type: 'string' }, collection: { type: 'string' }, collectionId: { type: 'string' }, productId: { type: 'string' }, limit: { type: 'number' }, sort: { type: 'string', enum: ['price_asc','price_desc'] } }, additionalProperties: false } },
+  { name: 'catalogue', description: 'Search the verified PrimeHub catalogue for collections or products. Use q for a broad need or an exact product/category phrase; use collection for a chosen collection and productId for one exact recent card. If the customer asks for a named item’s photo/image, call this tool with the customer’s exact wording so the real product card and image can be rendered. Never answer a product-image request from memory.', parameters: { type: 'object', properties: { q: { type: 'string' }, collection: { type: 'string' }, collectionId: { type: 'string' }, productId: { type: 'string' }, limit: { type: 'number' }, sort: { type: 'string', enum: ['price_asc','price_desc'] } }, additionalProperties: false } },
   { name: 'knowledge', description: 'Search the current PrimeHub website for any fact: homepage, Sale Mela, deals, rewards, Reseller Club, Prime Skills, delivery, payment, contact, or policies.', parameters: { type: 'object', properties: { query: { type: 'string' }, topic: { type: 'string' } }, additionalProperties: false } },
   { name: 'inspect_image', description: 'Inspect the customer image against recent verified product cards. Use whenever the customer asks about an uploaded image.', parameters: { type: 'object', properties: { question: { type: 'string' } }, additionalProperties: false } },
   { name: 'order', description: 'Progress the server-validated order. Start with a verified recent product id; record advance only when an image was uploaded; save only the currently requested customer field. Use status when unsure.', parameters: { type: 'object', properties: { action: { type: 'string', enum: ['start','record_advance','set_customer_field','status'] }, productId: { type: 'string' }, productName: { type: 'string' }, quantity: { type: 'number' }, field: { type: 'string', enum: ['name','city','phone','address'] }, value: { type: 'string' } }, required: ['action'], additionalProperties: false } },
@@ -85,7 +85,8 @@ async function executeAgentTool(request:Request,conversation:any,call:{name:stri
   const args=safeArgs(call.arguments);
   if(call.name==='catalogue'){
     const result:any=await runCustomerWorker(request,{job:'catalogue',payload:args,conversationId:conversation.id});
-    return {result,products:result?.type==='products'&&Array.isArray(result.products)?result.products:undefined};
+    const cardProducts=result?.type==='products'&&Array.isArray(result.products)?result.products:result?.type==='product'&&result.product?[result.product]:undefined;
+    return {result,products:cardProducts};
   }
   if(call.name==='knowledge'){
     const result:any=await runCustomerWorker(request,{job:'knowledge',payload:{query:String(args.query||args.topic||customerText)},conversationId:conversation.id});
