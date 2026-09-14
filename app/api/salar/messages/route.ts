@@ -51,11 +51,6 @@ type Draft = { stage?: 'awaiting_advance'|'collecting_details'|'complete'; items
 
 function historyForModel(messages: StoredMessage[]): SalarLlmMessage[] { return messages.slice(-8).filter((m) => m.role === 'user' || m.role === 'assistant').map((m) => ({ role: m.role as 'user'|'assistant', content: String(m.text || '').slice(0,1200) })); }
 function safeArgs(value: unknown) { return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, any> : {}; }
-function shoppingLike(text: string) { return /bangle|churi|choori|kangan|jewel|watch|product|item|dikha|show|collection|shop|shopping/i.test(text); }
-function orderIntent(text: string) { return /\b(order|buy|purchase|confirm)\b|mangwa|mangwana|manga do|le(?:na|ni)\s+hai|chahiye|checkout/i.test(text); }
-function collectionFollowUp(messages: StoredMessage[]) { const last = [...messages].reverse().find((m) => m.role === 'assistant'); return /which collection|kaunsi collection|collection dekh|collections mili/i.test(String(last?.text || '')); }
-function collectionReply(collections: any[]) { const names = collections.map((x) => String(x?.name || '').trim()).filter(Boolean); return `Assalamualaikum, I am Salar from PrimeHub Mall.\n\nAap ke liye ye collections mili hain:\n${names.map((n) => `• ${n}`).join('\n')}\n\nAap kaunsi collection dekhna chahenge?`; }
-function noVerifiedResult() { return `Mujhe website index mein verified information nahi mili. PrimeHub se rabta karein: ${PHONE}`; }
 function objectAttachments(v: any) { return v && !Array.isArray(v) ? v : {}; }
 function productsFromAttachments(v: any): WorkerProduct[] { const a = objectAttachments(v); return Array.isArray(a.products) ? a.products : []; }
 function recentProducts(messages: StoredMessage[]) { const m = [...messages].reverse().find((x) => x.role === 'assistant' && productsFromAttachments(x.attachments).length); return m ? productsFromAttachments(m.attachments).slice(0, 30) : []; }
