@@ -9,7 +9,7 @@ export type SalarWorkerJob = 'catalogue' | 'knowledge' | 'vision' | 'order' | 'm
 export type SalarWorkerInput = { job: SalarWorkerJob | string; payload?: Record<string, any>; conversationId?: string | null };
 
 const CACHE_MAX_AGE_MS = 15 * 60 * 1000;
-const CATALOGUE_QUERY_SCHEMA_VERSION = 2;
+const CATALOGUE_QUERY_SCHEMA_VERSION = 3;
 const INDEX_STALE_MS = 24 * 60 * 60 * 1000;
 export const SALAR_INDEX_SCHEMA_VERSION = 3;
 const COMMON_SYNONYMS: Record<string, string[]> = {
