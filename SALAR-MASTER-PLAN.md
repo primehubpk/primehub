@@ -13,6 +13,15 @@ Salar is one trained, customer-facing PrimeHub Mall salesman. Groq, Gemini, and 
 - Quick area: Images, Reseller Club, Prime Skill, Shopping.
 - Tone: warm, sweet, respectful Roman Urdu/Urdu/English, concise, one question at a time.
 
+## Natural conversation architecture
+
+- Salar is model-led for every normal customer turn. The server does not choose a canned reply from keyword regexes.
+- The model sees a compact private conversation context, recent verified cards, current order state, uploaded-image availability, and the admin Brain files.
+- The model chooses catalogue, knowledge, image, and order tools; it can answer greetings, follow-up questions, comparisons, Sale Mela questions, and unfamiliar wording naturally.
+- Product cards remain authoritative UI data. The model receives a compact summary so 30 cards do not bloat the prompt or force a repeated table.
+- Website knowledge refresh discovers the public sitemap and indexes public pages plus live storefront settings/catalogue/skills. Admin refresh is the source-of-truth update operation.
+- Order tools only save the currently requested field, so an unrelated customer question cannot become a name, city, phone, or address.
+
 ## Salar and Worker responsibilities
 
 Salar:
@@ -80,7 +89,7 @@ The exact feature/salar preview may be public for QA. Main/production remain unc
 - session and message APIs;
 - active Groq answer plus tested fallback behavior;
 - catalogue refresh, first request, and cache hit;
-- broad bangles → collections → 30-product flow;
+- broad and unfamiliar shopping wording → collections → 30-product flow;
 - product-card reference questions;
 - upload/vision handling;
 - Rs 300 → details → website order → WhatsApp flow;
