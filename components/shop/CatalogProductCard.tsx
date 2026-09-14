@@ -101,9 +101,9 @@ export default function CatalogProductCard({ product, addedId, addProduct, compa
   }
 
   return (
-    <article className={`group flex h-full flex-col overflow-hidden ${dense ? 'rounded-[16px] sm:rounded-[20px]' : 'rounded-[22px]'} border border-[#e6ded2] bg-white shadow-[0_6px_18px_rgba(35,29,20,0.06)] transition hover:-translate-y-0.5 hover:shadow-[0_12px_30px_rgba(35,29,20,0.12)] ${compact ? 'w-[168px] shrink-0 snap-start sm:w-[186px]' : 'w-full'}`}>
+    <article className={`group flex h-full flex-col overflow-hidden ${dense ? 'rounded-[15px] sm:rounded-[20px]' : 'rounded-[22px]'} border border-[#e6ded2] bg-white shadow-[0_6px_18px_rgba(35,29,20,0.06)] transition hover:-translate-y-0.5 hover:shadow-[0_12px_30px_rgba(35,29,20,0.12)] ${compact ? 'w-[168px] shrink-0 snap-start sm:w-[186px]' : 'w-full'}`}>
       <FastProductLink product={product} className="block">
-        <div className={`relative overflow-hidden bg-[#f3eee7] ${dense ? 'aspect-[1.22/1]' : 'aspect-square'}`}>
+        <div className={`relative overflow-hidden bg-[#f3eee7] ${dense ? 'aspect-[1.38/1] sm:aspect-[1.22/1]' : 'aspect-square'}`}>
           {image ? (
             <Image
               src={image}
@@ -121,10 +121,10 @@ export default function CatalogProductCard({ product, addedId, addProduct, compa
           {discount > 0 && <span className="absolute left-2 top-2 rounded-lg bg-[#ec1626] px-2 py-1 text-[8px] font-black text-white shadow-sm sm:text-[9px]">{discount}% OFF</span>}
           {product.isFlashSale && <span className="absolute left-2 top-9 rounded-lg bg-[#c18300] px-2 py-1 text-[7px] font-black text-white">FLASH DEAL</span>}
           {isWholesaleProduct(product) && <WholesaleBadge />}
-          <span className="absolute bottom-2 right-2 flex h-8 w-8 items-center justify-center rounded-full bg-white/95 text-[#17221f] shadow-md" aria-hidden="true"><Eye size={15} /></span>
+          <span className={`absolute bottom-2 right-2 flex items-center justify-center rounded-full bg-white/95 text-[#17221f] shadow-md ${dense ? 'h-7 w-7 sm:h-8 sm:w-8' : 'h-8 w-8'}`} aria-hidden="true"><Eye size={dense ? 13 : 15} /></span>
         </div>
-        <div className={dense ? "p-2.5 pb-1 sm:p-3" : "p-3 pb-1"}>
-          <p className={dense ? "line-clamp-2 min-h-[32px] text-[10px] font-black leading-4 text-[#17221f] sm:text-[12px]" : "line-clamp-2 min-h-[30px] text-[11px] font-black leading-4"}>{titleOf(product)}</p>
+        <div className={dense ? "px-2.5 pb-0.5 pt-2 sm:p-3" : "p-3 pb-1"}>
+          <p className={dense ? "line-clamp-2 min-h-[28px] text-[10px] font-black leading-[14px] text-[#17221f] sm:min-h-[32px] sm:text-[12px] sm:leading-4" : "line-clamp-2 min-h-[30px] text-[11px] font-black leading-4"}>{titleOf(product)}</p>
           {rating > 0 && (
             <div className="mt-1 flex items-center gap-1 text-[8px] font-bold text-black/45 sm:text-[9px]">
               <span className="flex items-center text-[#e7a814]"><Star size={11} fill="currentColor" /></span>
@@ -132,21 +132,21 @@ export default function CatalogProductCard({ product, addedId, addProduct, compa
               {reviews > 0 && <span>({reviews})</span>}
             </div>
           )}
-          <div className="mt-2 flex flex-wrap items-end gap-1.5">
-            <span className={dense ? "text-[14px] font-black leading-none text-[#062d27] sm:text-[17px]" : "font-[family-name:var(--font-mono)] text-sm font-black text-[#E1352B]"}>Rs. {price.toLocaleString()}</span>
+          <div className={dense ? "mt-1.5 flex flex-wrap items-end gap-1.5 sm:mt-2" : "mt-2 flex flex-wrap items-end gap-1.5"}>
+            <span className={dense ? "text-[13px] font-black leading-none text-[#062d27] sm:text-[17px]" : "font-[family-name:var(--font-mono)] text-sm font-black text-[#E1352B]"}>Rs. {price.toLocaleString()}</span>
             {original > price && <span className="text-[9px] text-black/30 line-through">Rs. {original.toLocaleString()}</span>}
             {discount > 0 && <span className="ml-auto rounded-md bg-[#cceedd] px-1.5 py-1 text-[7px] font-black text-[#075447] sm:text-[8px]">SAVE {discount}%</span>}
           </div>
         </div>
       </FastProductLink>
-      <div className={dense ? "mt-auto px-2.5 pb-2.5 pt-2 sm:px-3 sm:pb-3" : "mt-auto px-3 pb-3 pt-2"}>
+      <div className={dense ? "mt-auto px-2.5 pb-2 pt-1.5 sm:px-3 sm:pb-3 sm:pt-2" : "mt-auto px-3 pb-3 pt-2"}>
         <button
           type="button"
           disabled={unavailable}
           onClick={handleAdd}
-          className={`flex min-h-10 w-full min-w-0 items-center justify-center gap-1.5 rounded-xl px-2 py-2 text-[8px] font-black transition active:scale-[0.98] sm:text-[10px] ${unavailable ? 'cursor-not-allowed bg-black/5 text-black/25' : added ? 'bg-[#0F6A5F] text-white' : 'bg-[#005448] text-white hover:bg-[#063f37]'}`}
+          className={`flex w-full min-w-0 items-center justify-center gap-1.5 rounded-xl px-2 text-[8px] font-black transition active:scale-[0.98] sm:text-[10px] ${dense ? 'min-h-9 py-1.5 sm:min-h-10 sm:py-2' : 'min-h-10 py-2'} ${unavailable ? 'cursor-not-allowed bg-black/5 text-black/25' : added ? 'bg-[#0F6A5F] text-white' : 'bg-[#005448] text-white hover:bg-[#063f37]'}`}
         >
-          {unavailable ? 'Unavailable' : added ? <><Check size={13} />Added to Cart</> : <><ShoppingBag size={13} />Add to Cart</>}
+          {unavailable ? 'Unavailable' : added ? <><Check size={13} />Added to Cart</> : <><ShoppingBag size={dense ? 12 : 13} />Add to Cart</>}
         </button>
       </div>
     </article>

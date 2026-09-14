@@ -28,7 +28,7 @@ export function ProductUrgencyBadges({ stock, productId, claimedPercent }: { sto
       {hasClaimed && (
         <span className="block w-fit rounded-full bg-[#E1352B] px-2 py-1 text-[8px] font-black text-white">⚡ {Math.round(claimed)}% claimed · Limited deal</span>
       )}
-      <span className="block w-fit rounded-full bg-white/90 px-2 py-1 text-[8px] font-black text-[#14140F] transition-all duration-500">👥 {viewers} viewing now</span>
+      <span className="product-viewing-now block w-fit rounded-full bg-white/90 px-2 py-1 text-[8px] font-black text-[#14140F] transition-all duration-500">👥 {viewers} viewing now</span>
     </div>
   );
 }
