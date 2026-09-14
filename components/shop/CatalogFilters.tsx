@@ -137,19 +137,26 @@ type Props = FilterPanelProps & {
 
 export function FilterDrawer({ filtersOpen, setFiltersOpen, ...panelProps }: Props) {
   const drawerRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const dragStartY = useRef<number | null>(null);
+  const dragEnabled = useRef(false);
   const [dragOffset, setDragOffset] = useState(0);
   const [dragging, setDragging] = useState(false);
 
   if (!filtersOpen) return null;
 
   const startDrag = (event: TouchEvent<HTMLDivElement>) => {
-    dragStartY.current = event.touches[0]?.clientY ?? null;
-    setDragging(dragStartY.current !== null);
+    const startY = event.touches[0]?.clientY ?? null;
+    const startedInScrollable = scrollRef.current?.contains(event.target as Node) ?? false;
+    const scrollIsAtTop = (scrollRef.current?.scrollTop ?? 0) <= 0;
+
+    dragStartY.current = startY;
+    dragEnabled.current = startY !== null && (!startedInScrollable || scrollIsAtTop);
+    setDragging(dragEnabled.current);
   };
 
   const moveDrag = (event: TouchEvent<HTMLDivElement>) => {
-    if (dragStartY.current === null) return;
+    if (!dragEnabled.current || dragStartY.current === null) return;
     const currentY = event.touches[0]?.clientY;
     if (currentY == null) return;
     const nextOffset = Math.max(0, currentY - dragStartY.current);
@@ -158,8 +165,9 @@ export function FilterDrawer({ filtersOpen, setFiltersOpen, ...panelProps }: Pro
   };
 
   const finishDrag = () => {
-    const shouldClose = dragOffset >= 80;
+    const shouldClose = dragEnabled.current && dragOffset >= 80;
     dragStartY.current = null;
+    dragEnabled.current = false;
     setDragging(false);
     setDragOffset(0);
     if (shouldClose) setFiltersOpen(false);
@@ -184,14 +192,14 @@ export function FilterDrawer({ filtersOpen, setFiltersOpen, ...panelProps }: Pro
           transition: dragging ? 'none' : 'transform 180ms ease',
           overscrollBehaviorY: 'contain',
         }}
+        onTouchStart={startDrag}
+        onTouchMove={moveDrag}
+        onTouchEnd={finishDrag}
+        onTouchCancel={finishDrag}
       >
         <div
           className="shrink-0 px-5 pt-4"
           style={{ touchAction: 'none' }}
-          onTouchStart={startDrag}
-          onTouchMove={moveDrag}
-          onTouchEnd={finishDrag}
-          onTouchCancel={finishDrag}
         >
           <div className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-black/15" aria-hidden="true" />
           <div className="mb-4 flex items-center justify-between">
@@ -211,6 +219,7 @@ export function FilterDrawer({ filtersOpen, setFiltersOpen, ...panelProps }: Pro
         </div>
 
         <div
+          ref={scrollRef}
           className="min-h-0 flex-1 overflow-y-auto px-5 pb-5"
           style={{ overscrollBehaviorY: 'contain' }}
         >
