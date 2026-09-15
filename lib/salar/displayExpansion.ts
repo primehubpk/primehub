@@ -85,6 +85,13 @@ function uniqueById<T extends { id: string }>(items: T[]) {
   });
 }
 
+function relevanceFloor(topScore: number) {
+  if (topScore >= 220) return Math.max(70, Math.floor(topScore * 0.42));
+  if (topScore >= 140) return Math.max(48, Math.floor(topScore * 0.34));
+  if (topScore >= 80) return Math.max(30, Math.floor(topScore * 0.28));
+  return Math.max(12, Math.floor(topScore * 0.22));
+}
+
 export async function expandSalarDisplay(message: string, result: SalarResult) {
   const mode = result.displayMode || 'none';
   if (mode === 'none') return result;
@@ -102,35 +109,59 @@ export async function expandSalarDisplay(message: string, result: SalarResult) {
         index,
         score: query ? productSearchScore({ title: category?.title, name: category?.name, category: category?.title }, query) : 0,
       }))
+      .filter((item) => item.score > 0)
       .sort((a, b) => b.score - a.score || a.index - b.index)
       .map((item) => categoryCard(item.category))
       .filter((item) => item.id && item.title);
     const selected = Array.isArray(result.categories) ? result.categories : [];
-    return { ...result, categories: uniqueById([...selected, ...ranked]).slice(0, 30) };
+    const categories = ranked.length ? uniqueById([...ranked, ...selected]).slice(0, 30) : selected.slice(0, 30);
+    return { ...result, categories };
   }
 
   if (mode !== 'products' && mode !== 'product_images') return result;
 
   const selected = Array.isArray(result.products) ? result.products : [];
-  if (!selected.length) return result;
-
   const selectedIds = new Set(selected.map((product) => product.id));
   const alreadyShown = new Set((result.context?.shownProductIds || []).filter((id) => !selectedIds.has(id)));
-  const firstCategory = normalizeSearchText(selected[0]?.category || '');
-  const ranked = catalogue.products
+
+  const scored = catalogue.products
     .map((product: any, index: number) => ({
       product,
       index,
       score: query ? productSearchScore(product, query) : 0,
-      sameCategory: firstCategory && normalizeSearchText(product?.category) === firstCategory ? 1 : 0,
     }))
-    .filter((item) => !alreadyShown.has(text(item.product?.id, 200)))
-    .sort((a, b) => b.score - a.score || b.sameCategory - a.sameCategory || a.index - b.index)
+    .filter((item) => item.score > 0 && !alreadyShown.has(text(item.product?.id, 200)))
+    .sort((a, b) => b.score - a.score || a.index - b.index);
+
+  const topScore = scored[0]?.score || 0;
+  const floor = relevanceFloor(topScore);
+  const stronglyRelated = scored
+    .filter((item) => item.score >= floor)
     .map((item) => productCard(item.product))
     .filter((item) => item.id && item.title && (mode !== 'product_images' || item.imageUrl));
 
+  let candidates = stronglyRelated;
+
+  if (!candidates.length && selected.length) {
+    const selectedCategory = normalizeSearchText(selected[0]?.category || '');
+    candidates = catalogue.products
+      .filter((product: any) => {
+        const id = text(product?.id, 200);
+        if (!id || alreadyShown.has(id)) return false;
+        return selectedCategory && normalizeSearchText(product?.category) === selectedCategory;
+      })
+      .map(productCard)
+      .filter((item) => item.id && item.title && (mode !== 'product_images' || item.imageUrl));
+  }
+
+  const selectedRelevant = selected.filter((product) => {
+    if (!product.id || alreadyShown.has(product.id)) return false;
+    const match = scored.find((item) => text(item.product?.id, 200) === product.id);
+    return !topScore || Boolean(match && match.score >= floor);
+  });
+
   const limit = mode === 'product_images' ? 30 : 20;
-  const products = uniqueById([...selected, ...ranked]).slice(0, limit);
+  const products = uniqueById([...candidates, ...selectedRelevant]).slice(0, limit);
   const shownProductIds = [...(result.context?.shownProductIds || []), ...products.map((product) => product.id)]
     .filter(Boolean)
     .slice(-120);
@@ -138,6 +169,7 @@ export async function expandSalarDisplay(message: string, result: SalarResult) {
   return {
     ...result,
     products,
+    displayMode: products.length ? mode : 'none',
     context: {
       ...(result.context || {}),
       lastProductQuery: query || result.context?.lastProductQuery,
