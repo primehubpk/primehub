@@ -89,6 +89,7 @@ function textValues(product: SearchableProduct): string[] {
   const tags = Array.isArray(product.tags) ? product.tags : typeof product.tags === 'string' ? product.tags.split(',') : [];
   const keywords = Array.isArray(product.keywords) ? product.keywords : typeof product.keywords === 'string' ? product.keywords.split(',') : [];
   return [
+    product.id,
     product.title,
     product.name,
     product.category,
