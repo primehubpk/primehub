@@ -47,7 +47,17 @@ function cleanText(value: unknown, max = 2000) {
   return String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
 }
 
+function cleanInstructions(value: unknown) {
+  return String(value ?? '')
+    .replace(/\r\n?/g, '\n')
+    .replace(/[ \t]+/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+    .slice(0, MAX_INSTRUCTION_LENGTH);
+}
+
 function finiteNumber(value: unknown) {
+  if (value === '' || value == null) return undefined;
   const number = Number(value);
   return Number.isFinite(number) ? number : undefined;
 }
@@ -57,8 +67,10 @@ function safeArray(value: unknown, max = 60) {
 }
 
 function compactProduct(product: any): Record<string, unknown> {
+  const id = cleanText(product?.id, 200);
   const record: Record<string, unknown> = {
-    id: cleanText(product?.id, 200),
+    id,
+    path: id ? `/product/${encodeURIComponent(id)}` : '',
     title: cleanText(product?.title ?? product?.name, 300),
     slug: cleanText(product?.slug, 300),
     description: cleanText(product?.description, 1800),
@@ -105,6 +117,25 @@ function compactCategory(category: any): Record<string, unknown> {
     active: category?.active !== false,
     sortOrder: finiteNumber(category?.sortOrder ?? category?.order),
   }).filter(([, value]) => value !== undefined && value !== ''));
+}
+
+function publicStorefrontValue(value: unknown, depth = 0): unknown {
+  if (depth > 5 || value == null) return value == null ? value : undefined;
+  if (typeof value === 'string') return value.slice(0, 4000);
+  if (typeof value === 'number' || typeof value === 'boolean') return value;
+  if (Array.isArray(value)) {
+    return value.slice(0, 100).map((item) => publicStorefrontValue(item, depth + 1)).filter((item) => item !== undefined);
+  }
+  if (typeof value === 'object') {
+    const output: Record<string, unknown> = {};
+    for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
+      if (/(password|secret|token|api[_-]?key|credential|private[_-]?key)/i.test(key)) continue;
+      const safe = publicStorefrontValue(item, depth + 1);
+      if (safe !== undefined) output[key] = safe;
+    }
+    return output;
+  }
+  return undefined;
 }
 
 function decodeHtml(value: string) {
@@ -211,7 +242,7 @@ function normalizeState(payload: Record<string, any> | null): SalarState {
   return {
     version: 1,
     enabled: payload.enabled !== false,
-    instructions: cleanText(payload.instructions, MAX_INSTRUCTION_LENGTH),
+    instructions: cleanInstructions(payload.instructions),
     updatedAt: typeof payload.updatedAt === 'string' ? payload.updatedAt : null,
     catalogue: payload.catalogue && typeof payload.catalogue === 'object' ? payload.catalogue as SalarCatalogue : null,
   };
@@ -245,7 +276,7 @@ export async function saveSalarSettings(input: { enabled?: unknown; instructions
   const next: SalarState = {
     ...current,
     enabled: typeof input.enabled === 'boolean' ? input.enabled : current.enabled,
-    instructions: cleanText(input.instructions ?? current.instructions, MAX_INSTRUCTION_LENGTH),
+    instructions: cleanInstructions(input.instructions ?? current.instructions),
     updatedAt: new Date().toISOString(),
   };
   return persistSalarState(next);
@@ -267,6 +298,7 @@ export async function refreshSalarCatalogue(origin: string) {
   const categories = catalogueResult.categories
     .filter((category: any) => category?.active !== false)
     .map(compactCategory);
+  const safeStorefront = publicStorefrontValue(storefront);
 
   const catalogue: SalarCatalogue = {
     updatedAt: new Date().toISOString(),
@@ -274,7 +306,9 @@ export async function refreshSalarCatalogue(origin: string) {
     products,
     categories,
     pages,
-    storefront: storefront && typeof storefront === 'object' ? storefront as Record<string, unknown> : {},
+    storefront: safeStorefront && typeof safeStorefront === 'object' && !Array.isArray(safeStorefront)
+      ? safeStorefront as Record<string, unknown>
+      : {},
   };
 
   const current = await readSalarStateFromDatabase();
@@ -379,11 +413,8 @@ export async function answerWithSalar(input: { message: unknown; history?: unkno
   const message = cleanText(input.message, MAX_USER_MESSAGE_LENGTH);
   if (!message) throw new Error('Please enter a message.');
 
-  let state = await getSalarState();
+  const state = await getSalarState();
   if (!state.enabled) return { reply: 'Salar is temporarily unavailable.', model: null, catalogueUpdatedAt: state.catalogue?.updatedAt || null };
-  if (!state.catalogue) {
-    state = await refreshSalarCatalogue(canonicalOrigin());
-  }
   if (!state.catalogue) throw new Error('Salar catalogue is not ready.');
 
   const { apiKey, model } = groqConfig();
