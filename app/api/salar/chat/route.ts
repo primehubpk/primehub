@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server';
-import { answerWithSalar, type SalarImageInput } from '@/lib/salar/chatEngine';
-import { expandSalarDisplay } from '@/lib/salar/displayExpansion';
+import { answerWithModelDrivenSalar, type SalarModelImageInput } from '@/lib/salar/modelDrivenEngine';
 import { getSalarState } from '@/lib/salar/server';
-import { understandCustomerWithGroq } from '@/lib/salar/modelFirstUnderstanding';
 import {
   appendSalarMessage,
   bootstrapSalarHistory,
@@ -97,7 +95,7 @@ async function readRequest(request: Request) {
       customerEmail: body?.customerEmail,
       mention: safeMention(body?.mention),
       references: safeReferences(body?.references),
-      image: undefined as SalarImageInput | undefined,
+      image: undefined as SalarModelImageInput | undefined,
       imageBuffer: undefined as Buffer | undefined,
       imageName: '',
     };
@@ -105,7 +103,7 @@ async function readRequest(request: Request) {
 
   const form = await request.formData();
   const imageValue = form.get('image');
-  let image: SalarImageInput | undefined;
+  let image: SalarModelImageInput | undefined;
   let imageBuffer: Buffer | undefined;
   let imageName = '';
 
@@ -250,24 +248,15 @@ export async function POST(request: Request) {
       }, { headers: { 'Cache-Control': 'private, no-store, max-age=0' } });
     }
 
-    const understanding = await understandCustomerWithGroq({ message: aiMessage, history: aiHistory });
-    console.info('Salar model-first understanding', understanding ? {
-      searchText: understanding.searchText,
-      intentSummary: understanding.intentSummary,
-      requirements: understanding.requirements,
-      wantsCatalogue: understanding.wantsCatalogue,
-    } : { fallback: 'original-message' });
-
-    const baseResult = await answerWithSalar({
+    const exactProductIds = [input.mention?.id, ...input.references.map((product) => product.id)].filter(Boolean) as string[];
+    const result = await answerWithModelDrivenSalar({
       message: aiMessage,
-      searchQuery: understanding?.searchText || aiMessage,
-      understanding,
       history: aiHistory,
       context: chat.context,
       customerName: chat.customerName,
+      exactProductIds,
       image: input.image,
     });
-    const result = await expandSalarDisplay(understanding?.searchText || aiMessage, baseResult);
 
     chat = appendSalarMessage({ ...chat, context: result.context || chat.context }, {
       role: 'assistant',
