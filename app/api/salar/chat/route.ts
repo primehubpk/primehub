@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { answerWithSalar, type SalarImageInput } from '@/lib/salar/chatEngine';
 import { expandSalarDisplay } from '@/lib/salar/displayExpansion';
 import { getSalarState } from '@/lib/salar/server';
-import { buildModelFirstSearchMessage, understandCustomerWithGroq } from '@/lib/salar/modelFirstUnderstanding';
+import { understandCustomerWithGroq } from '@/lib/salar/modelFirstUnderstanding';
 import {
   appendSalarMessage,
   bootstrapSalarHistory,
@@ -251,7 +251,6 @@ export async function POST(request: Request) {
     }
 
     const understanding = await understandCustomerWithGroq({ message: aiMessage, history: aiHistory });
-    const modelFirstMessage = buildModelFirstSearchMessage(aiMessage, understanding);
     console.info('Salar model-first understanding', understanding ? {
       searchText: understanding.searchText,
       intentSummary: understanding.intentSummary,
@@ -260,7 +259,9 @@ export async function POST(request: Request) {
     } : { fallback: 'original-message' });
 
     const baseResult = await answerWithSalar({
-      message: modelFirstMessage,
+      message: aiMessage,
+      searchQuery: understanding?.searchText || aiMessage,
+      understanding,
       history: aiHistory,
       context: chat.context,
       customerName: chat.customerName,
