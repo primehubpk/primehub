@@ -24,6 +24,8 @@ type CategoryCard = {
   imageUrl?: string;
 };
 
+type DisplayMode = 'none' | 'products' | 'categories' | 'product_images';
+
 type ChatContext = {
   lastProductQuery?: string;
   shownProductIds?: string[];
@@ -35,11 +37,16 @@ type ChatMessage = {
   imagePreview?: string;
   products?: ProductCard[];
   categories?: CategoryCard[];
+  displayMode?: DisplayMode;
 };
 
 function money(value: unknown) {
   const amount = Number(value);
   return Number.isFinite(amount) ? `Rs. ${amount.toLocaleString('en-PK')}` : '';
+}
+
+function safeDisplayMode(value: unknown): DisplayMode {
+  return value === 'products' || value === 'categories' || value === 'product_images' ? value : 'none';
 }
 
 export default function SalarWidget() {
@@ -97,7 +104,7 @@ export default function SalarWidget() {
     const message = rawMessage.trim();
     if ((!message && !attachedImage) || sending) return;
 
-    const history = messages.slice(-10).map(({ role, content }) => ({ role, content }));
+    const history = messages.slice(-10).map(({ role, content }) => ({ role, content })).filter((item) => item.content);
     const userContent = message || '📷 Product photo';
     setMessages((current) => [...current, { role: 'user', content: userContent, imagePreview: preview || undefined }]);
     setSending(true);
@@ -138,9 +145,10 @@ export default function SalarWidget() {
         content: reply,
         products: Array.isArray(result?.products) ? result.products : [],
         categories: Array.isArray(result?.categories) ? result.categories : [],
+        displayMode: safeDisplayMode(result?.displayMode),
       }]);
     } catch {
-      setMessages((current) => [...current, { role: 'assistant', content: 'Salar could not respond right now. Please try again.' }]);
+      setMessages((current) => [...current, { role: 'assistant', content: 'Salar could not respond right now. Please try again.', displayMode: 'none' }]);
     } finally {
       setSending(false);
     }
@@ -176,54 +184,78 @@ export default function SalarWidget() {
               </div>
             ) : null}
 
-            {messages.map((message, index) => (
-              <div key={`${message.role}-${index}`} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={message.role === 'user' ? 'max-w-[86%]' : 'max-w-[94%]'}>
-                  <div className={`whitespace-pre-wrap rounded-2xl px-3.5 py-2.5 text-xs leading-5 ${message.role === 'user' ? 'bg-[#0F6A5F] text-white' : 'bg-white text-[#14140F] shadow-sm'}`}>
-                    {message.imagePreview ? <img src={message.imagePreview} alt="Customer attachment" className="mb-2 max-h-40 w-full rounded-xl object-cover"/> : null}
-                    {message.content}
+            {messages.map((message, index) => {
+              const imageOnlyProducts = message.displayMode === 'product_images'
+                ? (message.products || []).filter((product) => product.imageUrl)
+                : [];
+              const showBubble = Boolean(message.content || message.imagePreview);
+
+              return (
+                <div key={`${message.role}-${index}`} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                  <div className={message.role === 'user' ? 'max-w-[86%]' : 'max-w-[94%]'}>
+                    {showBubble ? (
+                      <div className={`whitespace-pre-wrap rounded-2xl px-3.5 py-2.5 text-xs leading-5 ${message.role === 'user' ? 'bg-[#0F6A5F] text-white' : 'bg-white text-[#14140F] shadow-sm'}`}>
+                        {message.imagePreview ? <img src={message.imagePreview} alt="Customer attachment" className="mb-2 max-h-40 w-full rounded-xl object-cover"/> : null}
+                        {message.content}
+                      </div>
+                    ) : null}
+
+                    {message.role === 'assistant' && message.categories?.length ? (
+                      <div className={`${showBubble ? 'mt-2' : ''} grid grid-cols-2 gap-2`}>
+                        {message.categories.map((category) => (
+                          <button
+                            key={category.id || category.title}
+                            type="button"
+                            disabled={sending}
+                            onClick={() => void sendMessage(category.title)}
+                            className="flex min-h-[58px] items-center gap-2 rounded-2xl border border-black/8 bg-white p-2 text-left shadow-sm transition active:scale-[0.98] disabled:opacity-50"
+                          >
+                            {category.imageUrl ? <img src={category.imageUrl} alt="" className="h-10 w-10 shrink-0 rounded-xl object-cover"/> : <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#F4F4F1] text-[9px] font-black">CAT</span>}
+                            <span className="line-clamp-2 text-[10px] font-black leading-4 text-[#14140F]">{category.title}</span>
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
+
+                    {message.role === 'assistant' && imageOnlyProducts.length ? (
+                      <div className={`${showBubble ? 'mt-2' : ''} grid grid-cols-2 gap-2`}>
+                        {imageOnlyProducts.map((product) => (
+                          <a
+                            key={product.id}
+                            href={product.path || `/product/${encodeURIComponent(product.id)}`}
+                            aria-label={product.title || 'Open product'}
+                            className="block aspect-square overflow-hidden rounded-2xl border border-black/8 bg-[#F4F4F1] shadow-sm"
+                          >
+                            <img src={product.imageUrl} alt={product.title || 'Product'} className="h-full w-full object-cover"/>
+                          </a>
+                        ))}
+                      </div>
+                    ) : null}
+
+                    {message.role === 'assistant' && message.displayMode !== 'product_images' && message.products?.length ? (
+                      <div className={`${showBubble ? 'mt-2' : ''} flex gap-2 overflow-x-auto pb-1`}>
+                        {message.products.map((product) => (
+                          <a
+                            key={product.id}
+                            href={product.path || `/product/${encodeURIComponent(product.id)}`}
+                            className="w-[142px] shrink-0 overflow-hidden rounded-2xl border border-black/8 bg-white shadow-sm"
+                          >
+                            <div className="aspect-square bg-[#F4F4F1]">
+                              {product.imageUrl ? <img src={product.imageUrl} alt={product.title} className="h-full w-full object-cover"/> : <div className="flex h-full items-center justify-center text-[9px] font-black text-black/30">PrimeHubMall</div>}
+                            </div>
+                            <div className="p-2.5">
+                              <p className="line-clamp-2 text-[10px] font-black leading-4 text-[#14140F]">{product.title}</p>
+                              {product.price != null ? <p className="mt-1 text-[10px] font-black text-[#E1352B]">{money(product.price)}</p> : null}
+                              {product.stock != null ? <p className="mt-0.5 text-[8px] font-bold text-black/40">{Number(product.stock) > 0 ? `${product.stock} in stock` : 'Out of stock'}</p> : null}
+                            </div>
+                          </a>
+                        ))}
+                      </div>
+                    ) : null}
                   </div>
-
-                  {message.role === 'assistant' && message.categories?.length ? (
-                    <div className="mt-2 grid grid-cols-2 gap-2">
-                      {message.categories.map((category) => (
-                        <button
-                          key={category.id || category.title}
-                          type="button"
-                          disabled={sending}
-                          onClick={() => void sendMessage(category.title)}
-                          className="flex min-h-[58px] items-center gap-2 rounded-2xl border border-black/8 bg-white p-2 text-left shadow-sm transition active:scale-[0.98] disabled:opacity-50"
-                        >
-                          {category.imageUrl ? <img src={category.imageUrl} alt="" className="h-10 w-10 shrink-0 rounded-xl object-cover"/> : <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#F4F4F1] text-[9px] font-black">CAT</span>}
-                          <span className="line-clamp-2 text-[10px] font-black leading-4 text-[#14140F]">{category.title}</span>
-                        </button>
-                      ))}
-                    </div>
-                  ) : null}
-
-                  {message.role === 'assistant' && message.products?.length ? (
-                    <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
-                      {message.products.map((product) => (
-                        <a
-                          key={product.id}
-                          href={product.path || `/product/${encodeURIComponent(product.id)}`}
-                          className="w-[142px] shrink-0 overflow-hidden rounded-2xl border border-black/8 bg-white shadow-sm"
-                        >
-                          <div className="aspect-square bg-[#F4F4F1]">
-                            {product.imageUrl ? <img src={product.imageUrl} alt={product.title} className="h-full w-full object-cover"/> : <div className="flex h-full items-center justify-center text-[9px] font-black text-black/30">PrimeHubMall</div>}
-                          </div>
-                          <div className="p-2.5">
-                            <p className="line-clamp-2 text-[10px] font-black leading-4 text-[#14140F]">{product.title}</p>
-                            {product.price != null ? <p className="mt-1 text-[10px] font-black text-[#E1352B]">{money(product.price)}</p> : null}
-                            {product.stock != null ? <p className="mt-0.5 text-[8px] font-bold text-black/40">{Number(product.stock) > 0 ? `${product.stock} in stock` : 'Out of stock'}</p> : null}
-                          </div>
-                        </a>
-                      ))}
-                    </div>
-                  ) : null}
                 </div>
-              </div>
-            ))}
+              );
+            })}
 
             {sending ? <div className="inline-flex rounded-2xl bg-white px-3.5 py-2.5 text-[10px] font-bold text-black/40 shadow-sm">Salar is typing…</div> : null}
             <div ref={endRef}/>
