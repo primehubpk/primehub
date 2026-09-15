@@ -8,7 +8,8 @@ on:
       - .github/workflows/salar-order-memory-patch.yml
 
 permissions:
-  contents: write
+  contents: read
+  issues: write
 
 jobs:
   patch-and-typecheck:
@@ -33,14 +34,23 @@ jobs:
         run: npm ci
 
       - name: Capture TypeScript diagnostics
-        run: npx tsc --noEmit > scripts/salar-order-tsc.txt 2>&1 || true
+        run: npx tsc --noEmit > /tmp/salar-order-tsc.txt 2>&1 || true
 
-      - name: Commit diagnostics only
+      - name: Publish temporary diagnostics issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
-          git config user.name "PrimeHub Salar Patch"
-          git config user.email "actions@users.noreply.github.com"
-          git restore lib/salar/chatStore.ts lib/salar/modelDrivenEngine.ts app/api/salar/chat/route.ts components/salar/SalarWidget.tsx app/api/orders/route.ts
-          git add scripts/salar-order-tsc.txt
-          git diff --cached --quiet && exit 0
-          git commit -m "chore: capture Salar order patch typecheck"
-          git push origin HEAD:fix/salar-instruction-first
+          if [ -s /tmp/salar-order-tsc.txt ]; then
+            {
+              echo 'Temporary diagnostics for the Salar order-memory patch.'
+              echo
+              echo '```text'
+              head -c 50000 /tmp/salar-order-tsc.txt
+              echo
+              echo '```'
+            } > /tmp/issue-body.md
+          else
+            echo 'TypeScript check produced no diagnostics.' > /tmp/issue-body.md
+          fi
+          gh issue create --title "TEMP Salar order patch diagnostics" --body-file /tmp/issue-body.md
