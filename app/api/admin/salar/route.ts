@@ -1,12 +1,14 @@
 import { NextResponse } from 'next/server';
-import { verifyPrimeHubAdminRequest } from '@/lib/adminSession';
 import { getSalarRuntimeStatus, getSalarState, refreshSalarCatalogue, saveSalarSettings } from '@/lib/salar/server';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-async function authorized(request: Request) {
-  return Boolean(await verifyPrimeHubAdminRequest(request));
+const ADMIN_COOKIE = 'primehub_admin_auth';
+
+function authorized(request: Request) {
+  const cookie = request.headers.get('cookie') || '';
+  return cookie.split(';').some((part) => part.trim() === `${ADMIN_COOKIE}=true`);
 }
 
 function adminView(state: Awaited<ReturnType<typeof getSalarState>>) {
@@ -26,7 +28,7 @@ function adminView(state: Awaited<ReturnType<typeof getSalarState>>) {
 }
 
 export async function GET(request: Request) {
-  if (!(await authorized(request))) {
+  if (!authorized(request)) {
     return NextResponse.json({ success: false, error: 'Authentication required.' }, { status: 401 });
   }
   try {
@@ -41,7 +43,7 @@ export async function GET(request: Request) {
 }
 
 export async function PUT(request: Request) {
-  if (!(await authorized(request))) {
+  if (!authorized(request)) {
     return NextResponse.json({ success: false, error: 'Authentication required.' }, { status: 401 });
   }
   try {
@@ -58,7 +60,7 @@ export async function PUT(request: Request) {
 }
 
 export async function POST(request: Request) {
-  if (!(await authorized(request))) {
+  if (!authorized(request)) {
     return NextResponse.json({ success: false, error: 'Authentication required.' }, { status: 401 });
   }
   try {
