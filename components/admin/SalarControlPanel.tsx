@@ -3,6 +3,14 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Bot, Database, RefreshCw, Save } from 'lucide-react';
 
+type ProviderStatus = {
+  provider: 'groq' | 'gemini' | 'openrouter';
+  configured: boolean;
+  model: string;
+  visionConfigured: boolean;
+  visionModel: string;
+};
+
 type SalarAdminView = {
   enabled: boolean;
   instructions: string;
@@ -15,10 +23,16 @@ type SalarAdminView = {
     pageCount: number;
   };
   runtime: {
-    groqConfigured: boolean;
-    model: string;
+    ready: boolean;
+    providers: ProviderStatus[];
   };
 };
+
+function providerLabel(value: ProviderStatus['provider']) {
+  if (value === 'openrouter') return 'OpenRouter';
+  if (value === 'gemini') return 'Gemini';
+  return 'Groq';
+}
 
 export default function SalarControlPanel() {
   const [data, setData] = useState<SalarAdminView | null>(null);
@@ -103,8 +117,17 @@ export default function SalarControlPanel() {
       <div className="grid gap-3 sm:grid-cols-3">
         <div className="rounded-3xl bg-white p-5 shadow-sm">
           <div className="flex items-center gap-2 text-[#E1352B]"><Bot size={18}/><span className="text-[10px] font-black uppercase tracking-[0.16em]">Salar</span></div>
-          <p className="mt-3 text-sm font-black">{enabled ? 'Salesman ON' : 'Salesman OFF'}</p>
-          <p className="mt-1 text-[10px] leading-4 text-black/45">Groq: {data?.runtime.groqConfigured ? 'Configured' : 'API key missing'} · {data?.runtime.model || 'No model'}</p>
+          <p className="mt-3 text-sm font-black">{enabled ? 'Salesman ON' : 'Salesman OFF'} · {data?.runtime.ready ? 'AI Ready' : 'AI not ready'}</p>
+          <div className="mt-2 space-y-1.5">
+            {(data?.runtime.providers || []).map((provider) => (
+              <div key={provider.provider} className="rounded-xl bg-[#F7F7F3] px-2.5 py-2 text-[9px] leading-4 text-black/55">
+                <b className="text-[#14140F]">{providerLabel(provider.provider)}</b>: {provider.configured ? 'Configured' : 'Not configured'}
+                {provider.model ? ` · ${provider.model}` : ''}
+                {provider.visionConfigured ? ' · Vision ready' : ''}
+              </div>
+            ))}
+          </div>
+          <p className="mt-2 text-[9px] leading-4 text-black/35">Uses the existing Vercel environment only. API keys are never shown here.</p>
         </div>
         <div className="rounded-3xl bg-white p-5 shadow-sm">
           <div className="flex items-center gap-2 text-[#0F6A5F]"><Database size={18}/><span className="text-[10px] font-black uppercase tracking-[0.16em]">Cached Catalogue</span></div>
@@ -124,8 +147,8 @@ export default function SalarControlPanel() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#E1352B]">Salar Instructions</p>
-            <h2 className="mt-1 text-lg font-black">Your dealing instructions</h2>
-            <p className="mt-1 max-w-2xl text-[11px] leading-5 text-black/45">Write only the special rules you want Salar to follow. If a customer question is not covered here, Salar will use its own intelligence while using the cached website data for PrimeHubMall facts.</p>
+            <h2 className="mt-1 text-lg font-black">Your salesman training</h2>
+            <p className="mt-1 max-w-2xl text-[11px] leading-5 text-black/45">Write the way you want Salar to deal with customers. Situations and examples are treated as guidance, not fixed reply scripts. Products, categories, prices, offers and website facts come from the updated catalogue rather than being locked into these instructions.</p>
           </div>
           <label className="flex items-center gap-2 rounded-full bg-[#F4F4F1] px-3 py-2 text-[10px] font-black">
             <input type="checkbox" checked={enabled} onChange={(event) => setEnabled(event.target.checked)} className="h-4 w-4"/>
@@ -136,8 +159,8 @@ export default function SalarControlPanel() {
         <textarea
           value={instructions}
           onChange={(event) => setInstructions(event.target.value.slice(0, 20000))}
-          rows={14}
-          placeholder={'Example: Wholesale customer se politely quantity pocho.\n\nApni special dealing instructions yahan likhein…'}
+          rows={16}
+          placeholder={'Apni salesman training, dealing style aur special business rules yahan likhein. Examples sirf behaviour samjhane ke liye likh sakte hain; Salar exact wording copy karne ka paband nahi hoga.'}
           className="mt-5 w-full resize-y rounded-2xl border border-black/10 bg-[#FAFAF7] p-4 text-sm leading-6 outline-none transition focus:border-[#0F6A5F]/50"
         />
         <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
