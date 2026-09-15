@@ -398,15 +398,22 @@ function safeHistory(history: unknown): SalarChatMessage[] {
     .filter((item) => item.content);
 }
 
+function firstConfiguredKey(value: string | undefined) {
+  return String(value || '')
+    .split(/[\n,;]+/)
+    .map((item) => item.trim())
+    .find(Boolean) || '';
+}
+
 function groqConfig() {
-  const apiKey = String(process.env.SALAR_GROQ_API_KEY || process.env.GROQ_API_KEY || '').trim();
-  const model = String(process.env.SALAR_GROQ_MODEL || process.env.GROQ_MODEL || 'openai/gpt-oss-120b').trim();
+  const apiKey = String(process.env.GROQ_API_KEY || firstConfiguredKey(process.env.GROQ_API_KEYS)).trim();
+  const model = String(process.env.SALAAR_GROQ_MODEL || process.env.GROQ_MODEL || '').trim();
   return { apiKey, model };
 }
 
 export function getSalarRuntimeStatus() {
   const { apiKey, model } = groqConfig();
-  return { groqConfigured: Boolean(apiKey), model };
+  return { groqConfigured: Boolean(apiKey && model), model };
 }
 
 export async function answerWithSalar(input: { message: unknown; history?: unknown }) {
@@ -418,7 +425,8 @@ export async function answerWithSalar(input: { message: unknown; history?: unkno
   if (!state.catalogue) throw new Error('Salar catalogue is not ready.');
 
   const { apiKey, model } = groqConfig();
-  if (!apiKey) throw new Error('Salar Groq API key is not configured.');
+  if (!apiKey) throw new Error('Salar Groq API key is not configured in the existing environment.');
+  if (!model) throw new Error('Salar Groq model is not configured in the existing environment.');
 
   const knowledge = buildRelevantKnowledge(message, state.catalogue);
   const system = [
