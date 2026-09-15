@@ -978,6 +978,7 @@ function buildFinalSystem(input: {
     'Use the ORIGINAL customer message and recent conversation for natural wording. Follow Admin Salesman Training first. Speak in the customer’s Roman Urdu, Urdu, English or mixed style. Never copy, quote or mechanically paraphrase training examples; convert their meaning into a natural reply in your own words unless exact wording is explicitly required.',
     'Answer the exact question first and keep simple answers concise. Choose tone and phrasing naturally from the customer’s style plus Admin Salesman Training; do not impose a hardcoded sales personality or canned wording.',
     'Never invent price, stock, size, colour, variant, policy, offer or another PrimeHubMall fact. Use supplied data only.',
+    'When MATCHING PRODUCT COUNT is 0 and there are no EXACT REFERENCED PRODUCT FACTS, state naturally that no matching item is available. Use display=none with empty productIds, and never name, offer, or claim to show a product that is absent from the supplied facts.',
     'If catalogueMode=none because a detail must be clarified, ask that clarification naturally using Admin Training. Do not pretend products were searched/shown.',
     'MATCHING PRODUCT CANDIDATES are the only products eligible to render. EXACT REFERENCED PRODUCT FACTS may be used to answer the selected product’s details. NEAR MATCH FACTS are answering aids only.',
     'If resultScope=all and the customer wants to see the matching collection, use display=product_images or products and set showAllMatches=true. This means the UI will render the FULL filtered matching set; do not try to enumerate every id.',
@@ -1225,3 +1226,4 @@ export async function answerWithModelDrivenSalar(input: {
     catalogueUpdatedAt: state.catalogue.updatedAt,
   };
 }
+
