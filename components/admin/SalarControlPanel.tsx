@@ -1,7 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
-import { Bot, Database, RefreshCw, Save } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Bot, Database, ImagePlus, Maximize2, RefreshCw, Save, Trash2, X } from 'lucide-react';
 
 type ProviderStatus = {
   provider: 'groq' | 'gemini' | 'openrouter';
@@ -38,21 +38,31 @@ export default function SalarControlPanel() {
   const [data, setData] = useState<SalarAdminView | null>(null);
   const [instructions, setInstructions] = useState('');
   const [enabled, setEnabled] = useState(true);
+  const [iconUrl, setIconUrl] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [uploadingIcon, setUploadingIcon] = useState(false);
+  const [editorOpen, setEditorOpen] = useState(false);
   const [message, setMessage] = useState('');
+  const editorRef = useRef<HTMLTextAreaElement | null>(null);
+  const iconInputRef = useRef<HTMLInputElement | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     setMessage('');
     try {
-      const response = await fetch('/api/admin/salar', { credentials: 'same-origin', cache: 'no-store' });
-      const result = await response.json().catch(() => null);
-      if (!response.ok || !result?.success) throw new Error(result?.error || 'Salar could not load.');
-      setData(result.salar);
-      setInstructions(result.salar.instructions || '');
-      setEnabled(result.salar.enabled !== false);
+      const [salarResponse, uiResponse] = await Promise.all([
+        fetch('/api/admin/salar', { credentials: 'same-origin', cache: 'no-store' }),
+        fetch('/api/admin/salar/ui', { credentials: 'same-origin', cache: 'no-store' }),
+      ]);
+      const salarResult = await salarResponse.json().catch(() => null);
+      const uiResult = await uiResponse.json().catch(() => null);
+      if (!salarResponse.ok || !salarResult?.success) throw new Error(salarResult?.error || 'Salar could not load.');
+      setData(salarResult.salar);
+      setInstructions(salarResult.salar.instructions || '');
+      setEnabled(salarResult.salar.enabled !== false);
+      if (uiResponse.ok && uiResult?.success) setIconUrl(String(uiResult.ui?.iconUrl || ''));
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Salar could not load.');
     } finally {
@@ -62,7 +72,7 @@ export default function SalarControlPanel() {
 
   useEffect(() => { void load(); }, [load]);
 
-  async function save() {
+  async function save(closeEditor = false) {
     setSaving(true);
     setMessage('');
     try {
@@ -77,10 +87,61 @@ export default function SalarControlPanel() {
       if (!response.ok || !result?.success) throw new Error(result?.error || 'Could not save Salar instructions.');
       setData(result.salar);
       setMessage('Salar instructions saved.');
+      if (closeEditor) setEditorOpen(false);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Could not save Salar instructions.');
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function saveIcon(nextIconUrl: string) {
+    const response = await fetch('/api/admin/salar/ui', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      cache: 'no-store',
+      body: JSON.stringify({ iconUrl: nextIconUrl }),
+    });
+    const result = await response.json().catch(() => null);
+    if (!response.ok || !result?.success) throw new Error(result?.error || 'Could not save Salar icon.');
+    setIconUrl(String(result.ui?.iconUrl || ''));
+  }
+
+  async function chooseIcon(file: File | undefined) {
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setMessage('Please choose an image from gallery.');
+      return;
+    }
+    setUploadingIcon(true);
+    setMessage('Uploading Salar icon…');
+    try {
+      const form = new FormData();
+      form.append('image', file, file.name || 'salar-icon.jpg');
+      const uploadResponse = await fetch('/api/upload/r2', { method: 'POST', credentials: 'same-origin', body: form });
+      const uploadResult = await uploadResponse.json().catch(() => null);
+      if (!uploadResponse.ok || !uploadResult?.success || !uploadResult?.url) throw new Error(uploadResult?.error || 'Image upload failed.');
+      await saveIcon(String(uploadResult.url));
+      setMessage('Salar chat icon updated.');
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Salar icon could not be updated.');
+    } finally {
+      setUploadingIcon(false);
+      if (iconInputRef.current) iconInputRef.current.value = '';
+    }
+  }
+
+  async function removeIcon() {
+    setUploadingIcon(true);
+    setMessage('');
+    try {
+      await saveIcon('');
+      setMessage('Custom Salar icon removed.');
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Salar icon could not be removed.');
+    } finally {
+      setUploadingIcon(false);
     }
   }
 
@@ -106,6 +167,13 @@ export default function SalarControlPanel() {
     } finally {
       setRefreshing(false);
     }
+  }
+
+  function selectAllInstructions() {
+    const textarea = editorRef.current;
+    if (!textarea) return;
+    textarea.focus();
+    textarea.select();
   }
 
   if (loading) {
@@ -148,30 +216,56 @@ export default function SalarControlPanel() {
           <div>
             <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#E1352B]">Salar Instructions</p>
             <h2 className="mt-1 text-lg font-black">Your salesman training</h2>
-            <p className="mt-1 max-w-2xl text-[11px] leading-5 text-black/45">Write the way you want Salar to deal with customers. Situations and examples are treated as guidance, not fixed reply scripts. Products, categories, prices, offers and website facts come from the updated catalogue rather than being locked into these instructions.</p>
+            <p className="mt-1 max-w-2xl text-[11px] leading-5 text-black/45">Examples are guidance, not fixed scripts. Website facts still come from the current catalogue.</p>
           </div>
-          <label className="flex items-center gap-2 rounded-full bg-[#F4F4F1] px-3 py-2 text-[10px] font-black">
-            <input type="checkbox" checked={enabled} onChange={(event) => setEnabled(event.target.checked)} className="h-4 w-4"/>
-            Salar enabled
-          </label>
+          <div className="flex flex-wrap items-center gap-2">
+            <button type="button" onClick={() => setEditorOpen(true)} className="inline-flex items-center gap-2 rounded-full bg-[#0F6A5F] px-4 py-2.5 text-[10px] font-black text-white"><Maximize2 size={13}/>Open full editor</button>
+            <label className="flex items-center gap-2 rounded-full bg-[#F4F4F1] px-3 py-2 text-[10px] font-black">
+              <input type="checkbox" checked={enabled} onChange={(event) => setEnabled(event.target.checked)} className="h-4 w-4"/>
+              Salar enabled
+            </label>
+          </div>
         </div>
 
-        <textarea
-          value={instructions}
-          onChange={(event) => setInstructions(event.target.value.slice(0, 20000))}
-          rows={16}
-          placeholder={'Apni salesman training, dealing style aur special business rules yahan likhein. Examples sirf behaviour samjhane ke liye likh sakte hain; Salar exact wording copy karne ka paband nahi hoga.'}
-          className="mt-5 w-full resize-y rounded-2xl border border-black/10 bg-[#FAFAF7] p-4 text-sm leading-6 outline-none transition focus:border-[#0F6A5F]/50"
-        />
+        <textarea value={instructions} onChange={(event) => setInstructions(event.target.value.slice(0, 20000))} rows={10} className="mt-5 w-full resize-y rounded-2xl border border-black/10 bg-[#FAFAF7] p-4 text-sm leading-6 outline-none transition focus:border-[#0F6A5F]/50"/>
         <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
           <span className="text-[10px] text-black/35">{instructions.length.toLocaleString()} / 20,000 characters</span>
-          <button onClick={() => void save()} disabled={saving} className="inline-flex items-center gap-2 rounded-full bg-[#14140F] px-5 py-3 text-[11px] font-black text-white disabled:opacity-50">
-            <Save size={14}/>{saving ? 'Saving…' : 'Save Instructions'}
-          </button>
+          <button onClick={() => void save()} disabled={saving} className="inline-flex items-center gap-2 rounded-full bg-[#14140F] px-5 py-3 text-[11px] font-black text-white disabled:opacity-50"><Save size={14}/>{saving ? 'Saving…' : 'Save Instructions'}</button>
+        </div>
+      </div>
+
+      <div className="rounded-3xl bg-white p-5 shadow-sm sm:p-6">
+        <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#0F6A5F]">Chat Launcher</p>
+        <h3 className="mt-1 text-base font-black">Salar icon</h3>
+        <p className="mt-1 text-[10px] leading-4 text-black/45">Choose an image from your phone gallery. It will appear on the website Salar chat icon.</p>
+        <div className="mt-4 flex items-center gap-3">
+          <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-[#FFB020] text-[#14140F] shadow-sm">
+            {iconUrl ? <img src={iconUrl} alt="Salar icon" className="h-full w-full object-cover"/> : <Bot size={26}/>} 
+          </div>
+          <input ref={iconInputRef} type="file" accept="image/*" className="hidden" onChange={(event) => void chooseIcon(event.target.files?.[0])}/>
+          <button type="button" disabled={uploadingIcon} onClick={() => iconInputRef.current?.click()} className="inline-flex items-center gap-2 rounded-full bg-[#14140F] px-4 py-3 text-[10px] font-black text-white disabled:opacity-50"><ImagePlus size={14}/>{uploadingIcon ? 'Uploading…' : 'Choose from gallery'}</button>
+          {iconUrl ? <button type="button" disabled={uploadingIcon} onClick={() => void removeIcon()} className="flex h-10 w-10 items-center justify-center rounded-full bg-[#F4F4F1] text-[#E1352B] disabled:opacity-40" aria-label="Remove custom icon"><Trash2 size={15}/></button> : null}
         </div>
       </div>
 
       {message ? <div className="rounded-2xl border border-black/8 bg-white px-4 py-3 text-xs font-bold text-black/60 shadow-sm">{message}</div> : null}
+
+      {editorOpen ? (
+        <div className="fixed inset-0 z-[120] flex flex-col bg-[#F7F7F3]">
+          <div className="flex shrink-0 items-center justify-between border-b border-black/8 bg-white px-4 py-3">
+            <div><p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#E1352B]">Salar Instructions</p><p className="text-sm font-black">Full training editor</p></div>
+            <button type="button" onClick={() => setEditorOpen(false)} className="flex h-10 w-10 items-center justify-center rounded-full bg-[#F4F4F1]" aria-label="Close full editor"><X size={17}/></button>
+          </div>
+          <div className="flex-1 p-3 sm:p-5">
+            <textarea ref={editorRef} autoFocus value={instructions} onChange={(event) => setInstructions(event.target.value.slice(0, 20000))} className="h-full min-h-[50vh] w-full resize-none rounded-2xl border border-black/10 bg-white p-4 text-sm leading-6 outline-none focus:border-[#0F6A5F]/50"/>
+          </div>
+          <div className="flex shrink-0 items-center gap-2 border-t border-black/8 bg-white p-3 sm:px-5">
+            <button type="button" onClick={selectAllInstructions} className="rounded-full bg-[#F1F1ED] px-4 py-3 text-[10px] font-black">Select all</button>
+            <span className="ml-auto text-[9px] text-black/35">{instructions.length.toLocaleString()} / 20,000</span>
+            <button type="button" disabled={saving} onClick={() => void save(true)} className="inline-flex items-center gap-2 rounded-full bg-[#14140F] px-5 py-3 text-[10px] font-black text-white disabled:opacity-50"><Save size={14}/>{saving ? 'Saving…' : 'Save'}</button>
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }
