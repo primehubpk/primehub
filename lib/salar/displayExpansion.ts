@@ -18,6 +18,7 @@ type CategoryCard = { id: string; title: string; slug?: string; imageUrl?: strin
 type DisplayMode = 'none' | 'products' | 'categories' | 'product_images';
 
 type SalarResult = {
+  reply?: string;
   displayMode?: DisplayMode;
   products?: ProductCard[];
   categories?: CategoryCard[];
@@ -92,8 +93,8 @@ function relevanceFloor(topScore: number) {
   return Math.max(12, Math.floor(topScore * 0.22));
 }
 
-export async function expandSalarDisplay(message: string, result: SalarResult) {
-  const mode = result.displayMode || 'none';
+export async function expandSalarDisplay(message: string, result: SalarResult): Promise<SalarResult> {
+  const mode: DisplayMode = result.displayMode || 'none';
   if (mode === 'none') return result;
 
   const state = await getSalarState();
@@ -165,11 +166,12 @@ export async function expandSalarDisplay(message: string, result: SalarResult) {
   const shownProductIds = [...(result.context?.shownProductIds || []), ...products.map((product) => product.id)]
     .filter(Boolean)
     .slice(-120);
+  const nextDisplayMode: DisplayMode = products.length ? mode : 'none';
 
   return {
     ...result,
     products,
-    displayMode: products.length ? mode : 'none',
+    displayMode: nextDisplayMode,
     context: {
       ...(result.context || {}),
       lastProductQuery: query || result.context?.lastProductQuery,
