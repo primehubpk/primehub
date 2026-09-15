@@ -9,7 +9,7 @@ import GlobalFooter from '@/components/GlobalFooter';
 import CartMiniBar from '@/components/CartMiniBar';
 import PWARegister from '@/components/PWARegister';
 import GlobalVariantSelector from '@/components/GlobalVariantSelector';
-import SalarWidget from '@/components/salar/SalarWidget';
+import SalarViewportShell from '@/components/salar/SalarViewportShell';
 import { SettingsProvider } from '@/lib/useSettings';
 import './globals.css';
 
@@ -137,7 +137,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <GlobalVariantSelector />
           <CartMiniBar />
           <PWARegister />
-          <SalarWidget />
+          <SalarViewportShell />
         </SettingsProvider>
       </body>
     </html>
