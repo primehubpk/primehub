@@ -17,6 +17,9 @@ export async function POST(request: Request) {
     if (message.includes('Please enter a message')) {
       return NextResponse.json({ success: false, error: 'Please enter a message.' }, { status: 400 });
     }
+    if (message.includes('catalogue is not ready')) {
+      return NextResponse.json({ success: false, error: 'Salar is getting ready. Please try again after the catalogue is updated.' }, { status: 503 });
+    }
     if (message.includes('API key is not configured')) {
       return NextResponse.json({ success: false, error: 'Salar is not configured yet.' }, { status: 503 });
     }
