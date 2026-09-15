@@ -332,7 +332,7 @@ export default function SalarWidget() {
     if (!open || adminDrawerOpen) return;
     const frame = window.requestAnimationFrame(() => endRef.current?.scrollIntoView({ behavior: sending ? 'smooth' : 'auto', block: 'end' }));
     return () => window.cancelAnimationFrame(frame);
-  }, [messages, open, sending, expanded, adminDrawerOpen, orderItems, orderQuote, orderId]);
+  }, [messages.length, open, sending, adminDrawerOpen]);
 
   if (pathname?.startsWith('/admin')) return null;
 
@@ -359,7 +359,6 @@ export default function SalarWidget() {
       if (current.some((item) => item.id === product.id)) return current.filter((item) => item.id !== product.id);
       return [...current, product].slice(0, 30);
     });
-    window.setTimeout(() => composerRef.current?.focus(), 0);
   }
 
   function selected(id: string) {
