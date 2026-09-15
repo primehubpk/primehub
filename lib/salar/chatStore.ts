@@ -321,16 +321,40 @@ export function bootstrapSalarHistory(chat: SalarCustomerChat, history: unknown)
   return { ...chat, messages: imported.slice(-MAX_MESSAGES) };
 }
 
+export function recentCustomerProductReferences(chat: SalarCustomerChat, max = 12) {
+  const output: Array<{ id: string; title: string; imageUrl?: string }> = [];
+  const seen = new Set<string>();
+  for (const message of [...chat.messages].reverse()) {
+    if (message.actor !== 'customer') continue;
+    const references = [
+      ...(message.products || []).map((product) => ({ id: product.id, title: product.title, imageUrl: product.imageUrl })),
+      ...(message.mention ? [{ id: message.mention.id, title: message.mention.title, imageUrl: message.mention.imageUrl }] : []),
+    ];
+    for (const reference of references) {
+      if (!reference.id || seen.has(reference.id)) continue;
+      seen.add(reference.id);
+      output.push(reference);
+      if (output.length >= max) return output;
+    }
+  }
+  return output;
+}
+
 export function salarAiHistory(chat: SalarCustomerChat, max = 10) {
   return chat.messages
     .filter((message) => message.content)
     .slice(-Math.max(1, Math.min(20, max)))
-    .map((message) => ({
-      role: message.role,
-      content: message.actor === 'admin'
-        ? `[PrimeHub Admin message] ${message.content}`
-        : message.content,
-    }));
+    .map((message) => {
+      const base = message.actor === 'admin' ? `[PrimeHub Admin message] ${message.content}` : message.content;
+      if (message.actor !== 'customer') return { role: message.role, content: base };
+      const selected = (message.products || []).slice(0, 12).map((product) => product.title + ' [product id: ' + product.id + ']');
+      const mentioned = message.mention ? message.mention.title + ' [product id: ' + message.mention.id + ']' : '';
+      const metadata = [
+        selected.length ? '[Customer selected exact products: ' + selected.join(' | ') + ']' : '',
+        mentioned ? '[Customer referenced exact product: ' + mentioned + ']' : '',
+      ].filter(Boolean).join('\n');
+      return { role: message.role, content: [base, metadata].filter(Boolean).join('\n') };
+    });
 }
 
 function supabaseConfig() {

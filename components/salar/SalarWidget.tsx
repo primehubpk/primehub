@@ -171,10 +171,6 @@ function groupedImageProducts(products: ProductCard[]) {
   return [...groups.entries()];
 }
 
-function orderIntent(value: string) {
-  return /(order|final|confirm|book|place|mangwa|mangwana|mangva|mangwana|order kr|order kar|final kr|final kar|پکا|آرڈر)/i.test(value);
-}
-
 function cleanPhone(value: string) {
   return value.replace(/[^0-9+]/g, '').slice(0, 20);
 }
@@ -586,7 +582,6 @@ export default function SalarWidget() {
       `City: ${orderCustomer.city}`,
       `Address: ${orderCustomer.address}`,
       quote?.total != null ? `Total: Rs. ${Number(quote.total).toLocaleString('en-PK')}` : '',
-      'Advance requested: Rs. 300',
     ].filter(Boolean).join('\n');
     window.open(`https://wa.me/${number}?text=${encodeURIComponent(message)}`, '_blank', 'noopener,noreferrer');
   }
@@ -605,7 +600,7 @@ export default function SalarWidget() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
         body: JSON.stringify({
-          customer: { ...customer, notes: 'Order prepared through Salar chat. Advance requested: Rs. 300; remaining payment after ready-order video confirmation.' },
+          customer: { ...customer, notes: 'Order prepared through Salar chat.' },
           items: items.map((item) => ({ productId: item.id, quantity: item.quantity })),
         }),
       });
@@ -687,19 +682,11 @@ export default function SalarWidget() {
         setContext(result.context as ChatContext);
       }
 
-      const candidatesForOrder = references.length ? references : lastSharedProducts;
-      const lastAssistant = [...messages].reverse().find((item) => item.role === 'assistant')?.content || '';
-      const simpleYes = /^(?:yes|y|haan|han|haa|hmm yes|ok|okay|theek|thik|ji|g|jee|bilkul|kr do|kar do)[.! ]*$/i.test(message.trim());
-      const confirmsPreviousOrderQuestion = simpleYes && /(order|final|bill|design|baqi|remaining|include|add|3|teen)/i.test(lastAssistant);
-      const shouldDraftOrder = orderIntent(message) || confirmsPreviousOrderQuestion;
-      let currentOrderItems = orderItems;
-      if (shouldDraftOrder && !currentOrderItems.length && candidatesForOrder.length) {
-        currentOrderItems = candidatesForOrder.map((product) => ({ ...product, quantity: 1 }));
-        setOrderItems(currentOrderItems);
-        void quoteOrder(currentOrderItems);
-      }
-      if (orderIntent(message) && currentOrderItems.length && customerComplete(mergedCustomer) && !orderId) {
-        void placeChatOrder(false, currentOrderItems, mergedCustomer);
+      const modelOrderProducts: ProductCard[] = Array.isArray(result?.orderProducts)
+        ? result.orderProducts.filter((product: any) => product?.id && product?.title).slice(0, 30)
+        : [];
+      if (result?.orderAction === 'draft' && modelOrderProducts.length) {
+        await startOrderDraft(modelOrderProducts);
       }
     } catch (error) {
       const reply = error instanceof Error ? error.message : 'Salar could not respond right now. Please try again.';
@@ -843,7 +830,7 @@ export default function SalarWidget() {
 
             {orderItems.length ? (
               <div className="rounded-2xl border border-[#0F6A5F]/20 bg-white p-3 shadow-sm">
-                <div className="flex items-center justify-between gap-2"><div className="flex items-center gap-2"><ShoppingCart size={16} className="text-[#0F6A5F]"/><div><p className="text-[10px] font-black">Order draft</p><p className="text-[8px] text-black/40">Advance Rs. 300 · balance after ready-order video</p></div></div><button type="button" onClick={() => { setOrderItems([]); setOrderQuote(null); setOrderId(''); setOrderError(''); }} className="flex h-7 w-7 items-center justify-center rounded-full bg-[#F4F4F1]"><X size={13}/></button></div>
+                <div className="flex items-center justify-between gap-2"><div className="flex items-center gap-2"><ShoppingCart size={16} className="text-[#0F6A5F]"/><div><p className="text-[10px] font-black">Order draft</p><p className="text-[8px] text-black/40">Live bill from selected products</p></div></div><button type="button" onClick={() => { setOrderItems([]); setOrderQuote(null); setOrderId(''); setOrderError(''); }} className="flex h-7 w-7 items-center justify-center rounded-full bg-[#F4F4F1]"><X size={13}/></button></div>
                 <div className="mt-2 space-y-2">{orderItems.map((item) => <div key={item.id} className="flex items-center gap-2 rounded-xl bg-[#F6F6F2] p-2">{item.imageUrl ? <img src={item.imageUrl} alt="" className="h-10 w-10 rounded-lg object-cover"/> : null}<p className="min-w-0 flex-1 line-clamp-2 text-[9px] font-bold">{item.title}</p><div className="flex items-center gap-1"><button type="button" onClick={() => changeQuantity(item.id, -1)} className="flex h-6 w-6 items-center justify-center rounded-full bg-white"><Minus size={11}/></button><span className="w-5 text-center text-[9px] font-black">{item.quantity}</span><button type="button" onClick={() => changeQuantity(item.id, 1)} className="flex h-6 w-6 items-center justify-center rounded-full bg-white"><Plus size={11}/></button></div></div>)}</div>
                 {orderQuote ? <div className="mt-2 rounded-xl bg-[#FFF7E7] p-2.5 text-[9px]"><div className="flex justify-between"><span>Subtotal</span><b>{money(orderQuote.subtotal ?? orderQuote.rawSubtotal)}</b></div><div className="mt-1 flex justify-between"><span>Delivery</span><b>{money(orderQuote.deliveryCharge)}</b></div><div className="mt-1 flex justify-between text-[10px]"><span className="font-black">Total</span><b className="text-[#E1352B]">{money(orderQuote.total)}</b></div></div> : null}
                 {!orderId ? <div className="mt-3 grid grid-cols-2 gap-2"><input value={orderCustomer.name} onChange={(event) => setOrderCustomer((current) => ({ ...current, name: event.target.value }))} placeholder="Name" className="rounded-xl bg-[#F4F4F1] px-3 py-2 text-[9px] outline-none"/><input value={orderCustomer.phone} onChange={(event) => setOrderCustomer((current) => ({ ...current, phone: event.target.value }))} placeholder="Contact" className="rounded-xl bg-[#F4F4F1] px-3 py-2 text-[9px] outline-none"/><input value={orderCustomer.city} onChange={(event) => setOrderCustomer((current) => ({ ...current, city: event.target.value }))} placeholder="City" className="rounded-xl bg-[#F4F4F1] px-3 py-2 text-[9px] outline-none"/><input value={orderCustomer.address} onChange={(event) => setOrderCustomer((current) => ({ ...current, address: event.target.value }))} placeholder="Complete address" className="rounded-xl bg-[#F4F4F1] px-3 py-2 text-[9px] outline-none"/></div> : null}

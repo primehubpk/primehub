@@ -8,6 +8,7 @@ import {
   createEmptySalarChat,
   getSalarChat,
   salarAiHistory,
+  recentCustomerProductReferences,
   saveSalarChat,
   type SalarCustomerChat,
   type SalarStoredMention,
@@ -248,13 +249,27 @@ export async function POST(request: Request) {
       }, { headers: { 'Cache-Control': 'private, no-store, max-age=0' } });
     }
 
-    const exactProductIds = [input.mention?.id, ...input.references.map((product) => product.id)].filter(Boolean) as string[];
+    const recentReferences = recentCustomerProductReferences(chat, 12);
+    const exactReferenceMap = new Map<string, { id: string; imageUrl?: string }>();
+    const currentReferences = [
+      ...(input.mention ? [{ id: input.mention.id, imageUrl: input.mention.imageUrl }] : []),
+      ...input.references.map((product) => ({ id: product.id, imageUrl: product.imageUrl })),
+    ];
+    for (const reference of [...currentReferences, ...recentReferences]) {
+      const id = cleanText(reference.id, 200);
+      if (!id || exactReferenceMap.has(id)) continue;
+      const imageUrl = safeHttpsUrl(reference.imageUrl);
+      exactReferenceMap.set(id, { id, ...(imageUrl ? { imageUrl } : {}) });
+    }
+    const exactProductReferences = [...exactReferenceMap.values()];
+    const exactProductIds = exactProductReferences.map((reference) => reference.id);
     const result = await answerWithModelDrivenSalar({
       message: aiMessage,
       history: aiHistory,
       context: chat.context,
       customerName: chat.customerName,
       exactProductIds,
+      exactProductReferences,
       image: input.image,
     });
 
