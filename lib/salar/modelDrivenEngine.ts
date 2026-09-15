@@ -6,7 +6,7 @@ import { normalizeSearchText, productSearchScore } from '@/lib/smartSearch';
 export type SalarModelImageInput = BaseSalarImageInput;
 
 type ChatMessage = { role: 'user' | 'assistant'; content: string };
-type ChatContext = { lastProductQuery?: string; shownProductIds?: string[] };
+type ChatContext = { lastProductQuery?: string; shownProductIds?: string[]; confirmedOrderProductIds?: string[] };
 type DisplayMode = 'none' | 'products' | 'categories' | 'product_images';
 type CatalogueMode = 'none' | 'products' | 'categories';
 type ResultScope = 'focused' | 'all';
@@ -111,8 +111,8 @@ const MAX_ADMIN_CHARS = 20000;
 const MAX_FIRST_SYSTEM_CHARS = 26000;
 const MAX_FINAL_SYSTEM_CHARS = 30000;
 const MAX_FINAL_PROMPT_PRODUCTS = 18;
-const TEXT_TIMEOUT_MS = 5000;
-const VISION_TIMEOUT_MS = 8000;
+const TEXT_TIMEOUT_MS = 14000;
+const VISION_TIMEOUT_MS = 16000;
 
 function cleanText(value: unknown, max = 2000) {
   return String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
@@ -174,14 +174,28 @@ function safeHistory(value: unknown): ChatMessage[] {
     .filter((item) => item.content);
 }
 
+function uniqueIdList(value: unknown, max: number) {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  const ids: string[] = [];
+  for (const item of value) {
+    const id = cleanText(item, 200);
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    ids.push(id);
+    if (ids.length >= max) break;
+  }
+  return ids;
+}
+
 function safeContext(value: unknown): ChatContext {
   if (!value || typeof value !== 'object') return { shownProductIds: [] };
   const source = value as Record<string, unknown>;
+  const confirmedOrderProductIds = uniqueIdList(source.confirmedOrderProductIds, 30);
   return {
     lastProductQuery: cleanText(source.lastProductQuery, 1000) || undefined,
-    shownProductIds: Array.isArray(source.shownProductIds)
-      ? source.shownProductIds.map((id) => cleanText(id, 200)).filter(Boolean).slice(-MAX_SHOWN_IDS)
-      : [],
+    shownProductIds: uniqueIdList(source.shownProductIds, MAX_SHOWN_IDS),
+    ...(confirmedOrderProductIds.length ? { confirmedOrderProductIds } : {}),
   };
 }
 
@@ -814,13 +828,13 @@ function buildCandidates(input: {
     });
 
     const exactMatching = exactProducts.filter((product) => {
-      const hasColourReference = productImageUrls(product).length > 1
-        || safeArray(product?.variantColors, 30).some((variant: any) => safeHttpsUrl(variant?.imageUrl));
       return productAvailable(product)
         && interpretation.requirements.every((requirement) => {
           const requirementName = normalizeSearchText(requirement.name);
           const isColourRequirement = requirementName.includes('color') || requirementName.includes('colour');
-          return isColourRequirement && hasColourReference ? true : matchesRequirement(product, requirement);
+          // Keep the selected product in context for colour questions. Named variants
+          // are not the only colour evidence; gallery images and vision are.
+          return isColourRequirement ? true : matchesRequirement(product, requirement);
         });
     });
     const source = [...exactMatching, ...displayable.map((item) => item.product)];
@@ -923,8 +937,9 @@ function compactPromptFact(fact: ProductFact) {
     isWholesale: fact.isWholesale,
     availableSizes: fact.availableSizes,
     availableColors: fact.availableColors,
-    variantColors: fact.variantColors?.map((variant) => variant.name),
+    variantColors: fact.variantColors,
     galleryImageCount: fact.imageUrls?.length,
+    galleryImageUrls: fact.imageUrls?.slice(0, 6),
     availableVariants: fact.availableVariants,
   }).filter(([, value]) => value !== undefined && value !== '' && !(Array.isArray(value) && value.length === 0)));
 }
@@ -966,6 +981,7 @@ function buildFinalSystem(input: {
   knowledge: ReturnType<typeof websiteKnowledge>;
   customerName: string;
   imageDescription?: string;
+  confirmedOrderProductIds?: string[];
 }) {
   const admin = [
     'ADMIN SALESMAN TRAINING — READ THIS FIRST. It controls shop-specific behaviour, policy and judgement. Treat it semantically, not as customer-facing copy. Understand what the admin wants, then write the reply in your own natural words unless the admin explicitly requires exact wording.',
@@ -1006,10 +1022,31 @@ function buildFinalSystem(input: {
     `CATEGORY CANDIDATES: ${limitedJson(input.candidates.categories, 2600)}`,
     `WEBSITE KNOWLEDGE: ${limitedJson(input.knowledge, 2800)}`,
     input.customerName ? `SIGNED-IN CUSTOMER NAME: ${input.customerName}` : '',
+    input.confirmedOrderProductIds?.length ? `CONFIRMED ORDER PRODUCT IDS ALREADY REMEMBERED THIS CHAT: ${limitedJson(input.confirmedOrderProductIds, 800)}` : '',
     input.imageDescription ? `IMAGE UNDERSTANDING: ${cleanText(input.imageDescription, 900)}` : '',
   ].filter(Boolean).join('\n');
 
   return appendWithinBudget([admin, protocol, data], MAX_FINAL_SYSTEM_CHARS);
+}
+
+function resolveOrderProducts(
+  catalogue: SalarCatalogue,
+  requestedIds: string[],
+  exactProductFacts: ProductFact[],
+  confirmedIds: string[],
+) {
+  const ids = uniqueIdList([...confirmedIds, ...requestedIds], 30);
+  const exactCards = exactProductFacts.map(productCard);
+  const fromExact = selectByIds(exactCards, ids, 30);
+  const found = new Set(fromExact.map((product) => product.id));
+  const extra = ids
+    .filter((id) => !found.has(id))
+    .map((id) => {
+      const product = catalogue.products.find((item: any) => cleanText(item?.id, 200) === id);
+      return product ? productCard(productFact(product)) : null;
+    })
+    .filter(Boolean) as ProductCard[];
+  return [...fromExact, ...extra].slice(0, 30);
 }
 
 function selectByIds<T extends { id: string }>(items: T[], ids: string[], max: number) {
@@ -1068,6 +1105,7 @@ export async function answerWithModelDrivenSalar(input: {
   const exactProductIds = [...new Set([
     ...(Array.isArray(input.exactProductIds) ? input.exactProductIds.map((id) => cleanText(id, 200)).filter(Boolean) : []),
     ...exactProductReferences.map((reference) => reference.id),
+    ...(context.confirmedOrderProductIds || []),
   ])].slice(0, 40);
   const uploadedVision = input.image ? await analyzeImage(input.image, message) : null;
 
@@ -1115,6 +1153,7 @@ export async function answerWithModelDrivenSalar(input: {
     knowledge,
     customerName,
     imageDescription: vision?.text,
+    confirmedOrderProductIds: context.confirmedOrderProductIds,
   });
 
   const targets = fastProviderTargets(false);
@@ -1176,16 +1215,23 @@ export async function answerWithModelDrivenSalar(input: {
     : categories.length
       ? 'categories'
       : 'none';
-  const exactCards = candidates.exactProductFacts.map(productCard);
+  const requestedOrderIds = decision.orderProductIds.length
+    ? decision.orderProductIds
+    : (decision.orderAction !== 'none' ? (context.confirmedOrderProductIds || []) : []);
   const orderProducts = decision.orderAction === 'draft' || decision.orderAction === 'place'
-    ? selectByIds(exactCards, decision.orderProductIds, 30)
+    ? resolveOrderProducts(state.catalogue, requestedOrderIds, candidates.exactProductFacts, context.confirmedOrderProductIds || [])
     : [];
   const orderAction: OrderAction = decision.orderAction !== 'none' && orderProducts.length ? decision.orderAction : 'none';
 
   const nextShown = [...(context.shownProductIds || []), ...products.map((product) => product.id)].filter(Boolean).slice(-MAX_SHOWN_IDS);
+  const nextConfirmed = uniqueIdList([
+    ...(context.confirmedOrderProductIds || []),
+    ...(orderAction !== 'none' ? orderProducts.map((product) => product.id) : []),
+  ], 30);
   const nextContext: ChatContext = {
     lastProductQuery: interpretation.catalogueMode === 'products' && interpretation.searchText ? interpretation.searchText : context.lastProductQuery,
     shownProductIds: [...new Set(nextShown)],
+    ...(nextConfirmed.length ? { confirmedOrderProductIds: nextConfirmed } : {}),
   };
 
   console.info('Salar final-model decision', {

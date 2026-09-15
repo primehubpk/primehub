@@ -47,6 +47,7 @@ export type SalarStoredMessage = {
 export type SalarStoredContext = {
   lastProductQuery?: string;
   shownProductIds?: string[];
+  confirmedOrderProductIds?: string[];
 };
 
 export type SalarCustomerChat = {
@@ -213,13 +214,27 @@ function normalizeMessage(value: any): SalarStoredMessage | null {
   };
 }
 
+function uniqueIds(value: unknown, max = 40) {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  const ids: string[] = [];
+  for (const item of value) {
+    const id = cleanText(item, 200);
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    ids.push(id);
+    if (ids.length >= max) break;
+  }
+  return ids;
+}
+
 function normalizeContext(value: any): SalarStoredContext {
   if (!value || typeof value !== 'object') return { shownProductIds: [] };
+  const confirmedOrderProductIds = uniqueIds(value.confirmedOrderProductIds, 30);
   return {
     lastProductQuery: cleanText(value.lastProductQuery, 500) || undefined,
-    shownProductIds: Array.isArray(value.shownProductIds)
-      ? value.shownProductIds.map((id: unknown) => cleanText(id, 200)).filter(Boolean).slice(-200)
-      : [],
+    shownProductIds: uniqueIds(value.shownProductIds, 200),
+    ...(confirmedOrderProductIds.length ? { confirmedOrderProductIds } : {}),
   };
 }
 
@@ -328,7 +343,6 @@ export function recentCustomerProductReferences(chat: SalarCustomerChat, max = 1
   const output: Array<{ id: string; title: string; imageUrl?: string }> = [];
   const seen = new Set<string>();
   for (const message of [...chat.messages].reverse()) {
-    if (message.actor !== 'customer') continue;
     const references = [
       ...(message.products || []).map((product) => ({ id: product.id, title: product.title, imageUrl: product.imageUrl })),
       ...(message.mention ? [{ id: message.mention.id, title: message.mention.title, imageUrl: message.mention.imageUrl }] : []),

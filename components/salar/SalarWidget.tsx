@@ -626,8 +626,9 @@ export default function SalarWidget() {
       const notes = [
         'Order prepared through Salar chat.',
         `Salar chat ID: ${chatId}`,
+        imageContext.markedImageUrl ? `Marked colour/design reference: ${imageContext.markedImageUrl}` : '',
         ...imageContext.customerImageUrls.map((url, index) => `Customer image ${index + 1}: ${url}`),
-      ].join('\n');
+      ].filter(Boolean).join('\n');
       const response = await fetch('/api/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
@@ -645,7 +646,7 @@ export default function SalarWidget() {
       setMessages((current) => [...current, {
         role: 'assistant',
         actor: 'salar',
-        content: `Order website par place ho gaya hai. Order ID: ${placedId}`,
+        content: `Order website par place ho gaya hai. Order ID: ${placedId}. WhatsApp button se same order images aur details ke sath bhej sakte hain.`,
         createdAt: new Date().toISOString(),
       }]);
       if (openWhatsAppAfter) await whatsappOrder(placedId, data as OrderQuote, items, customer, messagesOverride);
@@ -665,7 +666,7 @@ export default function SalarWidget() {
     const mergedCustomer = { ...orderCustomer, ...parsedDetails };
     if (Object.keys(parsedDetails).length) setOrderCustomer(mergedCustomer);
 
-    const history = messages.slice(-10).map((item) => ({ role: item.role, content: historyContent(item) })).filter((item) => item.content);
+    const history = messages.slice(-30).map((item) => ({ role: item.role, content: historyContent(item) })).filter((item) => item.content);
     const userContent = message || (references.length ? `${references.length} selected products` : '📷 Product photo');
     const optimisticId = `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
@@ -729,6 +730,15 @@ export default function SalarWidget() {
         : {};
       const finalCustomer = { ...mergedCustomer, ...modelCustomer } as OrderCustomer;
       setOrderCustomer(finalCustomer);
+
+      if (Array.isArray(result?.products) && result.products.length) {
+        const shown = result.products.filter((product: any) => product?.id && product?.title).slice(0, 30);
+        setLastSharedProducts((current) => {
+          const merged = new Map(current.map((product) => [product.id, product]));
+          for (const product of shown) merged.set(product.id, { ...merged.get(product.id), ...product });
+          return [...merged.values()].slice(-30);
+        });
+      }
 
       const modelOrderProducts: ProductCard[] = Array.isArray(result?.orderProducts)
         ? result.orderProducts.filter((product: any) => product?.id && product?.title).slice(0, 30)
