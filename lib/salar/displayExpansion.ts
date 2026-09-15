@@ -93,6 +93,41 @@ function relevanceFloor(topScore: number) {
   return Math.max(12, Math.floor(topScore * 0.22));
 }
 
+function titleHasToken(product: any, token: string) {
+  const title = normalizeSearchText(product?.title || product?.name);
+  if (!title || !token) return false;
+  const titleTokens = title.split(' ').filter(Boolean);
+  if (titleTokens.some((candidate) => candidate === token || candidate.includes(token) || token.includes(candidate))) return true;
+  const compactToken = token.replace(/\s+/g, '');
+  return compactToken.length >= 4 && title.replace(/\s+/g, '').includes(compactToken);
+}
+
+function distinctiveTitleTokens(products: any[], query: string) {
+  const normalizedTokens = [...new Set(normalizeSearchText(query).split(' ').filter((token) => token.length >= 3))];
+  if (!normalizedTokens.length || !products.length) return [] as string[];
+  const total = products.length;
+  return normalizedTokens
+    .map((token) => ({ token, count: products.reduce((sum, product) => sum + (titleHasToken(product, token) ? 1 : 0), 0) }))
+    .filter((item) => item.count > 0 && item.count / total <= 0.35)
+    .sort((a, b) => a.count - b.count || b.token.length - a.token.length)
+    .slice(0, 5)
+    .map((item) => item.token);
+}
+
+function keepBestExactTitleGroup<T extends { product: any; score: number }>(items: T[], catalogue: any[], query: string) {
+  const tokens = distinctiveTitleTokens(catalogue, query);
+  if (!tokens.length) return items;
+  const withMatches = items.map((item) => ({
+    item,
+    matches: tokens.reduce((sum, token) => sum + (titleHasToken(item.product, token) ? 1 : 0), 0),
+  }));
+  const allTokens = withMatches.filter((entry) => entry.matches === tokens.length);
+  if (allTokens.length) return allTokens.map((entry) => entry.item);
+  const maxMatches = withMatches.reduce((max, entry) => Math.max(max, entry.matches), 0);
+  if (maxMatches <= 0) return [];
+  return withMatches.filter((entry) => entry.matches === maxMatches).map((entry) => entry.item);
+}
+
 export async function expandSalarDisplay(message: string, result: SalarResult): Promise<SalarResult> {
   const mode: DisplayMode = result.displayMode || 'none';
   if (mode === 'none') return result;
@@ -134,16 +169,18 @@ export async function expandSalarDisplay(message: string, result: SalarResult): 
     .filter((item) => item.score > 0 && !alreadyShown.has(text(item.product?.id, 200)))
     .sort((a, b) => b.score - a.score || a.index - b.index);
 
-  const topScore = scored[0]?.score || 0;
+  const exactTitleScored = keepBestExactTitleGroup(scored, catalogue.products, query);
+  const source = exactTitleScored.length || distinctiveTitleTokens(catalogue.products, query).length ? exactTitleScored : scored;
+  const topScore = source[0]?.score || 0;
   const floor = relevanceFloor(topScore);
-  const stronglyRelated = scored
+  const stronglyRelated = source
     .filter((item) => item.score >= floor)
     .map((item) => productCard(item.product))
     .filter((item) => item.id && item.title && (mode !== 'product_images' || item.imageUrl));
 
   let candidates = stronglyRelated;
 
-  if (!candidates.length && selected.length) {
+  if (!candidates.length && selected.length && !distinctiveTitleTokens(catalogue.products, query).length) {
     const selectedCategory = normalizeSearchText(selected[0]?.category || '');
     candidates = catalogue.products
       .filter((product: any) => {
@@ -157,7 +194,7 @@ export async function expandSalarDisplay(message: string, result: SalarResult): 
 
   const selectedRelevant = selected.filter((product) => {
     if (!product.id || alreadyShown.has(product.id)) return false;
-    const match = scored.find((item) => text(item.product?.id, 200) === product.id);
+    const match = source.find((item) => text(item.product?.id, 200) === product.id);
     return !topScore || Boolean(match && match.score >= floor);
   });
 
