@@ -70,6 +70,7 @@ const STORAGE_KEY = 'primehub-salar-chat-v5';
 const LEGACY_STORAGE_KEYS = ['primehub-salar-chat-v4', 'primehub-salar-chat-v3'];
 const CHAT_ID_KEY = 'primehub-salar-chat-id-v1';
 const MAX_SAVED_MESSAGES = 100;
+const MAX_SAVED_PRODUCTS_PER_MESSAGE = 600;
 
 function money(value: unknown) {
   const amount = Number(value);
@@ -110,7 +111,7 @@ function savedMessages(value: unknown): ChatMessage[] {
       content: String(item.content || '').slice(0, 6000),
       createdAt: item.createdAt ? String(item.createdAt).slice(0, 80) : undefined,
       imageUrl: item.imageUrl ? String(item.imageUrl).slice(0, 1600) : undefined,
-      products: Array.isArray(item.products) ? item.products.slice(0, 30) : [],
+      products: Array.isArray(item.products) ? item.products.slice(0, MAX_SAVED_PRODUCTS_PER_MESSAGE) : [],
       categories: Array.isArray(item.categories) ? item.categories.slice(0, 30) : [],
       displayMode: safeDisplayMode(item.displayMode),
       mention: item.mention && typeof item.mention === 'object'
@@ -126,6 +127,17 @@ function savedMessages(value: unknown): ChatMessage[] {
 
 function messageImage(message: ChatMessage) {
   return message.imagePreview || message.imageUrl || '';
+}
+
+function groupedImageProducts(products: ProductCard[]) {
+  const groups = new Map<string, ProductCard[]>();
+  for (const product of products) {
+    const label = String(product.category || '').trim() || 'More designs';
+    const current = groups.get(label) || [];
+    current.push(product);
+    groups.set(label, current);
+  }
+  return [...groups.entries()];
 }
 
 function orderIntent(value: string) {
@@ -596,6 +608,7 @@ export default function SalarWidget() {
 
             {messages.map((message, index) => {
               const imageOnlyProducts = message.displayMode === 'product_images' ? (message.products || []).filter((product) => product.imageUrl) : [];
+              const imageGroups = groupedImageProducts(imageOnlyProducts);
               const displayImage = messageImage(message);
               const showBubble = Boolean(message.content || displayImage || message.mention);
               const adminMessage = message.actor === 'admin';
@@ -624,12 +637,19 @@ export default function SalarWidget() {
                     ) : null}
 
                     {message.role === 'assistant' && imageOnlyProducts.length ? (
-                      <div className={`${showBubble ? 'mt-2' : ''} grid grid-cols-2 gap-2`}>
-                        {imageOnlyProducts.map((product) => (
-                          <button key={product.id} type="button" onClick={() => toggleProduct(product)} className={`relative block aspect-square overflow-hidden rounded-2xl border bg-[#F4F4F1] shadow-sm ${selected(product.id) ? 'border-[#0F6A5F] ring-2 ring-[#0F6A5F]/30' : 'border-black/8'}`} aria-label={`Select ${product.title}`}>
-                            <img src={product.imageUrl} alt={product.title || 'Product'} className="h-full w-full object-cover"/>
-                            {selected(product.id) ? <span className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-[#0F6A5F] text-white"><Check size={14}/></span> : null}
-                          </button>
+                      <div className={`${showBubble ? 'mt-2' : ''} space-y-3`}>
+                        {imageGroups.map(([groupName, groupProducts]) => (
+                          <div key={groupName}>
+                            {imageGroups.length > 1 ? <p className="mb-1.5 text-[9px] font-black uppercase tracking-wide text-black/50">{groupName}</p> : null}
+                            <div className="grid grid-cols-5 gap-1.5">
+                              {groupProducts.map((product) => (
+                                <button key={product.id} type="button" onClick={() => toggleProduct(product)} className={`relative block aspect-square overflow-hidden rounded-xl border bg-[#F4F4F1] shadow-sm ${selected(product.id) ? 'border-[#0F6A5F] ring-2 ring-[#0F6A5F]/30' : 'border-black/8'}`} aria-label={`Select ${product.title}`}>
+                                  <img src={product.imageUrl} alt={product.title || 'Product'} className="h-full w-full object-cover"/>
+                                  {selected(product.id) ? <span className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-[#0F6A5F] text-white"><Check size={11}/></span> : null}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
                         ))}
                       </div>
                     ) : null}
