@@ -18,6 +18,7 @@ import RewardsTermsManager from '@/components/admin/RewardsTermsManager';
 import ResellerWhatsAppRequests from '@/components/admin/ResellerWhatsAppRequests';
 import WhatsAppCoexistenceSetup from '@/components/admin/WhatsAppCoexistenceSetup';
 import WholesaleVideoManager from '@/components/admin/WholesaleVideoManager';
+import SalarControlPanel from '@/components/admin/SalarControlPanel';
 
 type SectionDefinition = {
   title: string;
@@ -92,6 +93,12 @@ const SECTIONS: Record<string, SectionDefinition> = {
     eyebrow: 'WhatsApp',
     description: 'Manage WhatsApp bot setup and coexistence.',
     content: <WhatsAppCoexistenceSetup />,
+  },
+  salar: {
+    title: 'Salar',
+    eyebrow: 'AI Salesman',
+    description: 'Manage Salar instructions and refresh his cached PrimeHubMall catalogue.',
+    content: <SalarControlPanel />,
   },
   suppliers: {
     title: 'Suppliers',

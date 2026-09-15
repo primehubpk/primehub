@@ -9,6 +9,21 @@ const WEEKDAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'frida
 type Weekday = (typeof WEEKDAYS)[number];
 type IncomingItem = { id?: string | number; productId?: string; name?: string; title?: string; price?: number; originalPrice?: number; image?: string; imageUrl?: string; qty?: number; quantity?: number; dealDay?: Weekday; variant?: { color?: string; size?: string } };
 type Customer = { name: string; phone: string; email?: string; address: string; city: string; notes?: string };
+type SalarOrderContext = { chatId: string; customerImageUrls: string[]; markedImageUrl?: string };
+
+function safeHttpsUrl(value: unknown) { try { const url = new URL(String(value || '').trim()); return url.protocol === 'https:' ? url.toString().slice(0, 1600) : ''; } catch { return ''; } }
+function cleanSalarOrderContext(value: unknown): SalarOrderContext | null {
+  if (!value || typeof value !== 'object') return null;
+  const source = value as Record<string, unknown>;
+  if (source.source !== 'salar') return null;
+  const chatId = String(source.chatId || '').trim();
+  if (!/^[A-Za-z0-9_-]{12,80}$/.test(chatId)) return null;
+  const customerImageUrls = Array.isArray(source.customerImageUrls)
+    ? [...new Set(source.customerImageUrls.map(safeHttpsUrl).filter(Boolean))].slice(0, 12)
+    : [];
+  const markedImageUrl = safeHttpsUrl(source.markedImageUrl);
+  return { chatId, customerImageUrls, ...(markedImageUrl ? { markedImageUrl } : {}) };
+}
 type RewardWallet = { freeDeliveryCredits?: number; history?: any[]; [key: string]: any };
 
 function pakistanWeekday(): Weekday { const day = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Karachi', weekday: 'long' }).format(new Date()).toLowerCase(); return (WEEKDAYS.includes(day as Weekday) ? day : 'sunday') as Weekday; }
@@ -60,7 +75,8 @@ export async function POST(request: Request) {
     const customer = body?.customer as Customer | undefined;
     if (!customer?.name?.trim() || !customer?.phone?.trim() || (!selfCollect && (!customer?.address?.trim() || !customer?.city?.trim()))) return NextResponse.json({ error: selfCollect ? 'Name and phone are required.' : 'Name, phone, address and city are required.' }, { status: 400 });
     const resellerUserId = reseller?.userId || ''; const resellerGuestId = cleanGuestId(body?.guestId); const orderRef = getAdminDb().collection('orders').doc();
-    const orderData: any = { customer: { name: customer.name.trim(), phone: customer.phone.trim(), email: String(customer.email || '').trim(), address: selfCollect ? 'PrimeHub Shop Pickup' : customer.address.trim(), city: selfCollect ? 'Lahore' : customer.city.trim(), notes: String(customer.notes || '').trim() }, ...quote, idempotencyKey: `website-order:${orderRef.id}`, currency: 'PKR', status: 'pending', source: 'website', createdAt: new Date() };
+    const salar = cleanSalarOrderContext(body?.orderContext);
+    const orderData: any = { customer: { name: customer.name.trim(), phone: customer.phone.trim(), email: String(customer.email || '').trim(), address: selfCollect ? 'PrimeHub Shop Pickup' : customer.address.trim(), city: selfCollect ? 'Lahore' : customer.city.trim(), notes: String(customer.notes || '').trim() }, ...quote, idempotencyKey: `${salar ? 'salar' : 'website'}-order:${orderRef.id}`, currency: 'PKR', status: 'pending', source: salar ? 'salar' : 'website', ...(salar ? { salar } : {}), createdAt: new Date() };
     if (resellerUserId) orderData.resellerUserId = resellerUserId; if (resellerGuestId) orderData.resellerGuestId = resellerGuestId;
     await orderRef.set(orderData);
     if (user && freeDeliveryReward) {
