@@ -137,7 +137,7 @@ function normalizeMention(value: any): SalarStoredMention | undefined {
 
 function normalizeProducts(value: unknown): SalarStoredProduct[] {
   if (!Array.isArray(value)) return [];
-  return value.slice(0, 12).map((item: any) => {
+  return value.slice(0, 30).map((item: any) => {
     const imageUrl = safeHttpsUrl(item?.imageUrl);
     return Object.fromEntries(Object.entries({
       id: cleanText(item?.id, 200),
@@ -154,7 +154,7 @@ function normalizeProducts(value: unknown): SalarStoredProduct[] {
 
 function normalizeCategories(value: unknown): SalarStoredCategory[] {
   if (!Array.isArray(value)) return [];
-  return value.slice(0, 12).map((item: any) => {
+  return value.slice(0, 30).map((item: any) => {
     const imageUrl = safeHttpsUrl(item?.imageUrl);
     return Object.fromEntries(Object.entries({
       id: cleanText(item?.id, 200),
@@ -200,7 +200,7 @@ function normalizeContext(value: any): SalarStoredContext {
   return {
     lastProductQuery: cleanText(value.lastProductQuery, 500) || undefined,
     shownProductIds: Array.isArray(value.shownProductIds)
-      ? value.shownProductIds.map((id: unknown) => cleanText(id, 200)).filter(Boolean).slice(-80)
+      ? value.shownProductIds.map((id: unknown) => cleanText(id, 200)).filter(Boolean).slice(-120)
       : [],
   };
 }
