@@ -1,0 +1,45 @@
+name: Salar order memory patch
+
+on:
+  push:
+    branches:
+      - fix/salar-instruction-first
+    paths:
+      - .github/workflows/salar-order-memory-patch.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout active branch
+        uses: actions/checkout@v4
+        with:
+          ref: fix/salar-instruction-first
+          fetch-depth: 0
+
+      - name: Apply model-driven order memory patch
+        run: python scripts/salar-order-memory-patch.py
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: TypeScript check
+        run: npx tsc --noEmit
+
+      - name: Commit tested patch
+        run: |
+          git config user.name "PrimeHub Salar Patch"
+          git config user.email "actions@users.noreply.github.com"
+          git add lib/salar/chatStore.ts lib/salar/modelDrivenEngine.ts app/api/salar/chat/route.ts components/salar/SalarWidget.tsx app/api/orders/route.ts
+          git diff --cached --quiet && exit 0
+          git commit -m "fix(salar): make model own persistent order flow"
+          git push origin HEAD:fix/salar-instruction-first
