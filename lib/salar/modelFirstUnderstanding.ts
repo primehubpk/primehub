@@ -68,6 +68,25 @@ function parseUnderstanding(raw: string, originalMessage: string): SalarUndersta
   }
 }
 
+function looseUnderstanding(raw: string, originalMessage: string): SalarUnderstanding | null {
+  const text = cleanText(raw, 1600);
+  if (!text) return null;
+
+  const searchMatch = text.match(/search\s*text\s*[:=\-]\s*["']?([^\n,}\"']+)/i)
+    || text.match(/searchText\s*[:=\-]\s*["']?([^\n,}\"']+)/i);
+  const intentMatch = text.match(/intent(?:Summary)?\s*[:=\-]\s*["']?([^\n,}\"']+)/i);
+  const searchText = cleanText(searchMatch?.[1] || text, 900) || cleanText(originalMessage, 1200);
+  const intentSummary = cleanText(intentMatch?.[1] || text, 500);
+  const explicitlyNoCatalogue = /wantsCatalogue\s*[:=]\s*false/i.test(text);
+
+  return {
+    searchText,
+    intentSummary,
+    requirements: [],
+    wantsCatalogue: !explicitlyNoCatalogue,
+  };
+}
+
 export async function understandCustomerWithGroq(input: {
   message: string;
   history?: unknown;
@@ -86,7 +105,7 @@ export async function understandCustomerWithGroq(input: {
     'Understand Roman Urdu, Urdu, English and mixed language naturally, including spelling mistakes, phonetic spellings, incomplete words, slang and short follow-ups.',
     'Use recent conversation context to understand short replies such as yes/no/more/okay when the meaning is clear from the previous turn.',
     'Normalize likely spelling mistakes and produce the best catalogue-search meaning. Preserve exact product titles or product ids when the message contains an exact selected-product reference.',
-    'Extract requirements generically, such as size, colour, material, design/style, quantity, budget or another concrete constraint. Do not invent a requirement that the customer did not imply.',
+    'Extract requirements generically, such as size, colour, material, design/style, quantity, budget, recipient/adult/kids context, or another concrete constraint. Do not invent a requirement that the customer did not imply.',
     'Do not invent products, prices, stock or website facts.',
     'Return JSON only in this shape: {"searchText":"best normalized catalogue search phrase","intentSummary":"short plain-language meaning","requirements":[{"name":"constraint name","value":"constraint value"}],"wantsCatalogue":true}.',
     'If the message is normal conversation and does not need catalogue lookup, set wantsCatalogue=false but still describe the meaning accurately.',
@@ -109,7 +128,7 @@ export async function understandCustomerWithGroq(input: {
         body: JSON.stringify({
           model,
           messages,
-          temperature: 0.1,
+          temperature: 0.05,
           max_tokens: 320,
         }),
         cache: 'no-store',
@@ -126,6 +145,12 @@ export async function understandCustomerWithGroq(input: {
       const raw = cleanText(data?.choices?.[0]?.message?.content, 3000);
       const parsed = parseUnderstanding(raw, message);
       if (parsed) return parsed;
+
+      const loose = looseUnderstanding(raw, message);
+      if (loose) {
+        console.warn(`Salar model-first Groq key ${index + 1} returned imperfect JSON; using its understood meaning.`);
+        return loose;
+      }
     } catch (error) {
       console.warn(`Salar model-first Groq key ${index + 1} failed`, error instanceof Error ? error.message : 'unknown');
     }
