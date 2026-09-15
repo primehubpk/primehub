@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { answerWithSalar, type SalarImageInput } from '@/lib/salar/server';
+import { answerWithSalar, type SalarImageInput } from '@/lib/salar/chatEngine';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
