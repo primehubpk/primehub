@@ -106,7 +106,7 @@ function savedMessages(value: unknown): ChatMessage[] {
           }
         : undefined,
     }))
-    .filter((item) => item.content || item.imageUrl || item.products?.length || item.categories?.length || item.mention);
+    .filter((item) => item.content || item.imageUrl || item.products?.length || item.categories?.length || item.mention) as ChatMessage[];
 }
 
 function messageImage(message: ChatMessage) {
@@ -383,7 +383,7 @@ export default function SalarWidget() {
   }
 
   const chatShellClass = expanded
-    ? 'relative fixed inset-0 z-[80] flex h-[100dvh] w-screen flex-col overflow-hidden bg-[#FFFDF8] shadow-2xl'
+    ? 'relative flex h-[100dvh] w-screen flex-col overflow-hidden bg-[#FFFDF8] shadow-2xl'
     : 'relative flex h-[min(620px,calc(100dvh-120px))] w-[min(390px,calc(100vw-24px))] flex-col overflow-hidden rounded-[26px] border border-black/10 bg-[#FFFDF8] shadow-2xl';
 
   return (
