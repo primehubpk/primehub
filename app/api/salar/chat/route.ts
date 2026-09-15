@@ -68,7 +68,7 @@ function safeReferences(value: unknown): SalarStoredProduct[] {
       originalPrice: finiteNumber(item?.originalPrice),
       stock: finiteNumber(item?.stock),
       category: cleanText(item?.category, 220) || undefined,
-    }).filter(([, field]) => field !== undefined && field !== '')) as SalarStoredProduct;
+    }).filter(([, field]) => field !== undefined && field !== '')) as unknown as SalarStoredProduct;
   }).filter(Boolean) as SalarStoredProduct[];
 }
 

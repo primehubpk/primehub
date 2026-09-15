@@ -9,6 +9,8 @@ export type SalarStoredProduct = {
   title: string;
   path?: string;
   imageUrl?: string;
+  imageUrls?: string[];
+  variantColors?: Array<{ name: string; imageUrl?: string }>;
   price?: number;
   originalPrice?: number;
   stock?: number;
@@ -140,11 +142,23 @@ function normalizeProducts(value: unknown): SalarStoredProduct[] {
   if (!Array.isArray(value)) return [];
   return value.slice(0, MAX_PRODUCTS_PER_MESSAGE).map((item: any) => {
     const imageUrl = safeHttpsUrl(item?.imageUrl);
+    const imageUrls = Array.isArray(item?.imageUrls)
+      ? [...new Set(item.imageUrls.map((url: unknown) => safeHttpsUrl(url)).filter(Boolean))].slice(0, 8)
+      : [];
+    const variantColors = Array.isArray(item?.variantColors)
+      ? item.variantColors.slice(0, 30).map((variant: any) => {
+          const name = cleanText(variant?.name ?? variant, 120);
+          const variantImage = safeHttpsUrl(variant?.imageUrl);
+          return name ? { name, ...(variantImage ? { imageUrl: variantImage } : {}) } : null;
+        }).filter(Boolean)
+      : [];
     return Object.fromEntries(Object.entries({
       id: cleanText(item?.id, 200),
       title: cleanText(item?.title, 300),
       path: cleanText(item?.path, 500),
       imageUrl: imageUrl || undefined,
+      imageUrls: imageUrls.length ? imageUrls : undefined,
+      variantColors: variantColors.length ? variantColors : undefined,
       price: finiteNumber(item?.price),
       originalPrice: finiteNumber(item?.originalPrice),
       stock: finiteNumber(item?.stock),

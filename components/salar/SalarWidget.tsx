@@ -1,7 +1,7 @@
 'use client';
 
-import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
-import { Bot, Check, Forward, ImagePlus, Maximize2, Menu, Minus, Minimize2, Plus, Send, ShoppingCart, X } from 'lucide-react';
+import { FormEvent, PointerEvent as ReactPointerEvent, useCallback, useEffect, useRef, useState } from 'react';
+import { Bot, Check, Forward, ImagePlus, Maximize2, Menu, Minus, Minimize2, Pencil, Plus, RotateCcw, Send, ShoppingCart, X, ZoomIn, ZoomOut } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { doc, getDoc } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -13,6 +13,8 @@ type ProductCard = {
   title: string;
   path: string;
   imageUrl?: string;
+  imageUrls?: string[];
+  variantColors?: Array<{ name: string; imageUrl?: string }>;
   price?: number;
   originalPrice?: number;
   stock?: number;
@@ -229,9 +231,16 @@ export default function SalarWidget() {
   const [orderLoading, setOrderLoading] = useState(false);
   const [orderError, setOrderError] = useState('');
   const [orderId, setOrderId] = useState('');
+  const [imageEditor, setImageEditor] = useState<{ product: ProductCard; sourceUrl: string } | null>(null);
+  const [editorZoom, setEditorZoom] = useState(1);
+  const [editorReady, setEditorReady] = useState(false);
+  const [editorError, setEditorError] = useState('');
+  const [editorNonce, setEditorNonce] = useState(0);
   const fileRef = useRef<HTMLInputElement | null>(null);
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
   const endRef = useRef<HTMLDivElement | null>(null);
+  const editorCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const editorDrawingRef = useRef(false);
 
   useEffect(() => {
     const stop = onAuthStateChanged(auth, (user) => {
@@ -346,6 +355,34 @@ export default function SalarWidget() {
     return () => window.cancelAnimationFrame(frame);
   }, [messages.length, open, sending, adminDrawerOpen]);
 
+  useEffect(() => {
+    if (!imageEditor) return;
+    const canvas = editorCanvasRef.current;
+    if (!canvas) return;
+    setEditorReady(false);
+    setEditorError('');
+    const image = new Image();
+    image.onload = () => {
+      const maxSide = 1200;
+      const naturalWidth = Math.max(1, image.naturalWidth || image.width);
+      const naturalHeight = Math.max(1, image.naturalHeight || image.height);
+      const ratio = Math.min(1, maxSide / Math.max(naturalWidth, naturalHeight));
+      canvas.width = Math.max(1, Math.round(naturalWidth * ratio));
+      canvas.height = Math.max(1, Math.round(naturalHeight * ratio));
+      const context2d = canvas.getContext('2d');
+      if (!context2d) {
+        setEditorError('Image editor start nahi ho saka.');
+        return;
+      }
+      context2d.clearRect(0, 0, canvas.width, canvas.height);
+      context2d.drawImage(image, 0, 0, canvas.width, canvas.height);
+      setEditorReady(true);
+    };
+    image.onerror = () => setEditorError('Image edit ke liye load nahi ho saki. Dobara try karein.');
+    image.src = `/api/salar/image-proxy?url=${encodeURIComponent(imageEditor.sourceUrl)}&v=${editorNonce}`;
+    return () => { image.src = ''; };
+  }, [imageEditor, editorNonce]);
+
   if (pathname?.startsWith('/admin')) return null;
 
   function clearImage() {
@@ -375,6 +412,73 @@ export default function SalarWidget() {
 
   function selected(id: string) {
     return selectedProducts.some((product) => product.id === id);
+  }
+
+  function openImageEditor(product: ProductCard) {
+    if (!product.imageUrl) return;
+    setSelectedProducts((current) => current.some((item) => item.id === product.id) ? current : [...current, product].slice(0, 30));
+    setImageEditor({ product, sourceUrl: product.imageUrl });
+    setEditorZoom(1);
+    setEditorReady(false);
+    setEditorError('');
+    setEditorNonce((value) => value + 1);
+  }
+
+  function editorPoint(event: ReactPointerEvent<HTMLCanvasElement>) {
+    const canvas = editorCanvasRef.current;
+    if (!canvas) return null;
+    const rect = canvas.getBoundingClientRect();
+    if (!rect.width || !rect.height) return null;
+    return {
+      x: (event.clientX - rect.left) * (canvas.width / rect.width),
+      y: (event.clientY - rect.top) * (canvas.height / rect.height),
+    };
+  }
+
+  function startEditorMark(event: ReactPointerEvent<HTMLCanvasElement>) {
+    if (!editorReady) return;
+    const canvas = editorCanvasRef.current;
+    const point = editorPoint(event);
+    const context2d = canvas?.getContext('2d');
+    if (!canvas || !point || !context2d) return;
+    editorDrawingRef.current = true;
+    canvas.setPointerCapture?.(event.pointerId);
+    context2d.beginPath();
+    context2d.moveTo(point.x, point.y);
+    context2d.lineCap = 'round';
+    context2d.lineJoin = 'round';
+    context2d.strokeStyle = '#E1352B';
+    context2d.lineWidth = Math.max(7, Math.round(canvas.width / 95));
+  }
+
+  function moveEditorMark(event: ReactPointerEvent<HTMLCanvasElement>) {
+    if (!editorDrawingRef.current) return;
+    const canvas = editorCanvasRef.current;
+    const point = editorPoint(event);
+    const context2d = canvas?.getContext('2d');
+    if (!point || !context2d) return;
+    context2d.lineTo(point.x, point.y);
+    context2d.stroke();
+  }
+
+  function stopEditorMark(event?: ReactPointerEvent<HTMLCanvasElement>) {
+    const canvas = editorCanvasRef.current;
+    if (event && canvas?.hasPointerCapture?.(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
+    editorDrawingRef.current = false;
+  }
+
+  async function sendMarkedImage() {
+    const canvas = editorCanvasRef.current;
+    const editor = imageEditor;
+    if (!canvas || !editor || !editorReady || sending) return;
+    setEditorError('');
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.92));
+    if (!blob) return setEditorError('Marked image save nahi ho saki. Dobara try karein.');
+    const file = new File([blob], `salar-colour-reference-${Date.now()}.jpg`, { type: 'image/jpeg' });
+    const preview = canvas.toDataURL('image/jpeg', 0.9);
+    const product = { ...editor.product, imageUrl: editor.sourceUrl };
+    setImageEditor(null);
+    await sendMessage('Is marked image mein jis colour par maine nishan lagaya hai woh chahiye. Is photo ko mere order ka exact colour reference save karein.', file, preview, [product]);
   }
 
   async function quoteOrder(items: OrderItem[]) {
@@ -418,18 +522,42 @@ export default function SalarWidget() {
     if (!orderNumber) return;
     const number = await adminWhatsAppNumber();
     if (!number) return setOrderError('WhatsApp number website settings mein nahi mila.');
-    const lines = (quote?.items || orderItems).map((item: any, index: number) => `${index + 1}. ${item.title || item.name || 'Product'} x ${item.quantity || 1}`);
+    const quotedItems = (quote?.items || orderItems) as any[];
+    const lines = quotedItems.flatMap((item: any, index: number) => {
+      const local = orderItems.find((candidate) => candidate.id === item.productId || candidate.id === item.id || candidate.title === item.title);
+      const image = String(local?.imageUrl || item.image || item.imageUrl || '').trim();
+      return [
+        `${index + 1}. ${item.title || item.name || 'Product'} x ${item.quantity || 1}`,
+        image ? `   Product image: ${image}` : '',
+      ].filter(Boolean);
+    });
+    const customerImages = [...new Set([...messages]
+      .reverse()
+      .filter((message) => message.role === 'user' && message.imageUrl)
+      .map((message) => String(message.imageUrl || '').trim())
+      .filter(Boolean))].slice(0, 4);
+    const markedReference = [...messages].reverse().find((message) => (
+      message.role === 'user'
+      && message.imageUrl
+      && /(marked|nishan|colour reference|color reference|exact colour|exact color)/i.test(message.content || '')
+    ))?.imageUrl || '';
     const message = [
       '*PrimeHub Salar Order*',
       `Order ID: ${orderNumber}`,
       '',
       ...lines,
+      markedReference ? '' : '',
+      markedReference ? `*Marked colour reference:* ${markedReference}` : '',
+      customerImages.length ? '' : '',
+      customerImages.length ? '*Customer image references:*' : '',
+      ...customerImages.map((url, index) => `${index + 1}. ${url}`),
       '',
       `Name: ${orderCustomer.name}`,
       `Phone: ${orderCustomer.phone}`,
       `City: ${orderCustomer.city}`,
       `Address: ${orderCustomer.address}`,
       quote?.total != null ? `Total: Rs. ${Number(quote.total).toLocaleString('en-PK')}` : '',
+      'Advance requested: Rs. 300',
     ].filter(Boolean).join('\n');
     window.open(`https://wa.me/${number}?text=${encodeURIComponent(message)}`, '_blank', 'noopener,noreferrer');
   }
@@ -448,7 +576,7 @@ export default function SalarWidget() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
         body: JSON.stringify({
-          customer: { ...customer, notes: 'Order prepared through Salar chat. Advance requested: Rs. 500; remaining payment after ready-order video confirmation.' },
+          customer: { ...customer, notes: 'Order prepared through Salar chat. Advance requested: Rs. 300; remaining payment after ready-order video confirmation.' },
           items: items.map((item) => ({ productId: item.id, quantity: item.quantity })),
         }),
       });
@@ -531,8 +659,12 @@ export default function SalarWidget() {
       }
 
       const candidatesForOrder = references.length ? references : lastSharedProducts;
+      const lastAssistant = [...messages].reverse().find((item) => item.role === 'assistant')?.content || '';
+      const simpleYes = /^(?:yes|y|haan|han|haa|hmm yes|ok|okay|theek|thik|ji|g|jee|bilkul|kr do|kar do)[.! ]*$/i.test(message.trim());
+      const confirmsPreviousOrderQuestion = simpleYes && /(order|final|bill|design|baqi|remaining|include|add|3|teen)/i.test(lastAssistant);
+      const shouldDraftOrder = orderIntent(message) || confirmsPreviousOrderQuestion;
       let currentOrderItems = orderItems;
-      if (orderIntent(message) && !currentOrderItems.length && candidatesForOrder.length) {
+      if (shouldDraftOrder && !currentOrderItems.length && candidatesForOrder.length) {
         currentOrderItems = candidatesForOrder.map((product) => ({ ...product, quantity: 1 }));
         setOrderItems(currentOrderItems);
         void quoteOrder(currentOrderItems);
@@ -607,7 +739,12 @@ export default function SalarWidget() {
             {messages.length === 0 ? <div className="rounded-2xl bg-white p-4 text-xs leading-5 text-black/55 shadow-sm">Assalam-o-Alaikum! Main Salar hoon. Aap product, deal, offer ya PrimeHubMall ke bare mein pooch sakte hain — product ki photo bhi share kar sakte hain.</div> : null}
 
             {messages.map((message, index) => {
-              const imageOnlyProducts = message.displayMode === 'product_images' ? (message.products || []).filter((product) => product.imageUrl) : [];
+              const imageOnlyProducts = message.displayMode === 'product_images'
+                ? (message.products || []).flatMap((product) => {
+                    const urls = [...new Set([...(product.imageUrls || []), product.imageUrl].filter(Boolean) as string[])].slice(0, 8);
+                    return urls.map((url) => ({ ...product, imageUrl: url }));
+                  })
+                : [];
               const imageGroups = groupedImageProducts(imageOnlyProducts);
               const displayImage = messageImage(message);
               const showBubble = Boolean(message.content || displayImage || message.mention);
@@ -641,12 +778,15 @@ export default function SalarWidget() {
                         {imageGroups.map(([groupName, groupProducts]) => (
                           <div key={groupName}>
                             {imageGroups.length > 1 ? <p className="mb-1.5 text-[9px] font-black uppercase tracking-wide text-black/50">{groupName}</p> : null}
-                            <div className="grid grid-cols-5 gap-1.5">
+                            <div className="grid grid-cols-3 gap-2">
                               {groupProducts.map((product) => (
-                                <button key={product.id} type="button" onClick={() => toggleProduct(product)} className={`relative block aspect-square overflow-hidden rounded-xl border bg-[#F4F4F1] shadow-sm ${selected(product.id) ? 'border-[#0F6A5F] ring-2 ring-[#0F6A5F]/30' : 'border-black/8'}`} aria-label={`Select ${product.title}`}>
-                                  <img src={product.imageUrl} alt={product.title || 'Product'} className="h-full w-full object-cover"/>
-                                  {selected(product.id) ? <span className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-[#0F6A5F] text-white"><Check size={11}/></span> : null}
-                                </button>
+                                <div key={`${product.id}-${product.imageUrl || 'image'}`} className={`relative aspect-square overflow-hidden rounded-xl border bg-[#F4F4F1] shadow-sm ${selected(product.id) ? 'border-[#0F6A5F] ring-2 ring-[#0F6A5F]/30' : 'border-black/8'}`}>
+                                  <button type="button" onClick={() => toggleProduct(product)} className="absolute inset-0 block h-full w-full" aria-label={`Select ${product.title}`}>
+                                    <img src={product.imageUrl} alt={product.title || 'Product'} className="h-full w-full object-cover"/>
+                                    {selected(product.id) ? <span className="absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-[#0F6A5F] text-white"><Check size={12}/></span> : null}
+                                  </button>
+                                  {selected(product.id) ? <button type="button" onClick={() => openImageEditor(product)} className="absolute bottom-1.5 left-1.5 z-10 inline-flex items-center gap-1 rounded-full bg-black/78 px-2 py-1 text-[8px] font-black text-white shadow"><Pencil size={10}/>Edit</button> : null}
+                                </div>
                               ))}
                             </div>
                           </div>
@@ -662,7 +802,7 @@ export default function SalarWidget() {
                               {product.imageUrl ? <img src={product.imageUrl} alt={product.title} className="h-full w-full object-cover"/> : <div className="flex h-full items-center justify-center text-[9px] font-black text-black/30">PrimeHubMall</div>}
                               {selected(product.id) ? <span className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-[#0F6A5F] text-white"><Check size={14}/></span> : null}
                             </button>
-                            <div className="p-2.5"><a href={product.path || `/product/${encodeURIComponent(product.id)}`} className="line-clamp-2 text-[10px] font-black leading-4 text-[#14140F]">{product.title}</a>{product.price != null ? <p className="mt-1 text-[10px] font-black text-[#E1352B]">{money(product.price)}</p> : null}</div>
+                            <div className="p-2.5"><a href={product.path || `/product/${encodeURIComponent(product.id)}`} className="line-clamp-2 text-[10px] font-black leading-4 text-[#14140F]">{product.title}</a>{product.price != null ? <p className="mt-1 text-[10px] font-black text-[#E1352B]">{money(product.price)}</p> : null}{selected(product.id) && product.imageUrl ? <button type="button" onClick={() => openImageEditor(product)} className="mt-2 inline-flex items-center gap-1 rounded-full bg-[#14140F] px-2 py-1 text-[8px] font-black text-white"><Pencil size={10}/>Edit colour</button> : null}</div>
                           </div>
                         ))}
                       </div>
@@ -674,7 +814,7 @@ export default function SalarWidget() {
 
             {orderItems.length ? (
               <div className="rounded-2xl border border-[#0F6A5F]/20 bg-white p-3 shadow-sm">
-                <div className="flex items-center justify-between gap-2"><div className="flex items-center gap-2"><ShoppingCart size={16} className="text-[#0F6A5F]"/><div><p className="text-[10px] font-black">Order draft</p><p className="text-[8px] text-black/40">Advance Rs. 500 · balance after ready-order video</p></div></div><button type="button" onClick={() => { setOrderItems([]); setOrderQuote(null); setOrderId(''); setOrderError(''); }} className="flex h-7 w-7 items-center justify-center rounded-full bg-[#F4F4F1]"><X size={13}/></button></div>
+                <div className="flex items-center justify-between gap-2"><div className="flex items-center gap-2"><ShoppingCart size={16} className="text-[#0F6A5F]"/><div><p className="text-[10px] font-black">Order draft</p><p className="text-[8px] text-black/40">Advance Rs. 300 · balance after ready-order video</p></div></div><button type="button" onClick={() => { setOrderItems([]); setOrderQuote(null); setOrderId(''); setOrderError(''); }} className="flex h-7 w-7 items-center justify-center rounded-full bg-[#F4F4F1]"><X size={13}/></button></div>
                 <div className="mt-2 space-y-2">{orderItems.map((item) => <div key={item.id} className="flex items-center gap-2 rounded-xl bg-[#F6F6F2] p-2">{item.imageUrl ? <img src={item.imageUrl} alt="" className="h-10 w-10 rounded-lg object-cover"/> : null}<p className="min-w-0 flex-1 line-clamp-2 text-[9px] font-bold">{item.title}</p><div className="flex items-center gap-1"><button type="button" onClick={() => changeQuantity(item.id, -1)} className="flex h-6 w-6 items-center justify-center rounded-full bg-white"><Minus size={11}/></button><span className="w-5 text-center text-[9px] font-black">{item.quantity}</span><button type="button" onClick={() => changeQuantity(item.id, 1)} className="flex h-6 w-6 items-center justify-center rounded-full bg-white"><Plus size={11}/></button></div></div>)}</div>
                 {orderQuote ? <div className="mt-2 rounded-xl bg-[#FFF7E7] p-2.5 text-[9px]"><div className="flex justify-between"><span>Subtotal</span><b>{money(orderQuote.subtotal ?? orderQuote.rawSubtotal)}</b></div><div className="mt-1 flex justify-between"><span>Delivery</span><b>{money(orderQuote.deliveryCharge)}</b></div><div className="mt-1 flex justify-between text-[10px]"><span className="font-black">Total</span><b className="text-[#E1352B]">{money(orderQuote.total)}</b></div></div> : null}
                 {!orderId ? <div className="mt-3 grid grid-cols-2 gap-2"><input value={orderCustomer.name} onChange={(event) => setOrderCustomer((current) => ({ ...current, name: event.target.value }))} placeholder="Name" className="rounded-xl bg-[#F4F4F1] px-3 py-2 text-[9px] outline-none"/><input value={orderCustomer.phone} onChange={(event) => setOrderCustomer((current) => ({ ...current, phone: event.target.value }))} placeholder="Contact" className="rounded-xl bg-[#F4F4F1] px-3 py-2 text-[9px] outline-none"/><input value={orderCustomer.city} onChange={(event) => setOrderCustomer((current) => ({ ...current, city: event.target.value }))} placeholder="City" className="rounded-xl bg-[#F4F4F1] px-3 py-2 text-[9px] outline-none"/><input value={orderCustomer.address} onChange={(event) => setOrderCustomer((current) => ({ ...current, address: event.target.value }))} placeholder="Complete address" className="rounded-xl bg-[#F4F4F1] px-3 py-2 text-[9px] outline-none"/></div> : null}
@@ -686,6 +826,38 @@ export default function SalarWidget() {
             {sending ? <div className="inline-flex rounded-2xl bg-white px-3.5 py-2.5 text-[10px] font-bold text-black/40 shadow-sm">Salar is typing…</div> : null}
             <div ref={endRef}/>
           </div>
+
+          {imageEditor ? (
+            <div className="absolute inset-0 z-[95] flex flex-col bg-[#11110F]/95 text-white">
+              <div className="flex shrink-0 items-center justify-between border-b border-white/10 px-3 py-3">
+                <div className="min-w-0"><p className="text-xs font-black">Colour mark karein</p><p className="truncate text-[9px] text-white/60">{imageEditor.product.title}</p></div>
+                <button type="button" onClick={() => setImageEditor(null)} className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10"><X size={17}/></button>
+              </div>
+              <div className="flex-1 overflow-auto p-3">
+                <div className="flex min-h-full items-center justify-center">
+                  <canvas
+                    ref={editorCanvasRef}
+                    onPointerDown={startEditorMark}
+                    onPointerMove={moveEditorMark}
+                    onPointerUp={stopEditorMark}
+                    onPointerCancel={stopEditorMark}
+                    className="h-auto max-w-none touch-none rounded-xl bg-white shadow-2xl"
+                    style={{ width: `${Math.round(editorZoom * 100)}%` }}
+                  />
+                </div>
+              </div>
+              <div className="shrink-0 border-t border-white/10 bg-[#171713] p-3">
+                <p className="mb-2 text-[9px] leading-4 text-white/65">Image ko zoom karein aur jis colour par chahen ungli se nishan/circle laga dein. Salar isi marked photo ko exact colour reference ke taur par save karega.</p>
+                {editorError ? <p className="mb-2 text-[9px] font-bold text-[#FF9D97]">{editorError}</p> : null}
+                <div className="flex items-center gap-2">
+                  <button type="button" onClick={() => setEditorZoom((value) => Math.max(0.75, Number((value - 0.25).toFixed(2))))} className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10"><ZoomOut size={15}/></button>
+                  <button type="button" onClick={() => setEditorZoom((value) => Math.min(2.5, Number((value + 0.25).toFixed(2))))} className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10"><ZoomIn size={15}/></button>
+                  <button type="button" onClick={() => setEditorNonce((value) => value + 1)} className="flex h-9 items-center gap-1 rounded-full bg-white/10 px-3 text-[8px] font-black"><RotateCcw size={13}/>Reset</button>
+                  <button type="button" disabled={!editorReady || sending} onClick={() => void sendMarkedImage()} className="ml-auto rounded-full bg-[#E1352B] px-4 py-2.5 text-[9px] font-black text-white disabled:opacity-40">Send marked image</button>
+                </div>
+              </div>
+            </div>
+          ) : null}
 
           <form onSubmit={submit} className="shrink-0 border-t border-black/8 bg-white p-3">
             {selectedProducts.length ? (
