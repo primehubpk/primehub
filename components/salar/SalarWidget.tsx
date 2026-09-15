@@ -131,6 +131,35 @@ function messageImage(message: ChatMessage) {
   return message.imagePreview || message.imageUrl || '';
 }
 
+function proxiedCatalogueImage(url: string) {
+  return `/api/salar/image-proxy?url=${encodeURIComponent(url)}`;
+}
+
+function SalarCatalogueImage({ src, alt, className }: { src: string; alt: string; className: string }) {
+  const [retryWithProxy, setRetryWithProxy] = useState(false);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    setRetryWithProxy(false);
+    setFailed(false);
+  }, [src]);
+
+  if (failed) return <div className={`${className} flex items-center justify-center bg-[#F4F4F1] px-2 text-center text-[9px] font-black text-black/35`}>Image loading...</div>;
+
+  return (
+    <img
+      src={retryWithProxy ? proxiedCatalogueImage(src) : src}
+      alt={alt}
+      className={className}
+      referrerPolicy="no-referrer"
+      onError={() => {
+        if (!retryWithProxy) setRetryWithProxy(true);
+        else setFailed(true);
+      }}
+    />
+  );
+}
+
 function groupedImageProducts(products: ProductCard[]) {
   const groups = new Map<string, ProductCard[]>();
   for (const product of products) {
@@ -782,7 +811,7 @@ export default function SalarWidget() {
                               {groupProducts.map((product) => (
                                 <div key={`${product.id}-${product.imageUrl || 'image'}`} className={`relative aspect-square overflow-hidden rounded-xl border bg-[#F4F4F1] shadow-sm ${selected(product.id) ? 'border-[#0F6A5F] ring-2 ring-[#0F6A5F]/30' : 'border-black/8'}`}>
                                   <button type="button" onClick={() => toggleProduct(product)} className="absolute inset-0 block h-full w-full" aria-label={`Select ${product.title}`}>
-                                    <img src={product.imageUrl} alt={product.title || 'Product'} className="h-full w-full object-cover"/>
+                                    <SalarCatalogueImage src={String(product.imageUrl || '')} alt={product.title || 'Product'} className="h-full w-full object-cover"/>
                                     {selected(product.id) ? <span className="absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-[#0F6A5F] text-white"><Check size={12}/></span> : null}
                                   </button>
                                   {selected(product.id) ? <button type="button" onClick={() => openImageEditor(product)} className="absolute bottom-1.5 left-1.5 z-10 inline-flex items-center gap-1 rounded-full bg-black/78 px-2 py-1 text-[8px] font-black text-white shadow"><Pencil size={10}/>Edit</button> : null}

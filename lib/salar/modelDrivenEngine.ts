@@ -142,9 +142,9 @@ function productImageUrls(product: any) {
     product?.image,
   ];
   const urls = images
-    .map((value) => safeHttpsUrl(typeof value === 'string' ? value : value?.url))
+    .map((value) => safeHttpsUrl(typeof value === 'string' ? value : value?.url || value?.imageUrl || value?.src || value?.image))
     .filter(Boolean);
-  return [...new Set(urls)].slice(0, 8);
+  return [...new Set(urls)].slice(0, 12);
 }
 
 function productImageUrl(product: any) {
@@ -406,12 +406,12 @@ function parseInterpretation(raw: string): Interpretation | null {
 }
 
 async function analyzeImage(image: SalarModelImageInput, message: string) {
-  const system = 'Understand this customer image for catalogue retrieval and sales context only. Describe visible product type, design/style, material if clear, colours, pattern and useful distinguishing details. If the customer has drawn a mark/circle/arrow on a product image, explicitly identify the visibly marked colour or area. If it is clearly a payment screenshot, identify it as payment proof and only mention an amount if it is visibly legible. Do not invent brand, price, stock or SKU. Return one compact line.';
+  const system = 'Understand this customer image for catalogue retrieval and sales context only. Describe visible product type, design/style, material if clear, colours, pattern and useful distinguishing details. If the customer asks whether a colour is present, explicitly say whether that requested colour is visibly present in the image. If the customer has drawn a mark/circle/arrow on a product image, explicitly identify the visibly marked colour or area. If it is clearly a payment screenshot, identify it as payment proof and only mention an amount if it is visibly legible. Do not invent brand, price, stock or SKU. Return one compact line.';
   try {
     return await runProviders({
       system,
       history: [],
-      user: message ? `Customer message: ${cleanText(message, 500)}\nDescribe the image for catalogue search.` : 'Describe the image for catalogue search.',
+      user: message ? `Customer message: ${cleanText(message, 500)}\nInspect the image carefully and answer the visible-colour/design question for sales context.` : 'Describe the image for catalogue search.',
       image,
       useVisionModel: true,
       maxTokens: 260,
@@ -421,6 +421,44 @@ async function analyzeImage(image: SalarModelImageInput, message: string) {
     console.warn('Salar image understanding unavailable', error instanceof Error ? error.message : 'unknown');
     return null;
   }
+}
+
+function asksAboutVisibleProductImage(message: string) {
+  return /(colou?r|rang|blue|red|green|pink|black|white|gold(?:en)?|silver|orange|yellow|purple|maroon|mehroon|brown|grey|gray|navy|sky|turquoise|mint|pic|photo|image|tasveer|design|style|isme|is mein|iss mein|mil jay|mil ja|available)/i.test(message);
+}
+
+function imageMimeType(value: string) {
+  const contentType = cleanText(value, 120).toLowerCase().split(';')[0];
+  return contentType.startsWith('image/') ? contentType : '';
+}
+
+async function catalogueReferenceVision(catalogue: SalarCatalogue, exactProductIds: string[], message: string) {
+  if (!exactProductIds.length || !asksAboutVisibleProductImage(message)) return null;
+  const exactIds = new Set(exactProductIds);
+  const exactProducts = catalogue.products.filter((product: any) => exactIds.has(cleanText(product?.id, 200)));
+  for (const product of exactProducts) {
+    for (const imageUrl of productImageUrls(product).slice(0, 4)) {
+      try {
+        const response = await fetch(imageUrl, {
+          cache: 'no-store',
+          headers: { Accept: 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8', 'User-Agent': 'PrimeHubMall-Salar/1.0' },
+          signal: AbortSignal.timeout(7000),
+        });
+        if (!response.ok) continue;
+        const mimeType = imageMimeType(response.headers.get('content-type') || '');
+        if (!mimeType) continue;
+        const declared = Number(response.headers.get('content-length') || 0);
+        if (Number.isFinite(declared) && declared > 4 * 1024 * 1024) continue;
+        const bytes = await response.arrayBuffer();
+        if (!bytes.byteLength || bytes.byteLength > 4 * 1024 * 1024) continue;
+        const vision = await analyzeImage({ mimeType, base64: Buffer.from(bytes).toString('base64') }, message);
+        if (vision) return vision;
+      } catch (error) {
+        console.warn('Salar selected catalogue image could not be inspected; trying next image.', error instanceof Error ? error.message : 'unknown');
+      }
+    }
+  }
+  return null;
 }
 
 function appendWithinBudget(sections: string[], maxChars: number) {
@@ -878,7 +916,7 @@ function buildFinalSystem(input: {
     'If resultScope=focused, keep showAllMatches=false and choose only the best relevant product ids from the candidate sample.',
     'Do not switch to categories just because a product/variant search has no matches. Categories should only be displayed when FIRST MODEL INTERPRETATION explicitly chose catalogueMode=categories.',
     'If a requested variant/size is unavailable for a selected item, say so briefly and offer matching available alternatives. If the customer then broadens the request, follow the current interpretation rather than re-imposing the old design.',
-    'CUSTOM COLOUR RULE: variant rows remain the first stock authority, but merchant-provided variantColors are also valid makeable colour choices even when that colour is not a stock-row variant. If the exact selected design has gallery/colour-reference images and the requested colour is not explicitly named in data, DO NOT incorrectly say the design cannot be made in that colour. Show the exact design with display=product_images and ask the customer to select the relevant image, tap Edit, mark/circle the desired colour and send it back. Treat a customer-marked image as the exact colour reference for that order. Never invent an unnamed colour as available before it is marked or otherwise evidenced.',
+    'CUSTOM COLOUR RULE: variant rows remain the first stock authority, but merchant-provided variantColors are also valid makeable colour choices even when that colour is not a stock-row variant. For an exact selected product, IMAGE UNDERSTANDING is valid visual evidence about colours actually visible in that product photo. If IMAGE UNDERSTANDING explicitly confirms the customer requested colour is visibly present, answer the customer directly that the shown colour can be used as the reference; do not make them mark it again unless the shade is ambiguous or they want a different colour. If the exact selected design has gallery/colour-reference images and the requested colour is not explicitly named in data or visibly confirmed, DO NOT incorrectly say the design cannot be made in that colour. Show the exact design with display=product_images and ask the customer to select the relevant image, tap Edit, mark/circle the desired colour and send it back. Treat a customer-marked image as the exact colour reference for that order. Never invent an unnamed colour as available before it is marked or otherwise evidenced.',
     'When the customer asks which other colours can be made for the same selected design, use availableColors/variantColors first. If gallery colour-reference images exist, show them with product_images so the customer can mark the desired colour. Explain naturally that the same style can be prepared in the chosen shown colour when merchant variantColors supports it.',
     'ORDER FLOW FOR SELECTED DESIGNS: remember the customer’s selected designs across short follow-ups. If one design is being discussed while two other designs were already selected, naturally ask whether those remaining two should also be included. When the customer confirms, finalize the selected designs, summarize the bill/order draft, request exactly Rs. 300 advance (not Rs. 500), and collect/save name, contact number, city and complete address. After the customer shares a payment screenshot, acknowledge it only if the image is actually understood as payment proof, keep the final order draft ready, and guide them to use the WhatsApp order button. The WhatsApp order must preserve the selected product images plus the customer-marked colour-reference image URL so the shop can match the exact colour.',
     'Keep the tone friendly, respectful and lightly playful/pyaar-mohabbat style where natural, without becoming unprofessional or making fake promises.',
@@ -952,7 +990,11 @@ export async function answerWithModelDrivenSalar(input: {
   const exactProductIds = Array.isArray(input.exactProductIds)
     ? input.exactProductIds.map((id) => cleanText(id, 200)).filter(Boolean).slice(0, 40)
     : [];
-  const vision = input.image ? await analyzeImage(input.image, message) : null;
+  const uploadedVision = input.image ? await analyzeImage(input.image, message) : null;
+  const selectedProductVision = !input.image
+    ? await catalogueReferenceVision(state.catalogue, exactProductIds, message)
+    : null;
+  const vision = uploadedVision || selectedProductVision;
 
   const understood = await interpretCustomer({
     message: message || 'Customer shared a product image and wants help.',

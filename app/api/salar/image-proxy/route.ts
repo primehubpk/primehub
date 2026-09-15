@@ -27,7 +27,7 @@ function catalogueImageUrls(product: any) {
     product?.imageUrl,
     product?.image,
   ];
-  return values.map((value: any) => safeHttpsUrl(typeof value === 'string' ? value : value?.url)).filter(Boolean);
+  return values.map((value: any) => safeHttpsUrl(typeof value === 'string' ? value : value?.url || value?.imageUrl || value?.src || value?.image)).filter(Boolean);
 }
 
 export async function GET(request: Request) {
@@ -39,7 +39,11 @@ export async function GET(request: Request) {
     const allowed = new Set((state.catalogue?.products || []).flatMap((product: any) => catalogueImageUrls(product)));
     if (!allowed.has(requested)) return NextResponse.json({ error: 'Image is not in the live Salar catalogue.' }, { status: 404 });
 
-    const response = await fetch(requested, { cache: 'no-store', signal: AbortSignal.timeout(9000) });
+    const response = await fetch(requested, {
+      cache: 'no-store',
+      headers: { Accept: 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8', 'User-Agent': 'PrimeHubMall-Salar/1.0' },
+      signal: AbortSignal.timeout(9000),
+    });
     if (!response.ok) return NextResponse.json({ error: 'Image could not be loaded.' }, { status: 502 });
     const contentType = String(response.headers.get('content-type') || '').toLowerCase();
     if (!contentType.startsWith('image/')) return NextResponse.json({ error: 'Remote file is not an image.' }, { status: 415 });
