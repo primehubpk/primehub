@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { answerWithSalar, type SalarImageInput } from '@/lib/salar/chatEngine';
+import { expandSalarDisplay } from '@/lib/salar/displayExpansion';
 import { getSalarState } from '@/lib/salar/server';
 import {
   appendSalarMessage,
@@ -11,6 +12,7 @@ import {
   saveSalarChat,
   type SalarCustomerChat,
   type SalarStoredMention,
+  type SalarStoredProduct,
 } from '@/lib/salar/chatStore';
 import { getSalarUiSettings } from '@/lib/salar/uiSettings';
 import { compressForR2, isR2PublicUrl, r2ObjectKey, uploadWebpToR2 } from '@/lib/r2';
@@ -22,6 +24,12 @@ const MAX_IMAGE_BYTES = 3 * 1024 * 1024;
 
 function cleanText(value: unknown, max = 2000) {
   return String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
+}
+
+function finiteNumber(value: unknown) {
+  if (value === '' || value == null) return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
 }
 
 function safeHttpsUrl(value: unknown) {
@@ -43,6 +51,26 @@ function safeMention(value: unknown): SalarStoredMention | undefined {
   if (!id || !title) return undefined;
   const imageUrl = safeHttpsUrl(source.imageUrl);
   return { id, title, ...(imageUrl ? { imageUrl } : {}) };
+}
+
+function safeReferences(value: unknown): SalarStoredProduct[] {
+  if (!Array.isArray(value)) return [];
+  return value.slice(0, 30).map((item: any) => {
+    const id = cleanText(item?.id, 200);
+    const title = cleanText(item?.title, 300);
+    if (!id || !title) return null;
+    const imageUrl = safeHttpsUrl(item?.imageUrl);
+    return Object.fromEntries(Object.entries({
+      id,
+      title,
+      path: cleanText(item?.path, 500) || undefined,
+      imageUrl: imageUrl || undefined,
+      price: finiteNumber(item?.price),
+      originalPrice: finiteNumber(item?.originalPrice),
+      stock: finiteNumber(item?.stock),
+      category: cleanText(item?.category, 220) || undefined,
+    }).filter(([, field]) => field !== undefined && field !== '')) as SalarStoredProduct;
+  }).filter(Boolean) as SalarStoredProduct[];
 }
 
 function parseJsonField(value: FormDataEntryValue | null, fallback: unknown) {
@@ -67,6 +95,7 @@ async function readRequest(request: Request) {
       customerName: body?.customerName,
       customerEmail: body?.customerEmail,
       mention: safeMention(body?.mention),
+      references: safeReferences(body?.references),
       image: undefined as SalarImageInput | undefined,
       imageBuffer: undefined as Buffer | undefined,
       imageName: '',
@@ -99,6 +128,7 @@ async function readRequest(request: Request) {
     customerName: form.get('customerName'),
     customerEmail: form.get('customerEmail'),
     mention: safeMention(parseJsonField(form.get('mention'), null)),
+    references: safeReferences(parseJsonField(form.get('references'), [])),
     image,
     imageBuffer,
     imageName,
@@ -171,7 +201,7 @@ export async function POST(request: Request) {
     }
 
     const message = cleanText(input.message, 4000);
-    if (!message && !input.image && !input.mention) {
+    if (!message && !input.image && !input.mention && !input.references.length) {
       return NextResponse.json({ success: false, error: 'Please enter a message or attach an image.' }, { status: 400 });
     }
 
@@ -186,10 +216,15 @@ export async function POST(request: Request) {
 
     const aiHistory = salarAiHistory(chat, 10);
     const imageUrl = await persistCustomerImage(input.imageBuffer, input.imageName);
-    const userContent = message || (input.mention ? 'Is product ke bare mein batain.' : '📷 Product photo');
-    const aiMessage = input.mention
-      ? `${message || 'Is product ke bare mein details batain.'}\n\n[Customer is referring to this exact product from the chat: ${input.mention.title}; product id: ${input.mention.id}]`
-      : message;
+    const referenceSummary = input.references.length
+      ? input.references.map((product, index) => `${index + 1}. ${product.title} [product id: ${product.id}]`).join('\n')
+      : '';
+    const userContent = message || (input.references.length ? `${input.references.length} selected products` : input.mention ? 'Is product ke bare mein batain.' : '📷 Product photo');
+    const aiMessage = input.references.length
+      ? `${message || 'In selected products ke bare mein help karein.'}\n\n[Customer selected these exact products from the chat:\n${referenceSummary}\n]`
+      : input.mention
+        ? `${message || 'Is product ke bare mein details batain.'}\n\n[Customer is referring to this exact product from the chat: ${input.mention.title}; product id: ${input.mention.id}]`
+        : message;
 
     chat = appendSalarMessage(chat, {
       role: 'user',
@@ -197,6 +232,7 @@ export async function POST(request: Request) {
       content: userContent,
       ...(imageUrl ? { imageUrl } : {}),
       ...(input.mention ? { mention: input.mention } : {}),
+      ...(input.references.length ? { products: input.references } : {}),
     });
     chat = await saveSalarChat(chat);
 
@@ -213,13 +249,14 @@ export async function POST(request: Request) {
       }, { headers: { 'Cache-Control': 'private, no-store, max-age=0' } });
     }
 
-    const result = await answerWithSalar({
+    const baseResult = await answerWithSalar({
       message: aiMessage,
       history: aiHistory,
       context: chat.context,
       customerName: chat.customerName,
       image: input.image,
     });
+    const result = await expandSalarDisplay(aiMessage, baseResult);
 
     chat = appendSalarMessage({ ...chat, context: result.context || chat.context }, {
       role: 'assistant',
