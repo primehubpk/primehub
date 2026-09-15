@@ -39,6 +39,7 @@ type ProductMention = {
 type ChatContext = {
   lastProductQuery?: string;
   shownProductIds?: string[];
+  confirmedOrderProductIds?: string[];
 };
 
 type ChatMessage = {
