@@ -11,6 +11,10 @@
   width: min(100%, 162px);
   margin: -2px auto 2px;
 }
+.ph-card.ph-wheel .psw-disc {
+  transition-duration: .65s !important;
+  transition-timing-function: cubic-bezier(.16,.84,.24,1) !important;
+}
 .ph-card.ph-wheel > button {
   margin-top: auto;
   min-height: 32px;
@@ -22,9 +26,26 @@
   font-weight: 900;
   box-shadow: none;
 }
+
+/* Keep the 7-day check-in card vertically aligned with the other reward cards. */
+.ph-card.ph-check {
+  display: flex;
+  flex-direction: column;
+}
+.ph-card.ph-check .ph-days {
+  margin-top: 14px;
+}
+.ph-card.ph-check > button {
+  margin-top: auto;
+  min-height: 32px;
+}
+
 @media (max-width: 390px) {
   .ph-card.ph-wheel .psw {
     width: min(100%, 136px);
+  }
+  .ph-card.ph-check .ph-days {
+    margin-top: 12px;
   }
 }
 @media (min-width: 760px) {
