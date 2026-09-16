@@ -1,9 +1,12 @@
 'use client';
 
+import dynamic from 'next/dynamic';
 import { CSSProperties, useEffect, useState } from 'react';
-import SalarWidget from '@/components/salar/SalarWidget';
-import SalarInteractionEnhancer from '@/components/salar/SalarInteractionEnhancer';
-import SalarOrderCustomizationBridge from '@/components/salar/SalarOrderCustomizationBridge';
+
+const SalarWidget = dynamic(() => import('@/components/salar/SalarWidget'), { ssr: false });
+const SalarInteractionEnhancer = dynamic(() => import('@/components/salar/SalarInteractionEnhancer'), { ssr: false });
+const SalarOrderCustomizationBridge = dynamic(() => import('@/components/salar/SalarOrderCustomizationBridge'), { ssr: false });
+const SalarOrderFeedbackBridge = dynamic(() => import('@/components/salar/SalarOrderFeedbackBridge'), { ssr: false });
 
 type VisualBox = { height: number; top: number };
 
@@ -21,8 +24,13 @@ function currentVisualBox(): VisualBox {
   };
 }
 
+function routeIsStillLoading() {
+  return Boolean(document.querySelector('main[role="status"][aria-label="Opening page"]'));
+}
+
 export default function SalarViewportShell() {
   const [visualBox, setVisualBox] = useState<VisualBox>({ height: 800, top: 0 });
+  const [salarReady, setSalarReady] = useState(false);
 
   useEffect(() => {
     const update = () => setVisualBox(currentVisualBox());
@@ -40,6 +48,40 @@ export default function SalarViewportShell() {
     };
   }, []);
 
+  useEffect(() => {
+    let idleId = 0;
+    let timeoutId = 0;
+    let scheduled = false;
+    let disposed = false;
+
+    const reveal = () => {
+      if (disposed) return;
+      setSalarReady(true);
+    };
+
+    const schedule = () => {
+      if (scheduled || disposed || routeIsStillLoading()) return;
+      scheduled = true;
+      const requestIdle = (window as any).requestIdleCallback as undefined | ((callback: () => void, options?: { timeout: number }) => number);
+      if (typeof requestIdle === 'function') idleId = requestIdle(reveal, { timeout: 900 });
+      else timeoutId = window.setTimeout(reveal, 250);
+    };
+
+    const observer = new MutationObserver(schedule);
+    observer.observe(document.body, { childList: true, subtree: true });
+    window.addEventListener('load', schedule, { once: true });
+    schedule();
+
+    return () => {
+      disposed = true;
+      observer.disconnect();
+      window.removeEventListener('load', schedule);
+      if (timeoutId) window.clearTimeout(timeoutId);
+      const cancelIdle = (window as any).cancelIdleCallback as undefined | ((id: number) => void);
+      if (idleId && typeof cancelIdle === 'function') cancelIdle(idleId);
+    };
+  }, []);
+
   const style: SalarShellStyle = {
     '--salar-viewport-height': `${visualBox.height}px`,
     '--salar-viewport-top': `${visualBox.top}px`,
@@ -47,9 +89,14 @@ export default function SalarViewportShell() {
 
   return (
     <div id="salar-viewport-shell" style={style}>
-      <SalarWidget />
-      <SalarInteractionEnhancer />
-      <SalarOrderCustomizationBridge />
+      {salarReady ? (
+        <>
+          <SalarWidget />
+          <SalarInteractionEnhancer />
+          <SalarOrderCustomizationBridge />
+          <SalarOrderFeedbackBridge />
+        </>
+      ) : null}
       <style jsx global>{`
         #salar-viewport-shell > div:has(button[aria-label="Close Salar"]) {
           position: fixed !important;
