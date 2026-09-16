@@ -1,7 +1,7 @@
 'use client';
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, Bot, PauseCircle, PlayCircle, RefreshCw, Send, X } from 'lucide-react';
+import { ArrowLeft, Ban, Bot, PauseCircle, PlayCircle, RefreshCw, Send, Trash2, X } from 'lucide-react';
 
 type ChatSummary = {
   id: string;
@@ -39,6 +39,8 @@ type Props = {
   open: boolean;
   onClose: () => void;
 };
+
+type ChatAction = 'pause' | 'resume' | 'reply' | 'delete' | 'block';
 
 function timeLabel(value: string) {
   try {
@@ -110,8 +112,8 @@ export default function SalarAdminDrawer({ open, onClose }: Props) {
     return true;
   }), [chats, filter]);
 
-  async function action(actionName: 'pause' | 'resume' | 'reply', message = '', pauseSalar = false) {
-    if (!selectedId || acting) return;
+  async function action(actionName: ChatAction, message = '', pauseSalar = false, targetChatId = selectedId) {
+    if (!targetChatId || acting) return;
     setActing(true);
     setError('');
     try {
@@ -120,11 +122,19 @@ export default function SalarAdminDrawer({ open, onClose }: Props) {
         headers: { 'Content-Type': 'application/json' },
         credentials: 'same-origin',
         cache: 'no-store',
-        body: JSON.stringify({ action: actionName, chatId: selectedId, message, pauseSalar }),
+        body: JSON.stringify({ action: actionName, chatId: targetChatId, message, pauseSalar }),
       });
       const result = await response.json().catch(() => null);
       if (!response.ok || !result?.success) throw new Error(result?.error || 'Action failed.');
-      setDetail(result.chat as ChatDetail);
+      if (actionName === 'delete') {
+        if (selectedId === targetChatId) {
+          setSelectedId('');
+          setDetail(null);
+        }
+        setChats((current) => current.filter((chat) => chat.id !== targetChatId));
+      } else if (selectedId === targetChatId && result.chat) {
+        setDetail(result.chat as ChatDetail);
+      }
       if (actionName === 'reply') setReply('');
       await loadList(true);
     } catch (cause) {
@@ -132,6 +142,18 @@ export default function SalarAdminDrawer({ open, onClose }: Props) {
     } finally {
       setActing(false);
     }
+  }
+
+  async function confirmDelete(chat: ChatSummary) {
+    const label = chat.customerName || chat.customerEmail || 'this customer chat';
+    if (!window.confirm(`Delete ${label}? This chat will be removed from the admin chat list.`)) return;
+    await action('delete', '', false, chat.id);
+  }
+
+  async function confirmBlock(chat: ChatSummary) {
+    const label = chat.customerName || chat.customerEmail || 'this customer';
+    if (!window.confirm(`Block ${label}? Salar chat access will be stopped for this guest/session or logged-in account.`)) return;
+    await action('block', '', false, chat.id);
   }
 
   async function submitReply(event: FormEvent<HTMLFormElement>, pauseAfter = false) {
@@ -171,21 +193,27 @@ export default function SalarAdminDrawer({ open, onClose }: Props) {
             {!loading && visibleChats.length === 0 ? <div className="rounded-2xl bg-white p-4 text-xs text-black/45">No {filter === 'all' ? '' : filter} chats yet.</div> : null}
             <div className="space-y-2">
               {visibleChats.map((chat) => (
-                <button key={chat.id} type="button" onClick={() => setSelectedId(chat.id)} className="flex w-full items-center gap-3 rounded-2xl border border-black/7 bg-white p-3 text-left shadow-sm">
-                  <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-xl bg-[#F1F1ED]">
-                    {chat.imageUrl ? <img src={chat.imageUrl} alt="" className="h-full w-full object-cover"/> : <div className="flex h-full w-full items-center justify-center text-sm font-black text-black/25">{(chat.customerName || 'C').slice(0, 1).toUpperCase()}</div>}
-                    <span className={`absolute bottom-1 right-1 h-2.5 w-2.5 rounded-full border-2 border-white ${chat.active ? 'bg-emerald-500' : 'bg-black/25'}`}/>
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <p className="truncate text-[11px] font-black">{chat.customerName || 'Guest customer'}</p>
-                      {chat.salarPaused ? <span className="rounded-full bg-[#FFE8E5] px-2 py-0.5 text-[7px] font-black text-[#C62E25]">SALAR STOPPED</span> : null}
+                <div key={chat.id} className="flex items-stretch gap-2 rounded-2xl border border-black/7 bg-white p-2 shadow-sm">
+                  <button type="button" onClick={() => setSelectedId(chat.id)} className="flex min-w-0 flex-1 items-center gap-3 rounded-xl p-1 text-left">
+                    <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-xl bg-[#F1F1ED]">
+                      {chat.imageUrl ? <img src={chat.imageUrl} alt="" className="h-full w-full object-cover"/> : <div className="flex h-full w-full items-center justify-center text-sm font-black text-black/25">{(chat.customerName || 'C').slice(0, 1).toUpperCase()}</div>}
+                      <span className={`absolute bottom-1 right-1 h-2.5 w-2.5 rounded-full border-2 border-white ${chat.active ? 'bg-emerald-500' : 'bg-black/25'}`}/>
                     </div>
-                    {chat.customerEmail ? <p className="truncate text-[8px] text-black/35">{chat.customerEmail}</p> : null}
-                    <p className="mt-1 line-clamp-1 text-[9px] text-black/55">{chat.lastPreview || 'Conversation started'}</p>
-                    <p className="mt-1 text-[7px] font-bold text-black/30">{chat.messageCount} msgs · {timeLabel(chat.updatedAt)}</p>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="truncate text-[11px] font-black">{chat.customerName || 'Guest customer'}</p>
+                        {chat.salarPaused ? <span className="rounded-full bg-[#FFE8E5] px-2 py-0.5 text-[7px] font-black text-[#C62E25]">SALAR STOPPED</span> : null}
+                      </div>
+                      {chat.customerEmail ? <p className="truncate text-[8px] text-black/35">{chat.customerEmail}</p> : null}
+                      <p className="mt-1 line-clamp-1 text-[9px] text-black/55">{chat.lastPreview || 'Conversation started'}</p>
+                      <p className="mt-1 text-[7px] font-bold text-black/30">{chat.messageCount} msgs · {timeLabel(chat.updatedAt)}</p>
+                    </div>
+                  </button>
+                  <div className="flex shrink-0 flex-col justify-center gap-1.5">
+                    <button type="button" disabled={acting} onClick={() => void confirmBlock(chat)} className="flex h-8 w-8 items-center justify-center rounded-full bg-[#FFF1D6] text-[#9A6200] disabled:opacity-40" aria-label={`Block ${chat.customerName || 'customer'}`} title="Block customer"><Ban size={13}/></button>
+                    <button type="button" disabled={acting} onClick={() => void confirmDelete(chat)} className="flex h-8 w-8 items-center justify-center rounded-full bg-[#FFE8E5] text-[#C62E25] disabled:opacity-40" aria-label={`Delete ${chat.customerName || 'chat'}`} title="Delete chat"><Trash2 size={13}/></button>
                   </div>
-                </button>
+                </div>
               ))}
             </div>
           </div>
