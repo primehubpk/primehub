@@ -52,13 +52,6 @@ export default function HomeResellerLiveRail({initialProducts=[]}:{initialProduc
   const fallback=settings as typeof settings & LiveSettings;
   const initialRewards=fallback.homeRewardSettings||{};
   const [liveRewardSettings, setLiveRewardSettings] = useState<RewardSettings | null>(null);
-  const rewardSettings:RewardSettings={
-    ...initialRewards,
-    ...(liveRewardSettings||{}),
-    checkInRewards:Array.isArray(liveRewardSettings?.checkInRewards)?liveRewardSettings.checkInRewards:Array.isArray(initialRewards.checkInRewards)?initialRewards.checkInRewards:[10,15,20,25,30,50,100],
-    spinWheelSlots:Array.isArray(liveRewardSettings?.spinWheelSlots)&&liveRewardSettings.spinWheelSlots.length?liveRewardSettings.spinWheelSlots:Array.isArray(initialRewards.spinWheelSlots)?initialRewards.spinWheelSlots:[],
-    guestMode:(liveRewardSettings?.guestMode??initialRewards.guestMode)!==false,
-  };
   const [gifts,setGifts]=useState<RewardGift[]>([]);
   const catalogProducts=useMemo<Record<string,RewardProduct>>(()=>{const next:Record<string,RewardProduct>={};initialProducts.forEach(product=>{if(product?.id)next[String(product.id)]=product;});return next;},[initialProducts]);
   const [resolvedProducts,setResolvedProducts]=useState<Record<string,RewardProduct>>({});
@@ -74,6 +67,13 @@ export default function HomeResellerLiveRail({initialProducts=[]}:{initialProduc
   const [rotation,setRotation]=useState(0);
   const [message,setMessage]=useState("");
   const [selectedPrize,setSelectedPrize]=useState<RewardPrize|null>(null);
+  const rewardSettings:RewardSettings={
+    ...initialRewards,
+    ...(liveRewardSettings||{}),
+    checkInRewards:Array.isArray(liveRewardSettings?.checkInRewards)?liveRewardSettings.checkInRewards:Array.isArray(initialRewards.checkInRewards)?initialRewards.checkInRewards:[10,15,20,25,30,50,100],
+    spinWheelSlots:Array.isArray(liveRewardSettings?.spinWheelSlots)&&liveRewardSettings.spinWheelSlots.length?liveRewardSettings.spinWheelSlots:Array.isArray(initialRewards.spinWheelSlots)?initialRewards.spinWheelSlots:[],
+    guestMode:(liveRewardSettings?.guestMode??initialRewards.guestMode)!==false,
+  };
 
   useEffect(()=>()=>{if(revealTimer.current)clearTimeout(revealTimer.current);},[]);
   useEffect(()=>{const node=sectionRef.current;if(!node)return;if(typeof IntersectionObserver==="undefined"){setLiveDataActive(true);return;}const observer=new IntersectionObserver(entries=>{if(entries.some(entry=>entry.isIntersecting)){setLiveDataActive(true);observer.disconnect();}},{rootMargin:"600px 0px"});observer.observe(node);return()=>observer.disconnect();},[]);
