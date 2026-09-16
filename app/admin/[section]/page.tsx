@@ -13,11 +13,12 @@ import SkillsManager from '@/components/admin/SkillsManager';
 import OrdersManager from '@/components/admin/OrdersManager';
 import VendorRequests from '@/components/admin/VendorRequests';
 import SiteSettingsManager from '@/components/admin/SiteSettingsManager';
-import RewardsManager from '@/components/admin/RewardsManager';
+import PremiumRewardsManager from '@/components/admin/PremiumRewardsManager';
 import RewardsTermsManager from '@/components/admin/RewardsTermsManager';
 import ResellerWhatsAppRequests from '@/components/admin/ResellerWhatsAppRequests';
 import WhatsAppCoexistenceSetup from '@/components/admin/WhatsAppCoexistenceSetup';
 import WholesaleVideoManager from '@/components/admin/WholesaleVideoManager';
+import SalarControlPanel from '@/components/admin/SalarControlPanel';
 
 type SectionDefinition = {
   title: string;
@@ -66,8 +67,8 @@ const SECTIONS: Record<string, SectionDefinition> = {
   rewards: {
     title: 'Rewards',
     eyebrow: 'Rewards',
-    description: 'Manage reward settings and reward terms.',
-    content: <><RewardsManager /><RewardsTermsManager /></>,
+    description: 'Manage the shared premium spin wheel, reward settings and reward terms.',
+    content: <><PremiumRewardsManager /><RewardsTermsManager /></>,
   },
   'video-hub': {
     title: 'Video Hub',
@@ -92,6 +93,12 @@ const SECTIONS: Record<string, SectionDefinition> = {
     eyebrow: 'WhatsApp',
     description: 'Manage WhatsApp bot setup and coexistence.',
     content: <WhatsAppCoexistenceSetup />,
+  },
+  salar: {
+    title: 'Salar',
+    eyebrow: 'AI Salesman',
+    description: 'Manage Salar instructions and refresh his cached PrimeHubMall catalogue.',
+    content: <SalarControlPanel />,
   },
   suppliers: {
     title: 'Suppliers',

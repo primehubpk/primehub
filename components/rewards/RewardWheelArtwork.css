@@ -1,0 +1,84 @@
+.reward-wheel-artwork {
+  box-sizing: border-box;
+  display: grid;
+  width: 100%;
+  height: 100%;
+  grid-template-rows: minmax(0, 1fr) auto;
+  align-items: center;
+  justify-items: center;
+  gap: 4px;
+  overflow: visible;
+  padding: 0;
+  color: #17140f;
+  text-align: center;
+}
+
+.reward-wheel-artwork img {
+  display: block;
+  width: min(58px, 78%);
+  height: min(58px, 78%);
+  min-height: 0;
+  margin: auto;
+  object-fit: contain;
+  object-position: center;
+  filter: drop-shadow(0 3px 5px rgba(75, 48, 12, .2));
+  pointer-events: none;
+  user-select: none;
+}
+
+.reward-wheel-artwork strong {
+  box-sizing: border-box;
+  display: grid;
+  width: max-content;
+  max-width: calc(100% + 18px);
+  min-width: 48px;
+  place-items: center;
+  align-content: center;
+  overflow: visible;
+  padding: 0 1px;
+  color: #17140f;
+  font-size: 11px;
+  font-weight: 950;
+  line-height: .95;
+  letter-spacing: -.03em;
+  text-shadow: 0 1px 0 rgba(255,255,255,.78), 0 2px 5px rgba(255,255,255,.55);
+  white-space: nowrap;
+}
+
+.reward-wheel-artwork strong span {
+  display: block;
+  max-width: 100%;
+}
+
+.reward-wheel-artwork--compact {
+  gap: 2px;
+}
+
+.reward-wheel-artwork--compact img {
+  width: min(26px, 66%);
+  height: min(26px, 66%);
+  filter: drop-shadow(0 1px 2px rgba(75, 48, 12, .16));
+}
+
+.reward-wheel-artwork--compact strong {
+  width: max-content;
+  max-width: calc(100% + 8px);
+  min-width: 28px;
+  padding: 0;
+  font-size: 6.2px;
+  line-height: .9;
+  letter-spacing: -.03em;
+  text-shadow: 0 1px 0 rgba(255,255,255,.82);
+}
+
+@media (max-width: 390px) {
+  .reward-wheel-artwork--compact img {
+    width: min(23px, 64%);
+    height: min(23px, 64%);
+  }
+
+  .reward-wheel-artwork--compact strong {
+    min-width: 26px;
+    font-size: 5.7px;
+  }
+}

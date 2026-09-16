@@ -33,6 +33,8 @@ import {
 } from '@/lib/resellerTasks';
 import { getResellerTiers } from '@/lib/resellerTiers';
 import type { ResellerProfile, ResellerTier } from '@/lib/resellerTypes';
+import PremiumSpinWheel from '@/components/rewards/PremiumSpinWheel';
+import { orderPremiumWheelPrizes, rewardWheelPrizeLabel } from '@/components/rewards/RewardWheelArtwork';
 
 const outfit = Outfit({ subsets: ['latin'] });
 const GUEST_ID_KEY = 'primehub_reseller_guest_id_v1';
@@ -564,22 +566,12 @@ function TaskRow({ task, monthlyOrders, target }: { task: ResellerTask; monthlyO
 }
 
 function prizeLabel(prize: RewardPrize) {
-  if (prize.type === 'points') return `${Math.max(0, Number(prize.points || 0))} Points`;
-  if (prize.type === 'free-delivery') return 'Free Delivery';
-  if (prize.type === 'coupon') return Number(prize.voucherAmount || 0) > 0 ? `Rs. ${Number(prize.voucherAmount).toLocaleString()} Voucher` : (prize.name || 'Voucher');
-  return prize.name || (prize.type === 'try-again' ? 'Try Again' : 'Reward');
-}
-function prizeIcon(prize: RewardPrize) {
-  if (prize.type === 'points') return '⭐';
-  if (prize.type === 'free-delivery') return '📦';
-  if (prize.type === 'coupon') return '₨';
-  if (prize.type === 'try-again') return '↻';
-  return '🎁';
+  if (prize.type === 'product' && prize.name) return prize.name;
+  return rewardWheelPrizeLabel(prize);
 }
 
-function RewardWheel({ settings, rewardSettings, wallet, onWallet }: { settings: ResellerWheelSettings; rewardSettings: RewardSettings; wallet: RewardWallet; onWallet: (wallet: RewardWallet) => void }) {
-  const prizes = (rewardSettings.spinWheelSlots || []).filter(prize => prize.active !== false && Number(prize.stock ?? 1) > 0).slice(0, 5);
-  const displayPrizes = prizes.length ? prizes : [{ id: 'loading', name: settings.customPrizeTitle || 'Rewards loading', type: 'try-again' } as RewardPrize];
+function RewardWheel({ rewardSettings, wallet, onWallet }: { settings?: ResellerWheelSettings; rewardSettings: RewardSettings; wallet: RewardWallet; onWallet: (wallet: RewardWallet) => void }) {
+  const prizes = orderPremiumWheelPrizes((rewardSettings.spinWheelSlots || []).filter(prize => prize.active !== false && Number(prize.stock ?? 1) > 0));
   const [rotation, setRotation] = useState(0);
   const [spinning, setSpinning] = useState(false);
   const [result, setResult] = useState('');
@@ -609,20 +601,14 @@ function RewardWheel({ settings, rewardSettings, wallet, onWallet }: { settings:
     }
   }
   return (
-    <section className="overflow-hidden rounded-[18px] bg-[linear-gradient(160deg,#16332E,#0C1C19)] p-4 text-white shadow-[0_8px_24px_rgba(20,20,15,.12)]">
-      <span className="text-[10px] font-extrabold uppercase tracking-[.14em] text-[#FF9A3C]">Spin & win</span>
-      <h2 className="mt-1.5 text-xl font-extrabold">Your reward wheel</h2>
-      <p className="mt-1 text-xs text-white/65">Same Admin rewards and same daily count on Home & Reseller Club.</p>
-      <div className="relative mx-auto mt-5 aspect-square w-full max-w-[300px] sm:max-w-[360px]">
-        <div className="absolute left-1/2 top-[-10px] z-20 h-0 w-0 -translate-x-1/2 border-x-[12px] border-t-[24px] border-x-transparent border-t-[#FF9A3C]" />
-        <div className="relative h-full w-full rounded-full border-[8px] border-[#FFFDF8] shadow-2xl transition-transform duration-[3000ms] ease-out" style={{ transform: `rotate(${rotation}deg)`, background: 'conic-gradient(#E85D04 0deg 72deg,#0E7C6F 72deg 144deg,#D94B3D 144deg 216deg,#C9A227 216deg 288deg,#7B4B94 288deg 360deg)' }}>
-          {displayPrizes.map((prize, index) => { const angle=index*72+36; return <div key={prize.id || `${prize.name}-${index}`} className="absolute left-1/2 top-1/2 w-[86px] text-center text-[10px] font-extrabold leading-tight" style={{ transform: `translate(-50%,-50%) rotate(${angle}deg) translateY(-105px) rotate(-${angle}deg)` }}><span className="block text-xl">{prize.imageUrl ? <img src={prize.imageUrl} alt="" className="mx-auto h-8 w-8 rounded-full object-cover"/> : prizeIcon(prize)}</span>{prizeLabel(prize)}</div>; })}
-          <div className="absolute left-1/2 top-1/2 grid h-14 w-14 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border-4 border-white bg-[#14140F] text-[10px] font-extrabold">WIN</div>
-        </div>
-      </div>
-      <button type="button" onClick={spin} disabled={spinning || usedToday || !prizes.length} className="mt-5 w-full rounded-xl bg-[#FF9A3C] px-4 py-3 text-sm font-extrabold text-[#14140F] disabled:opacity-60">{spinning ? 'Spinning…' : usedToday ? 'Come tomorrow' : 'Spin the wheel'}</button>
-      {result && <p className="mt-3 rounded-xl bg-white/10 p-3 text-center text-sm font-extrabold">You got: {result}</p>}
-      {error && <p className="mt-3 rounded-xl bg-white/10 p-3 text-center text-xs font-extrabold">{error}</p>}
+    <section className="psw-panel">
+      <span>Spin & win</span>
+      <h2>Your reward wheel</h2>
+      <p>Same Admin rewards and same daily count on Home & Reseller Club.</p>
+      <PremiumSpinWheel prizes={prizes} rotation={rotation} />
+      <button type="button" className="psw-spin" onClick={spin} disabled={spinning || usedToday || !prizes.length}>{spinning ? 'Spinning…' : usedToday ? 'Come tomorrow' : 'Spin the wheel'}</button>
+      {result && <p className="psw-note">You got: {result}</p>}
+      {error && <p className="psw-note is-error">{error}</p>}
     </section>
   );
 }

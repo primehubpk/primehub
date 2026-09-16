@@ -25,6 +25,10 @@ export function normalizeSearchText(value: unknown): string {
     .replace(/\s+/g, ' ');
 }
 
+function compact(value: string) {
+  return normalizeSearchText(value).replace(/\s+/g, '');
+}
+
 function editDistance(a: string, b: string): number {
   if (a === b) return 0;
   if (!a.length) return b.length;
@@ -53,10 +57,39 @@ function tokenMatches(queryToken: string, candidateToken: string): boolean {
   return editDistance(queryToken, candidateToken) <= maxDistance;
 }
 
+function availableVariantValues(product: SearchableProduct): string[] {
+  const sources = [product.variantMatrix, product.variants, product.options]
+    .filter(Array.isArray)
+    .flatMap((value: any) => value.slice(0, 80));
+
+  const values: string[] = [];
+  for (const row of sources) {
+    if (row == null) continue;
+    if (typeof row === 'string' || typeof row === 'number') {
+      values.push(String(row));
+      continue;
+    }
+    if (typeof row !== 'object') continue;
+    if ((row as any).active === false || (row as any).enabled === false) continue;
+
+    const rawStock = (row as any).stock ?? (row as any).quantity ?? (row as any).qty;
+    const numericStock = rawStock === '' || rawStock == null ? null : Number(rawStock);
+    if (numericStock != null && Number.isFinite(numericStock) && numericStock <= 0) continue;
+
+    for (const [key, value] of Object.entries(row as Record<string, unknown>)) {
+      if (value == null || value === '') continue;
+      if (/(^|_)(stock|quantity|qty|price|saleprice|sale_price|active|enabled|id)(_|$)/i.test(key)) continue;
+      if (typeof value === 'string' || typeof value === 'number') values.push(String(value));
+    }
+  }
+  return values;
+}
+
 function textValues(product: SearchableProduct): string[] {
   const tags = Array.isArray(product.tags) ? product.tags : typeof product.tags === 'string' ? product.tags.split(',') : [];
   const keywords = Array.isArray(product.keywords) ? product.keywords : typeof product.keywords === 'string' ? product.keywords.split(',') : [];
   return [
+    product.id,
     product.title,
     product.name,
     product.category,
@@ -65,8 +98,10 @@ function textValues(product: SearchableProduct): string[] {
     product.shortDescription,
     product.color,
     product.material,
+    product.size,
     ...tags,
     ...keywords,
+    ...availableVariantValues(product),
   ].map(normalizeSearchText).filter(Boolean);
 }
 
@@ -78,22 +113,44 @@ export function productSearchScore(product: SearchableProduct, rawQuery: string)
   const haystack = values.join(' ');
   if (!haystack) return 0;
 
+  const compactQuery = compact(query);
+  const compactTitle = compact(title);
+  const compactHaystack = compact(haystack);
+
   let score = 0;
-  if (title === query) score += 120;
-  if (title.startsWith(query)) score += 90;
-  if (title.includes(query)) score += 70;
-  if (haystack.includes(query)) score += 45;
+  if (title === query) score += 140;
+  if (title.startsWith(query)) score += 110;
+  if (title.includes(query)) score += 90;
+  if (compactQuery.length >= 4 && compactTitle === compactQuery) score += 140;
+  if (compactQuery.length >= 4 && compactTitle.startsWith(compactQuery)) score += 105;
+  if (compactQuery.length >= 4 && compactTitle.includes(compactQuery)) score += 85;
+  if (haystack.includes(query)) score += 50;
+  if (compactQuery.length >= 5 && compactHaystack.includes(compactQuery)) score += 40;
 
   const queryTokens = query.split(' ').filter(Boolean);
+  const titleTokens = title.split(' ').filter(Boolean);
   const candidateTokens = haystack.split(' ').filter(Boolean);
   let matched = 0;
+  let titleMatched = 0;
+
   for (const token of queryTokens) {
-    if (candidateTokens.some((candidate) => tokenMatches(token, candidate))) {
-      matched += 1;
-      score += 18;
+    const compactToken = compact(token);
+    const exactTitleToken = titleTokens.some((candidate) => tokenMatches(token, candidate))
+      || (compactToken.length >= 4 && compactTitle.includes(compactToken));
+    const anyMatch = exactTitleToken || candidateTokens.some((candidate) => tokenMatches(token, candidate));
+    if (!anyMatch) continue;
+    matched += 1;
+    if (exactTitleToken) {
+      titleMatched += 1;
+      score += token.length >= 5 ? 34 : 24;
+    } else {
+      score += token.length >= 5 ? 14 : 9;
     }
   }
-  if (queryTokens.length && matched === queryTokens.length) score += 35;
+
+  if (queryTokens.length && matched === queryTokens.length) score += 40;
+  if (titleMatched >= 1) score += 18;
+  if (titleMatched >= 2) score += 28;
   return score;
 }
 
