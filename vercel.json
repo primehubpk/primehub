@@ -5,6 +5,7 @@
   },
   "git": {
     "deploymentEnabled": {
+      "fix/weekly-deal-original-price": false,
       "feature/home-nav-instant-active-fix": false,
       "fix/mobile-nav-performance-audit": true,
       "fix/bottom-nav-performance": true,
