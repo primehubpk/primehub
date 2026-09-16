@@ -14,6 +14,14 @@ type Prize = {
 
 const BULB_COUNT = 28;
 
+const FACE_FALLBACK: Prize[] = [
+  { id: 'preview-points', name: 'Free Points', type: 'points' },
+  { id: 'preview-voucher', name: 'Free Voucher', type: 'coupon' },
+  { id: 'preview-delivery', name: 'Free Delivery', type: 'free-delivery' },
+  { id: 'preview-product', name: 'Free Deal Box', type: 'product' },
+  { id: 'preview-try-again', name: 'Try Again', type: 'try-again' },
+];
+
 function GoldPointer({ pinId }: { pinId: string }) {
   return (
     <svg className="psw-pointer-svg" viewBox="0 0 72 96" aria-hidden="true">
@@ -59,7 +67,8 @@ export default function PremiumSpinWheel({
   rotation: number;
   compact?: boolean;
 }) {
-  const count = Math.max(1, prizes.length);
+  const face = prizes.length ? prizes : FACE_FALLBACK;
+  const count = Math.max(1, face.length);
   const radius = compact ? 34 : 33;
   const pinId = `pswpin${useId().replace(/:/g, '')}`;
 
@@ -85,7 +94,7 @@ export default function PremiumSpinWheel({
           }}
         >
           <div className="psw-disc-sheen" aria-hidden="true" />
-          {prizes.map((prize, index) => {
+          {face.map((prize, index) => {
             const angle = index * (360 / count);
             const radians = (angle * Math.PI) / 180;
             const x = 50 + radius * Math.sin(radians);

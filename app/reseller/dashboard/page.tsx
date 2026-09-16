@@ -34,7 +34,7 @@ import {
 import { getResellerTiers } from '@/lib/resellerTiers';
 import type { ResellerProfile, ResellerTier } from '@/lib/resellerTypes';
 import PremiumSpinWheel from '@/components/rewards/PremiumSpinWheel';
-import { rewardWheelPrizeLabel } from '@/components/rewards/RewardWheelArtwork';
+import { orderPremiumWheelPrizes, rewardWheelPrizeLabel } from '@/components/rewards/RewardWheelArtwork';
 
 const outfit = Outfit({ subsets: ['latin'] });
 const GUEST_ID_KEY = 'primehub_reseller_guest_id_v1';
@@ -570,9 +570,8 @@ function prizeLabel(prize: RewardPrize) {
   return rewardWheelPrizeLabel(prize);
 }
 
-function RewardWheel({ settings, rewardSettings, wallet, onWallet }: { settings: ResellerWheelSettings; rewardSettings: RewardSettings; wallet: RewardWallet; onWallet: (wallet: RewardWallet) => void }) {
-  const prizes = (rewardSettings.spinWheelSlots || []).filter(prize => prize.active !== false && Number(prize.stock ?? 1) > 0).slice(0, 5);
-  const displayPrizes = prizes.length ? prizes : [{ id: 'loading', name: settings.customPrizeTitle || 'Rewards loading', type: 'try-again' } as RewardPrize];
+function RewardWheel({ rewardSettings, wallet, onWallet }: { settings?: ResellerWheelSettings; rewardSettings: RewardSettings; wallet: RewardWallet; onWallet: (wallet: RewardWallet) => void }) {
+  const prizes = orderPremiumWheelPrizes((rewardSettings.spinWheelSlots || []).filter(prize => prize.active !== false && Number(prize.stock ?? 1) > 0));
   const [rotation, setRotation] = useState(0);
   const [spinning, setSpinning] = useState(false);
   const [result, setResult] = useState('');
@@ -606,7 +605,7 @@ function RewardWheel({ settings, rewardSettings, wallet, onWallet }: { settings:
       <span>Spin & win</span>
       <h2>Your reward wheel</h2>
       <p>Same Admin rewards and same daily count on Home & Reseller Club.</p>
-      <PremiumSpinWheel prizes={displayPrizes} rotation={rotation} />
+      <PremiumSpinWheel prizes={prizes} rotation={rotation} />
       <button type="button" className="psw-spin" onClick={spin} disabled={spinning || usedToday || !prizes.length}>{spinning ? 'Spinning…' : usedToday ? 'Come tomorrow' : 'Spin the wheel'}</button>
       {result && <p className="psw-note">You got: {result}</p>}
       {error && <p className="psw-note is-error">{error}</p>}

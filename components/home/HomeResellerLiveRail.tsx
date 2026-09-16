@@ -12,7 +12,7 @@ import type { ResellerProfile, ResellerTier } from "@/lib/resellerTypes";
 import { useSettings } from "@/lib/useSettings";
 import HomeHeading from "./HomeHeading";
 import PremiumSpinWheel from "@/components/rewards/PremiumSpinWheel";
-import { rewardWheelArtworkSource } from "@/components/rewards/RewardWheelArtwork";
+import { orderPremiumWheelPrizes, rewardWheelArtworkSource } from "@/components/rewards/RewardWheelArtwork";
 import "./HomeResellerLiveRail.css";
 import "./HomeResellerWheelInstant.css";
 
@@ -51,11 +51,13 @@ export default function HomeResellerLiveRail({initialProducts=[]}:{initialProduc
   const {settings}=useSettings();
   const fallback=settings as typeof settings & LiveSettings;
   const initialRewards=fallback.homeRewardSettings||{};
+  const [liveRewardSettings, setLiveRewardSettings] = useState<RewardSettings | null>(null);
   const rewardSettings:RewardSettings={
     ...initialRewards,
-    checkInRewards:Array.isArray(initialRewards.checkInRewards)?initialRewards.checkInRewards:[10,15,20,25,30,50,100],
-    spinWheelSlots:Array.isArray(initialRewards.spinWheelSlots)?initialRewards.spinWheelSlots:[],
-    guestMode:initialRewards.guestMode!==false,
+    ...(liveRewardSettings||{}),
+    checkInRewards:Array.isArray(liveRewardSettings?.checkInRewards)?liveRewardSettings.checkInRewards:Array.isArray(initialRewards.checkInRewards)?initialRewards.checkInRewards:[10,15,20,25,30,50,100],
+    spinWheelSlots:Array.isArray(liveRewardSettings?.spinWheelSlots)&&liveRewardSettings.spinWheelSlots.length?liveRewardSettings.spinWheelSlots:Array.isArray(initialRewards.spinWheelSlots)?initialRewards.spinWheelSlots:[],
+    guestMode:(liveRewardSettings?.guestMode??initialRewards.guestMode)!==false,
   };
   const [gifts,setGifts]=useState<RewardGift[]>([]);
   const catalogProducts=useMemo<Record<string,RewardProduct>>(()=>{const next:Record<string,RewardProduct>={};initialProducts.forEach(product=>{if(product?.id)next[String(product.id)]=product;});return next;},[initialProducts]);
@@ -76,13 +78,14 @@ export default function HomeResellerLiveRail({initialProducts=[]}:{initialProduc
   useEffect(()=>()=>{if(revealTimer.current)clearTimeout(revealTimer.current);},[]);
   useEffect(()=>{const node=sectionRef.current;if(!node)return;if(typeof IntersectionObserver==="undefined"){setLiveDataActive(true);return;}const observer=new IntersectionObserver(entries=>{if(entries.some(entry=>entry.isIntersecting)){setLiveDataActive(true);observer.disconnect();}},{rootMargin:"600px 0px"});observer.observe(node);return()=>observer.disconnect();},[]);
   useEffect(()=>{if(!liveDataActive)return;return onSnapshot(collection(db,"reward_gifts"),s=>setGifts(s.docs.map(d=>({id:d.id,...d.data()} as RewardGift)).filter(g=>g.active!==false&&Number(g.stock??1)>0)),()=>undefined);},[liveDataActive]);
+  useEffect(()=>{if(!liveDataActive)return;return onSnapshot(doc(db,"settings","rewards"),snap=>{const data=(snap.data()||{}) as RewardSettings;setLiveRewardSettings({guestMode:data.guestMode,checkInRewards:Array.isArray(data.checkInRewards)?data.checkInRewards:undefined,spinWheelSlots:Array.isArray(data.spinWheelSlots)?data.spinWheelSlots:[]});},()=>undefined);},[liveDataActive]);
   useEffect(()=>{if(!liveDataActive)return;const linkedIds=[...gifts.map(g=>g.productId),...(rewardSettings.spinWheelSlots||[]).filter(p=>p.type==="product").map(p=>p.productId)];const missingIds=Array.from(new Set(linkedIds.map(id=>String(id||"").trim()).filter(Boolean))).filter(id=>!catalogProducts[id]&&!resolvedProducts[id]).slice(0,24);if(!missingIds.length)return;let cancelled=false;const query=encodeURIComponent(JSON.stringify(missingIds));fetch(`/api/storefront/read?type=products&ids=${query}`,{cache:"no-store"}).then(response=>response.ok?response.json():null).then(data=>{if(cancelled||!Array.isArray(data?.products))return;const next:Record<string,RewardProduct>={};data.products.forEach((product:RewardProduct)=>{if(product?.id)next[String(product.id)]=product;});if(Object.keys(next).length)setResolvedProducts(current=>({...current,...next}));}).catch(()=>undefined);return()=>{cancelled=true};},[liveDataActive,gifts,rewardSettings.spinWheelSlots,catalogProducts,resolvedProducts]);
   useEffect(()=>{if(!liveDataActive)return;setEvents(readTaskEvents());let sp:(()=>void)|undefined;let sw:(()=>void)|undefined;const stop=onAuthStateChanged(auth,u=>{sp?.();sw?.();setUser(u);if(!u){setProfile(null);setWallet(readGuestWallet());return;}sp=onSnapshot(doc(db,"reseller_profiles",u.uid),s=>setProfile(s.exists()?s.data() as ResellerProfile:null),()=>undefined);sw=onSnapshot(doc(db,"user_rewards",u.uid),s=>setWallet(s.data()||{}),()=>undefined);});return()=>{stop();sp?.();sw?.();};},[liveDataActive]);
 
   const source:LiveSettings=fallback;
   const tasks=useMemo(()=>(source.resellerTasks?.length?source.resellerTasks:DEFAULT_RESELLER_TASKS).filter(t=>t.active!==false),[source.resellerTasks]);
   const tiers=useMemo(()=>(source.resellerTiers?.length?[...source.resellerTiers]:getResellerTiers()).sort((a,b)=>a.minMonthlyOrders-b.minMonthlyOrders),[source.resellerTiers]);
-  const prizes=(rewardSettings.spinWheelSlots||[]).filter(p=>p.active!==false&&Number(p.stock??1)>0).slice(0,5);
+  const prizes=orderPremiumWheelPrizes((rewardSettings.spinWheelSlots||[]).filter(p=>p.active!==false&&Number(p.stock??1)>0));
   const today=dayKey(); const guestWallet=typeof window!=="undefined"?readGuestWallet():{}; const usedSpin=wallet.lastSpin===today||guestWallet.lastSpin===today;
   const streak=Math.max(0,Math.min(7,Number(wallet.streak||0))); const monthlyOrders=Math.max(0,Number(profile?.monthlyOrders||0));
   const cashAvailable=Math.max(0,Number(profile?.walletAvailable||0)); const cashPending=Math.max(0,Number(profile?.walletPending||0));

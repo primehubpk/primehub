@@ -81,6 +81,16 @@ export function rewardWheelPrizeLabel(prize: RewardWheelPrizeLike) {
   return 'Try Again';
 }
 
+export function orderPremiumWheelPrizes<T extends RewardWheelPrizeLike>(prizes: T[]): T[] {
+  const remaining = [...prizes];
+  const ordered: T[] = [];
+  for (const kind of PREMIUM_REWARD_WHEEL_ORDER) {
+    const index = remaining.findIndex(prize => rewardWheelArtworkKind(prize) === kind);
+    if (index >= 0) ordered.push(remaining.splice(index, 1)[0]);
+  }
+  return [...ordered, ...remaining].slice(0, 5);
+}
+
 export function rewardWheelArtworkSource(prize: RewardWheelPrizeLike) {
   return ARTWORK[rewardWheelArtworkKind(prize)];
 }
