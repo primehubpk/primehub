@@ -495,7 +495,6 @@ async function callOpenAiCompatible(
         { role: 'user', content: userContent },
       ],
       temperature: 0.2,
-      max_tokens: 650,
       ...(!images.length ? { response_format: { type: 'json_object' } } : {}),
     }),
     cache: 'no-store',
@@ -537,7 +536,6 @@ async function callGemini(
         ],
         generationConfig: {
           temperature: 0.2,
-          maxOutputTokens: 650,
           ...(!images.length ? { responseMimeType: 'application/json' } : {}),
         },
       }),
