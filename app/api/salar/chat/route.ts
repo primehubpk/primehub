@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-import { answerWithModelDrivenSalar, type SalarModelImageInput } from '@/lib/salar/modelDrivenEngine';
-import { answerWithResilientSalarFallback, isSalarProviderFailure } from '@/lib/salar/resilientFallback';
+import { answerWithModelDrivenSalar, isSalarProviderFailure, type SalarModelImageInput } from '@/lib/salar/modelDrivenEngine';
 import { getSalarState } from '@/lib/salar/server';
 import {
   appendSalarMessage,
@@ -281,28 +280,15 @@ export async function POST(request: Request) {
     const exactProductReferences = [...exactReferenceMap.values()];
     const exactProductIds = exactProductReferences.map((reference) => reference.id);
 
-    let result: any;
-    try {
-      result = await answerWithModelDrivenSalar({
-        message: aiMessage,
-        history: aiHistory,
-        context: chat.context,
-        customerName: chat.customerName,
-        exactProductIds,
-        exactProductReferences,
-        image: input.image,
-      });
-    } catch (primaryError) {
-      if (!isSalarProviderFailure(primaryError)) throw primaryError;
-      console.warn('Salar structured engine provider path failed; switching to all-key resilient fallback.', primaryError instanceof Error ? primaryError.message : 'unknown');
-      result = await answerWithResilientSalarFallback({
-        message: aiMessage || userContent,
-        history: aiHistory,
-        context: chat.context,
-        customerName: chat.customerName,
-        image: input.image,
-      });
-    }
+    const result = await answerWithModelDrivenSalar({
+      message: aiMessage,
+      history: aiHistory,
+      context: chat.context,
+      customerName: chat.customerName,
+      exactProductIds,
+      exactProductReferences,
+      image: input.image,
+    });
 
     if (result.imageUnderstanding) {
       const customerIndex = [...chat.messages].map((stored, index) => ({ stored, index })).reverse().find((item) => item.stored.actor === 'customer')?.index;
@@ -351,7 +337,7 @@ export async function POST(request: Request) {
     if (message.includes('No Salar AI provider is configured')) {
       return NextResponse.json({ success: false, error: 'Salar AI providers are not configured in the existing environment.' }, { status: 503 });
     }
-    if (chat && (isSalarProviderFailure(error) || message.includes('emergency provider'))) {
+    if (chat && isSalarProviderFailure(error)) {
       const busy = await persistedBusyReply(chat);
       return NextResponse.json({
         success: true,
