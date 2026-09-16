@@ -1,1 +1,15 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320"><defs><radialGradient id="bg" cx="34%" cy="26%" r="78%"><stop stop-color="#62C7FF"/><stop offset=".42" stop-color="#168BE7"/><stop offset="1" stop-color="#074FAD"/></radialGradient><linearGradient id="ring" x1="45" y1="35" x2="275" y2="285" gradientUnits="userSpaceOnUse"><stop stop-color="#FFFFFF"/><stop offset=".35" stop-color="#CFEAFF"/><stop offset=".7" stop-color="#7DB7F0"/><stop offset="1" stop-color="#FFFFFF"/></linearGradient><filter id="s"><feDropShadow dx="0" dy="8" stdDeviation="8" flood-opacity=".26"/></filter></defs><circle cx="160" cy="160" r="146" fill="url(#ring)" filter="url(#s)"/><circle cx="160" cy="160" r="130" fill="#0B6BC7"/><circle cx="160" cy="160" r="118" fill="url(#bg)"/><circle cx="160" cy="160" r="102" fill="none" stroke="#FFFFFF" stroke-opacity=".3" stroke-width="3"/><path d="M218 119a75 75 0 1 0 14 78" fill="none" stroke="#fff" stroke-width="24" stroke-linecap="round"/><path d="m206 78 39 57-68-1z" fill="#FDFEFF" stroke="#B7DFFF" stroke-width="5" stroke-linejoin="round"/><path d="M91 90h18M100 81v18M231 220h16M239 212v16" stroke="#FFF" stroke-width="8" stroke-linecap="round" opacity=".9"/><path d="M244 85h10M249 80v10" stroke="#FFE28A" stroke-width="7" stroke-linecap="round"/><circle cx="113" cy="226" r="5" fill="#AEE1FF"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="none">
+  <defs>
+    <linearGradient id="g" x1="24" y1="16" x2="104" y2="112" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#8AF0B8"/>
+      <stop offset="1" stop-color="#14A85A"/>
+    </linearGradient>
+    <filter id="s" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="3.2" flood-color="#0B7A45" flood-opacity=".25"/>
+    </filter>
+  </defs>
+  <g filter="url(#s)">
+    <path d="M100 54a36 36 0 1 0-8 40" stroke="url(#g)" stroke-width="14" stroke-linecap="round" fill="none"/>
+    <path d="M86 22l24 30-36-4z" fill="#19B562"/>
+  </g>
+</svg>

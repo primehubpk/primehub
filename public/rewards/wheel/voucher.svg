@@ -1,1 +1,18 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320"><defs><radialGradient id="g" cx="34%" cy="25%" r="80%"><stop stop-color="#FF7867"/><stop offset=".45" stop-color="#D92D2C"/><stop offset="1" stop-color="#86151B"/></radialGradient><linearGradient id="gold" x1="48" y1="42" x2="275" y2="280" gradientUnits="userSpaceOnUse"><stop stop-color="#FFF2A8"/><stop offset=".4" stop-color="#E7B039"/><stop offset="1" stop-color="#A66105"/></linearGradient><filter id="s"><feDropShadow dx="0" dy="8" stdDeviation="8" flood-opacity=".27"/></filter></defs><circle cx="160" cy="160" r="146" fill="url(#gold)" filter="url(#s)"/><circle cx="160" cy="160" r="130" fill="#9E1B20"/><circle cx="160" cy="160" r="116" fill="url(#g)"/><path d="M62 108h196c-16 0-16 25 0 25v54c-16 0-16 25 0 25H62c16 0 16-25 0-25v-54c16 0 16-25 0-25Z" fill="#FFF9EB" stroke="#FFD66C" stroke-width="7" stroke-linejoin="round"/><path d="M123 116v88" stroke="#D22A28" stroke-width="6" stroke-dasharray="8 9"/><circle cx="172" cy="143" r="17" fill="none" stroke="#D12C29" stroke-width="9"/><circle cx="215" cy="178" r="17" fill="none" stroke="#D12C29" stroke-width="9"/><path d="m166 190 56-61" stroke="#D12C29" stroke-width="10" stroke-linecap="round"/><path d="M83 91h16M91 83v16M237 85h16M245 77v16" stroke="#FFF0A6" stroke-width="7" stroke-linecap="round"/><path d="M77 230h38" stroke="#FFD565" stroke-width="8" stroke-linecap="round" opacity=".85"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="none">
+  <defs>
+    <linearGradient id="tix" x1="18" y1="36" x2="110" y2="96" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFF3B3"/>
+      <stop offset=".45" stop-color="#F0C44A"/>
+      <stop offset="1" stop-color="#C88814"/>
+    </linearGradient>
+    <filter id="vs" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="3.5" flood-color="#8A5A12" flood-opacity=".28"/>
+    </filter>
+  </defs>
+  <g filter="url(#vs)">
+    <path d="M18 44c8 0 8 12 0 12v16c8 0 8 12 0 12h92c-8 0-8-12 0-12V56c-8 0-8-12 0-12H18Z" fill="url(#tix)" stroke="#FFF6D0" stroke-width="3"/>
+    <circle cx="50" cy="54" r="9" fill="none" stroke="#FFFDF8" stroke-width="7"/>
+    <circle cx="78" cy="74" r="9" fill="none" stroke="#FFFDF8" stroke-width="7"/>
+    <path d="M48 82 L80 48" stroke="#FFFDF8" stroke-width="7" stroke-linecap="round"/>
+  </g>
+</svg>

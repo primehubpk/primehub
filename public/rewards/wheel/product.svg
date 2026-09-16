@@ -1,1 +1,28 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 320"><defs><radialGradient id="g" cx="36%" cy="24%" r="82%"><stop stop-color="#FFF0A7"/><stop offset=".45" stop-color="#F6C54D"/><stop offset="1" stop-color="#C57909"/></radialGradient><linearGradient id="red" x1="82" y1="88" x2="246" y2="246" gradientUnits="userSpaceOnUse"><stop stop-color="#FF6658"/><stop offset=".5" stop-color="#D92E2C"/><stop offset="1" stop-color="#8E171B"/></linearGradient><linearGradient id="gold" x1="50" y1="42" x2="270" y2="280" gradientUnits="userSpaceOnUse"><stop stop-color="#FFF3B0"/><stop offset=".42" stop-color="#E9B239"/><stop offset="1" stop-color="#A96305"/></linearGradient><filter id="s"><feDropShadow dx="0" dy="8" stdDeviation="8" flood-opacity=".27"/></filter></defs><circle cx="160" cy="160" r="146" fill="url(#gold)" filter="url(#s)"/><circle cx="160" cy="160" r="129" fill="#A91D20"/><circle cx="160" cy="160" r="116" fill="url(#g)"/><path d="M83 140h154v94H83z" fill="url(#red)" stroke="#FFF7D9" stroke-width="8"/><path d="M72 105h176v55H72z" fill="#FFF9E8" stroke="#FFF" stroke-width="8"/><path d="M145 105h30v129h-30z" fill="#E63B35"/><path d="M160 106c-40 0-58-46-29-46 19 0 29 23 29 46Zm2 0c40 0 58-46 29-46-19 0-29 23-29 46Z" fill="#E63B35" stroke="#FFF2C0" stroke-width="6" stroke-linejoin="round"/><path d="M102 172h88" stroke="#FFCF63" stroke-width="8" stroke-linecap="round" opacity=".85"/><path d="M221 188h12M227 182v12M90 82h15M97.5 74.5v15" stroke="#fff" stroke-width="7" stroke-linecap="round"/><path d="M248 84h12M254 78v12" stroke="#FFE379" stroke-width="7" stroke-linecap="round"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="none">
+  <defs>
+    <linearGradient id="pbox" x1="24" y1="58" x2="100" y2="118" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#C9A6FF"/>
+      <stop offset="1" stop-color="#7B4AD4"/>
+    </linearGradient>
+    <linearGradient id="plid" x1="30" y1="48" x2="98" y2="86" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#B388F7"/>
+      <stop offset="1" stop-color="#6934C4"/>
+    </linearGradient>
+    <linearGradient id="pgold" x1="40" y1="20" x2="96" y2="90" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFF1A8"/>
+      <stop offset="1" stop-color="#E0A322"/>
+    </linearGradient>
+    <filter id="ps" x="-25%" y="-25%" width="150%" height="150%">
+      <feDropShadow dx="0" dy="4" stdDeviation="3.5" flood-color="#5B2D9A" flood-opacity=".28"/>
+    </filter>
+  </defs>
+  <g filter="url(#ps)">
+    <path d="M28 78l10-22h52l10 22v28a10 10 0 0 1-10 10H38a10 10 0 0 1-10-10V78Z" fill="url(#pbox)"/>
+    <path d="M38 56h52l8 18H30l8-18Z" fill="url(#plid)"/>
+    <path d="M36 48l-14-16 18 8 8-18 8 20 22-12-10 22" fill="url(#pgold)" opacity=".95"/>
+    <path d="M86 36l16-10-6 16 14 6-18 4 4 16-12-12-14 10 8-16-16-2 18-8Z" fill="#FFE36A"/>
+    <circle cx="92" cy="30" r="4" fill="#FFE36A"/>
+    <circle cx="34" cy="40" r="3.5" fill="#FFD35A"/>
+    <circle cx="104" cy="58" r="3" fill="#FFF0A8"/>
+  </g>
+</svg>

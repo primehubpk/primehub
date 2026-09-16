@@ -11,7 +11,8 @@ import { getResellerTiers } from "@/lib/resellerTiers";
 import type { ResellerProfile, ResellerTier } from "@/lib/resellerTypes";
 import { useSettings } from "@/lib/useSettings";
 import HomeHeading from "./HomeHeading";
-import RewardWheelArtwork, { rewardWheelArtworkSource, rewardWheelBackground } from "@/components/rewards/RewardWheelArtwork";
+import PremiumSpinWheel from "@/components/rewards/PremiumSpinWheel";
+import { rewardWheelArtworkSource } from "@/components/rewards/RewardWheelArtwork";
 import "./HomeResellerLiveRail.css";
 import "./HomeResellerWheelInstant.css";
 
@@ -138,9 +139,6 @@ export default function HomeResellerLiveRail({initialProducts=[]}:{initialProduc
   async function checkIn(){if(busy||wallet.lastCheckIn===today)return;setBusy(true);try{if(user){const token=await user.getIdToken();const r=await fetch("/api/reseller/reward-action",{method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${token}`},body:JSON.stringify({action:"checkin",guestId:guestId()})});const d=await r.json();if(!r.ok)throw new Error(d.error||"Check-in failed.");}else{const y=new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Karachi"}).format(new Date(Date.now()-86400000));const ns=wallet.lastCheckIn===y?Math.min(7,Number(wallet.streak||0)+1):1;const pts=Number(rewardSettings.checkInRewards?.[ns-1]||10);const next={...wallet,streak:ns,lastCheckIn:today,points:Number(wallet.points||0)+pts};writeGuestWallet(next);setWallet(next);}}catch(e){setMessage(e instanceof Error?e.message:"Check-in failed.");}finally{setBusy(false);}}
   function openTask(task:ResellerTask){if(events.includes(task.id)&&!user){location.href="/login?redirect=/#reseller-tasks";return;}if(["weekly-orders","monthly-orders","wholesale-order"].includes(task.id)){location.href="/shop";return;}const url=task.url||(task.id==="refer-reseller"?`${location.origin}/reseller/join?ref=${encodeURIComponent(user?.uid||guestId())}`:"");saveTaskEvent(task.id);setEvents(readTaskEvents());if(task.id==="whatsapp-share"||task.id==="refer-reseller"){window.open(`https://wa.me/?text=${encodeURIComponent(`${task.shareText||task.description}\n${url||location.origin}`)}`,"_blank","noopener,noreferrer");return;}if(url)window.open(url,"_blank","noopener,noreferrer");}
 
-  const count=Math.max(1,prizes.length);
-  const imageSize=count<=2?62:count===3?56:count===4?49:count===5?46:count<=7?39:34;
-  const radius=count<=3?40:count<=5?45:count<=7?48:50;
   const topBase=2+tasks.length; const bottomBase=1+tiers.length+vouchers.length; const topGiftCount=Math.max(0,Math.min(gifts.length,Math.round((bottomBase+gifts.length-topBase)/2))); const topGifts=gifts.slice(0,topGiftCount); const bottomGifts=gifts.slice(topGiftCount);
   const GiftCard=({gift}:{gift:RewardGift})=>{const image=gift.imageUrl||productImage(gift.productId?products[gift.productId]:undefined);return <article className="ph-card ph-gift"><div className="ph-gift-art">{image?<img src={image} alt={gift.title||"Gift"}/>:<Gift size={30}/>}</div><small>POINT STORE</small><h4>{gift.title||products[gift.productId||""]?.title||products[gift.productId||""]?.name||"PrimeHub Gift"}</h4><p>{Number(gift.pointsCost||0).toLocaleString()} points</p></article>;};
 
@@ -151,7 +149,7 @@ export default function HomeResellerLiveRail({initialProducts=[]}:{initialProduc
     <div className="ph-live-scroll"><div className="ph-live-grid">
       <div className="ph-live-row">
         <article className="ph-card ph-check" id="reseller-rewards"><small>WEEKLY STREAK</small><div className="ph-title"><h3>7-Day Check-in</h3><b>{streak}/7</b></div><div className="ph-days">{Array.from({length:7},(_,i)=><span key={i} className={i<streak?"done":""}>D{i+1}<b>+{rewardSettings.checkInRewards?.[i]||0}</b></span>)}</div><button onClick={()=>void checkIn()} disabled={busy||wallet.lastCheckIn===today}><CheckCircle2 size={14}/>{wallet.lastCheckIn===today?"Done today":"Check in"}</button></article>
-        <article className="ph-card ph-wheel"><div className="ph-wheel-wrap"><i></i><div className="ph-wheel-disc" style={{transform:`rotate(${rotation}deg)`,background:rewardWheelBackground(count)}}>{prizes.map((p,i)=>{const angle=i*(360/count);return <div className="ph-prize" key={p.id} style={{width:imageSize,height:imageSize,transform:`translate(-50%,-50%) rotate(${angle}deg) translateY(-${radius}px) rotate(${-angle}deg)`}}><RewardWheelArtwork prize={p} compact /></div>})}<em>WIN</em></div></div><button onClick={()=>void spin()} disabled={busy||usedSpin||!prizes.length}>{usedSpin?"Come tomorrow":busy?"Spinning…":"Spin the wheel"}</button></article>
+        <article className="ph-card ph-wheel"><PremiumSpinWheel prizes={prizes} rotation={rotation} compact /><button onClick={()=>void spin()} disabled={busy||usedSpin||!prizes.length}>{usedSpin?"Come tomorrow":busy?"Spinning…":"Spin the wheel"}</button></article>
         {tasks.map((task,index)=><article className="ph-card ph-task" id={index===0?"reseller-tasks":undefined} key={task.id}><div className="ph-task-head"><span>{task.icon||"✓"}</span><b>+{Number(task.reward||0)}</b></div><h4>{task.title}</h4><p>{task.description}</p><div className="ph-task-state">{events.includes(task.id)?"Completed — login to claim":"Admin task"}</div><button onClick={()=>openTask(task)}>{events.includes(task.id)&&!user?"Login to claim":"Start task"}<ChevronRight size={12}/></button></article>)}
         {topGifts.map(g=><GiftCard key={g.id} gift={g}/>) }
       </div>

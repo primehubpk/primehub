@@ -34,12 +34,12 @@ const ARTWORK: Record<RewardWheelArtworkKind, string> = {
 
 // Premium pastel palette from the approved reference: pink, yellow, blue,
 // purple and mint green, separated by slim gold dividers.
-const WHEEL_COLORS = ['#F7A8C7', '#FFE08A', '#8BC7F6', '#A98AF4', '#8EE0B2'];
+const WHEEL_COLORS = ['#F4B6D2', '#F3D25C', '#7EC4F4', '#C4A3F5', '#7FDEB0'];
 
 export function rewardWheelBackground(count: number) {
   const safeCount = Math.max(1, count);
   const step = 360 / safeCount;
-  const separator = Math.min(1.35, step * 0.03);
+  const separator = Math.min(2.1, step * 0.045);
   const stops = Array.from({ length: safeCount }, (_, index) => {
     const start = index * step;
     const end = (index + 1) * step;

@@ -6,10 +6,10 @@ import { Check, Gift, RotateCcw, Save, Sparkles, Star, TicketPercent, Truck } fr
 import RewardWheelArtwork, {
   PREMIUM_REWARD_WHEEL_ORDER,
   rewardWheelArtworkKind,
-  rewardWheelBackground,
   rewardWheelPrizeLabel,
   type RewardWheelArtworkKind,
 } from '@/components/rewards/RewardWheelArtwork';
+import PremiumSpinWheel from '@/components/rewards/PremiumSpinWheel';
 import { adminCollection, setAdminDocument, type Product } from './shared';
 
 type PrizeType = 'product' | 'points' | 'free-delivery' | 'coupon' | 'try-again';
@@ -384,10 +384,8 @@ export default function PremiumWheelConfigurator() {
 }
 
 function PremiumWheelPreview({ prizes }: { prizes: Prize[] }) {
-  const count = 5;
-  const radius = 32;
   return (
-    <div className="overflow-hidden rounded-[28px] bg-[linear-gradient(155deg,#fffdf8,#f4ecdf)] p-4 text-[#17140f] shadow-[0_18px_45px_rgba(90,55,10,.15)]">
+    <div className="overflow-visible rounded-[28px] bg-[linear-gradient(155deg,#fffdf8,#f4ecdf)] p-4 text-[#17140f] shadow-[0_18px_45px_rgba(90,55,10,.15)]">
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="text-[9px] font-black uppercase tracking-[.2em] text-[#B7791F]">Live customer preview</p>
@@ -396,32 +394,8 @@ function PremiumWheelPreview({ prizes }: { prizes: Prize[] }) {
         <span className="rounded-full border border-[#B7791F]/20 bg-white px-2.5 py-1 text-[9px] font-black">Shared wheel</span>
       </div>
 
-      <div className="relative mx-auto mt-5 aspect-square w-full max-w-[350px]">
-        <div className="absolute left-1/2 top-[-10px] z-30 h-0 w-0 -translate-x-1/2 border-x-[16px] border-t-[29px] border-x-transparent border-t-[#E6AD42] drop-shadow-md" />
-        <div
-          className="absolute inset-0 overflow-hidden rounded-full border-[10px] border-[#E6AD42] shadow-[0_0_0_3px_#FFF0A7,0_0_0_6px_#B97818,0_18px_40px_rgba(87,49,4,.28)]"
-          style={{ background: rewardWheelBackground(count) }}
-        >
-          <div className="pointer-events-none absolute inset-[4%] rounded-full border border-white/45 bg-[radial-gradient(circle,rgba(255,255,255,.15)_0_29%,transparent_30%_70%,rgba(255,255,255,.11)_71%_100%)]" />
-          {prizes.map((prize, index) => {
-            const angle = index * (360 / count);
-            const radians = (angle * Math.PI) / 180;
-            const x = 50 + radius * Math.sin(radians);
-            const y = 50 - radius * Math.cos(radians);
-            return (
-              <div
-                key={prize.id}
-                className="absolute z-10 h-[25%] w-[27%] -translate-x-1/2 -translate-y-1/2"
-                style={{ left: `${x}%`, top: `${y}%` }}
-              >
-                <RewardWheelArtwork prize={prize} />
-              </div>
-            );
-          })}
-          <div className="absolute left-1/2 top-1/2 z-20 grid h-[23%] w-[23%] -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border-[6px] border-[#FFF0A7] bg-[radial-gradient(circle_at_35%_28%,#FFFFFF,#FFF9EC_72%)] text-center shadow-[0_0_0_3px_#B87916,0_8px_18px_rgba(86,51,7,.30)]">
-            <span className="text-[10px] font-black leading-[.9] tracking-[-.03em] text-[#1D2B4A] sm:text-xs">PrimeHub<br /><b className="mt-1 inline-block text-[8px] tracking-[.16em] text-[#B7791F]">SPIN</b></span>
-          </div>
-        </div>
+      <div className="mx-auto mt-2 w-full max-w-[350px]">
+        <PremiumSpinWheel prizes={prizes} rotation={0} />
       </div>
 
       <div className="mt-4 rounded-2xl border border-[#B7791F]/10 bg-white/75 p-3 text-[10px] leading-4 text-black/55">
