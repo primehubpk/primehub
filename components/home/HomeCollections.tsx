@@ -40,10 +40,12 @@ export function HomeProductCard({
   product,
   horizontal = false,
   pack = false,
+  badgeText,
 }: {
   product: Product;
   horizontal?: boolean;
   pack?: boolean;
+  badgeText?: string;
 }) {
   const addItem = useCartStore((s) => s.addItem);
   const openVariantModal = useCartStore((s) => s.openVariantModal);
@@ -93,6 +95,12 @@ export function HomeProductCard({
         ) : (
           <Package aria-label="Image unavailable" />
         )}
+        {badgeText ? (
+          <span className="home-product-badge home-product-badge-new">
+            <span aria-hidden="true">✦</span>
+            {badgeText}
+          </span>
+        ) : null}
       </FastProductLink>
       <div className="home-product-info">
         <FastProductLink product={product} className="home-product-title">
