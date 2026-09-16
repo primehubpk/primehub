@@ -10,6 +10,7 @@ import CartMiniBar from '@/components/CartMiniBar';
 import PWARegister from '@/components/PWARegister';
 import GlobalVariantSelector from '@/components/GlobalVariantSelector';
 import SalarViewportShell from '@/components/salar/SalarViewportShell';
+import RewardWheelImageFix from '@/components/rewards/RewardWheelImageFix';
 import { SettingsProvider } from '@/lib/useSettings';
 import './globals.css';
 
@@ -138,6 +139,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <CartMiniBar />
           <PWARegister />
           <SalarViewportShell />
+          <RewardWheelImageFix />
         </SettingsProvider>
       </body>
     </html>
