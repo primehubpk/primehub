@@ -1,5 +1,6 @@
 import 'server-only';
 
+import { revalidateTag, unstable_cache } from 'next/cache';
 import { getSupabasePrimaryPayload, mapDocumentToSupabase, supabasePrimaryUpsert } from '@/lib/dualWriteServer';
 
 export type SalarUiSettings = {
@@ -8,6 +9,7 @@ export type SalarUiSettings = {
 };
 
 const SETTINGS_ID = 'salar_ui';
+const SETTINGS_TAG = 'salar-ui-settings';
 
 function safeHttpsUrl(value: unknown) {
   const text = String(value ?? '').trim().slice(0, 1600);
@@ -27,12 +29,22 @@ function normalize(payload: Record<string, any> | null): SalarUiSettings {
   };
 }
 
-export async function getSalarUiSettings() {
+async function readSalarUiSettings() {
   return normalize(await getSupabasePrimaryPayload('settings', SETTINGS_ID));
 }
 
+const readCachedSalarUiSettings = unstable_cache(
+  readSalarUiSettings,
+  ['primehub-salar-ui-v1'],
+  { revalidate: 3600, tags: [SETTINGS_TAG] },
+);
+
+export function getSalarUiSettings() {
+  return readCachedSalarUiSettings();
+}
+
 export async function saveSalarUiSettings(input: { iconUrl?: unknown }) {
-  const current = await getSalarUiSettings();
+  const current = await readSalarUiSettings();
   const next: SalarUiSettings = {
     iconUrl: input.iconUrl === undefined ? current.iconUrl : safeHttpsUrl(input.iconUrl),
     updatedAt: new Date().toISOString(),
@@ -40,5 +52,6 @@ export async function saveSalarUiSettings(input: { iconUrl?: unknown }) {
   const row = mapDocumentToSupabase('settings', SETTINGS_ID, next, 'supabase');
   if (!row) throw new Error('Could not build Salar UI settings row.');
   await supabasePrimaryUpsert({ table: 'settings', row });
+  revalidateTag(SETTINGS_TAG);
   return next;
 }
