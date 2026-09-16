@@ -14,6 +14,14 @@ export type RewardWheelArtworkKind =
   | 'free-product'
   | 'voucher';
 
+export const PREMIUM_REWARD_WHEEL_ORDER: RewardWheelArtworkKind[] = [
+  'try-again',
+  'free-delivery',
+  'free-product',
+  'points',
+  'voucher',
+];
+
 const ARTWORK: Record<RewardWheelArtworkKind, string> = {
   points: '/rewards/wheel/points.svg',
   'try-again': '/rewards/wheel/try-again.svg',
@@ -22,17 +30,17 @@ const ARTWORK: Record<RewardWheelArtworkKind, string> = {
   voucher: '/rewards/wheel/voucher.svg',
 };
 
-const WHEEL_COLORS = ['#D5A62D', '#64717A', '#784464', '#14796D', '#C95B45'];
+const WHEEL_COLORS = ['#FFF3D4', '#BA2424', '#E9B43B', '#0E6A55', '#7C1722'];
 
 export function rewardWheelBackground(count: number) {
   const safeCount = Math.max(1, count);
   const step = 360 / safeCount;
-  const separator = Math.min(1.8, step * 0.035);
+  const separator = Math.min(1.15, step * 0.025);
   const stops = Array.from({ length: safeCount }, (_, index) => {
     const start = index * step;
     const end = (index + 1) * step;
     const color = WHEEL_COLORS[index % WHEEL_COLORS.length];
-    return `#F7E7B7 ${start.toFixed(2)}deg ${(start + separator).toFixed(2)}deg, ${color} ${(start + separator).toFixed(2)}deg ${(end - separator).toFixed(2)}deg, #F7E7B7 ${(end - separator).toFixed(2)}deg ${end.toFixed(2)}deg`;
+    return `#F8D66B ${start.toFixed(2)}deg ${(start + separator).toFixed(2)}deg, ${color} ${(start + separator).toFixed(2)}deg ${(end - separator).toFixed(2)}deg, #F8D66B ${(end - separator).toFixed(2)}deg ${end.toFixed(2)}deg`;
   });
   return `conic-gradient(from ${(-step / 2).toFixed(2)}deg, ${stops.join(', ')})`;
 }
@@ -44,7 +52,7 @@ export function rewardWheelArtworkKind(prize: RewardWheelPrizeLike): RewardWheel
   if (type === 'points' || name.includes('point')) return 'points';
   if (type === 'free-delivery' || name.includes('delivery')) return 'free-delivery';
   if (type === 'coupon' || type === 'voucher' || name.includes('voucher') || name.includes('coupon')) return 'voucher';
-  if (type === 'product' || name.includes('product') || name.includes('gift')) return 'free-product';
+  if (type === 'product' || name.includes('product') || name.includes('gift') || name.includes('deal box')) return 'free-product';
   return 'try-again';
 }
 
@@ -56,7 +64,7 @@ export function rewardWheelPrizeLabel(prize: RewardWheelPrizeLike) {
     return amount > 0 ? `Rs. ${amount.toLocaleString()} Voucher` : 'Voucher';
   }
   if (kind === 'free-delivery') return 'Free Delivery';
-  if (kind === 'free-product') return 'Free Product';
+  if (kind === 'free-product') return 'Free Deal Box';
   return 'Try Again';
 }
 
@@ -80,7 +88,7 @@ export default function RewardWheelArtwork({
       : kind === 'free-delivery'
         ? ['Free', 'Delivery']
         : kind === 'free-product'
-          ? ['Free', 'Product']
+          ? ['Free', 'Deal Box']
           : ['Try', 'Again'];
 
   return (
