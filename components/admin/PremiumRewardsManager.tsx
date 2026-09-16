@@ -11,20 +11,26 @@ export default function PremiumRewardsManager({ products = [] }: { products?: an
     const root = legacyRef.current;
     if (!root) return;
 
-    const hideLegacyWheelTab = () => {
-      const buttons = Array.from(root.querySelectorAll('button'));
-      for (const button of buttons) {
-        if (button.textContent?.trim() === 'Spin Wheel') {
-          button.hidden = true;
-          button.setAttribute('aria-hidden', 'true');
-          button.tabIndex = -1;
-        }
-      }
+    const keepSingleWheelEditor = () => {
+      const buttons = Array.from(root.querySelectorAll<HTMLButtonElement>('button'));
+      const overview = buttons.find(button => button.textContent?.trim() === 'Overview');
+      const legacyWheel = buttons.find(button => button.textContent?.trim() === 'Spin Wheel');
+
+      if (!legacyWheel) return;
+
+      // If the old tab was ever selected by a stale client render, return to the
+      // overview before hiding it. PremiumWheelConfigurator above is the only
+      // wheel editor customers/admins should use now.
+      if (legacyWheel.className.includes('bg-white')) overview?.click();
+      legacyWheel.style.setProperty('display', 'none', 'important');
+      legacyWheel.setAttribute('aria-hidden', 'true');
+      legacyWheel.tabIndex = -1;
+      legacyWheel.disabled = true;
     };
 
-    hideLegacyWheelTab();
-    const observer = new MutationObserver(hideLegacyWheelTab);
-    observer.observe(root, { childList: true, subtree: true });
+    keepSingleWheelEditor();
+    const observer = new MutationObserver(keepSingleWheelEditor);
+    observer.observe(root, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
     return () => observer.disconnect();
   }, []);
 
