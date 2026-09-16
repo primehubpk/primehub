@@ -2,6 +2,7 @@
 
 import { CSSProperties, useEffect, useState } from 'react';
 import SalarWidget from '@/components/salar/SalarWidget';
+import SalarInteractionEnhancer from '@/components/salar/SalarInteractionEnhancer';
 
 type VisualBox = { height: number; top: number };
 
@@ -46,6 +47,7 @@ export default function SalarViewportShell() {
   return (
     <div id="salar-viewport-shell" style={style}>
       <SalarWidget />
+      <SalarInteractionEnhancer />
       <style jsx global>{`
         #salar-viewport-shell > div:has(button[aria-label="Close Salar"]) {
           position: fixed !important;
