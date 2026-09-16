@@ -3,8 +3,8 @@
 import dynamic from 'next/dynamic';
 import { CSSProperties, useEffect, useState } from 'react';
 import RewardWheelPresentationEnhancer from '@/components/rewards/RewardWheelPresentationEnhancer';
+import SalarWidget from '@/components/salar/SalarWidget';
 
-const SalarWidget = dynamic(() => import('@/components/salar/SalarWidget'), { ssr: false });
 const SalarInteractionEnhancer = dynamic(() => import('@/components/salar/SalarInteractionEnhancer'), { ssr: false });
 const SalarOrderCustomizationBridge = dynamic(() => import('@/components/salar/SalarOrderCustomizationBridge'), { ssr: false });
 const SalarOrderFeedbackBridge = dynamic(() => import('@/components/salar/SalarOrderFeedbackBridge'), { ssr: false });
@@ -31,7 +31,7 @@ function routeIsStillLoading() {
 
 export default function SalarViewportShell() {
   const [visualBox, setVisualBox] = useState<VisualBox>({ height: 800, top: 0 });
-  const [salarReady, setSalarReady] = useState(false);
+  const [enhancersReady, setEnhancersReady] = useState(false);
 
   useEffect(() => {
     const update = () => setVisualBox(currentVisualBox());
@@ -55,17 +55,17 @@ export default function SalarViewportShell() {
     let scheduled = false;
     let disposed = false;
 
-    const reveal = () => {
+    const revealEnhancers = () => {
       if (disposed) return;
-      setSalarReady(true);
+      setEnhancersReady(true);
     };
 
     const schedule = () => {
       if (scheduled || disposed || routeIsStillLoading()) return;
       scheduled = true;
       const requestIdle = (window as any).requestIdleCallback as undefined | ((callback: () => void, options?: { timeout: number }) => number);
-      if (typeof requestIdle === 'function') idleId = requestIdle(reveal, { timeout: 900 });
-      else timeoutId = window.setTimeout(reveal, 250);
+      if (typeof requestIdle === 'function') idleId = requestIdle(revealEnhancers, { timeout: 900 });
+      else timeoutId = window.setTimeout(revealEnhancers, 250);
     };
 
     const observer = new MutationObserver(schedule);
@@ -91,9 +91,9 @@ export default function SalarViewportShell() {
   return (
     <div id="salar-viewport-shell" style={style}>
       <RewardWheelPresentationEnhancer />
-      {salarReady ? (
+      <SalarWidget />
+      {enhancersReady ? (
         <>
-          <SalarWidget />
           <SalarInteractionEnhancer />
           <SalarOrderCustomizationBridge />
           <SalarOrderFeedbackBridge />
