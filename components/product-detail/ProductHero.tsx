@@ -55,7 +55,7 @@ export default function ProductHero({ product, images, activeImage, savingsAmoun
               unoptimized={directDisplayImage}
               sizes="(max-width: 768px) 100vw, 52vw"
               quality={78}
-              className="object-cover"
+              className={liveDeal || bigDealActive ? 'object-contain' : 'object-cover'}
             />
           </button>
         ) : <div className="flex h-full items-center justify-center text-sm font-bold text-black/25">No product image</div>}

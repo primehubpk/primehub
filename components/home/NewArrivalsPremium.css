@@ -1,0 +1,50 @@
+.home-storefront .home-product-badge {
+  position: absolute;
+  left: 8px;
+  top: 8px;
+  z-index: 4;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: calc(100% - 16px);
+  padding: 5px 9px;
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: 999px;
+  color: #fff;
+  font-size: 8px;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  box-shadow: 0 6px 18px rgba(77, 47, 0, 0.22);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+  pointer-events: none;
+}
+
+.home-storefront .home-product-badge-new {
+  background: linear-gradient(120deg, #6f4300 0%, #b7791f 38%, #f5cf73 70%, #8b5700 100%);
+  text-shadow: 0 1px 2px rgba(55, 32, 0, 0.35);
+}
+
+.home-storefront .home-product-badge-new > span {
+  color: #fff3bd;
+  font-size: 9px;
+  line-height: 1;
+}
+
+@media (max-width: 600px) {
+  .home-storefront .home-product-badge {
+    left: 6px;
+    top: 6px;
+    gap: 3px;
+    padding: 4px 7px;
+    font-size: 6.5px;
+    letter-spacing: 0.08em;
+  }
+
+  .home-storefront .home-product-badge-new > span {
+    font-size: 7.5px;
+  }
+}

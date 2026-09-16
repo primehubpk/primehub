@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ChevronRight, Package, ShoppingCart } from "lucide-react";
 import FastProductLink from "@/components/FastProductLink";
 import HomeHeading from "@/components/home/HomeHeading";
@@ -36,14 +36,57 @@ export function homePrice(product: Product) {
   });
 }
 
+function productTime(product: Product) {
+  const value = product.createdAt || product.updatedAt;
+  if (typeof value?.toMillis === "function") return value.toMillis();
+  const parsed = new Date(value || 0).getTime();
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function seededUnit(seed: number, key: string) {
+  let hash = (seed ^ 0x811c9dc5) >>> 0;
+  for (let index = 0; index < key.length; index += 1) {
+    hash ^= key.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  hash ^= hash << 13;
+  hash ^= hash >>> 17;
+  hash ^= hash << 5;
+  return (hash >>> 0) / 4294967295;
+}
+
+function shuffleWithNewArrivalPriority(products: Product[], seed: number) {
+  if (products.length < 2 || seed === 0) return [...products];
+
+  const newest = [...products].sort(
+    (a, b) => productTime(b) - productTime(a) || b.id.localeCompare(a.id),
+  );
+  const timestamped = newest.filter((product) => productTime(product) > 0);
+  const freshnessRank = new Map<string, number>();
+  timestamped.forEach((product, index) => {
+    const denominator = Math.max(1, timestamped.length - 1);
+    freshnessRank.set(product.id, 1 - index / denominator);
+  });
+
+  return [...products].sort((a, b) => {
+    const aFreshness = freshnessRank.get(a.id) ?? 0;
+    const bFreshness = freshnessRank.get(b.id) ?? 0;
+    const aScore = seededUnit(seed, a.id) * 0.55 + aFreshness * 0.9;
+    const bScore = seededUnit(seed, b.id) * 0.55 + bFreshness * 0.9;
+    return bScore - aScore || b.id.localeCompare(a.id);
+  });
+}
+
 export function HomeProductCard({
   product,
   horizontal = false,
   pack = false,
+  badgeText,
 }: {
   product: Product;
   horizontal?: boolean;
   pack?: boolean;
+  badgeText?: string;
 }) {
   const addItem = useCartStore((s) => s.addItem);
   const openVariantModal = useCartStore((s) => s.openVariantModal);
@@ -93,6 +136,12 @@ export function HomeProductCard({
         ) : (
           <Package aria-label="Image unavailable" />
         )}
+        {badgeText ? (
+          <span className="home-product-badge home-product-badge-new">
+            <span aria-hidden="true">✦</span>
+            {badgeText}
+          </span>
+        ) : null}
       </FastProductLink>
       <div className="home-product-info">
         <FastProductLink product={product} className="home-product-title">
@@ -152,11 +201,23 @@ export default function HomeCollections({
   onWholesaleSelect?: () => void;
 }) {
   const { settings } = useSettings();
+  const [shuffleSeed, setShuffleSeed] = useState(0);
   const catalog = products.filter((p) => p.published !== false);
   const buckets = sortPriceBuckets(
     (settings.priceBuckets || []).filter((b) => b.active),
   );
   const packs = catalog.filter(isWholesaleProduct);
+
+  useEffect(() => {
+    if (standalone) return;
+    const values = new Uint32Array(1);
+    if (typeof window !== "undefined" && window.crypto?.getRandomValues) {
+      window.crypto.getRandomValues(values);
+      setShuffleSeed(values[0] || Date.now());
+      return;
+    }
+    setShuffleSeed((Date.now() ^ Math.floor(Math.random() * 0xffffffff)) >>> 0);
+  }, [standalone]);
 
   return (
     <>
@@ -180,7 +241,7 @@ export default function HomeCollections({
               ? `#${anchor}`
               : bucketHref(bucket.amount ?? null, wholesale);
             const saleRange = saleMelaPriceRange(amount);
-            const matches = wholesale
+            const baseMatches = wholesale
               ? sortBySalePrice(packs)
               : sortBySalePrice(
                   catalog.filter((product) => {
@@ -191,6 +252,9 @@ export default function HomeCollections({
                       : matchesPriceBucket(price, buckets, amount);
                   }),
                 );
+            const matches = standalone
+              ? baseMatches
+              : shuffleWithNewArrivalPriority(baseMatches, shuffleSeed);
 
             return (
               <div
