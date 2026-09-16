@@ -12,6 +12,7 @@ import { db } from '@/lib/firebase';
 import { useCartStore } from '@/lib/cartStore';
 import { imageOf, originalOf, priceOf, productHasVariants, titleOf, type Product } from '@/components/shop/ShopTypes';
 import { isDirectStorefrontImage, normalizeImageUrl } from '@/lib/imageUrl';
+import '@/components/home/NewArrivalsPremium.css';
 
 function timeOf(p: Product) {
   const value = p.createdAt || p.updatedAt;
@@ -51,7 +52,7 @@ export default function NewArrivalsRail({
     return () => stop();
   }, [liveUpdates]);
 
-  const newest = useMemo(() => newestFirst(products).slice(0, homeLayout ? 20 : products.length), [products, homeLayout]);
+  const newest = useMemo(() => newestFirst(products).slice(0, homeLayout ? 100 : products.length), [products, homeLayout]);
 
   const addProduct = (product: Product) => {
     const image = imageOf(product);
@@ -77,7 +78,7 @@ export default function NewArrivalsRail({
         <div className="grid grid-flow-col grid-rows-2 auto-cols-[calc((100%-7px)/2)] gap-2 overflow-x-auto overscroll-x-contain pb-2 scroll-smooth snap-x snap-mandatory [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {newest.map((p) => (
             <div key={p.id} className="min-w-0 snap-start">
-              <HomeProductCard product={p} horizontal />
+              <HomeProductCard product={p} horizontal badgeText="New Arrival" />
             </div>
           ))}
         </div>
@@ -133,4 +134,3 @@ export default function NewArrivalsRail({
     </section>
   );
 }
-
