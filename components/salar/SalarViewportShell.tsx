@@ -2,6 +2,7 @@
 
 import dynamic from 'next/dynamic';
 import { CSSProperties, useEffect, useState } from 'react';
+import RewardWheelPresentationEnhancer from '@/components/rewards/RewardWheelPresentationEnhancer';
 
 const SalarWidget = dynamic(() => import('@/components/salar/SalarWidget'), { ssr: false });
 const SalarInteractionEnhancer = dynamic(() => import('@/components/salar/SalarInteractionEnhancer'), { ssr: false });
@@ -89,6 +90,7 @@ export default function SalarViewportShell() {
 
   return (
     <div id="salar-viewport-shell" style={style}>
+      <RewardWheelPresentationEnhancer />
       {salarReady ? (
         <>
           <SalarWidget />
@@ -134,12 +136,48 @@ export default function SalarViewportShell() {
           border-radius: 0 !important;
         }
 
+        /* Collapsed Salar stays a simple profile-style floating avatar. */
+        #salar-viewport-shell > div:not(:has(button[aria-label="Close Salar"])) > div {
+          gap: 0 !important;
+        }
+        #salar-viewport-shell > div:not(:has(button[aria-label="Close Salar"])) > div > span {
+          display: none !important;
+        }
+        #salar-viewport-shell > div:not(:has(button[aria-label="Close Salar"])) > div > button {
+          width: 60px !important;
+          height: 60px !important;
+          padding: 4px !important;
+          gap: 0 !important;
+          border: 3px solid #fff !important;
+          border-radius: 9999px !important;
+          background: #14140f !important;
+          box-shadow: 0 10px 28px rgba(20,20,15,.28) !important;
+        }
+        #salar-viewport-shell > div:not(:has(button[aria-label="Close Salar"])) > div > button > span:first-child {
+          width: 46px !important;
+          height: 46px !important;
+          flex: 0 0 46px !important;
+          border-radius: 9999px !important;
+        }
+        #salar-viewport-shell > div:not(:has(button[aria-label="Close Salar"])) > div > button > span:last-child {
+          display: none !important;
+        }
+
         @media (min-width: 640px) {
           #salar-viewport-shell > div:has(button[aria-label="Open full chat"]) {
             padding: 20px !important;
           }
           #salar-viewport-shell > div:has(button[aria-label="Open full chat"]) > div {
             max-height: calc(var(--salar-viewport-height) - 40px) !important;
+          }
+          #salar-viewport-shell > div:not(:has(button[aria-label="Close Salar"])) > div > button {
+            width: 64px !important;
+            height: 64px !important;
+          }
+          #salar-viewport-shell > div:not(:has(button[aria-label="Close Salar"])) > div > button > span:first-child {
+            width: 50px !important;
+            height: 50px !important;
+            flex-basis: 50px !important;
           }
         }
       `}</style>
