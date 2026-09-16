@@ -22,8 +22,9 @@ export const dynamic = 'force-dynamic';
 
 const MAX_IMAGE_BYTES = 3 * 1024 * 1024;
 
-function cleanText(value: unknown, max = 2000) {
-  return String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
+function cleanText(value: unknown, max?: number) {
+  const text = String(value ?? '').replace(/\s+/g, ' ').trim();
+  return typeof max === 'number' ? text.slice(0, max) : text;
 }
 
 function finiteNumber(value: unknown) {
@@ -216,7 +217,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: 'Salar chat session is invalid.' }, { status: 400 });
     }
 
-    const message = cleanText(input.message, 4000);
+    const message = cleanText(input.message);
     if (!message && !input.image && !input.mention && !input.references.length) {
       return NextResponse.json({ success: false, error: 'Please enter a message or attach an image.' }, { status: 400 });
     }
