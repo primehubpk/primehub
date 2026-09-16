@@ -109,6 +109,7 @@ export default function HomeResellerLiveRail({initialProducts=[]}:{initialProduc
   async function spin(){
     if(busy||usedSpin||!prizes.length)return;
     setBusy(true);setMessage("");setSelectedPrize(null);
+    setRotation(value=>value+1080);
     if(revealTimer.current)clearTimeout(revealTimer.current);
     try{
       let data:any;
@@ -128,19 +129,20 @@ export default function HomeResellerLiveRail({initialProducts=[]}:{initialProduc
       }
       const prize=data?.prize as RewardPrize|undefined;
       const winner=Math.max(0,prizes.findIndex(p=>p.id===prize?.id));
-      setRotation(value=>value+1440+(360-winner*(360/Math.max(1,prizes.length))));
+      setRotation(value=>value+720+(360-winner*(360/Math.max(1,prizes.length))));
       revealTimer.current=setTimeout(()=>{
         setSelectedPrize(prize||null);
         setMessage(prize?rewardMessage(prize,Boolean(user)):"Spin complete.");
         setBusy(false);
-      },3150);
+      },700);
     }catch(error){
       setMessage(error instanceof Error?error.message:"Spin failed.");
       setBusy(false);
     }
   }
   async function checkIn(){if(busy||wallet.lastCheckIn===today)return;setBusy(true);try{if(user){const token=await user.getIdToken();const r=await fetch("/api/reseller/reward-action",{method:"POST",headers:{"Content-Type":"application/json",Authorization:`Bearer ${token}`},body:JSON.stringify({action:"checkin",guestId:guestId()})});const d=await r.json();if(!r.ok)throw new Error(d.error||"Check-in failed.");}else{const y=new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Karachi"}).format(new Date(Date.now()-86400000));const ns=wallet.lastCheckIn===y?Math.min(7,Number(wallet.streak||0)+1):1;const pts=Number(rewardSettings.checkInRewards?.[ns-1]||10);const next={...wallet,streak:ns,lastCheckIn:today,points:Number(wallet.points||0)+pts};writeGuestWallet(next);setWallet(next);}}catch(e){setMessage(e instanceof Error?e.message:"Check-in failed.");}finally{setBusy(false);}}
-  function openTask(task:ResellerTask){if(events.includes(task.id)&&!user){location.href="/login?redirect=/#reseller-tasks";return;}if(["weekly-orders","monthly-orders","wholesale-order"].includes(task.id)){location.href="/shop";return;}const url=task.url||(task.id==="refer-reseller"?`${location.origin}/reseller/join?ref=${encodeURIComponent(user?.uid||guestId())}`:"");saveTaskEvent(task.id);setEvents(readTaskEvents());if(task.id==="whatsapp-share"||task.id==="refer-reseller"){window.open(`https://wa.me/?text=${encodeURIComponent(`${task.shareText||task.description}\n${url||location.origin}`)}`,"_blank","noopener,noreferrer");return;}if(url)window.open(url,"_blank","noopener,noreferrer");}
+  function openTask(task:ResellerTask){if(events.includes(task.id)&&!user){location.href="/login?redirect=/#reseller-tasks";return;}if(["weekly-orders","monthly-orders","wholesale-order"].includes(task.id)){location.href="/shop";return;}const url=task.url||(task.id==="refer-reseller"?`${location.origin}/reseller/join?ref=${encodeURIComponent(user?.uid||guestId())}`:"");saveTaskEvent(task.id);setEvents(readTaskEvents());if(task.id==="whatsapp-share"||task.id==="refer-reseller"){window.open(`https://wa.me/?text=${encodeURIComponent(`${task.shareText||task.description}
+${url||location.origin}`)}`,"_blank","noopener,noreferrer");return;}if(url)window.open(url,"_blank","noopener,noreferrer");}
 
   const topBase=2+tasks.length; const bottomBase=1+tiers.length+vouchers.length; const topGiftCount=Math.max(0,Math.min(gifts.length,Math.round((bottomBase+gifts.length-topBase)/2))); const topGifts=gifts.slice(0,topGiftCount); const bottomGifts=gifts.slice(topGiftCount);
   const GiftCard=({gift}:{gift:RewardGift})=>{const image=gift.imageUrl||productImage(gift.productId?products[gift.productId]:undefined);return <article className="ph-card ph-gift"><div className="ph-gift-art">{image?<img src={image} alt={gift.title||"Gift"}/>:<Gift size={30}/>}</div><small>POINT STORE</small><h4>{gift.title||products[gift.productId||""]?.title||products[gift.productId||""]?.name||"PrimeHub Gift"}</h4><p>{Number(gift.pointsCost||0).toLocaleString()} points</p></article>;};
