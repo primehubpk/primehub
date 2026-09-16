@@ -85,13 +85,48 @@ const ROW_PREFIX = 'salar_chat_';
 const MAX_MESSAGES = 100;
 const MAX_PRODUCTS_PER_MESSAGE = 600;
 const ACTIVE_WINDOW_MS = 24 * 60 * 60 * 1000;
+const CHAT_HOT_CACHE_TTL_MS = 15 * 1000;
+
+type ChatCacheEntry = { expiresAt: number; chat: SalarCustomerChat };
+type SalarGlobalCache = typeof globalThis & { __primehubSalarChatHotCache?: Map<string, ChatCacheEntry> };
+const globalCache = globalThis as SalarGlobalCache;
+const chatHotCache = globalCache.__primehubSalarChatHotCache || new Map<string, ChatCacheEntry>();
+if (!globalCache.__primehubSalarChatHotCache) globalCache.__primehubSalarChatHotCache = chatHotCache;
+
+function cloneChat(chat: SalarCustomerChat) {
+  return JSON.parse(JSON.stringify(chat)) as SalarCustomerChat;
+}
+
+function readHotChat(chatId: string) {
+  const entry = chatHotCache.get(chatId);
+  if (!entry) return null;
+  if (entry.expiresAt <= Date.now()) {
+    chatHotCache.delete(chatId);
+    return null;
+  }
+  return cloneChat(entry.chat);
+}
+
+function rememberHotChat(chat: SalarCustomerChat) {
+  chatHotCache.set(chat.id, {
+    chat: cloneChat(chat),
+    expiresAt: Date.now() + CHAT_HOT_CACHE_TTL_MS,
+  });
+  if (chatHotCache.size > 250) {
+    const now = Date.now();
+    for (const [id, entry] of chatHotCache) {
+      if (entry.expiresAt <= now) chatHotCache.delete(id);
+    }
+  }
+}
 
 function cleanText(value: unknown, max = 2000) {
   return String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, max);
 }
 
-function cleanMultiline(value: unknown, max = 6000) {
-  return String(value ?? '').replace(/\r\n?/g, '\n').trim().slice(0, max);
+function cleanMultiline(value: unknown, max?: number) {
+  const text = String(value ?? '').replace(/\r\n?/g, '\n').trim();
+  return typeof max === 'number' ? text.slice(0, max) : text;
 }
 
 function safeHttpsUrl(value: unknown) {
@@ -191,7 +226,7 @@ function normalizeMessage(value: any): SalarStoredMessage | null {
       ? 'customer'
       : 'salar';
   const id = cleanText(value.id, 100) || crypto.randomUUID();
-  const content = cleanMultiline(value.content, 6000);
+  const content = cleanMultiline(value.content);
   const imageUrl = safeHttpsUrl(value.imageUrl);
   const imageAnalysis = cleanMultiline(value.imageAnalysis, 1600);
   const mention = normalizeMention(value.mention);
@@ -289,8 +324,12 @@ export function createEmptySalarChat(chatId: string, input?: {
 export async function getSalarChat(chatIdInput: unknown) {
   const chatId = cleanChatId(chatIdInput);
   if (!chatId) return null;
+  const cached = readHotChat(chatId);
+  if (cached) return cached;
   const payload = await getSupabasePrimaryPayload('settings', rowId(chatId));
-  return normalizeChat(payload, chatId);
+  const chat = normalizeChat(payload, chatId);
+  if (chat) rememberHotChat(chat);
+  return chat;
 }
 
 export async function saveSalarChat(chatInput: SalarCustomerChat) {
@@ -306,6 +345,7 @@ export async function saveSalarChat(chatInput: SalarCustomerChat) {
   const row = mapDocumentToSupabase('settings', rowId(chatId), next, 'supabase');
   if (!row) throw new Error('Could not build Salar chat row.');
   await supabasePrimaryUpsert({ table: 'settings', row });
+  rememberHotChat(next);
   return next;
 }
 
@@ -333,7 +373,7 @@ export function bootstrapSalarHistory(chat: SalarCustomerChat, history: unknown)
     id: `history-${index}-${now}`,
     role: item?.role === 'user' ? 'user' : 'assistant',
     actor: item?.role === 'user' ? 'customer' : 'salar',
-    content: cleanMultiline(item?.content, 1800),
+    content: cleanMultiline(item?.content),
     createdAt: new Date(now - (history.length - index) * 1000).toISOString(),
   })).filter(Boolean) as SalarStoredMessage[];
   return { ...chat, messages: imported.slice(-MAX_MESSAGES) };
