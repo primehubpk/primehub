@@ -6,22 +6,22 @@
   grid-template-rows: minmax(0, 1fr) auto;
   align-items: center;
   justify-content: center;
-  gap: 2px;
+  gap: 3px;
   overflow: visible;
   padding: 0;
-  color: #14140f;
+  color: #17140f;
   text-align: center;
 }
 
 .reward-wheel-artwork img {
   display: block;
-  width: min(40px, 72%);
-  height: min(40px, 72%);
+  width: min(46px, 70%);
+  height: min(46px, 70%);
   min-height: 0;
   margin: auto;
   object-fit: contain;
   object-position: center;
-  filter: drop-shadow(0 3px 4px rgba(20, 20, 15, .28));
+  filter: drop-shadow(0 3px 4px rgba(20, 20, 15, .24));
   pointer-events: none;
   user-select: none;
 }
@@ -29,23 +29,24 @@
 .reward-wheel-artwork strong {
   box-sizing: border-box;
   display: grid;
-  width: calc(100% + 4px);
-  min-width: 0;
-  min-height: 17px;
+  width: max-content;
+  max-width: calc(100% + 10px);
+  min-width: 42px;
+  min-height: 18px;
   place-items: center;
   align-content: center;
   overflow: visible;
   border: 1px solid rgba(255, 255, 255, .72);
   border-radius: 999px;
-  background: rgba(255, 253, 248, .92);
-  padding: 2px 3px;
-  color: #24231d;
-  font-size: 7px;
+  background: rgba(255, 253, 246, .94);
+  padding: 2px 7px 3px;
+  color: #211b13;
+  font-size: 7.4px;
   font-weight: 950;
-  line-height: .92;
-  letter-spacing: -.025em;
-  box-shadow: 0 2px 5px rgba(20, 20, 15, .2);
-  white-space: normal;
+  line-height: .94;
+  letter-spacing: -.02em;
+  box-shadow: 0 2px 6px rgba(20, 20, 15, .18);
+  white-space: nowrap;
 }
 
 .reward-wheel-artwork strong span {
@@ -53,25 +54,45 @@
   max-width: 100%;
 }
 
+.reward-wheel-artwork[data-reward-artwork='try-again'] strong {
+  background: rgba(235, 247, 255, .96);
+}
+
+.reward-wheel-artwork[data-reward-artwork='points'] strong,
+.reward-wheel-artwork[data-reward-artwork='voucher'] strong {
+  background: rgba(255, 246, 218, .96);
+}
+
 .reward-wheel-artwork--compact {
   gap: 1px;
 }
 
 .reward-wheel-artwork--compact img {
-  width: min(30px, 68%);
-  height: min(30px, 68%);
+  width: min(27px, 63%);
+  height: min(27px, 63%);
 }
 
 .reward-wheel-artwork--compact strong {
-  width: calc(100% + 2px);
-  min-height: 14px;
-  padding: 1px 2px;
-  font-size: 6px;
+  width: max-content;
+  max-width: calc(100% + 8px);
+  min-width: 32px;
+  min-height: 12px;
+  padding: 1px 4px 2px;
+  font-size: 5.25px;
+  line-height: .9;
+  box-shadow: 0 1px 3px rgba(20, 20, 15, .2);
 }
 
 @media (max-width: 390px) {
+  .reward-wheel-artwork--compact img {
+    width: min(25px, 60%);
+    height: min(25px, 60%);
+  }
+
   .reward-wheel-artwork--compact strong {
-    min-height: 13px;
-    font-size: 5.7px;
+    min-width: 30px;
+    min-height: 11px;
+    padding-inline: 3px;
+    font-size: 4.9px;
   }
 }
