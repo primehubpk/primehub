@@ -14,12 +14,14 @@ export type RewardWheelArtworkKind =
   | 'free-product'
   | 'voucher';
 
+// This order is shared by Admin, Home and Reseller Club. It matches the
+// customer-facing premium wheel clockwise from the top pointer.
 export const PREMIUM_REWARD_WHEEL_ORDER: RewardWheelArtworkKind[] = [
-  'try-again',
-  'free-delivery',
-  'free-product',
   'points',
   'voucher',
+  'free-delivery',
+  'free-product',
+  'try-again',
 ];
 
 const ARTWORK: Record<RewardWheelArtworkKind, string> = {
@@ -30,17 +32,19 @@ const ARTWORK: Record<RewardWheelArtworkKind, string> = {
   voucher: '/rewards/wheel/voucher.svg',
 };
 
-const WHEEL_COLORS = ['#FFF3D4', '#BA2424', '#E9B43B', '#0E6A55', '#7C1722'];
+// Premium pastel palette from the approved reference: pink, yellow, blue,
+// purple and mint green, separated by slim gold dividers.
+const WHEEL_COLORS = ['#F7A8C7', '#FFE08A', '#8BC7F6', '#A98AF4', '#8EE0B2'];
 
 export function rewardWheelBackground(count: number) {
   const safeCount = Math.max(1, count);
   const step = 360 / safeCount;
-  const separator = Math.min(1.15, step * 0.025);
+  const separator = Math.min(1.35, step * 0.03);
   const stops = Array.from({ length: safeCount }, (_, index) => {
     const start = index * step;
     const end = (index + 1) * step;
     const color = WHEEL_COLORS[index % WHEEL_COLORS.length];
-    return `#F8D66B ${start.toFixed(2)}deg ${(start + separator).toFixed(2)}deg, ${color} ${(start + separator).toFixed(2)}deg ${(end - separator).toFixed(2)}deg, #F8D66B ${(end - separator).toFixed(2)}deg ${end.toFixed(2)}deg`;
+    return `#D89C2E ${start.toFixed(2)}deg ${(start + separator).toFixed(2)}deg, ${color} ${(start + separator).toFixed(2)}deg ${(end - separator).toFixed(2)}deg, #D89C2E ${(end - separator).toFixed(2)}deg ${end.toFixed(2)}deg`;
   });
   return `conic-gradient(from ${(-step / 2).toFixed(2)}deg, ${stops.join(', ')})`;
 }
@@ -56,12 +60,21 @@ export function rewardWheelArtworkKind(prize: RewardWheelPrizeLike): RewardWheel
   return 'try-again';
 }
 
+function voucherName(prize: RewardWheelPrizeLike) {
+  const name = String(prize.name || '').trim();
+  return name || 'Free Voucher';
+}
+
 export function rewardWheelPrizeLabel(prize: RewardWheelPrizeLike) {
   const kind = rewardWheelArtworkKind(prize);
-  if (kind === 'points') return `${Math.max(0, Number(prize.points || 0)).toLocaleString()} Points`;
+  if (kind === 'points') {
+    const points = Math.max(0, Number(prize.points || 0));
+    return points > 0 ? `Free Points · ${points.toLocaleString()} points` : 'Free Points';
+  }
   if (kind === 'voucher') {
     const amount = Math.max(0, Number(prize.voucherAmount || 0));
-    return amount > 0 ? `Rs. ${amount.toLocaleString()} Voucher` : 'Voucher';
+    const name = voucherName(prize);
+    return amount > 0 ? `${name} · Rs. ${amount.toLocaleString()}` : name;
   }
   if (kind === 'free-delivery') return 'Free Delivery';
   if (kind === 'free-product') return 'Free Deal Box';
@@ -70,6 +83,16 @@ export function rewardWheelPrizeLabel(prize: RewardWheelPrizeLike) {
 
 export function rewardWheelArtworkSource(prize: RewardWheelPrizeLike) {
   return ARTWORK[rewardWheelArtworkKind(prize)];
+}
+
+function splitWheelLabel(value: string, fallback: [string, string]): [string, string] {
+  const clean = value.replace(/\s+/g, ' ').trim();
+  if (!clean) return fallback;
+  const words = clean.split(' ');
+  if (words.length === 1) return [words[0], ''];
+  if (words.length === 2) return [words[0], words[1]];
+  const middle = Math.ceil(words.length / 2);
+  return [words.slice(0, middle).join(' '), words.slice(middle).join(' ')];
 }
 
 export default function RewardWheelArtwork({
@@ -81,10 +104,10 @@ export default function RewardWheelArtwork({
 }) {
   const kind = rewardWheelArtworkKind(prize);
   const label = rewardWheelPrizeLabel(prize);
-  const labelParts = kind === 'points'
-    ? [Math.max(0, Number(prize.points || 0)).toLocaleString(), 'Points']
+  const labelParts: [string, string] = kind === 'points'
+    ? ['Free', 'Points']
     : kind === 'voucher'
-      ? [`Rs. ${Math.max(0, Number(prize.voucherAmount || 0)).toLocaleString()}`, 'Voucher']
+      ? splitWheelLabel(voucherName(prize), ['Free', 'Voucher'])
       : kind === 'free-delivery'
         ? ['Free', 'Delivery']
         : kind === 'free-product'
@@ -101,7 +124,7 @@ export default function RewardWheelArtwork({
       <img src={ARTWORK[kind]} alt="" aria-hidden="true" draggable={false} />
       <strong aria-hidden="true">
         <span>{labelParts[0]}</span>
-        <span>{labelParts[1]}</span>
+        {labelParts[1] ? <span>{labelParts[1]}</span> : null}
       </strong>
     </span>
   );
