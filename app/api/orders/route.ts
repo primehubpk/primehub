@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { calculateDeliveryCharge } from '@/lib/deliveryCharges';
 import { getDualProduct, getDualSettings } from '@/lib/dualReadServer';
 import { getAdminAuth, getAdminDb } from '@/lib/firebaseAdmin';
-import { getDualWriteMode, isSupabaseWriteConfigured, mapOrderToSupabase, mirrorSupabaseUpsert, recordMirrorFailure, supabasePrimaryUpsert } from '@/lib/dualWriteServer';
+import { isSupabaseWriteConfigured, mapOrderToSupabase, mirrorSupabaseUpsert, recordMirrorFailure, supabasePrimaryUpsert } from '@/lib/dualWriteServer';
 import { isWholesaleProduct } from '@/lib/wholesale';
 
 export const runtime = 'nodejs';
@@ -93,7 +93,7 @@ async function optionalReseller(request: Request) {
   const decoded = await decodedUser(request); if (!decoded) return null;
   let data: any = null;
   let shouldTryFirebase = true;
-  if (getDualWriteMode() === 'supabase-primary' && isSupabaseWriteConfigured()) {
+  if (isSupabaseWriteConfigured()) {
     try {
       data = await readSupabaseResellerProfile(decoded.uid);
       shouldTryFirebase = false;
@@ -121,14 +121,14 @@ async function optionalReseller(request: Request) {
 }
 
 async function readRewardWallet(uid: string): Promise<RewardWallet> {
-  if (getDualWriteMode() === 'supabase-primary' && isSupabaseWriteConfigured()) {
+  if (isSupabaseWriteConfigured()) {
     try { const { url, key } = sbCfg(); const r = await fetch(`${url}/rest/v1/user_rewards?id=eq.${encodeURIComponent(uid)}&select=payload&limit=1`, { headers: { apikey: key, Authorization: `Bearer ${key}` }, cache: 'no-store' }); if (r.ok) { const rows = await r.json(); return rows?.[0]?.payload || {}; } } catch {}
   }
   try { const snap = await getAdminDb().collection('user_rewards').doc(uid).get(); return snap.data() || {}; } catch { return {}; }
 }
 
 async function writeRewardWallet(uid: string, wallet: RewardWallet) {
-  if (getDualWriteMode() === 'supabase-primary' && isSupabaseWriteConfigured()) {
+  if (isSupabaseWriteConfigured()) {
     const { url, key } = sbCfg();
     const r = await fetch(`${url}/rest/v1/user_rewards?on_conflict=id`, {
       method: 'POST',
@@ -175,10 +175,8 @@ export async function POST(request: Request) {
     if (resellerUserId) orderData.resellerUserId = resellerUserId;
     if (resellerGuestId) orderData.resellerGuestId = resellerGuestId;
 
-    const writeMode = getDualWriteMode();
     const supabaseRow = mapOrderToSupabase(orderId, orderData);
-    if (writeMode === 'supabase-primary') {
-      if (!isSupabaseWriteConfigured()) throw new Error('Supabase order storage credentials are not configured.');
+    if (isSupabaseWriteConfigured()) {
       const primaryRow = { ...supabaseRow, authoritative_source: 'supabase', mirror_status: 'synced', mirror_error: null, firebase_mirrored_at: null };
       await supabasePrimaryUpsert({ table: 'orders', row: primaryRow });
       try {
