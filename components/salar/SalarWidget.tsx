@@ -19,6 +19,7 @@ type ProductCard = {
   originalPrice?: number;
   stock?: number;
   category?: string;
+  size?: string;
 };
 
 type CategoryCard = {
@@ -74,6 +75,13 @@ const LEGACY_STORAGE_KEYS = ['primehub-salar-chat-v4', 'primehub-salar-chat-v3']
 const CHAT_ID_KEY = 'primehub-salar-chat-id-v1';
 const MAX_SAVED_MESSAGES = 100;
 const MAX_SAVED_PRODUCTS_PER_MESSAGE = 600;
+const PRODUCT_QUERY_STOP_WORDS = new Set([
+  'bhai', 'please', 'mujhe', 'muje', 'mera', 'meri', 'mery', 'hamara', 'hamari',
+  'show', 'see', 'view', 'find', 'search', 'browse', 'option', 'options', 'product', 'products', 'item', 'items',
+  'dekhao', 'dikhao', 'dikhana', 'dekhana', 'dekhna', 'batao', 'batain', 'available',
+  'size', 'design', 'designs', 'sab', 'sari', 'all', 'ka', 'ki', 'ke', 'ko', 'me', 'mein', 'mai',
+  'and', 'or', 'aur', 'is', 'this', 'that', 'ye', 'wo', 'isme', 'iss', 'usme', 'color', 'colour',
+]);
 
 function money(value: unknown) {
   const amount = Number(value);
@@ -111,7 +119,7 @@ function savedMessages(value: unknown): ChatMessage[] {
       id: item.id ? String(item.id).slice(0, 120) : undefined,
       role: item.role,
       actor: item.actor === 'admin' ? 'admin' : item.actor === 'customer' || item.role === 'user' ? 'customer' : 'salar',
-      content: String(item.content || '').slice(0, 6000),
+      content: String(item.content || ''),
       createdAt: item.createdAt ? String(item.createdAt).slice(0, 80) : undefined,
       imageUrl: item.imageUrl ? String(item.imageUrl).slice(0, 1600) : undefined,
       products: Array.isArray(item.products) ? item.products.slice(0, MAX_SAVED_PRODUCTS_PER_MESSAGE) : [],
@@ -174,6 +182,85 @@ function groupedImageProducts(products: ProductCard[]) {
     groups.set(label, current);
   }
   return [...groups.entries()];
+}
+
+function normalizeFocusToken(value: string) {
+  const token = value.toLowerCase().trim();
+  return token.length > 4 && token.endsWith('s') ? token.slice(0, -1) : token;
+}
+
+function relevanceTokens(value: string) {
+  return [...new Set(String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9.]+/g, ' ')
+    .split(/\s+/)
+    .map(normalizeFocusToken)
+    .filter((token) => token.length >= 2 && !PRODUCT_QUERY_STOP_WORDS.has(token) && !/^\d+(?:\.\d+)?$/.test(token)))];
+}
+
+function numericTokens(value: string) {
+  return [...new Set(String(value || '').match(/\b\d+(?:\.\d+)?\b/g) || [])];
+}
+
+function productRelevanceText(product: ProductCard) {
+  return `${product.title || ''} ${product.category || ''} ${product.size || ''}`.toLowerCase();
+}
+
+function focusedProducts(products: ProductCard[], focusQuery = '', exactProduct?: ProductCard | null) {
+  const deduped = [...new Map([
+    ...(exactProduct?.id ? [[exactProduct.id, exactProduct] as const] : []),
+    ...products.filter((product) => product?.id).map((product) => [product.id, product] as const),
+  ]).values()];
+  if (!deduped.length) return deduped;
+
+  let candidates = deduped;
+  const anchorText = exactProduct ? `${exactProduct.title || ''} ${exactProduct.category || ''} ${exactProduct.size || ''}` : focusQuery;
+  const sizeTokens = numericTokens(focusQuery || anchorText);
+  if (sizeTokens.length) {
+    const sameSize = candidates.filter((product) => {
+      const text = productRelevanceText(product);
+      return sizeTokens.every((token) => text.includes(token));
+    });
+    if (sameSize.length) candidates = sameSize;
+  }
+
+  const tokens = relevanceTokens(anchorText);
+  if (tokens.length) {
+    const scored = candidates.map((product, index) => {
+      const textTokens = new Set(productRelevanceText(product)
+        .replace(/[^a-z0-9.]+/g, ' ')
+        .split(/\s+/)
+        .map(normalizeFocusToken)
+        .filter(Boolean));
+      const score = tokens.reduce((total, token) => total + (textTokens.has(token) ? 1 : 0), 0);
+      return { product, index, score };
+    });
+    const best = Math.max(...scored.map((item) => item.score));
+    if (best > 0) {
+      candidates = scored
+        .filter((item) => item.score === best || item.product.id === exactProduct?.id)
+        .sort((a, b) => (a.product.id === exactProduct?.id ? -1 : b.product.id === exactProduct?.id ? 1 : a.index - b.index))
+        .map((item) => item.product);
+    }
+  }
+
+  if (exactProduct?.id && !candidates.some((product) => product.id === exactProduct.id)) candidates = [exactProduct, ...candidates];
+  return candidates.length ? candidates : deduped;
+}
+
+function referencedProductBefore(messages: ChatMessage[], messageIndex: number) {
+  for (let index = messageIndex - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (message.role !== 'user') continue;
+    if (message.products?.length) return message.products[0];
+    if (message.mention?.id) {
+      for (let previous = index - 1; previous >= 0; previous -= 1) {
+        const found = messages[previous].products?.find((product) => product.id === message.mention?.id);
+        if (found) return found;
+      }
+    }
+  }
+  return null;
 }
 
 function cleanPhone(value: string) {
@@ -270,6 +357,8 @@ export default function SalarWidget() {
   const fileRef = useRef<HTMLInputElement | null>(null);
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
   const endRef = useRef<HTMLDivElement | null>(null);
+  const lastMessageRef = useRef<HTMLDivElement | null>(null);
+  const sendingRef = useRef(false);
   const editorCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const editorDrawingRef = useRef(false);
 
@@ -348,6 +437,7 @@ export default function SalarWidget() {
       const result = await response.json().catch(() => null);
       if (!response.ok || !result?.success) return;
       setIconUrl(String(result.settings?.iconUrl || ''));
+      if (sendingRef.current) return;
       if (result.chat && Array.isArray(result.chat.messages)) {
         setMessages(savedMessages(result.chat.messages));
         if (result.chat.context && typeof result.chat.context === 'object') setContext(result.chat.context as ChatContext);
@@ -381,10 +471,14 @@ export default function SalarWidget() {
   }, [open]);
 
   useEffect(() => {
-    if (!open || adminDrawerOpen) return;
-    const frame = window.requestAnimationFrame(() => endRef.current?.scrollIntoView({ behavior: sending ? 'smooth' : 'auto', block: 'end' }));
+    if (!open || adminDrawerOpen || !messages.length) return;
+    const latest = messages[messages.length - 1];
+    const frame = window.requestAnimationFrame(() => {
+      if (latest.role === 'assistant') lastMessageRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      else endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    });
     return () => window.cancelAnimationFrame(frame);
-  }, [messages.length, open, sending, adminDrawerOpen]);
+  }, [messages.length, open, adminDrawerOpen]);
 
   useEffect(() => {
     if (!imageEditor) return;
@@ -568,6 +662,7 @@ export default function SalarWidget() {
     ))?.imageUrl || '';
     return { source: 'salar', chatId, customerImageUrls, ...(markedImageUrl ? { markedImageUrl } : {}) };
   }
+
   async function whatsappOrder(
     orderNumber = orderId,
     quote = orderQuote,
@@ -671,6 +766,7 @@ export default function SalarWidget() {
     const userContent = message || (references.length ? `${references.length} selected products` : '📷 Product photo');
     const optimisticId = `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
+    sendingRef.current = true;
     setMessages((current) => [...current, {
       id: optimisticId,
       role: 'user',
@@ -758,8 +854,8 @@ export default function SalarWidget() {
       const reply = error instanceof Error ? error.message : 'Salar could not respond right now. Please try again.';
       setMessages((current) => [...current, { role: 'assistant', actor: 'salar', content: reply, displayMode: 'none' }]);
     } finally {
+      sendingRef.current = false;
       setSending(false);
-      void syncChat();
     }
   }
 
@@ -818,8 +914,15 @@ export default function SalarWidget() {
             {messages.length === 0 ? <div className="rounded-2xl bg-white p-4 text-xs leading-5 text-black/55 shadow-sm">Assalam-o-Alaikum! Main Salar hoon. Aap product, deal, offer ya PrimeHubMall ke bare mein pooch sakte hain — product ki photo bhi share kar sakte hain.</div> : null}
 
             {messages.map((message, index) => {
+              const exactFocusProduct = message.role === 'assistant' ? referencedProductBefore(messages, index) : null;
+              const focusedMessageProducts = message.role === 'assistant'
+                ? focusedProducts(message.products || [], context.lastProductQuery || '', exactFocusProduct)
+                : (message.products || []);
+              const topSuggestionImages = message.role === 'assistant' && message.displayMode !== 'product_images'
+                ? focusedMessageProducts.filter((product) => product.imageUrl).slice(0, 3)
+                : [];
               const imageOnlyProducts = message.displayMode === 'product_images'
-                ? (message.products || []).flatMap((product) => {
+                ? focusedMessageProducts.flatMap((product) => {
                     const urls = [...new Set([...(product.imageUrls || []), product.imageUrl].filter(Boolean) as string[])].slice(0, 8);
                     return urls.map((url) => ({ ...product, imageUrl: url }));
                   })
@@ -829,7 +932,7 @@ export default function SalarWidget() {
               const showBubble = Boolean(message.content || displayImage || message.mention);
               const adminMessage = message.actor === 'admin';
               return (
-                <div key={message.id || `${message.role}-${index}`} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                <div ref={index === messages.length - 1 ? lastMessageRef : undefined} key={message.id || `${message.role}-${index}`} className={`flex scroll-mt-3 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                   <div className={message.role === 'user' ? 'max-w-[88%]' : 'max-w-[96%]'}>
                     {showBubble ? (
                       <div className={`whitespace-pre-wrap rounded-2xl px-3.5 py-2.5 text-xs leading-5 ${message.role === 'user' ? 'bg-[#0F6A5F] text-white' : adminMessage ? 'bg-[#FFF1D6] text-[#14140F] shadow-sm' : 'bg-white text-[#14140F] shadow-sm'}`}>
@@ -873,9 +976,22 @@ export default function SalarWidget() {
                       </div>
                     ) : null}
 
-                    {message.role === 'assistant' && message.displayMode !== 'product_images' && message.products?.length ? (
-                      <div className={`${showBubble ? 'mt-2' : ''} flex gap-2 overflow-x-auto pb-1`}>
-                        {message.products.map((product) => (
+                    {topSuggestionImages.length ? (
+                      <div className={`${showBubble ? 'mt-2' : ''} grid grid-cols-3 gap-2`}>
+                        {topSuggestionImages.map((product) => (
+                          <div key={`top-${product.id}`} className={`relative aspect-square overflow-hidden rounded-xl border bg-[#F4F4F1] shadow-sm ${selected(product.id) ? 'border-[#0F6A5F] ring-2 ring-[#0F6A5F]/30' : 'border-black/8'}`}>
+                            <button type="button" onClick={() => toggleProduct(product)} className="absolute inset-0 block h-full w-full" aria-label={`Select ${product.title}`}>
+                              <SalarCatalogueImage src={String(product.imageUrl || '')} alt={product.title || 'Product'} className="h-full w-full object-cover"/>
+                              {selected(product.id) ? <span className="absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-[#0F6A5F] text-white"><Check size={12}/></span> : null}
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
+
+                    {message.role === 'assistant' && message.displayMode !== 'product_images' && focusedMessageProducts.length ? (
+                      <div className={`${showBubble || topSuggestionImages.length ? 'mt-2' : ''} flex gap-2 overflow-x-auto pb-1`}>
+                        {focusedMessageProducts.map((product) => (
                           <div key={product.id} className={`w-[142px] shrink-0 overflow-hidden rounded-2xl border bg-white shadow-sm ${selected(product.id) ? 'border-[#0F6A5F] ring-2 ring-[#0F6A5F]/20' : 'border-black/8'}`}>
                             <button type="button" onClick={() => toggleProduct(product)} className="relative block aspect-square w-full bg-[#F4F4F1]" aria-label={`Select ${product.title}`}>
                               {product.imageUrl ? <img src={product.imageUrl} alt={product.title} className="h-full w-full object-cover"/> : <div className="flex h-full items-center justify-center text-[9px] font-black text-black/30">PrimeHubMall</div>}
@@ -950,7 +1066,7 @@ export default function SalarWidget() {
             <div className="flex items-end gap-2 rounded-2xl bg-[#F4F4F1] p-2">
               <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(event) => chooseImage(event.target.files?.[0])}/>
               <button type="button" disabled={sending} onClick={() => fileRef.current?.click()} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-[#0F6A5F] shadow-sm disabled:opacity-40"><ImagePlus size={17}/></button>
-              <textarea ref={composerRef} value={text} onChange={(event) => setText(event.target.value.slice(0, 4000))} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }} rows={1} placeholder={salarPaused ? 'PrimeHub Admin ko message karein…' : 'Salar se poochain…'} className="max-h-24 min-h-[38px] flex-1 resize-none bg-transparent px-2 py-2 text-xs outline-none"/>
+              <textarea ref={composerRef} value={text} onChange={(event) => setText(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }} rows={1} placeholder={salarPaused ? 'PrimeHub Admin ko message karein…' : 'Salar se poochain…'} className="max-h-24 min-h-[38px] flex-1 resize-none bg-transparent px-2 py-2 text-xs outline-none"/>
               <button type="submit" disabled={sending || (!text.trim() && !imageFile && !selectedProducts.length)} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#E1352B] text-white disabled:opacity-40"><Send size={16}/></button>
             </div>
           </form>
