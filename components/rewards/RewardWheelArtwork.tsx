@@ -22,6 +22,21 @@ const ARTWORK: Record<RewardWheelArtworkKind, string> = {
   voucher: '/rewards/wheel/voucher.svg',
 };
 
+const WHEEL_COLORS = ['#D5A62D', '#64717A', '#784464', '#14796D', '#C95B45'];
+
+export function rewardWheelBackground(count: number) {
+  const safeCount = Math.max(1, count);
+  const step = 360 / safeCount;
+  const separator = Math.min(1.8, step * 0.035);
+  const stops = Array.from({ length: safeCount }, (_, index) => {
+    const start = index * step;
+    const end = (index + 1) * step;
+    const color = WHEEL_COLORS[index % WHEEL_COLORS.length];
+    return `#F7E7B7 ${start.toFixed(2)}deg ${(start + separator).toFixed(2)}deg, ${color} ${(start + separator).toFixed(2)}deg ${(end - separator).toFixed(2)}deg, #F7E7B7 ${(end - separator).toFixed(2)}deg ${end.toFixed(2)}deg`;
+  });
+  return `conic-gradient(from ${(-step / 2).toFixed(2)}deg, ${stops.join(', ')})`;
+}
+
 export function rewardWheelArtworkKind(prize: RewardWheelPrizeLike): RewardWheelArtworkKind {
   const type = String(prize.type || '').toLowerCase();
   const name = String(prize.name || '').toLowerCase();
@@ -58,6 +73,15 @@ export default function RewardWheelArtwork({
 }) {
   const kind = rewardWheelArtworkKind(prize);
   const label = rewardWheelPrizeLabel(prize);
+  const labelParts = kind === 'points'
+    ? [Math.max(0, Number(prize.points || 0)).toLocaleString(), 'Points']
+    : kind === 'voucher'
+      ? [`Rs. ${Math.max(0, Number(prize.voucherAmount || 0)).toLocaleString()}`, 'Voucher']
+      : kind === 'free-delivery'
+        ? ['Free', 'Delivery']
+        : kind === 'free-product'
+          ? ['Free', 'Product']
+          : ['Try', 'Again'];
 
   return (
     <span
@@ -67,7 +91,10 @@ export default function RewardWheelArtwork({
       title={label}
     >
       <img src={ARTWORK[kind]} alt="" aria-hidden="true" draggable={false} />
-      <strong>{label}</strong>
+      <strong aria-hidden="true">
+        <span>{labelParts[0]}</span>
+        <span>{labelParts[1]}</span>
+      </strong>
     </span>
   );
 }

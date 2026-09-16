@@ -1,68 +1,77 @@
 .reward-wheel-artwork {
   box-sizing: border-box;
-  display: flex;
+  display: grid;
   width: 100%;
   height: 100%;
-  flex-direction: column;
+  grid-template-rows: minmax(0, 1fr) auto;
   align-items: center;
   justify-content: center;
-  gap: 1px;
-  overflow: hidden;
-  border: 2px solid rgba(255, 255, 255, .98);
-  border-radius: 15px;
-  background: #fff;
-  padding: 3px;
+  gap: 2px;
+  overflow: visible;
+  padding: 0;
   color: #14140f;
   text-align: center;
-  box-shadow: 0 3px 9px rgba(20, 20, 15, .3);
 }
 
 .reward-wheel-artwork img {
   display: block;
-  width: 70%;
-  height: 70%;
+  width: min(40px, 72%);
+  height: min(40px, 72%);
   min-height: 0;
+  margin: auto;
   object-fit: contain;
   object-position: center;
+  filter: drop-shadow(0 3px 4px rgba(20, 20, 15, .28));
   pointer-events: none;
   user-select: none;
 }
 
 .reward-wheel-artwork strong {
-  display: block;
-  width: 100%;
-  overflow: hidden;
-  color: #292820;
+  box-sizing: border-box;
+  display: grid;
+  width: calc(100% + 4px);
+  min-width: 0;
+  min-height: 17px;
+  place-items: center;
+  align-content: center;
+  overflow: visible;
+  border: 1px solid rgba(255, 255, 255, .72);
+  border-radius: 999px;
+  background: rgba(255, 253, 248, .92);
+  padding: 2px 3px;
+  color: #24231d;
   font-size: 7px;
   font-weight: 950;
-  line-height: 1;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: .92;
+  letter-spacing: -.025em;
+  box-shadow: 0 2px 5px rgba(20, 20, 15, .2);
+  white-space: normal;
+}
+
+.reward-wheel-artwork strong span {
+  display: block;
+  max-width: 100%;
 }
 
 .reward-wheel-artwork--compact {
-  gap: 0;
-  border-radius: 12px;
-  padding: 2px;
+  gap: 1px;
 }
 
 .reward-wheel-artwork--compact img {
-  width: 72%;
-  height: 72%;
+  width: min(30px, 68%);
+  height: min(30px, 68%);
 }
 
 .reward-wheel-artwork--compact strong {
-  font-size: 5.7px;
-  letter-spacing: -.02em;
+  width: calc(100% + 2px);
+  min-height: 14px;
+  padding: 1px 2px;
+  font-size: 6px;
 }
 
 @media (max-width: 390px) {
-  .reward-wheel-artwork--compact {
-    border-radius: 10px;
-    padding: 1px;
-  }
-
   .reward-wheel-artwork--compact strong {
-    font-size: 5.2px;
+    min-height: 13px;
+    font-size: 5.7px;
   }
 }

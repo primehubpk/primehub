@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSalarState } from '@/lib/salar/server';
+import { getSalarUiSettings } from '@/lib/salar/uiSettings';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -35,8 +36,10 @@ export async function GET(request: Request) {
     const requested = safeHttpsUrl(new URL(request.url).searchParams.get('url'));
     if (!requested) return NextResponse.json({ error: 'Invalid image URL.' }, { status: 400 });
 
-    const state = await getSalarState();
+    const [state, ui] = await Promise.all([getSalarState(), getSalarUiSettings()]);
     const allowed = new Set((state.catalogue?.products || []).flatMap((product: any) => catalogueImageUrls(product)));
+    const salarIconUrl = safeHttpsUrl(ui.iconUrl);
+    if (salarIconUrl) allowed.add(salarIconUrl);
     if (!allowed.has(requested)) return NextResponse.json({ error: 'Image is not in the live Salar catalogue.' }, { status: 404 });
 
     const response = await fetch(requested, {

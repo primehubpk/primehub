@@ -170,7 +170,22 @@ function SalarCatalogueImage({ src, alt, className }: { src: string; alt: string
 }
 
 function SalarIcon({ iconUrl, size = 19 }: { iconUrl: string; size?: number }) {
-  return iconUrl ? <img src={iconUrl} alt="Salar" className="h-full w-full object-cover"/> : <Bot size={size}/>;
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => setFailed(false), [iconUrl]);
+
+  if (!iconUrl || failed) return <Bot size={size}/>;
+  return (
+    <img
+      src={`/api/salar/image-proxy?url=${encodeURIComponent(iconUrl)}`}
+      alt=""
+      aria-label="Salar"
+      className="h-full w-full object-cover object-center"
+      referrerPolicy="no-referrer"
+      draggable={false}
+      onError={() => setFailed(true)}
+    />
+  );
 }
 
 function groupedImageProducts(products: ProductCard[]) {
