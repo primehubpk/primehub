@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { answerWithModelDrivenSalar, type SalarModelImageInput } from '@/lib/salar/modelDrivenEngine';
+import { answerWithResilientSalarFallback, isSalarProviderFailure } from '@/lib/salar/resilientFallback';
 import { getSalarState } from '@/lib/salar/server';
 import {
   appendSalarMessage,
@@ -171,6 +172,22 @@ function updateCustomerMeta(chat: SalarCustomerChat, input: {
   } satisfies SalarCustomerChat;
 }
 
+async function persistedBusyReply(chat: SalarCustomerChat) {
+  const reply = 'Salar ke AI providers abhi busy hain. Aapka message save ho gaya hai — please ek dafa dobara send karein, Salar next available provider se reply karega.';
+  try {
+    const saved = await saveSalarChat(appendSalarMessage(chat, {
+      role: 'assistant',
+      actor: 'salar',
+      content: reply,
+      displayMode: 'none',
+    }));
+    return { reply, chat: saved };
+  } catch (error) {
+    console.error('Salar busy reply could not be persisted', error);
+    return { reply, chat };
+  }
+}
+
 export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
@@ -263,18 +280,32 @@ export async function POST(request: Request) {
     }
     const exactProductReferences = [...exactReferenceMap.values()];
     const exactProductIds = exactProductReferences.map((reference) => reference.id);
-    const result = await answerWithModelDrivenSalar({
-      message: aiMessage,
-      history: aiHistory,
-      context: chat.context,
-      customerName: chat.customerName,
-      exactProductIds,
-      exactProductReferences,
-      image: input.image,
-    });
+
+    let result: any;
+    try {
+      result = await answerWithModelDrivenSalar({
+        message: aiMessage,
+        history: aiHistory,
+        context: chat.context,
+        customerName: chat.customerName,
+        exactProductIds,
+        exactProductReferences,
+        image: input.image,
+      });
+    } catch (primaryError) {
+      if (!isSalarProviderFailure(primaryError)) throw primaryError;
+      console.warn('Salar structured engine provider path failed; switching to all-key resilient fallback.', primaryError instanceof Error ? primaryError.message : 'unknown');
+      result = await answerWithResilientSalarFallback({
+        message: aiMessage || userContent,
+        history: aiHistory,
+        context: chat.context,
+        customerName: chat.customerName,
+        image: input.image,
+      });
+    }
 
     if (result.imageUnderstanding) {
-      const customerIndex = [...chat.messages].map((message, index) => ({ message, index })).reverse().find((item) => item.message.actor === 'customer')?.index;
+      const customerIndex = [...chat.messages].map((stored, index) => ({ stored, index })).reverse().find((item) => item.stored.actor === 'customer')?.index;
       if (customerIndex != null) {
         chat = {
           ...chat,
@@ -319,6 +350,26 @@ export async function POST(request: Request) {
     }
     if (message.includes('No Salar AI provider is configured')) {
       return NextResponse.json({ success: false, error: 'Salar AI providers are not configured in the existing environment.' }, { status: 503 });
+    }
+    if (chat && (isSalarProviderFailure(error) || message.includes('emergency provider'))) {
+      const busy = await persistedBusyReply(chat);
+      return NextResponse.json({
+        success: true,
+        reply: busy.reply,
+        provider: null,
+        model: null,
+        understandingProvider: null,
+        understandingModel: null,
+        displayMode: 'none',
+        products: [],
+        categories: [],
+        context: busy.chat.context,
+        orderAction: 'none',
+        orderProducts: [],
+        orderCustomer: {},
+        salarPaused: false,
+        chat: publicChat(busy.chat),
+      }, { headers: { 'Cache-Control': 'private, no-store, max-age=0' } });
     }
     return NextResponse.json({ success: false, error: 'Salar could not respond right now. Please try again.' }, { status: 503 });
   }
