@@ -58,7 +58,6 @@ const SALAR_SETTINGS_ID = 'salar';
 const SALAR_STATE_TAG = 'salar-state';
 const MAX_PAGE_COUNT = 24;
 const MAX_PAGE_TEXT = 7000;
-const MAX_INSTRUCTION_LENGTH = 20000;
 const MAX_KEYS_PER_PROVIDER = 12;
 
 const DEFAULT_STATE: SalarState = {
@@ -78,8 +77,7 @@ function cleanInstructions(value: unknown) {
     .replace(/\r\n?/g, '\n')
     .replace(/[ \t]+/g, ' ')
     .replace(/\n{3,}/g, '\n\n')
-    .trim()
-    .slice(0, MAX_INSTRUCTION_LENGTH);
+    .trim();
 }
 
 function finiteNumber(value: unknown) {
