@@ -6,6 +6,7 @@ import {
   listSalarChats,
   saveSalarChat,
 } from '@/lib/salar/chatStore';
+import { blockSalarChatIdentity, deleteSalarChatRecord } from '@/lib/salar/blockStore';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -18,6 +19,8 @@ function authorized(request: Request) {
 function cleanText(value: unknown, max = 6000) {
   return String(value ?? '').replace(/\r\n?/g, '\n').trim().slice(0, max);
 }
+
+const BLOCK_MESSAGE = 'Aapka chat access filhaal block hai. Unblock request ke liye primehubpk1@gmail.com par contact karein.';
 
 export async function GET(request: Request) {
   if (!authorized(request)) return NextResponse.json({ success: false, error: 'Authentication required.' }, { status: 401 });
@@ -47,7 +50,19 @@ export async function POST(request: Request) {
     if (!chat) return NextResponse.json({ success: false, error: 'Chat not found.' }, { status: 404 });
 
     const action = String(body?.action || '').trim();
-    if (action === 'reply') {
+    if (action === 'delete') {
+      await deleteSalarChatRecord(chatId);
+      return NextResponse.json({ success: true, deleted: true, chatId }, { headers: { 'Cache-Control': 'private, no-store, max-age=0' } });
+    }
+
+    if (action === 'block') {
+      await blockSalarChatIdentity(chat);
+      chat = appendSalarMessage({ ...chat, salarPaused: true }, {
+        role: 'assistant',
+        actor: 'admin',
+        content: BLOCK_MESSAGE,
+      });
+    } else if (action === 'reply') {
       const message = cleanText(body?.message, 6000);
       if (!message) return NextResponse.json({ success: false, error: 'Reply cannot be empty.' }, { status: 400 });
       chat = appendSalarMessage(chat, {
@@ -65,7 +80,7 @@ export async function POST(request: Request) {
     }
 
     chat = await saveSalarChat(chat);
-    return NextResponse.json({ success: true, chat }, { headers: { 'Cache-Control': 'private, no-store, max-age=0' } });
+    return NextResponse.json({ success: true, chat, blocked: action === 'block' }, { headers: { 'Cache-Control': 'private, no-store, max-age=0' } });
   } catch (error) {
     console.error('Salar admin chat action failed', error);
     return NextResponse.json({ success: false, error: 'Chat action could not be completed.' }, { status: 500 });
