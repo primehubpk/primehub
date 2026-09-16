@@ -12,16 +12,35 @@ const ASSETS = {
 
 type AssetKey = keyof typeof ASSETS;
 
+const ASSET_LABELS: Record<AssetKey, string> = {
+  delivery: 'Free Delivery',
+  points: 'Points',
+  voucher: 'Voucher',
+  retry: 'Try Again',
+  gift: 'Free Gift',
+};
+
+function classifyText(value: string): AssetKey {
+  const text = value.toLowerCase();
+  if (text.includes('delivery')) return 'delivery';
+  if (text.includes('point')) return 'points';
+  if (text.includes('voucher') || text.includes('coupon')) return 'voucher';
+  if (text.includes('try-again') || text.includes('try again') || text.includes('retry') || text.includes('rewards loading')) return 'retry';
+  return 'gift';
+}
+
 function classifyPrize(node: HTMLElement): AssetKey {
   const icon = node.querySelector(':scope > span');
+  const image = node.querySelector<HTMLImageElement>('img');
   const iconText = String(icon?.textContent || '').trim();
-  const label = String(node.textContent || '').trim().toLowerCase();
+  const label = String(node.textContent || '').trim();
+  const source = `${image?.getAttribute('src') || ''} ${image?.getAttribute('alt') || ''} ${iconText} ${label}`;
 
-  if (iconText.includes('📦') || label.includes('free delivery')) return 'delivery';
-  if (iconText.includes('⭐') || label.includes('points')) return 'points';
-  if (iconText.includes('₨') || label.includes('voucher')) return 'voucher';
-  if (iconText.includes('↻') || label.includes('try again') || label.includes('rewards loading')) return 'retry';
-  return 'gift';
+  if (iconText.includes('📦')) return 'delivery';
+  if (iconText.includes('⭐')) return 'points';
+  if (iconText.includes('₨')) return 'voucher';
+  if (iconText.includes('↻')) return 'retry';
+  return classifyText(source);
 }
 
 function cleanPrizeLabel(node: HTMLElement) {
@@ -58,11 +77,11 @@ function decorateDashboardWheel() {
     if (center) center.dataset.phWheelCenter = 'true';
 
     const width = disc.getBoundingClientRect().width || wrap.getBoundingClientRect().width || 300;
-    const radius = Math.round(Math.min(108, Math.max(78, width * 0.35)));
+    const radius = Math.round(Math.min(110, Math.max(82, width * 0.345)));
 
     prizes.forEach((prize, index) => {
       const key = classifyPrize(prize);
-      const label = cleanPrizeLabel(prize);
+      const label = cleanPrizeLabel(prize) || ASSET_LABELS[key];
       const angle = index * 72 + 36;
 
       prize.dataset.phWheelPrize = 'true';
@@ -73,12 +92,86 @@ function decorateDashboardWheel() {
   }
 }
 
+function decorateHomeWheel() {
+  const prizes = Array.from(document.querySelectorAll<HTMLElement>('.ph-wheel-disc .ph-prize'));
+  prizes.forEach((prize) => {
+    const key = classifyPrize(prize);
+    prize.dataset.phWheelAsset = key;
+    prize.dataset.phWheelHomePrize = 'true';
+    prize.setAttribute('aria-label', ASSET_LABELS[key]);
+  });
+}
+
+function decorateSalarLauncher() {
+  const root = document.getElementById('salar-viewport-shell');
+  if (!root || root.querySelector('button[aria-label="Close Salar"]')) return;
+  const label = root.querySelector<HTMLElement>(':scope > div > div > span');
+  if (!label || label.textContent?.trim() !== 'Need help?') return;
+
+  label.style.setProperty('display', 'block', 'important');
+  label.style.setProperty('margin-right', '5px', 'important');
+  label.style.setProperty('padding', '5px 10px', 'important');
+  label.style.setProperty('border', '1px solid rgba(20,20,15,.08)', 'important');
+  label.style.setProperty('border-radius', '999px', 'important');
+  label.style.setProperty('background', '#fffdf8', 'important');
+  label.style.setProperty('color', '#14140f', 'important');
+  label.style.setProperty('font-size', '10px', 'important');
+  label.style.setProperty('font-weight', '900', 'important');
+  label.style.setProperty('box-shadow', '0 5px 16px rgba(20,20,15,.13)', 'important');
+}
+
+function createWhatsAppLink(title: string, number: string, href: string) {
+  const link = document.createElement('a');
+  link.href = href;
+  link.target = '_blank';
+  link.rel = 'noopener noreferrer';
+  link.dataset.salarWhatsappLink = 'true';
+  link.setAttribute('aria-label', `${title} WhatsApp ${number}`);
+
+  const icon = document.createElement('span');
+  icon.dataset.salarWhatsappIcon = 'true';
+  icon.textContent = 'WA';
+
+  const copy = document.createElement('span');
+  copy.dataset.salarWhatsappCopy = 'true';
+  const strong = document.createElement('strong');
+  strong.textContent = title;
+  const small = document.createElement('small');
+  small.textContent = number;
+  copy.append(strong, small);
+  link.append(icon, copy);
+  return link;
+}
+
+function decorateSalarWhatsApp() {
+  const close = document.querySelector<HTMLButtonElement>('#salar-viewport-shell button[aria-label="Close Salar"]');
+  if (!close) return;
+  const header = close.parentElement?.parentElement;
+  const shell = header?.parentElement;
+  if (!header || !shell || shell.querySelector('[data-salar-whatsapp-row="true"]')) return;
+
+  const row = document.createElement('div');
+  row.dataset.salarWhatsappRow = 'true';
+  row.append(
+    createWhatsAppLink('PrimeHub', '0303 5958676', 'https://wa.me/923035958676'),
+    createWhatsAppLink('Complaints / Helpline', '0323 8878009', 'https://wa.me/923238878009'),
+  );
+  header.insertAdjacentElement('afterend', row);
+}
+
+function decoratePresentation() {
+  decorateDashboardWheel();
+  decorateHomeWheel();
+  decorateSalarLauncher();
+  decorateSalarWhatsApp();
+}
+
 export default function RewardWheelPresentationEnhancer() {
   useEffect(() => {
     let frame = 0;
     const schedule = () => {
       if (frame) window.cancelAnimationFrame(frame);
-      frame = window.requestAnimationFrame(decorateDashboardWheel);
+      frame = window.requestAnimationFrame(decoratePresentation);
     };
 
     const observer = new MutationObserver(schedule);
@@ -95,23 +188,7 @@ export default function RewardWheelPresentationEnhancer() {
 
   return (
     <style jsx global>{`
-      /* One presentation language for both reward wheels. Reward selection and admin data stay untouched. */
-      .ph-prize {
-        border-radius: 12px !important;
-        border: 2px solid rgba(255,255,255,.96) !important;
-        background: #fff !important;
-        padding: 2px !important;
-        overflow: hidden !important;
-        box-shadow: 0 3px 9px rgba(20,20,15,.3) !important;
-      }
-      .ph-prize img {
-        width: 100% !important;
-        height: 100% !important;
-        border-radius: 9px !important;
-        background: #fff !important;
-        object-fit: contain !important;
-        object-position: center !important;
-      }
+      /* Shared visual layer only: reward selection, wallet, spin and admin values remain untouched. */
       .ph-wheel-disc,
       [data-ph-wheel-disc="true"] {
         border-color: #fffdf8 !important;
@@ -124,6 +201,26 @@ export default function RewardWheelPresentationEnhancer() {
         color: #fff !important;
         box-shadow: 0 3px 10px rgba(0,0,0,.32) !important;
       }
+
+      .ph-prize[data-ph-wheel-home-prize="true"] {
+        border: 2px solid rgba(255,255,255,.98) !important;
+        border-radius: 13px !important;
+        background-color: #fff !important;
+        background-repeat: no-repeat !important;
+        background-position: center !important;
+        background-size: contain !important;
+        padding: 2px !important;
+        overflow: hidden !important;
+        box-shadow: 0 3px 9px rgba(20,20,15,.28) !important;
+      }
+      .ph-prize[data-ph-wheel-home-prize="true"] img {
+        opacity: 0 !important;
+      }
+      .ph-prize[data-ph-wheel-asset="delivery"] { background-image: url('${ASSETS.delivery}') !important; }
+      .ph-prize[data-ph-wheel-asset="points"] { background-image: url('${ASSETS.points}') !important; }
+      .ph-prize[data-ph-wheel-asset="voucher"] { background-image: url('${ASSETS.voucher}') !important; }
+      .ph-prize[data-ph-wheel-asset="retry"] { background-image: url('${ASSETS.retry}') !important; }
+      .ph-prize[data-ph-wheel-asset="gift"] { background-image: url('${ASSETS.gift}') !important; }
 
       [data-ph-shared-wheel="true"] {
         background: linear-gradient(160deg,#16332e,#0c1c19) !important;
@@ -143,16 +240,16 @@ export default function RewardWheelPresentationEnhancer() {
       }
       [data-ph-wheel-prize="true"] > span {
         display: block !important;
-        width: clamp(38px, 12vw, 48px) !important;
-        height: clamp(38px, 12vw, 48px) !important;
-        margin: 0 auto 3px !important;
-        border: 2px solid rgba(255,255,255,.96) !important;
-        border-radius: 12px !important;
+        width: clamp(40px, 12vw, 50px) !important;
+        height: clamp(40px, 12vw, 50px) !important;
+        margin: 0 auto 4px !important;
+        border: 2px solid rgba(255,255,255,.98) !important;
+        border-radius: 13px !important;
         background-color: #fff !important;
         background-repeat: no-repeat !important;
         background-position: center !important;
         background-size: contain !important;
-        box-shadow: 0 3px 9px rgba(20,20,15,.3) !important;
+        box-shadow: 0 3px 9px rgba(20,20,15,.28) !important;
         color: transparent !important;
         font-size: 0 !important;
         overflow: hidden !important;
@@ -179,11 +276,73 @@ export default function RewardWheelPresentationEnhancer() {
       [data-ph-wheel-asset="retry"] > span { background-image: url('${ASSETS.retry}') !important; }
       [data-ph-wheel-asset="gift"] > span { background-image: url('${ASSETS.gift}') !important; }
 
+      [data-salar-whatsapp-row="true"] {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 7px;
+        flex: 0 0 auto;
+        padding: 8px 10px;
+        border-bottom: 1px solid rgba(20,20,15,.08);
+        background: #fffdf8;
+      }
+      [data-salar-whatsapp-link="true"] {
+        display: flex;
+        min-width: 0;
+        align-items: center;
+        gap: 7px;
+        border: 1px solid rgba(16,128,79,.16);
+        border-radius: 13px;
+        background: #eefaf4;
+        padding: 7px 8px;
+        color: #12663f;
+        text-decoration: none;
+        box-shadow: 0 3px 10px rgba(20,20,15,.04);
+      }
+      [data-salar-whatsapp-icon="true"] {
+        display: grid;
+        width: 28px;
+        height: 28px;
+        flex: 0 0 28px;
+        place-items: center;
+        border-radius: 999px;
+        background: #20b86a;
+        color: white;
+        font-size: 8px;
+        font-weight: 950;
+      }
+      [data-salar-whatsapp-copy="true"] {
+        min-width: 0;
+      }
+      [data-salar-whatsapp-copy="true"] strong,
+      [data-salar-whatsapp-copy="true"] small {
+        display: block;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      [data-salar-whatsapp-copy="true"] strong {
+        font-size: 9px;
+        line-height: 1.1;
+        font-weight: 950;
+      }
+      [data-salar-whatsapp-copy="true"] small {
+        margin-top: 2px;
+        font-size: 8px;
+        line-height: 1.1;
+        font-weight: 800;
+        opacity: .72;
+      }
+
       @media (max-width: 390px) {
         [data-ph-wheel-wrap="true"] { max-width: 286px !important; }
         [data-ph-wheel-prize="true"] { width: 64px !important; }
         [data-ph-wheel-prize="true"] > span { width: 40px !important; height: 40px !important; border-radius: 10px !important; }
         [data-ph-wheel-prize="true"]::after { font-size: 7.5px !important; }
+        [data-salar-whatsapp-row="true"] { gap: 6px; padding: 7px 8px; }
+        [data-salar-whatsapp-link="true"] { gap: 5px; padding: 6px; }
+        [data-salar-whatsapp-icon="true"] { width: 25px; height: 25px; flex-basis: 25px; font-size: 7px; }
+        [data-salar-whatsapp-copy="true"] strong { font-size: 8px; }
+        [data-salar-whatsapp-copy="true"] small { font-size: 7px; }
       }
 
       @media (min-width: 768px) {
