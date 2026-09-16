@@ -4,7 +4,7 @@ import { useEffect, useRef } from 'react';
 import PremiumWheelConfigurator from './PremiumWheelConfigurator';
 import RewardsManager from './RewardsManager';
 
-export default function PremiumRewardsManager() {
+export default function PremiumRewardsManager({ products = [] }: { products?: any[] }) {
   const legacyRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -32,7 +32,7 @@ export default function PremiumRewardsManager() {
     <>
       <PremiumWheelConfigurator />
       <div ref={legacyRef}>
-        <RewardsManager />
+        <RewardsManager products={products} />
       </div>
     </>
   );
