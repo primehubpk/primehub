@@ -55,28 +55,30 @@
 }
 
 .reward-wheel-artwork--compact img {
-  width: min(38px, 72%);
-  height: min(38px, 72%);
+  width: min(26px, 66%);
+  height: min(26px, 66%);
+  filter: drop-shadow(0 1px 2px rgba(75, 48, 12, .16));
 }
 
 .reward-wheel-artwork--compact strong {
   width: max-content;
-  max-width: calc(100% + 12px);
-  min-width: 36px;
+  max-width: calc(100% + 8px);
+  min-width: 28px;
   padding: 0;
-  font-size: 8.6px;
-  line-height: .92;
+  font-size: 6.2px;
+  line-height: .9;
   letter-spacing: -.03em;
+  text-shadow: 0 1px 0 rgba(255,255,255,.82);
 }
 
 @media (max-width: 390px) {
   .reward-wheel-artwork--compact img {
-    width: min(34px, 70%);
-    height: min(34px, 70%);
+    width: min(23px, 64%);
+    height: min(23px, 64%);
   }
 
   .reward-wheel-artwork--compact strong {
-    min-width: 32px;
-    font-size: 7.4px;
+    min-width: 26px;
+    font-size: 5.7px;
   }
 }

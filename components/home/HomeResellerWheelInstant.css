@@ -2,50 +2,34 @@
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  flex: 0 0 min(86vw, 340px);
-  width: min(86vw, 340px);
-  max-width: 340px;
-  height: 372px;
-  overflow: visible;
-  padding: 6px 12px 12px;
-  background:
-    radial-gradient(circle at 50% 30%, rgba(255, 214, 120, .42), transparent 48%),
-    linear-gradient(180deg, #fffdf8 0%, #f4ead8 100%);
+  overflow: hidden;
+  padding: 6px 8px 10px;
+  background: #fff;
   color: #17140f;
-  border: 1px solid rgba(183, 121, 31, .16);
 }
 .ph-card.ph-wheel .psw {
-  width: min(100%, 300px);
-  margin: 0 auto 4px;
+  width: min(100%, 162px);
+  margin: -2px auto 2px;
 }
 .ph-card.ph-wheel > button {
   margin-top: auto;
-  min-height: 38px;
+  min-height: 32px;
   border: 0;
-  border-radius: 12px;
+  border-radius: 11px;
   background: linear-gradient(135deg, #ff9a3c, #ffc86a);
   color: #14140f;
-  font-size: 12px;
+  font-size: 9px;
   font-weight: 900;
-  box-shadow: 0 8px 18px rgba(232, 93, 4, .2);
+  box-shadow: none;
 }
 @media (max-width: 390px) {
-  .ph-card.ph-wheel {
-    flex-basis: min(88vw, 320px);
-    width: min(88vw, 320px);
-    height: 348px;
-    padding: 4px 10px 10px;
-  }
   .ph-card.ph-wheel .psw {
-    width: min(100%, 276px);
+    width: min(100%, 136px);
   }
 }
 @media (min-width: 760px) {
-  .ph-card.ph-wheel {
-    flex-basis: 340px;
-    width: 340px;
-    max-width: 340px;
-    height: 386px;
+  .ph-card.ph-wheel .psw {
+    width: min(100%, 172px);
   }
 }
 

@@ -173,9 +173,35 @@
   container-type: inline-size;
 }
 
+.psw--compact .psw-glow {
+  display: none;
+}
+
+.psw--compact .psw-pointer-svg {
+  top: 0;
+  filter: drop-shadow(0 2px 2px rgba(92, 48, 6, .22));
+}
+
+.psw--compact .psw-stage {
+  inset: 8.5%;
+}
+
+.psw--compact .psw-rim {
+  box-shadow:
+    0 3px 8px rgba(90, 48, 8, .16),
+    0 0 0 1px #e8c25a,
+    0 0 0 3px #8a5910,
+    inset 0 1px 3px rgba(255, 248, 210, .3);
+}
+
+.psw--compact .psw-bulb::before {
+  box-shadow: 0 0 3px rgba(255, 214, 90, .65), inset 0 1px 1px #fff;
+}
+
 .psw--compact .psw-hub {
-  width: 23%;
-  height: 23%;
+  width: 24%;
+  height: 24%;
+  box-shadow: 0 0 0 .12em #c7922a, 0 3px 8px rgba(90, 48, 8, .16);
 }
 
 .psw-panel {
