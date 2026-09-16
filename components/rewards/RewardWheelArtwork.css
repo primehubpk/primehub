@@ -70,6 +70,43 @@
   text-shadow: 0 1px 0 rgba(255,255,255,.75), 0 1px 3px rgba(255,255,255,.62);
 }
 
+/* The Reseller Club large wheel already uses this shared artwork. Upgrade its
+   surrounding disc and plain WIN center without duplicating another wheel. */
+div:has(> div > .reward-wheel-artwork) {
+  border-color: #e6ad42 !important;
+  outline: 2px solid #fff0a7;
+  outline-offset: -4px;
+}
+
+div:has(> div > .reward-wheel-artwork) > div:last-child:not(:has(span)) {
+  border-color: #fff0a7 !important;
+  background: radial-gradient(circle at 35% 28%, #fff, #fff9ec 72%) !important;
+  color: #1d2b4a !important;
+  font-size: 0 !important;
+  box-shadow: 0 0 0 2px #b87916, 0 6px 14px rgba(86,51,7,.28) !important;
+}
+
+div:has(> div > .reward-wheel-artwork) > div:last-child:not(:has(span))::before {
+  content: 'PrimeHub';
+  display: block;
+  color: #1d2b4a;
+  font-size: 8px;
+  font-weight: 950;
+  line-height: 1;
+  letter-spacing: -.04em;
+}
+
+div:has(> div > .reward-wheel-artwork) > div:last-child:not(:has(span))::after {
+  content: 'SPIN';
+  display: block;
+  margin-top: 3px;
+  color: #b7791f;
+  font-size: 6px;
+  font-weight: 950;
+  line-height: 1;
+  letter-spacing: .14em;
+}
+
 @media (max-width: 390px) {
   .reward-wheel-artwork--compact img {
     width: min(23px, 56%);
