@@ -3,12 +3,12 @@
 .ph-wheel-wrap>i{filter:drop-shadow(0 2px 2px rgba(0,0,0,.28))}
 .ph-wheel-disc{box-sizing:border-box;background:#fff;overflow:hidden;border-width:6px;isolation:isolate}
 .ph-wheel-disc:before{inset:4%;background:radial-gradient(circle,transparent 0 36%,rgba(255,255,255,.12) 37% 100%);border:1px solid rgba(255,255,255,.52);z-index:1}
-.ph-prize{box-sizing:border-box;height:auto;transform-origin:center center;border:2px solid rgba(255,255,255,.95);border-radius:50%;background:#fff;padding:2px;overflow:hidden;box-shadow:0 2px 7px rgba(20,20,15,.28)}
-.ph-prize img{display:block;width:100%;height:100%;border-radius:50%;object-fit:contain;object-position:center;background:#fff}
-.ph-prize span{display:grid;width:100%;height:100%;place-items:center;border-radius:50%;background:#fff;font-size:20px}
+.ph-prize{box-sizing:border-box;height:auto;transform-origin:center center;overflow:visible}
+.ph-prize .reward-wheel-artwork img{width:72%;height:72%;object-position:center;transform:none}
+.ph-prize .reward-wheel-artwork strong{font-size:5.7px;line-height:1}
 .ph-wheel>button{margin-top:auto;min-height:34px}
 .ph-wheel-disc em{width:42px;height:42px;border-width:3px;box-shadow:0 2px 8px rgba(0,0,0,.28)}
-@media(max-width:390px){.ph-wheel-wrap{width:136px;height:136px}.ph-wheel-disc em{width:38px;height:38px}.ph-prize{padding:1px}}
+@media(max-width:390px){.ph-wheel-wrap{width:136px;height:136px}.ph-wheel-disc em{width:38px;height:38px}.ph-prize .reward-wheel-artwork strong{font-size:5.2px}}
 @media(min-width:760px){.ph-wheel-wrap{width:154px;height:154px}}
 
 .ph-win-backdrop{position:fixed;inset:0;z-index:120;display:grid;place-items:center;padding:20px;background:rgba(10,16,15,.72);backdrop-filter:blur(8px)}
