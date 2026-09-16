@@ -11,7 +11,33 @@
   white-space: nowrap;
 }
 
+/* Keep the live card + first locked card at their existing desktop proportions,
+   then continue every remaining locked slot in one horizontal swipe trail. */
+.home-storefront .home-big-grid {
+  display: flex;
+  gap: 13px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.home-storefront .home-big-grid::-webkit-scrollbar {
+  display: none;
+}
+
+.home-storefront .home-big-card {
+  flex: 0 0 calc(52.8302% - 6.87px);
+  min-width: 0;
+  scroll-snap-align: start;
+}
+
 .home-storefront .home-next-deal {
+  flex: 0 0 calc(47.1698% - 6.13px);
+  min-width: 0;
+  scroll-snap-align: start;
   cursor: not-allowed;
   background-size: cover;
   background-position: center;
@@ -82,6 +108,18 @@
 }
 
 @media (max-width: 600px) {
+  .home-storefront .home-big-grid {
+    gap: 8px;
+  }
+
+  .home-storefront .home-big-card {
+    flex-basis: calc(52.381% - 4.19px);
+  }
+
+  .home-storefront .home-next-deal {
+    flex-basis: calc(47.619% - 3.81px);
+  }
+
   .home-storefront .home-big-image {
     aspect-ratio: 1.1;
   }
