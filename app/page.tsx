@@ -1,5 +1,6 @@
 import HomePageClient from '@/components/HomePageClient';
 import WeeklyDealNavigationWarmup from '@/components/home/WeeklyDealNavigationWarmup';
+import WeeklyDealsHomeNavigation from '@/components/home/WeeklyDealsHomeNavigation';
 import { getFreshPublicCatalogSnapshot, getStorefrontSettingsResultSnapshot } from '@/lib/publicCatalogServer';
 import { getWholesaleVideosSnapshot } from '@/lib/wholesaleVideosServer';
 import { normalizeImageUrl } from '@/lib/imageUrl';
@@ -91,6 +92,7 @@ export default async function HomePage() {
     <>
       {liveWeeklyImage ? <link rel="preload" as="image" href={liveWeeklyImage} /> : null}
       <WeeklyDealNavigationWarmup weeklyDeals={weeklyDeals} />
+      <WeeklyDealsHomeNavigation />
       <HomePageClient
         initialProducts={snapshot.products as Product[]}
         initialCategories={snapshot.categories as Category[]}
