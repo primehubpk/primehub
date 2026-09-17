@@ -1,0 +1,51 @@
+name: One-off add mix size presets
+
+on:
+  push:
+    branches:
+      - feat/bulk-editor-image-variant-controls
+    paths:
+      - .github/workflows/oneoff-add-mix-size-presets.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/bulk-editor-image-variant-controls
+          fetch-depth: 0
+
+      - name: Add mix size box presets
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('components/admin/BulkProductEditor.tsx')
+          text = path.read_text()
+          anchor = "  { key: 'kids bracelet - openable / adjustable / fits most kids', label: 'Kids Bracelet — Openable / Adjustable / Fits most kids' },\n"
+          additions = (
+              "  { key: 'mix size box - 8 / 10 / 12 number', label: 'Mix Size Box — 8 / 10 / 12 Number' },\n"
+              "  { key: 'mix size box - 2.6 / 2.4 / 2.8', label: 'Mix Size Box — 2.6 / 2.4 / 2.8' },\n"
+          )
+          if additions not in text:
+              if anchor not in text:
+                  raise SystemExit('Expected size preset anchor not found')
+              text = text.replace(anchor, anchor + additions, 1)
+              path.write_text(text)
+          PY
+
+      - name: Commit patch
+        run: |
+          if git diff --quiet -- components/admin/BulkProductEditor.tsx; then
+            echo "No change needed"
+            exit 0
+          fi
+          git config user.name "primehubpk"
+          git config user.email "primehubpk1@gmail.com"
+          git add components/admin/BulkProductEditor.tsx
+          git commit -m "feat(admin): add mixed size box presets"
+          git push origin HEAD:feat/bulk-editor-image-variant-controls
