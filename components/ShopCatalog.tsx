@@ -15,6 +15,7 @@ import CatalogProductGrid from './shop/CatalogProductGrid';
 import FastProductLink from '@/components/FastProductLink';
 import { categoryHref, productMatchesCategory, slugifyCategory } from '@/lib/categoryUtils';
 import { isDirectStorefrontImage } from '@/lib/imageUrl';
+import { isWholesaleProduct } from '@/lib/wholesale';
 import { discountOf, imageOf, titleOf, type Product, type Category } from './shop/ShopTypes';
 
 function score(id: string) {
@@ -112,7 +113,7 @@ export default function ShopCatalog({
 
   const dealProducts = useMemo(
     () => shop.products
-      .filter((product) => product.published !== false && (product.isFlashSale || discountOf(product) > 0) && imageOf(product))
+      .filter((product) => product.published !== false && !isWholesaleProduct(product) && (product.isFlashSale || discountOf(product) > 0) && imageOf(product))
       .sort((a, b) => Number(Boolean(b.isFlashSale)) - Number(Boolean(a.isFlashSale)) || discountOf(b) - discountOf(a))
       .slice(0, 3),
     [shop.products],
@@ -140,6 +141,7 @@ export default function ShopCatalog({
           .filter(
             (product) =>
               product.published !== false &&
+              !isWholesaleProduct(product) &&
               productMatchesCategory(value, product, shop.categories),
           )
           .sort((a, b) => updatedTime(b) - updatedTime(a) || score(a.id) - score(b.id));
@@ -185,13 +187,15 @@ export default function ShopCatalog({
       return [...shop.products]
         .filter(
           (product) =>
-            product.published !== false && !selectedIds.has(product.id),
+            product.published !== false &&
+            (shop.wholesaleOnly ? isWholesaleProduct(product) : !isWholesaleProduct(product)) &&
+            !selectedIds.has(product.id),
         )
         .sort((a, b) => score(a.id) - score(b.id));
     }
 
     return [];
-  }, [budgetView, shop.filtered, shop.products]);
+  }, [budgetView, shop.filtered, shop.products, shop.wholesaleOnly]);
 
   const clearAll = () => {
     shop.setSearch('');
