@@ -120,9 +120,7 @@ export function useShopCatalog(initialCategory?: string, initialQuery = '', init
       const matchesDeal = !onlyDeals || Boolean(p.isFlashSale);
       const matchesWholesale = wholesaleOnly
         ? isWholesaleProduct(p)
-        : selectedSaleMelaBucket
-          ? !isWholesaleProduct(p)
-          : true;
+        : !isWholesaleProduct(p);
       return selectedCat && matchesPrice && matchesDeal && matchesWholesale;
     });
   }, [products, categories, search, category, maxPrice, onlyDeals, wholesaleOnly, selectedSaleMelaBucket]);
