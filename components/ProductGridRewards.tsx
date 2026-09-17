@@ -315,14 +315,41 @@ export default function ProductGridRewards({
         return Number(Boolean(b.isFlashSale)) - Number(Boolean(a.isFlashSale));
       });
     }
-    // Keep the homepage card layout and lazy image loading, but do not cap the
-    // catalog: customers should be able to scroll through every matching product.
+    // Keep the homepage card layout and full catalog available without deferred
+    // product-image loading; customers can scroll through every matching product.
     return filtered;
   }, [products, selectedMaxPrice, wholesaleSelected, sort, homeLayout]);
 
-  function add(p: Product) {
-    const img = image(p);
-    const modalProduct = getModalProduct(p);
+  async function add(p: Product) {
+    let currentProduct = p;
+
+    // Resolve the exact product from the Supabase-first no-store storefront reader
+    // immediately before opening variants. Firebase remains fallback in that API.
+    try {
+      const response = await fetch(
+        `/api/storefront/read?type=product&id=${encodeURIComponent(p.id)}`,
+        { cache: "no-store" },
+      );
+      if (response.ok) {
+        const data = await response.json();
+        if (data?.product && String(data.product.id || "") === String(p.id)) {
+          currentProduct = data.product as Product;
+          setProducts((current) =>
+            current.map((item) =>
+              item.id === currentProduct.id ? currentProduct : item,
+            ),
+          );
+        }
+      }
+    } catch (error) {
+      console.warn(
+        "Fresh homepage product read unavailable; using current product data",
+        error,
+      );
+    }
+
+    const img = image(currentProduct) || image(p);
+    const modalProduct = getModalProduct(currentProduct);
     const hasVariants = Boolean(
       (Array.isArray(modalProduct.variants) &&
         modalProduct.variants.length > 0) ||
@@ -345,15 +372,16 @@ export default function ProductGridRewards({
     }
 
     addItem({
-      id: p.id,
-      name: title(p),
-      price: effectivePrice(p),
-      originalPrice: original(p) || effectivePrice(p),
+      id: currentProduct.id,
+      name: title(currentProduct),
+      price: effectivePrice(currentProduct),
+      originalPrice:
+        original(currentProduct) || effectivePrice(currentProduct),
       image: img,
       imageUrl: img,
     });
 
-    setAdded(p.id);
+    setAdded(currentProduct.id);
     setTimeout(() => setAdded(null), 1100);
   }
 
@@ -503,7 +531,7 @@ export default function ProductGridRewards({
                           alt={title(p)}
                           fill
                           priority={index < 4}
-                          loading={index < 4 ? "eager" : "lazy"}
+                          loading="eager"
                           fetchPriority={index < 4 ? "high" : "auto"}
                           sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
                           quality={72}
@@ -649,7 +677,7 @@ export default function ProductGridRewards({
                     ) : (
                       <button
                         type="button"
-                        onClick={() => add(p)}
+                        onClick={() => void add(p)}
                         className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl bg-[#14140F] py-2.5 text-[10px] font-black text-white"
                       >
                         {added === p.id ? (
