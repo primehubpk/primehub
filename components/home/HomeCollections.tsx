@@ -87,11 +87,13 @@ export function HomeProductCard({
   horizontal = false,
   pack = false,
   badgeText,
+  cropImageEdges = false,
 }: {
   product: Product;
   horizontal?: boolean;
   pack?: boolean;
   badgeText?: string;
+  cropImageEdges?: boolean;
 }) {
   const addItem = useCartStore((s) => s.addItem);
   const openVariantModal = useCartStore((s) => s.openVariantModal);
@@ -137,6 +139,7 @@ export function HomeProductCard({
             unoptimized={isDirectStorefrontImage(src)}
             sizes="(max-width: 600px) 40vw, 300px"
             className="object-cover"
+            style={cropImageEdges ? { transform: "scale(1.08)" } : undefined}
           />
         ) : (
           <Package aria-label="Image unavailable" />
@@ -326,7 +329,7 @@ export default function HomeCollections({
                       className="home-budget"
                       href="#bucket-kids-metal-wholesale"
                       style={{
-                        width: "clamp(118px, 29vw, 170px)",
+                        width: "clamp(96px, 23vw, 145px)",
                         padding: "0",
                         marginBottom: "12px",
                       }}
@@ -369,6 +372,7 @@ export default function HomeCollections({
                         <HomeProductCard
                           product={product}
                           pack={wholesale}
+                          cropImageEdges={standalone && wholesale}
                         />
                       </div>
                     ))
@@ -426,7 +430,7 @@ export default function HomeCollections({
                     >
                       {kidsMatches.map((product) => (
                         <div key={product.id} style={{ minWidth: 0 }}>
-                          <HomeProductCard product={product} pack />
+                          <HomeProductCard product={product} pack cropImageEdges />
                         </div>
                       ))}
                     </div>
