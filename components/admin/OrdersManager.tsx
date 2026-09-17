@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { onSnapshot } from 'firebase/firestore';
 import {
   CalendarDays,
   CheckCircle2,
@@ -9,12 +8,13 @@ import {
   MessageCircle,
   Package,
   Phone,
+  RefreshCw,
   Search,
   Trash2,
   X,
 } from 'lucide-react';
 import { auth } from '@/lib/firebase';
-import { adminCollection, type Order } from './shared';
+import { type Order } from './shared';
 
 const ORDER_STATUSES = ['pending', 'processing', 'shipped', 'delivered', 'cancelled'] as const;
 type OrderStatus = (typeof ORDER_STATUSES)[number];
@@ -23,6 +23,13 @@ type OrderItem = Order['items'][number];
 type ActionMessage = {
   kind: 'success' | 'error';
   text: string;
+};
+
+type OrdersResponse = {
+  success: true;
+  orders: Order[];
+  primary?: string;
+  warning?: string | null;
 };
 
 const STATUS_STYLES: Record<OrderStatus, string> = {
@@ -42,6 +49,11 @@ function textValue(value: unknown) {
   return typeof value === 'string' || typeof value === 'number' ? String(value).trim() : '';
 }
 
+function customerValue(order: Order, key: string) {
+  const customer = order.customer || {};
+  return textValue((customer as Record<string, unknown>)[key]);
+}
+
 function money(value: unknown) {
   const amount = Number(value || 0);
   return Number.isFinite(amount) ? amount.toLocaleString() : '0';
@@ -52,11 +64,13 @@ function itemsFor(order: Order) {
 }
 
 function addressFor(order: Order) {
-  const customer = order.customer || {};
-  return [customer.address, customer.area, customer.city, customer.postalCode]
-    .map(textValue)
-    .filter(Boolean)
-    .join(', ');
+  const parts = [
+    customerValue(order, 'address'),
+    customerValue(order, 'area'),
+    customerValue(order, 'city'),
+    customerValue(order, 'postalCode'),
+  ].filter(Boolean);
+  return [...new Set(parts)].join(', ');
 }
 
 function itemImage(item: OrderItem) {
@@ -117,6 +131,19 @@ function whatsappUrl(order: Order) {
   return phone ? `https://wa.me/${phone}?text=${encodeURIComponent(message)}` : '';
 }
 
+async function fetchAdminOrders() {
+  const response = await fetch('/api/admin/orders', {
+    method: 'GET',
+    credentials: 'same-origin',
+    cache: 'no-store',
+  });
+  const result = await response.json().catch(() => null);
+  if (!response.ok || result?.success !== true) {
+    throw new Error(result?.error || 'Orders could not be loaded.');
+  }
+  return result as OrdersResponse;
+}
+
 async function adminOrderAction(action: 'status' | 'delete', orderId: string, status?: OrderStatus) {
   const response = await fetch('/api/admin/orders', {
     method: 'POST',
@@ -143,15 +170,26 @@ export default function OrdersManager() {
   const [rewardingOrderId, setRewardingOrderId] = useState<string | null>(null);
   const [rewardMessage, setRewardMessage] = useState('');
   const [actionMessage, setActionMessage] = useState<ActionMessage | null>(null);
+  const [loadWarning, setLoadWarning] = useState('');
+  const [loadingOrders, setLoadingOrders] = useState(true);
 
-  useEffect(
-    () => onSnapshot(
-      adminCollection('orders'),
-      (snapshot) => setOrders(snapshot.docs.map((item) => ({ id: item.id, ...item.data() }) as Order)),
-      () => setActionMessage({ kind: 'error', text: 'Orders could not be refreshed. Please reload the page.' }),
-    ),
-    [],
-  );
+  useEffect(() => {
+    let active = true;
+    fetchAdminOrders()
+      .then((data) => {
+        if (!active) return;
+        setOrders(Array.isArray(data.orders) ? data.orders : []);
+        setLoadWarning(data.warning || '');
+      })
+      .catch((error) => {
+        if (!active) return;
+        setActionMessage({ kind: 'error', text: error instanceof Error ? error.message : 'Orders could not be loaded.' });
+      })
+      .finally(() => {
+        if (active) setLoadingOrders(false);
+      });
+    return () => { active = false; };
+  }, []);
 
   const filteredOrders = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -162,8 +200,9 @@ export default function OrdersManager() {
           order.id,
           order.customer?.name,
           order.customer?.phone,
-          order.customer?.city,
-          addressFor(order),
+          customerValue(order, 'city'),
+          customerValue(order, 'address'),
+          customerValue(order, 'area'),
           ...itemsFor(order).flatMap((item) => [item.title, item.productId, itemVariant(item)]),
         ]
           .filter(Boolean)
@@ -174,13 +213,29 @@ export default function OrdersManager() {
       .sort((a, b) => orderTime(b.createdAt) - orderTime(a.createdAt));
   }, [orders, search, statusFilter]);
 
+  async function reloadOrders() {
+    if (loadingOrders) return;
+    setLoadingOrders(true);
+    setActionMessage(null);
+    try {
+      const data = await fetchAdminOrders();
+      setOrders(Array.isArray(data.orders) ? data.orders : []);
+      setLoadWarning(data.warning || '');
+    } catch (error) {
+      setActionMessage({ kind: 'error', text: error instanceof Error ? error.message : 'Orders could not be refreshed.' });
+    } finally {
+      setLoadingOrders(false);
+    }
+  }
+
   async function updateStatus(orderId: string, status: OrderStatus) {
     setUpdatingOrderId(orderId);
     setActionMessage(null);
     try {
-      await adminOrderAction('status', orderId, status);
+      const result = await adminOrderAction('status', orderId, status);
       setOrders((current) => current.map((order) => (order.id === orderId ? { ...order, status } : order)));
       setActionMessage({ kind: 'success', text: `Order #${orderId.slice(-6)} status updated to ${status}.` });
+      if (result.mirrorWarning) setLoadWarning('Order saved in Supabase. Firebase mirror is temporarily unavailable.');
     } catch (error) {
       setActionMessage({ kind: 'error', text: error instanceof Error ? error.message : 'Status update failed.' });
     } finally {
@@ -194,10 +249,11 @@ export default function OrdersManager() {
     setDeletingOrderId(orderId);
     setActionMessage(null);
     try {
-      await adminOrderAction('delete', orderId);
+      const result = await adminOrderAction('delete', orderId);
       setOrders((current) => current.filter((order) => order.id !== orderId));
       setDeleteOrder(null);
       setActionMessage({ kind: 'success', text: `Order #${orderId.slice(-6)} deleted successfully.` });
+      if (result.mirrorWarning) setLoadWarning('Order deleted from Supabase. Firebase mirror is temporarily unavailable.');
     } catch (error) {
       setActionMessage({ kind: 'error', text: error instanceof Error ? error.message : 'Order delete failed.' });
     } finally {
@@ -243,6 +299,14 @@ export default function OrdersManager() {
             {filteredOrders.length} {filteredOrders.length === 1 ? 'order' : 'orders'} shown
           </p>
         </div>
+        <button
+          type="button"
+          disabled={loadingOrders}
+          onClick={() => void reloadOrders()}
+          className="inline-flex items-center gap-2 rounded-full bg-white px-3.5 py-2.5 text-[10px] font-black shadow-sm ring-1 ring-black/8 disabled:opacity-50"
+        >
+          <RefreshCw size={14} className={loadingOrders ? 'animate-spin' : ''} /> {loadingOrders ? 'Loading…' : 'Refresh'}
+        </button>
       </div>
 
       {rewardMessage && (
@@ -252,6 +316,11 @@ export default function OrdersManager() {
         <p className={`mt-3 rounded-2xl p-3 text-xs font-bold ${actionMessage.kind === 'success' ? 'bg-[#DDF5F0] text-[#0F6A5F]' : 'bg-rose-50 text-rose-700'}`}>
           {actionMessage.text}
         </p>
+      )}
+      {loadWarning && (
+        <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-[10px] font-semibold leading-5 text-amber-800">
+          {loadWarning}
+        </div>
       )}
 
       <div className="mt-4 rounded-3xl border border-black/8 bg-white p-3 shadow-sm sm:p-4">
@@ -283,9 +352,14 @@ export default function OrdersManager() {
           const row = order as Order & { resellerUserId?: string; resellerRewardStatus?: string };
           const status = normalizedStatus(order.status);
           const items = itemsFor(order);
-          const hasPhone = Boolean(String(order.customer?.phone || '').replace(/\D/g, ''));
+          const name = customerValue(order, 'name') || 'Customer';
+          const phone = customerValue(order, 'phone');
+          const city = customerValue(order, 'city');
+          const address = customerValue(order, 'address');
+          const area = customerValue(order, 'area');
+          const postalCode = customerValue(order, 'postalCode');
+          const hasPhone = Boolean(phone.replace(/\D/g, ''));
           const deliveryCharge = Number(order.deliveryCharge || 0);
-          const fullAddress = addressFor(order);
 
           return (
             <article key={order.id} className="overflow-hidden rounded-[26px] border border-black/8 bg-white shadow-sm">
@@ -300,9 +374,9 @@ export default function OrdersManager() {
                         <span className="inline-flex rounded-full bg-[#DDF5F0] px-2.5 py-1 text-[9px] font-black text-[#0F6A5F]">RESELLER</span>
                       )}
                     </div>
-                    <h3 className="mt-2 truncate text-base font-black sm:text-lg">{order.customer?.name || 'Customer'}</h3>
-                    <a href={hasPhone ? `tel:${order.customer?.phone}` : undefined} className="mt-1 inline-flex items-center gap-1.5 text-xs font-semibold text-black/50">
-                      <Phone size={13} /> {order.customer?.phone || 'No phone'}
+                    <h3 className="mt-2 truncate text-base font-black sm:text-lg">{name}</h3>
+                    <a href={hasPhone ? `tel:${phone}` : undefined} className="mt-1 inline-flex items-center gap-1.5 text-xs font-semibold text-black/50">
+                      <Phone size={13} /> {phone || 'No phone'}
                     </a>
                   </div>
                   <div className="shrink-0 text-right">
@@ -365,13 +439,20 @@ export default function OrdersManager() {
 
                 <div className="mt-4 grid gap-3 md:grid-cols-2">
                   <div className="rounded-2xl border border-black/8 p-3.5 sm:p-4">
-                    <p className="text-[9px] font-black uppercase tracking-[0.16em] text-black/35">Customer & Delivery</p>
-                    <div className="mt-2.5 flex items-start gap-2 text-xs leading-5 text-black/65">
-                      <MapPin size={15} className="mt-0.5 shrink-0 text-[#0F6A5F]" />
-                      <span className="min-w-0 break-words">{fullAddress || 'No delivery address was provided.'}</span>
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-[9px] font-black uppercase tracking-[0.16em] text-black/35">Customer Details</p>
+                      <MapPin size={15} className="text-[#0F6A5F]" />
+                    </div>
+                    <div className="mt-3 space-y-2.5 text-xs">
+                      <div className="grid grid-cols-[72px_minmax(0,1fr)] gap-2"><span className="font-semibold text-black/40">Name</span><span className="font-black text-black/75">{name}</span></div>
+                      <div className="grid grid-cols-[72px_minmax(0,1fr)] gap-2"><span className="font-semibold text-black/40">Contact</span><span className="break-words font-bold text-black/70">{phone || 'Not provided'}</span></div>
+                      <div className="grid grid-cols-[72px_minmax(0,1fr)] gap-2"><span className="font-semibold text-black/40">City</span><span className="break-words font-bold text-black/70">{city || 'Not provided'}</span></div>
+                      <div className="grid grid-cols-[72px_minmax(0,1fr)] gap-2"><span className="font-semibold text-black/40">Address</span><span className="break-words font-bold leading-5 text-black/70">{address || 'Not provided'}</span></div>
+                      {area && <div className="grid grid-cols-[72px_minmax(0,1fr)] gap-2"><span className="font-semibold text-black/40">Area</span><span className="break-words font-bold text-black/70">{area}</span></div>}
+                      {postalCode && <div className="grid grid-cols-[72px_minmax(0,1fr)] gap-2"><span className="font-semibold text-black/40">Postal</span><span className="break-words font-bold text-black/70">{postalCode}</span></div>}
                     </div>
                     <button type="button" onClick={() => setAddressOrder(order)} className="mt-3 rounded-full bg-[#F4F4F1] px-3 py-2 text-[10px] font-black text-[#0F6A5F]">
-                      View address
+                      View full address
                     </button>
                   </div>
 
@@ -380,7 +461,7 @@ export default function OrdersManager() {
                     <div className="mt-2.5 space-y-2 text-xs">
                       <div className="flex justify-between gap-3 text-black/50"><span>Subtotal</span><span className="font-bold">Rs {money(order.subtotal)}</span></div>
                       <div className="flex justify-between gap-3 text-black/50"><span>Delivery</span><span className="font-bold">Rs {money(deliveryCharge)}</span></div>
-                      <div className="border-t border-black/8 pt-2.5 flex justify-between gap-3 text-sm font-black"><span>Total</span><span>Rs {money(order.total)}</span></div>
+                      <div className="flex justify-between gap-3 border-t border-black/8 pt-2.5 text-sm font-black"><span>Total</span><span>Rs {money(order.total)}</span></div>
                     </div>
                   </div>
                 </div>
@@ -444,7 +525,7 @@ export default function OrdersManager() {
           );
         })}
 
-        {filteredOrders.length === 0 && (
+        {!loadingOrders && filteredOrders.length === 0 && (
           <div className="rounded-[26px] border border-dashed border-black/15 bg-white px-5 py-12 text-center">
             <Package className="mx-auto h-8 w-8 text-black/15" />
             <p className="mt-3 text-sm font-black">No matching orders found</p>
@@ -458,15 +539,19 @@ export default function OrdersManager() {
           <div className="w-full max-w-md rounded-[26px] bg-white p-5 shadow-xl" onClick={(event) => event.stopPropagation()}>
             <div className="flex items-start justify-between gap-4">
               <div>
-                <h3 className="text-lg font-black">Delivery Address</h3>
-                <p className="mt-1 text-xs text-black/50">{addressOrder.customer?.name || 'Customer'} • #{addressOrder.id.slice(-6)}</p>
+                <h3 className="text-lg font-black">Customer & Delivery</h3>
+                <p className="mt-1 text-xs text-black/50">#{addressOrder.id.slice(-6)}</p>
               </div>
               <button type="button" onClick={() => setAddressOrder(null)} className="rounded-full bg-[#F4F4F1] p-2" aria-label="Close address">
                 <X className="h-4 w-4" />
               </button>
             </div>
-            <div className="mt-5 rounded-2xl bg-[#F4F4F1] p-4 text-sm leading-6">{addressFor(addressOrder) || 'No delivery address was provided.'}</div>
-            {addressOrder.customer?.phone && <p className="mt-3 text-sm font-semibold text-black/55">Phone: {addressOrder.customer.phone}</p>}
+            <div className="mt-5 space-y-3 rounded-2xl bg-[#F4F4F1] p-4 text-sm">
+              <div><span className="block text-[9px] font-black uppercase tracking-wider text-black/35">Name</span><span className="mt-1 block font-black">{customerValue(addressOrder, 'name') || 'Customer'}</span></div>
+              <div><span className="block text-[9px] font-black uppercase tracking-wider text-black/35">Contact</span><span className="mt-1 block font-bold">{customerValue(addressOrder, 'phone') || 'Not provided'}</span></div>
+              <div><span className="block text-[9px] font-black uppercase tracking-wider text-black/35">City</span><span className="mt-1 block font-bold">{customerValue(addressOrder, 'city') || 'Not provided'}</span></div>
+              <div><span className="block text-[9px] font-black uppercase tracking-wider text-black/35">Complete Address</span><span className="mt-1 block break-words font-bold leading-6">{addressFor(addressOrder) || 'No delivery address was provided.'}</span></div>
+            </div>
           </div>
         </div>
       )}
