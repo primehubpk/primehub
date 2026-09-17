@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { onSnapshot } from 'firebase/firestore';
-import { ImagePlus, Loader2, PackageSearch, Pencil, Save, Search, Star, Trash2 } from 'lucide-react';
+import { Eye, EyeOff, ImagePlus, Loader2, PackageSearch, Pencil, Save, Search, Star, Trash2 } from 'lucide-react';
 import { productMatchesCategory } from '@/lib/categoryUtils';
 import { isWholesalePriceBucket, sortPriceBuckets } from '@/lib/priceBucketUtils';
 import type { PriceBucket } from '@/lib/types';
@@ -23,6 +23,7 @@ type VariantDraft = {
   size: string;
   stock: string;
   imageUrl: string;
+  active: boolean;
   raw: Record<string, unknown>;
 };
 
@@ -109,6 +110,7 @@ function productVariantRows(product: Product): VariantDraft[] {
         size,
         stock: String(row?.stock ?? legacyStock ?? 0),
         imageUrl: String(row?.imageUrl || colorImages[color] || fallbackImage || ''),
+        active: row?.active !== false && row?.hidden !== true,
         raw: row && typeof row === 'object' ? { ...row } : {},
       };
     });
@@ -143,6 +145,7 @@ function productVariantRows(product: Product): VariantDraft[] {
     size,
     stock: String(legacyStock ?? 0),
     imageUrl: colorPhoto(color),
+    active: true,
     raw: {},
   })));
 }
@@ -171,7 +174,8 @@ function variantDraftsMatch(left: VariantDraft[], right: VariantDraft[]) {
       && variant.color === other.color
       && variant.size === other.size
       && variant.stock === other.stock
-      && variant.imageUrl === other.imageUrl;
+      && variant.imageUrl === other.imageUrl
+      && variant.active === other.active;
   });
 }
 
@@ -217,6 +221,8 @@ function updatePayload(product: Product, draft: ProductDraft) {
       stock: variantStock,
       imageUrl: variant.imageUrl,
       price: String(price),
+      active: variant.active !== false,
+      hidden: variant.active === false,
     };
   });
 
@@ -542,6 +548,16 @@ function EditableProductRow({ product, draft, categories, priceBuckets, disabled
     setRowMessage('Only this variant was removed. Press Save to keep the change.');
   }
 
+  function toggleVariantVisibility(index: number) {
+    const variant = draft.variants[index];
+    if (!variant) return;
+    const nextActive = variant.active === false;
+    updateVariant(index, { active: nextActive });
+    setRowMessage(nextActive
+      ? 'Variant is visible again. Press Save to keep the change.'
+      : 'Variant hidden from customers. Press Save to keep the change.');
+  }
+
   function sizePresetComplete(preset: SizePreset) {
     const groups = Array.from(new Set(draft.variants.map(variant => variant.color.trim())));
     const targetGroups = groups.length ? groups : [''];
@@ -564,6 +580,7 @@ function EditableProductRow({ product, draft, categories, priceBuckets, disabled
         size: preset.label,
         stock: seed?.stock || draft.stock || '0',
         imageUrl: seed?.imageUrl || draft.images[0] || '',
+        active: true,
         raw: {},
       });
     });
@@ -660,18 +677,24 @@ function EditableProductRow({ product, draft, categories, priceBuckets, disabled
               <label className="min-w-0"><span className="block text-[7px] font-black uppercase text-black/35">Color</span><input value={variant.color} onChange={event => updateVariant(index, { color: event.target.value })} className="mt-1 w-full rounded-lg bg-[#F4F4F1] p-2 text-[9px] outline-none"/></label>
               <label className="min-w-0"><span className="block text-[7px] font-black uppercase text-black/35">Size</span><input value={variant.size} onChange={event => updateVariant(index, { size: event.target.value })} className="mt-1 w-full rounded-lg bg-[#F4F4F1] p-2 text-[9px] outline-none"/></label>
               <label className="min-w-0"><span className="block text-[7px] font-black uppercase text-black/35">Stock</span><input type="number" min="0" value={variant.stock} onChange={event => updateVariant(index, { stock: event.target.value })} className="mt-1 w-full rounded-lg bg-[#F4F4F1] p-2 text-[9px] outline-none"/></label>
-              <div className="col-span-4 flex justify-end gap-1.5">
+              <div className="col-span-4 flex flex-wrap justify-end gap-1.5">
                 <button type="button" onClick={() => setEditingVariantIndex(null)} className="rounded-lg bg-[#0F6A5F] px-3 py-2 text-[8px] font-black text-white">Done</button>
                 <button type="button" disabled={disabled} onClick={() => removeVariant(index)} className="inline-flex items-center gap-1 rounded-lg bg-red-50 px-3 py-2 text-[8px] font-black text-[#E1352B] disabled:opacity-40"><Trash2 size={10}/>Delete</button>
+                <button type="button" disabled={disabled} onClick={() => toggleVariantVisibility(index)} className={`inline-flex items-center gap-1 rounded-lg px-3 py-2 text-[8px] font-black disabled:opacity-40 ${variant.active === false ? 'bg-[#0F6A5F]/10 text-[#0F6A5F]' : 'bg-amber-50 text-amber-700'}`}>{variant.active === false ? <Eye size={10}/> : <EyeOff size={10}/>} {variant.active === false ? 'Unhide' : 'Hide'}</button>
               </div>
             </div> : <div className="flex items-center gap-2">
               <div className="h-11 w-11 shrink-0 overflow-hidden rounded-lg bg-[#F4F4F1]">{variant.imageUrl ? <img src={variant.imageUrl} alt="" className="h-full w-full object-cover"/> : null}</div>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-[9px] font-black">{[variant.color, variant.size].filter(Boolean).join(' / ') || `Variant ${index + 1}`}</p>
-                <p className="mt-0.5 text-[8px] font-bold text-black/40">Stock: {variant.stock || '0'}</p>
+                <p className="mt-0.5 flex items-center gap-1.5 text-[8px] font-bold text-black/40">Stock: {variant.stock || '0'}{variant.active === false ? <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[7px] font-black text-amber-700">HIDDEN</span> : null}</p>
               </div>
-              <button type="button" disabled={disabled} onClick={() => setEditingVariantIndex(index)} className="inline-flex items-center gap-1 rounded-lg bg-[#0F6A5F]/10 px-2.5 py-2 text-[8px] font-black text-[#0F6A5F] disabled:opacity-40"><Pencil size={10}/>Edit</button>
-              <button type="button" disabled={disabled} onClick={() => removeVariant(index)} className="inline-flex items-center gap-1 rounded-lg bg-red-50 px-2.5 py-2 text-[8px] font-black text-[#E1352B] disabled:opacity-40"><Trash2 size={10}/>Delete</button>
+              <div className="flex shrink-0 flex-col gap-1.5">
+                <div className="flex gap-1.5">
+                  <button type="button" disabled={disabled} onClick={() => setEditingVariantIndex(index)} className="inline-flex items-center gap-1 rounded-lg bg-[#0F6A5F]/10 px-2.5 py-2 text-[8px] font-black text-[#0F6A5F] disabled:opacity-40"><Pencil size={10}/>Edit</button>
+                  <button type="button" disabled={disabled} onClick={() => removeVariant(index)} className="inline-flex items-center gap-1 rounded-lg bg-red-50 px-2.5 py-2 text-[8px] font-black text-[#E1352B] disabled:opacity-40"><Trash2 size={10}/>Delete</button>
+                </div>
+                <button type="button" disabled={disabled} onClick={() => toggleVariantVisibility(index)} className={`inline-flex items-center justify-center gap-1 rounded-lg px-2.5 py-2 text-[8px] font-black disabled:opacity-40 ${variant.active === false ? 'bg-[#0F6A5F]/10 text-[#0F6A5F]' : 'bg-amber-50 text-amber-700'}`}>{variant.active === false ? <Eye size={10}/> : <EyeOff size={10}/>} {variant.active === false ? 'Unhide' : 'Hide'}</button>
+              </div>
             </div>}
           </div>;
         })}

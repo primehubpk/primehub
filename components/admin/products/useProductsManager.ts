@@ -116,6 +116,8 @@ export function useProductsManager() {
           size,
           stock: old?.stock ?? (form.stock || '10'),
           imageUrl: color.imageUrl || form.images[0] || '',
+          active: old?.active !== false && old?.hidden !== true,
+          hidden: old?.active === false || old?.hidden === true,
         });
       }));
       return next;
@@ -287,6 +289,8 @@ export function useProductsManager() {
         size: row.size || String(row.label || '').split(' / ')[1] || '',
         stock: String(row.stock ?? legacyStock ?? 10),
         imageUrl: row.imageUrl || colorMap[row.color] || firstImg || '',
+        active: row.active !== false && row.hidden !== true,
+        hidden: row.active === false || row.hidden === true,
       }))
       : []);
     setDeal({
@@ -369,7 +373,7 @@ export function useProductsManager() {
       const cleanSizes = [...new Set(sizes.map(size => size.trim()).filter(Boolean))];
       const variantOptions = [{ id: 'color', name: 'Color', values: cleanColors.map(color => color.name) }, { id: 'size', name: 'Size', values: cleanSizes }];
       const colorImages = Object.fromEntries(cleanColors.map(color => [color.name, color.imageUrl]));
-      const variantMatrix = variantRows.map(row => ({ id: row.id, label: `${row.color} / ${row.size}`, color: row.color, size: row.size, stock: Math.max(0, Number(row.stock || 0)), imageUrl: row.imageUrl || colorImages[row.color] || form.images[0] || '', sku: '', price: String(salePrice), salePrice: '', active: true }));
+      const variantMatrix = variantRows.map(row => ({ id: row.id, label: `${row.color} / ${row.size}`, color: row.color, size: row.size, stock: Math.max(0, Number(row.stock || 0)), imageUrl: row.imageUrl || colorImages[row.color] || form.images[0] || '', sku: '', price: String(salePrice), salePrice: '', active: row.active !== false && row.hidden !== true, hidden: row.active === false || row.hidden === true }));
       const stockValue = form.stock.trim();
       const payload = { title: form.title.trim(), slug: slugify(form.title), price: salePrice, originalPrice, description: form.description, category: form.category, ...(stockValue !== '' ? { stock: Math.max(0, Number(stockValue)) } : {}), videoUrl: form.videoUrl.trim(), imageUrl: form.images[0] || '', images: form.images, colorImages, variantColors: cleanColors, variantOptions, variantMatrix, featured: form.featured, published: form.published, isWholesale: form.isWholesale === true, priceBucketIds: bucketIds, updatedAt: new Date().toISOString() };
       let productId = editing?.id || '';

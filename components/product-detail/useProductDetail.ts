@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import { getVariantRows, useCartStore } from '@/lib/cartStore';
+import { normalizeProductVariants, useCartStore } from '@/lib/cartStore';
 import { useSettings } from '@/lib/useSettings';
 import { WEEKDAY_LABELS, WEEKDAY_ORDER, countdownParts, dealTiming } from '@/lib/weeklyDealUtils';
 import { bigDealConfiguredSlotCount, bigDealRotationIndex } from '@/lib/bigDealRotation';
@@ -154,7 +154,11 @@ export function useProductDetail(): ProductDetailModel {
   const stock = Number(product?.stock ?? product?.quantity ?? product?.inventory ?? 10);
   const rating = Number(product?.rating || 0);
   const reviews = Number(product?.reviews || 0);
-  const variantRows = useMemo(() => (product ? getVariantRows(product) : []), [product]);
+  const normalizedVariants = useMemo(
+    () => product ? normalizeProductVariants(product) : { hasVariants: false, colors: [], sizes: [], rows: [] },
+    [product],
+  );
+  const variantRows = normalizedVariants.rows;
   const weeklyDeals = useMemo(
     () =>
       ((settings.weeklyDeals || []) as WeeklyDeal[])
@@ -268,7 +272,7 @@ export function useProductDetail(): ProductDetailModel {
       ? `${countdown.hours.toString().padStart(2, '0')}:${countdown.minutes.toString().padStart(2, '0')}:${countdown.seconds.toString().padStart(2, '0')}`
       : `${countdown.days}d ${countdown.hours.toString().padStart(2, '0')}:${countdown.minutes.toString().padStart(2, '0')}:${countdown.seconds.toString().padStart(2, '0')}`
     : '—';
-  const hasVariants = variantRows.length > 0;
+  const hasVariants = normalizedVariants.hasVariants;
 
   const addResolved = (selection: ProductVariantSelection | undefined, qty: number) => {
     if (!product || currentPrice <= 0 || stock === 0) return;
