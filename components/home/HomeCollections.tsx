@@ -77,6 +77,11 @@ function shuffleWithNewArrivalPriority(products: Product[], seed: number) {
   });
 }
 
+function isKidsWholesaleProduct(product: Product) {
+  const searchable = `${titleOf(product)} ${product.packDescription || ""}`.toLowerCase();
+  return /\bkids?\b/.test(searchable);
+}
+
 export function HomeProductCard({
   product,
   horizontal = false,
@@ -191,6 +196,15 @@ function sortBySalePrice(products: Product[]) {
   );
 }
 
+const standaloneGridStyle = {
+  display: "grid",
+  gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+  gap: "6px",
+  overflow: "visible",
+  paddingBottom: "3px",
+  scrollSnapType: "none",
+} as const;
+
 export default function HomeCollections({
   products,
   standalone = false,
@@ -207,9 +221,10 @@ export default function HomeCollections({
     (settings.priceBuckets || []).filter((b) => b.active),
   );
   const packs = catalog.filter(isWholesaleProduct);
+  const kidsPacks = packs.filter(isKidsWholesaleProduct);
+  const regularPacks = packs.filter((product) => !isKidsWholesaleProduct(product));
 
   useEffect(() => {
-    if (standalone) return;
     const values = new Uint32Array(1);
     if (typeof window !== "undefined" && window.crypto?.getRandomValues) {
       window.crypto.getRandomValues(values);
@@ -217,7 +232,7 @@ export default function HomeCollections({
       return;
     }
     setShuffleSeed((Date.now() ^ Math.floor(Math.random() * 0xffffffff)) >>> 0);
-  }, [standalone]);
+  }, []);
 
   return (
     <>
@@ -241,8 +256,9 @@ export default function HomeCollections({
               ? `#${anchor}`
               : bucketHref(bucket.amount ?? null, wholesale);
             const saleRange = saleMelaPriceRange(amount);
+            const packSource = standalone && wholesale ? regularPacks : packs;
             const baseMatches = wholesale
-              ? sortBySalePrice(packs)
+              ? sortBySalePrice(packSource)
               : sortBySalePrice(
                   catalog.filter((product) => {
                     if (isWholesaleProduct(product)) return false;
@@ -252,9 +268,41 @@ export default function HomeCollections({
                       : matchesPriceBucket(price, buckets, amount);
                   }),
                 );
-            const matches = standalone
-              ? baseMatches
-              : shuffleWithNewArrivalPriority(baseMatches, shuffleSeed);
+            const matches = shuffleWithNewArrivalPriority(baseMatches, shuffleSeed);
+            const kidsMatches = standalone && wholesale
+              ? shuffleWithNewArrivalPriority(
+                  sortBySalePrice(kidsPacks),
+                  (shuffleSeed ^ 0x9e3779b9) >>> 0,
+                )
+              : [];
+
+            const budgetLink = (
+              <Link
+                className="home-budget"
+                href={href}
+                prefetch={!standalone}
+                style={standalone ? {
+                  width: "clamp(96px, 23vw, 145px)",
+                  padding: "0",
+                  marginBottom: "12px",
+                } : undefined}
+                aria-label={`Browse ${bucket.title} in PrimeHubMall Sale Mela`}
+              >
+                <span className="home-budget-medallion">
+                  {wholesale ? (
+                    <Package size={42} />
+                  ) : (
+                    <>
+                      <small>Rs.</small>
+                      <b>{amount.toLocaleString("en-PK")}</b>
+                    </>
+                  )}
+                </span>
+                <span className="home-budget-label">
+                  {standalone && !wholesale ? saleMelaBucketLabel(amount) : bucket.title}
+                </span>
+              </Link>
+            );
 
             return (
               <div
@@ -263,42 +311,39 @@ export default function HomeCollections({
                 style={standalone ? { display: "block", marginBottom: "28px" } : undefined}
                 key={bucket.id}
               >
-                <Link
-                  className="home-budget"
-                  href={href}
-                  prefetch={!standalone}
-                  style={standalone ? {
-                    width: "clamp(96px, 23vw, 145px)",
-                    padding: "0",
-                    marginBottom: "12px",
-                  } : undefined}
-                  aria-label={`Browse ${bucket.title} in PrimeHubMall Sale Mela`}
-                >
-                  <span className="home-budget-medallion">
-                    {wholesale ? (
-                      <Package size={42} />
-                    ) : (
-                      <>
-                        <small>Rs.</small>
-                        <b>{amount.toLocaleString("en-PK")}</b>
-                      </>
-                    )}
-                  </span>
-                  <span className="home-budget-label">
-                    {standalone && !wholesale ? saleMelaBucketLabel(amount) : bucket.title}
-                  </span>
-                </Link>
+                {standalone && wholesale && kidsPacks.length > 0 ? (
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "flex-start",
+                      gap: "10px",
+                      flexWrap: "wrap",
+                    }}
+                    aria-label="Wholesale collection shortcuts"
+                  >
+                    {budgetLink}
+                    <Link
+                      className="home-budget"
+                      href="#bucket-kids-metal-wholesale"
+                      style={{
+                        width: "clamp(118px, 29vw, 170px)",
+                        padding: "0",
+                        marginBottom: "12px",
+                      }}
+                      aria-label="Jump to Kids Metal Wholesale"
+                    >
+                      <span className="home-budget-medallion">
+                        <Package size={34} />
+                        <small style={{ marginTop: "2px", fontWeight: 900 }}>KIDS</small>
+                      </span>
+                      <span className="home-budget-label">Kids Metal Wholesale</span>
+                    </Link>
+                  </div>
+                ) : budgetLink}
 
                 <div
                   className="home-sale-products [scrollbar-width:none]"
-                  style={standalone ? {
-                    display: "grid",
-                    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-                    gap: "6px",
-                    overflow: "visible",
-                    paddingBottom: "3px",
-                    scrollSnapType: "none",
-                  } : {
+                  style={standalone ? standaloneGridStyle : {
                     display: "flex",
                     gridTemplateColumns: "none",
                     gap: "6px",
@@ -336,6 +381,57 @@ export default function HomeCollections({
                     </p>
                   )}
                 </div>
+
+                {standalone && wholesale && kidsPacks.length > 0 ? (
+                  <section
+                    id="bucket-kids-metal-wholesale"
+                    className="scroll-mt-24"
+                    style={{ marginTop: "30px" }}
+                    aria-label="Kids Metal Wholesale"
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: "12px",
+                        marginBottom: "12px",
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                        <span
+                          className="home-budget-medallion"
+                          style={{ width: "58px", height: "58px", flex: "0 0 58px" }}
+                          aria-hidden="true"
+                        >
+                          <Package size={27} />
+                        </span>
+                        <div>
+                          <p style={{ fontSize: "18px", fontWeight: 900, lineHeight: 1.1 }}>
+                            Kids Metal Wholesale
+                          </p>
+                          <p style={{ marginTop: "4px", fontSize: "12px", color: "rgba(0,0,0,.55)" }}>
+                            Kids wholesale packs
+                          </p>
+                        </div>
+                      </div>
+                      <span style={{ fontSize: "11px", fontWeight: 800, color: "rgba(0,0,0,.48)" }}>
+                        {kidsMatches.length} packs
+                      </span>
+                    </div>
+
+                    <div
+                      className="home-sale-products [scrollbar-width:none]"
+                      style={standaloneGridStyle}
+                    >
+                      {kidsMatches.map((product) => (
+                        <div key={product.id} style={{ minWidth: 0 }}>
+                          <HomeProductCard product={product} pack />
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                ) : null}
               </div>
             );
           })}
