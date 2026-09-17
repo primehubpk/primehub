@@ -145,6 +145,21 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true, id, primary: 'firebase' });
     }
 
+    if (action === 'replace') {
+      if (!id) return NextResponse.json({ error: 'Document id is required.' }, { status: 400 });
+      const data = { ...normalize(name, body.value || {}), adminActor: ADMIN_EMAIL };
+
+      if (supabasePrimary) {
+        const mirrorWarning = await writeSupabaseFirst(name, id, data);
+        refreshCachesForCollection(name);
+        return NextResponse.json({ success: true, id, primary: 'supabase', mirrorWarning });
+      }
+
+      await db.collection(name).doc(id).set(data, { merge: false });
+      refreshCachesForCollection(name);
+      return NextResponse.json({ success: true, id, primary: 'firebase' });
+    }
+
     if (action === 'set') {
       if (!id) return NextResponse.json({ error: 'Document id is required.' }, { status: 400 });
       const patch = normalize(name, body.value || {});

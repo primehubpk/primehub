@@ -14,7 +14,7 @@ export type AdminRole = 'super_admin' | 'admin' | 'manager' | 'editor' | 'suppor
 export type AdminPermission = 'dashboard.view'|'products.view'|'products.manage'|'categories.view'|'categories.manage'|'deals.view'|'deals.manage'|'orders.view'|'orders.manage'|'customers.view'|'customers.manage'|'inventory.view'|'inventory.manage'|'marketing.view'|'marketing.manage'|'content.view'|'content.manage'|'analytics.view'|'settings.view'|'settings.manage'|'suppliers.view'|'suppliers.manage'|'security.view'|'security.manage';
 export interface AdminProfile { id: string; email?: string; displayName?: string; role: AdminRole; permissions: AdminPermission[]; active: boolean; lastLoginAt?: unknown; createdAt?: unknown; [key: string]: unknown }
 
-async function adminRequest(action: 'create' | 'update' | 'set' | 'delete' | 'get' | 'list', name: string, id?: string, value?: Record<string, any>) {
+async function adminRequest(action: 'create' | 'update' | 'replace' | 'set' | 'delete' | 'get' | 'list', name: string, id?: string, value?: Record<string, any>) {
   const response = await fetch('/api/admin/firestore', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -24,13 +24,13 @@ async function adminRequest(action: 'create' | 'update' | 'set' | 'delete' | 'ge
   });
   const result = await response.json().catch(() => null);
   if (!response.ok || !result?.success) throw new Error(result?.error || 'Admin operation failed.');
-  if ((name === 'products' || name === 'categories') && ['create', 'update', 'set', 'delete'].includes(action)) {
+  if ((name === 'products' || name === 'categories') && ['create', 'update', 'replace', 'set', 'delete'].includes(action)) {
     notifyCatalogUpdated({ action, collection: name, id, at: new Date().toISOString() });
   }
   return result;
 }
 
-async function adminWrite(action: 'create' | 'update' | 'set' | 'delete', name: string, id?: string, value?: Record<string, any>) {
+async function adminWrite(action: 'create' | 'update' | 'replace' | 'set' | 'delete', name: string, id?: string, value?: Record<string, any>) {
   return adminRequest(action, name, id, value);
 }
 
@@ -91,6 +91,7 @@ function normalizeAdminDocument(name: string, value: Record<string, any>) {
 }
 export const createAdminDocument = (name: string, value: Record<string, any>) => adminWrite('create', name, undefined, normalizeAdminDocument(name, value));
 export const updateAdminDocument = (name: string, id: string, value: Record<string, any>) => adminWrite('update', name, id, normalizeAdminDocument(name, value));
+export const replaceAdminDocument = (name: string, id: string, value: Record<string, any>) => adminWrite('replace', name, id, normalizeAdminDocument(name, value));
 export const setAdminDocument = (name: string, id: string, value: Record<string, any>) => adminWrite('set', name, id, normalizeAdminDocument(name, value));
 export const deleteAdminDocument = (name: string, id: string) => adminWrite('delete', name, id);
 export async function writeAdminAuditLog(action: string, entity: string, entityId?: string, metadata: Record<string, unknown> = {}) { await adminWrite('create', 'admin_audit_logs', undefined, { action, entity, entityId: entityId || null, actorUid: 'local-admin', actorEmail: 'primehubpk1@gmail.com', metadata, createdAt: new Date().toISOString() }); }
