@@ -43,6 +43,8 @@ type ProductDraft = {
 type SizePreset = { key: string; label: string };
 
 const SIZE_PRESETS: SizePreset[] = [
+  { key: 'girls bracelet - openable / adjustable / fits most hands', label: 'Girls Bracelet — Openable / Adjustable / Fits most hands' },
+  { key: 'kids bracelet - openable / adjustable / fits most kids', label: 'Kids Bracelet — Openable / Adjustable / Fits most kids' },
   { key: '2.8', label: '2.8 — Large / Dhai size / bhari hand' },
   { key: '2.6', label: '2.6 — Sawa 2 / regular size' },
   { key: '2.4', label: '2.4 — Adpa 2 size' },
@@ -56,14 +58,14 @@ const SIZE_PRESETS: SizePreset[] = [
 
 function sizeKey(value: string) {
   const normalized = value.toLowerCase().replace(/[–—]/g, '-').replace(/\s+/g, ' ').trim();
-  if (/^2\.8(?:|\s|-)/.test(normalized)) return '2.8';
-  if (/^2\.6(?:|\s|-)/.test(normalized)) return '2.6';
-  if (/^2\.4(?:|\s|-)/.test(normalized)) return '2.4';
-  if (/^2\.2(?:|\s|-)/.test(normalized)) return '2.2';
-  if (/^12(?:\s*number)?(?:|\s|-)/.test(normalized)) return '12-number';
-  if (/^10(?:\s*number)?(?:|\s|-)/.test(normalized)) return '10-number';
-  if (/^8(?:\s*number)?(?:|\s|-)/.test(normalized)) return '8-number';
-  if (/^14(?:\s*number)?(?:|\s|-)/.test(normalized)) return '14-number';
+  if (/^2\.8(?:\b|\s|-)/.test(normalized)) return '2.8';
+  if (/^2\.6(?:\b|\s|-)/.test(normalized)) return '2.6';
+  if (/^2\.4(?:\b|\s|-)/.test(normalized)) return '2.4';
+  if (/^2\.2(?:\b|\s|-)/.test(normalized)) return '2.2';
+  if (/^12(?:\s*number)?(?:\b|\s|-)/.test(normalized)) return '12-number';
+  if (/^10(?:\s*number)?(?:\b|\s|-)/.test(normalized)) return '10-number';
+  if (/^8(?:\s*number)?(?:\b|\s|-)/.test(normalized)) return '8-number';
+  if (/^14(?:\s*number)?(?:\b|\s|-)/.test(normalized)) return '14-number';
   if (/^3\s*inch/.test(normalized) || /^3inch/.test(normalized)) return '3-inch';
   return normalized;
 }
@@ -652,12 +654,12 @@ function EditableProductRow({ product, draft, categories, priceBuckets, disabled
         <div><p className="text-[10px] font-black">Variants ({draft.variants.length})</p><p className="text-[9px] text-black/45">Edit color, size or stock. Delete removes only the row you tap.</p></div>
         <label className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-white px-3 py-2 text-[9px] font-black ring-1 ring-black/5">
           <input type="checkbox" disabled={disabled} checked={showSizeAdder} onChange={event => setShowSizeAdder(event.target.checked)} className="h-3.5 w-3.5 accent-[#0F6A5F]"/>
-          Size
+          Size / Fit
         </label>
       </div>
       {showSizeAdder && <div className="mt-3 rounded-xl border border-[#0F6A5F]/15 bg-white p-3">
-        <p className="text-[9px] font-black text-[#0F6A5F]">Add size variants</p>
-        <p className="mt-0.5 text-[8px] leading-4 text-black/45">Tap a size to add only missing rows for every current design/color. Existing variants are never removed here.</p>
+        <p className="text-[9px] font-black text-[#0F6A5F]">Add size / fit variants</p>
+        <p className="mt-0.5 text-[8px] leading-4 text-black/45">Tap a size or adjustable fit to add only missing rows for every current design/color. Existing variants are never removed here.</p>
         <div className="mt-2 grid gap-2 sm:grid-cols-2">
           {SIZE_PRESETS.map(preset => {
             const added = sizePresetComplete(preset);
