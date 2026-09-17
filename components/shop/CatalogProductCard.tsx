@@ -4,10 +4,9 @@ import Image from 'next/image';
 import { Check, Eye, ShoppingBag, Star } from 'lucide-react';
 import FastProductLink from '@/components/FastProductLink';
 import WholesaleBadge from '@/components/WholesaleBadge';
-import { useCartStore } from '@/lib/cartStore';
 import { isWholesaleProduct } from '@/lib/wholesale';
 import { isDirectStorefrontImage } from '@/lib/imageUrl';
-import { Product, availableStockOf, discountOf, imageOf, originalOf, priceOf, productHasVariants, titleOf } from './ShopTypes';
+import { Product, availableStockOf, discountOf, imageOf, originalOf, priceOf, titleOf } from './ShopTypes';
 
 type Props = {
   product: Product;
@@ -20,12 +19,10 @@ type Props = {
 };
 
 export default function CatalogProductCard({ product, addedId, addProduct, compact = false, dense = false, premium = false, priority = false }: Props) {
-  const openVariantModal = useCartStore((state) => state.openVariantModal);
   const price = priceOf(product);
   const original = originalOf(product);
   const discount = discountOf(product);
   const image = imageOf(product);
-  const hasVariants = productHasVariants(product);
   const stock = availableStockOf(product);
   const unavailable = stock <= 0;
   const added = addedId === product.id;
@@ -34,7 +31,9 @@ export default function CatalogProductCard({ product, addedId, addProduct, compa
 
   function handleAdd() {
     if (unavailable) return;
-    if (hasVariants && openVariantModal({ ...product, image, imageUrl: image }, 'cart')) return;
+    // Always use the central addProduct path. It performs a no-store read for the
+    // current product before deciding whether to open the variant selector, so a
+    // stale card can never reopen deleted/old size options.
     addProduct(product);
   }
 
@@ -49,7 +48,7 @@ export default function CatalogProductCard({ product, addedId, addProduct, compa
                 alt={titleOf(product)}
                 fill
                 priority={priority}
-                loading={priority ? 'eager' : 'lazy'}
+                loading="eager"
                 fetchPriority={priority ? 'high' : 'auto'}
                 unoptimized={isDirectStorefrontImage(image)}
                 sizes="(max-width: 900px) 50vw, 430px"
@@ -112,7 +111,7 @@ export default function CatalogProductCard({ product, addedId, addProduct, compa
               alt={titleOf(product)}
               fill
               priority={priority}
-              loading={priority ? 'eager' : 'lazy'}
+              loading="eager"
               fetchPriority={priority ? 'high' : 'auto'}
               unoptimized={isDirectStorefrontImage(image)}
               sizes={dense ? '(max-width: 639px) 50vw, (max-width: 1279px) 33vw, 25vw' : '(max-width: 767px) 50vw, 25vw'}
