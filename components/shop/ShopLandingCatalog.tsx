@@ -45,7 +45,6 @@ type SortMode = 'featured' | 'newest' | 'price-low' | 'price-high';
 const NEXT_SALE_MELA_VIEW: Partial<Record<SaleMelaView, SaleMelaView>> = {
   '99': '299',
   '299': '999',
-  '999': 'wholesale',
 };
 
 function saleMelaLabel(view: SaleMelaView) {
@@ -101,10 +100,14 @@ export default function ShopLandingCatalog({
     () => shop.products.filter((product) => product.published !== false),
     [shop.products],
   );
+  const retailProducts = useMemo(
+    () => publishedProducts.filter((product) => !isWholesaleProduct(product)),
+    [publishedProducts],
+  );
 
   const dealProducts = useMemo(
     () =>
-      publishedProducts
+      retailProducts
         .filter(
           (product) =>
             (product.isFlashSale || discountOf(product) > 0) && imageOf(product),
@@ -115,15 +118,15 @@ export default function ShopLandingCatalog({
             discountOf(b) - discountOf(a),
         )
         .slice(0, 3),
-    [publishedProducts],
+    [retailProducts],
   );
 
   const quickProducts = useMemo(() => {
     if (searchView) return [...shop.filtered];
 
-    if (quickView === 'new') return newestFirst(publishedProducts);
+    if (quickView === 'new') return newestFirst(retailProducts);
     if (quickView === 'best') {
-      return [...publishedProducts].sort(
+      return [...retailProducts].sort(
         (a, b) => bestSellerScore(b) - bestSellerScore(a) || score(a.id) - score(b.id),
       );
     }
@@ -134,17 +137,13 @@ export default function ShopLandingCatalog({
     }
     if (quickView === '99' || quickView === '299' || quickView === '999') {
       const amount = Number(quickView);
-      return publishedProducts
-        .filter(
-          (product) =>
-            !isWholesaleProduct(product) &&
-            matchesSaleMelaBucket(salePrice(product), amount),
-        )
+      return retailProducts
+        .filter((product) => matchesSaleMelaBucket(salePrice(product), amount))
         .sort((a, b) => salePrice(a) - salePrice(b) || score(a.id) - score(b.id));
     }
 
     return [...shop.filtered].sort((a, b) => score(a.id) - score(b.id));
-  }, [publishedProducts, quickView, searchView, shop.filtered]);
+  }, [publishedProducts, quickView, retailProducts, searchView, shop.filtered]);
 
   const sortedProducts = useMemo(() => {
     const products = [...quickProducts];
@@ -183,24 +182,16 @@ export default function ShopLandingCatalog({
     const nextView = NEXT_SALE_MELA_VIEW[activeSaleMelaView];
     if (!nextView) return null;
 
-    const products = nextView === 'wholesale'
-      ? publishedProducts
-          .filter(isWholesaleProduct)
-          .sort((a, b) => salePrice(a) - salePrice(b) || score(a.id) - score(b.id))
-      : publishedProducts
-          .filter(
-            (product) =>
-              !isWholesaleProduct(product) &&
-              matchesSaleMelaBucket(salePrice(product), Number(nextView)),
-          )
-          .sort((a, b) => salePrice(a) - salePrice(b) || score(a.id) - score(b.id));
+    const products = retailProducts
+      .filter((product) => matchesSaleMelaBucket(salePrice(product), Number(nextView)))
+      .sort((a, b) => salePrice(a) - salePrice(b) || score(a.id) - score(b.id));
 
     return {
       view: nextView,
       heading: saleMelaLabel(nextView),
       products,
     };
-  }, [activeSaleMelaView, publishedProducts]);
+  }, [activeSaleMelaView, retailProducts]);
 
   const resetShopFilters = () => {
     shop.setSearch('');
