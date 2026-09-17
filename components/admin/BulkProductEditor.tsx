@@ -10,6 +10,7 @@ import { isWholesaleProduct } from '@/lib/wholesale';
 import {
   adminCollection,
   deleteAdminDocument,
+  replaceAdminDocument,
   updateAdminDocument,
   uploadImageToImgBB,
   type Category,
@@ -271,6 +272,58 @@ function updatePayload(product: Product, draft: ProductDraft) {
   };
 }
 
+function isFirestoreQuotaError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error || '');
+  return /RESOURCE_EXHAUSTED|quota exceeded/i.test(message);
+}
+
+function jsonSafeClientValue(value: unknown, seen = new WeakSet<object>()): unknown {
+  if (value == null || typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return value;
+  if (value instanceof Date) return value.toISOString();
+  if (Array.isArray(value)) {
+    if (seen.has(value)) return undefined;
+    seen.add(value);
+    return value.map(item => jsonSafeClientValue(item, seen)).filter(item => item !== undefined);
+  }
+  if (typeof value === 'object') {
+    const candidate = value as { toDate?: () => Date };
+    if (typeof candidate.toDate === 'function') {
+      try {
+        return candidate.toDate().toISOString();
+      } catch {
+        return undefined;
+      }
+    }
+    if (seen.has(value)) return undefined;
+    seen.add(value);
+    const result: Record<string, unknown> = {};
+    Object.entries(value as Record<string, unknown>).forEach(([key, item]) => {
+      const safe = jsonSafeClientValue(item, seen);
+      if (safe !== undefined) result[key] = safe;
+    });
+    return result;
+  }
+  return undefined;
+}
+
+function completeProductDocument(product: Product, payload: ReturnType<typeof updatePayload>) {
+  const safe = jsonSafeClientValue(product);
+  const document = safe && typeof safe === 'object' && !Array.isArray(safe)
+    ? { ...(safe as Record<string, any>) }
+    : {};
+  delete document.id;
+  return { ...document, ...payload };
+}
+
+async function persistProductChange(product: Product, payload: ReturnType<typeof updatePayload>) {
+  try {
+    return await updateAdminDocument('products', product.id, payload);
+  } catch (error) {
+    if (!isFirestoreQuotaError(error)) throw error;
+    return replaceAdminDocument('products', product.id, completeProductDocument(product, payload));
+  }
+}
+
 function timestampMs(value: unknown): number {
   if (!value) return 0;
   if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
@@ -385,7 +438,7 @@ export default function BulkProductEditor() {
       for (let index = 0; index < prepared.length; index += 10) {
         const batch = prepared.slice(index, index + 10);
         const results = await Promise.allSettled(
-          batch.map(({ product, payload }) => updateAdminDocument('products', product.id, payload)),
+          batch.map(({ product, payload }) => persistProductChange(product, payload)),
         );
         results.forEach((result, resultIndex) => {
           const product = batch[resultIndex].product;
@@ -655,7 +708,7 @@ function EditableProductRow({ product, draft, categories, priceBuckets, disabled
 
     <div className="mt-3 rounded-2xl border border-black/5 bg-[#F7F7F3] p-3">
       <div className="flex items-center justify-between gap-2">
-        <div><p className="text-[10px] font-black">Variants ({draft.variants.length})</p><p className="text-[9px] text-black/45">Edit color, size or stock. Delete removes only the row you tap.</p></div>
+        <div><p className="text-[10px] font-black">Variants ({draft.variants.length})</p><p className="text-[9px] text-black/45">Edit color, size, stock or image. Delete removes only the row you tap.</p></div>
         <label className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-white px-3 py-2 text-[9px] font-black ring-1 ring-black/5">
           <input type="checkbox" disabled={disabled} checked={showSizeAdder} onChange={event => setShowSizeAdder(event.target.checked)} className="h-3.5 w-3.5 accent-[#0F6A5F]"/>
           Size / Fit / Pack
@@ -683,6 +736,27 @@ function EditableProductRow({ product, draft, categories, priceBuckets, disabled
               <label className="min-w-0"><span className="block text-[7px] font-black uppercase text-black/35">Color</span><input value={variant.color} onChange={event => updateVariant(index, { color: event.target.value })} className="mt-1 w-full rounded-lg bg-[#F4F4F1] p-2 text-[9px] outline-none"/></label>
               <label className="min-w-0"><span className="block text-[7px] font-black uppercase text-black/35">Size</span><input value={variant.size} onChange={event => updateVariant(index, { size: event.target.value })} className="mt-1 w-full rounded-lg bg-[#F4F4F1] p-2 text-[9px] outline-none"/></label>
               <label className="min-w-0"><span className="block text-[7px] font-black uppercase text-black/35">Stock</span><input type="number" min="0" value={variant.stock} onChange={event => updateVariant(index, { stock: event.target.value })} className="mt-1 w-full rounded-lg bg-[#F4F4F1] p-2 text-[9px] outline-none"/></label>
+              {draft.images.length > 0 && <div className="col-span-4 mt-1 rounded-xl bg-[#F7F7F3] p-2">
+                <p className="text-[7px] font-black uppercase tracking-wider text-black/35">Variant image</p>
+                <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
+                  {draft.images.map((url, imageIndex) => {
+                    const selected = variant.imageUrl === url;
+                    return <button
+                      key={`${url}-${imageIndex}`}
+                      type="button"
+                      disabled={disabled}
+                      onClick={() => {
+                        updateVariant(index, { imageUrl: url });
+                        setRowMessage(`${imageIndex === 0 ? 'Main image' : `Image ${imageIndex + 1}`} selected for this variant. Press Save to keep it.`);
+                      }}
+                      className={`min-w-[72px] rounded-lg p-1.5 text-center text-[7px] font-black ring-1 transition disabled:opacity-40 ${selected ? 'bg-[#0F6A5F]/10 text-[#0F6A5F] ring-[#0F6A5F]/35' : 'bg-white text-black/55 ring-black/5'}`}
+                    >
+                      <span className="block h-12 w-full overflow-hidden rounded-md bg-[#F4F4F1]"><img src={url} alt={imageIndex === 0 ? 'Main image' : `Image ${imageIndex + 1}`} className="h-full w-full object-cover"/></span>
+                      <span className="mt-1 block">{imageIndex === 0 ? 'Main' : `Image ${imageIndex + 1}`}{selected ? ' ✓' : ''}</span>
+                    </button>;
+                  })}
+                </div>
+              </div>}
               <div className="col-span-4 flex flex-wrap justify-end gap-1.5">
                 <button type="button" onClick={() => setEditingVariantIndex(null)} className="rounded-lg bg-[#0F6A5F] px-3 py-2 text-[8px] font-black text-white">Done</button>
                 <button type="button" disabled={disabled} onClick={() => removeVariant(index)} className="inline-flex items-center gap-1 rounded-lg bg-red-50 px-3 py-2 text-[8px] font-black text-[#E1352B] disabled:opacity-40"><Trash2 size={10}/>Delete</button>
