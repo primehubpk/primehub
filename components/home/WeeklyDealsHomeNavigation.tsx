@@ -21,6 +21,7 @@ export default function WeeklyDealsHomeNavigation() {
       if (!link) return;
 
       event.preventDefault();
+      event.stopImmediatePropagation();
       router.push('/weekly-deals');
     };
 
