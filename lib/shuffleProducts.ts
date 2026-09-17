@@ -29,7 +29,11 @@ function timestamp(value: unknown): number {
   if (typeof value === 'object') {
     const candidate = value as { seconds?: unknown; _seconds?: unknown; toDate?: () => Date };
     if (typeof candidate.toDate === 'function') {
-      try { return candidate.toDate().getTime(); } catch { return 0; }
+      try {
+        return candidate.toDate().getTime();
+      } catch {
+        return 0;
+      }
     }
     const seconds = Number(candidate.seconds ?? candidate._seconds ?? 0);
     return Number.isFinite(seconds) ? seconds * 1000 : 0;
@@ -62,7 +66,7 @@ export function shuffleProducts<T>(items: T[]): T[] {
   const wholesaleItems: T[] = [];
 
   result.forEach((item, index) => {
-    if (item && typeof item === 'object' && isWholesaleProduct(item as ShuffleableProduct)) {
+    if (item && typeof item === 'object' && isWholesaleProduct(item as any)) {
       wholesaleSlots.push(index);
       wholesaleItems.push(item);
     }
