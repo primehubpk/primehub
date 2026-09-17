@@ -82,14 +82,13 @@ export function matchesPriceBucket(
   return price > range.minExclusive && price <= range.maxInclusive;
 }
 
-// Sale Mela uses strict, non-overlapping rails. Products are shuffled only
-// inside their own rail: 99 => Rs. 1-298, 299 => Rs. 299-998, and 999 =>
-// exactly Rs. 999. This prevents a higher-price product leaking into a lower
-// customer-facing Sale Mela bucket.
+// Sale Mela uses strict, non-overlapping rails. Products are grouped as:
+// 99 => Rs. 1-298, 299 => Rs. 299-998, and 999 => Rs. 999 and above.
+// Wholesale products are handled separately and never belong to these rails.
 export function saleMelaPriceRange(amount: number): SaleMelaPriceRange | null {
   if (amount === 99) return { minInclusive: 1, maxExclusive: 299 };
   if (amount === 299) return { minInclusive: 299, maxExclusive: 999 };
-  if (amount === 999) return { minInclusive: 999, maxExclusive: 1000 };
+  if (amount === 999) return { minInclusive: 999, maxExclusive: null };
   return null;
 }
 
@@ -105,7 +104,7 @@ export function matchesSaleMelaBucket(price: number, amount: number) {
 export function saleMelaBucketLabel(amount: number) {
   if (amount === 99) return 'Rs. 1–298';
   if (amount === 299) return 'Rs. 299–998';
-  if (amount === 999) return 'Rs. 999';
+  if (amount === 999) return 'Rs. 999 & Above';
   return `Up to Rs. ${Math.max(0, amount).toLocaleString('en-PK')}`;
 }
 

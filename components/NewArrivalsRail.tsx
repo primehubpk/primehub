@@ -12,6 +12,7 @@ import { db } from '@/lib/firebase';
 import { useCartStore } from '@/lib/cartStore';
 import { imageOf, originalOf, priceOf, productHasVariants, titleOf, type Product } from '@/components/shop/ShopTypes';
 import { isDirectStorefrontImage, normalizeImageUrl } from '@/lib/imageUrl';
+import { isWholesaleProduct } from '@/lib/wholesale';
 import '@/components/home/NewArrivalsPremium.css';
 
 function timeOf(p: Product) {
@@ -21,7 +22,7 @@ function timeOf(p: Product) {
 
 export function newestFirst(products: Product[]) {
   return [...products]
-    .filter((p) => p.published !== false)
+    .filter((p) => p.published !== false && !isWholesaleProduct(p))
     .sort((a, b) => timeOf(b) - timeOf(a) || b.id.localeCompare(a.id));
 }
 
