@@ -39,6 +39,34 @@ type ProductDraft = {
   variants: VariantDraft[];
 };
 
+type SizePreset = { key: string; label: string };
+
+const SIZE_PRESETS: SizePreset[] = [
+  { key: '2.8', label: '2.8 — Large / Dhai size / bhari hand' },
+  { key: '2.6', label: '2.6 — Sawa 2 / regular size' },
+  { key: '2.4', label: '2.4 — Adpa 2 size' },
+  { key: '2.2', label: '2.2 — Small / bareek hand / around 9–14 year girl' },
+  { key: '12-number', label: '12 Number — around 6–8/9 year girl' },
+  { key: '10-number', label: '10 Number — around 4–6 year girl' },
+  { key: '8-number', label: '8 Number — around 1–3/4 year girl' },
+  { key: '14-number', label: '14 Number' },
+  { key: '3-inch', label: '3inch — big size' },
+];
+
+function sizeKey(value: string) {
+  const normalized = value.toLowerCase().replace(/[–—]/g, '-').replace(/\s+/g, ' ').trim();
+  if (/^2\.8(?:|\s|-)/.test(normalized)) return '2.8';
+  if (/^2\.6(?:|\s|-)/.test(normalized)) return '2.6';
+  if (/^2\.4(?:|\s|-)/.test(normalized)) return '2.4';
+  if (/^2\.2(?:|\s|-)/.test(normalized)) return '2.2';
+  if (/^12(?:\s*number)?(?:|\s|-)/.test(normalized)) return '12-number';
+  if (/^10(?:\s*number)?(?:|\s|-)/.test(normalized)) return '10-number';
+  if (/^8(?:\s*number)?(?:|\s|-)/.test(normalized)) return '8-number';
+  if (/^14(?:\s*number)?(?:|\s|-)/.test(normalized)) return '14-number';
+  if (/^3\s*inch/.test(normalized) || /^3inch/.test(normalized)) return '3-inch';
+  return normalized;
+}
+
 function productImages(product: Product): string[] {
   const images = Array.isArray(product.images)
     ? product.images
@@ -444,7 +472,8 @@ export default function BulkProductEditor() {
 function EditableProductRow({ product, draft, categories, priceBuckets, disabled, deleting, onChange, onDelete }: { product: Product; draft: ProductDraft; categories: Category[]; priceBuckets: PriceBucket[]; disabled: boolean; deleting: boolean; onChange: (draft: ProductDraft) => void; onDelete: () => void }) {
   const [uploading, setUploading] = useState(false);
   const [replacingIndex, setReplacingIndex] = useState<number | null>(null);
-  const [editingVariantId, setEditingVariantId] = useState<string | null>(null);
+  const [editingVariantIndex, setEditingVariantIndex] = useState<number | null>(null);
+  const [showSizeAdder, setShowSizeAdder] = useState(false);
   const [rowMessage, setRowMessage] = useState('');
   const hasLegacyCategory = Boolean(draft.category && !categories.some(category => category.id === draft.category));
   const inputClass = 'min-w-0 w-full rounded-xl bg-[#F4F4F1] px-2 py-2.5 text-[10px] outline-none focus:ring-2 focus:ring-[#0F6A5F]/20 disabled:opacity-50 sm:px-3 sm:text-xs';
@@ -500,17 +529,52 @@ function EditableProductRow({ product, draft, categories, priceBuckets, disabled
     }
   }
 
-  function updateVariant(id: string, patch: Partial<VariantDraft>) {
+  function updateVariant(index: number, patch: Partial<VariantDraft>) {
     onChange({
       ...draft,
-      variants: draft.variants.map(variant => variant.id === id ? { ...variant, ...patch } : variant),
+      variants: draft.variants.map((variant, variantIndex) => variantIndex === index ? { ...variant, ...patch } : variant),
     });
   }
 
-  function removeVariant(id: string) {
-    onChange({ ...draft, variants: draft.variants.filter(variant => variant.id !== id) });
-    if (editingVariantId === id) setEditingVariantId(null);
-    setRowMessage('Variant removed. Press Save to keep the change.');
+  function removeVariant(index: number) {
+    onChange({ ...draft, variants: draft.variants.filter((_, variantIndex) => variantIndex !== index) });
+    setEditingVariantIndex(null);
+    setRowMessage('Only this variant was removed. Press Save to keep the change.');
+  }
+
+  function sizePresetComplete(preset: SizePreset) {
+    const groups = Array.from(new Set(draft.variants.map(variant => variant.color.trim())));
+    const targetGroups = groups.length ? groups : [''];
+    return targetGroups.every(color => draft.variants.some(variant => variant.color.trim() === color && sizeKey(variant.size) === preset.key));
+  }
+
+  function addSizePreset(preset: SizePreset) {
+    const groups = Array.from(new Set(draft.variants.map(variant => variant.color.trim())));
+    const targetGroups = groups.length ? groups : [''];
+    const existing = new Set(draft.variants.map(variant => `${variant.color.trim()}::${sizeKey(variant.size)}`));
+    const createdAt = Date.now();
+    const additions: VariantDraft[] = [];
+
+    targetGroups.forEach((color, groupIndex) => {
+      if (existing.has(`${color}::${preset.key}`)) return;
+      const seed = draft.variants.find(variant => variant.color.trim() === color) || draft.variants[0];
+      additions.push({
+        id: `bulk-${createdAt}-${groupIndex}-${preset.key.replace(/[^a-z0-9]+/gi, '-')}`,
+        color,
+        size: preset.label,
+        stock: seed?.stock || draft.stock || '0',
+        imageUrl: seed?.imageUrl || draft.images[0] || '',
+        raw: {},
+      });
+    });
+
+    if (!additions.length) {
+      setRowMessage(`${preset.label} is already added.`);
+      return;
+    }
+
+    onChange({ ...draft, variants: [...draft.variants, ...additions] });
+    setRowMessage(`${preset.label} added to ${additions.length} variant${additions.length === 1 ? '' : 's'}. Press Save to keep the change.`);
   }
 
   return <article className="rounded-3xl border border-black/[.04] bg-white p-3 shadow-sm sm:p-4">
@@ -568,20 +632,37 @@ function EditableProductRow({ product, draft, categories, priceBuckets, disabled
 
     <div className="mt-3 rounded-2xl border border-black/5 bg-[#F7F7F3] p-3">
       <div className="flex items-center justify-between gap-2">
-        <div><p className="text-[10px] font-black">Variants ({draft.variants.length})</p><p className="text-[9px] text-black/45">Edit color, size or stock. Delete removes that saved variant.</p></div>
+        <div><p className="text-[10px] font-black">Variants ({draft.variants.length})</p><p className="text-[9px] text-black/45">Edit color, size or stock. Delete removes only the row you tap.</p></div>
+        <label className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-white px-3 py-2 text-[9px] font-black ring-1 ring-black/5">
+          <input type="checkbox" disabled={disabled} checked={showSizeAdder} onChange={event => setShowSizeAdder(event.target.checked)} className="h-3.5 w-3.5 accent-[#0F6A5F]"/>
+          Size
+        </label>
       </div>
+      {showSizeAdder && <div className="mt-3 rounded-xl border border-[#0F6A5F]/15 bg-white p-3">
+        <p className="text-[9px] font-black text-[#0F6A5F]">Add size variants</p>
+        <p className="mt-0.5 text-[8px] leading-4 text-black/45">Tap a size to add only missing rows for every current design/color. Existing variants are never removed here.</p>
+        <div className="mt-2 grid gap-2 sm:grid-cols-2">
+          {SIZE_PRESETS.map(preset => {
+            const added = sizePresetComplete(preset);
+            return <button key={preset.key} type="button" disabled={disabled || added} onClick={() => addSizePreset(preset)} className={`flex items-start gap-2 rounded-xl px-3 py-2.5 text-left text-[8px] font-bold leading-4 transition ${added ? 'bg-[#0F6A5F]/10 text-[#0F6A5F]' : 'bg-[#F4F4F1] text-black/65'} disabled:opacity-70`}>
+              <span className="mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded border border-current text-[9px] font-black">{added ? '✓' : '+'}</span>
+              <span>{preset.label}</span>
+            </button>;
+          })}
+        </div>
+      </div>}
       {draft.variants.length ? <div className="mt-3 space-y-2">
         {draft.variants.map((variant, index) => {
-          const editing = editingVariantId === variant.id;
+          const editing = editingVariantIndex === index;
           return <div key={`${variant.id}-${index}`} className="rounded-xl bg-white p-2 ring-1 ring-black/5">
             {editing ? <div className="grid grid-cols-[44px_1fr_1fr_72px] items-end gap-1.5">
               <div className="h-11 w-11 overflow-hidden rounded-lg bg-[#F4F4F1]">{variant.imageUrl ? <img src={variant.imageUrl} alt="" className="h-full w-full object-cover"/> : null}</div>
-              <label className="min-w-0"><span className="block text-[7px] font-black uppercase text-black/35">Color</span><input value={variant.color} onChange={event => updateVariant(variant.id, { color: event.target.value })} className="mt-1 w-full rounded-lg bg-[#F4F4F1] p-2 text-[9px] outline-none"/></label>
-              <label className="min-w-0"><span className="block text-[7px] font-black uppercase text-black/35">Size</span><input value={variant.size} onChange={event => updateVariant(variant.id, { size: event.target.value })} className="mt-1 w-full rounded-lg bg-[#F4F4F1] p-2 text-[9px] outline-none"/></label>
-              <label className="min-w-0"><span className="block text-[7px] font-black uppercase text-black/35">Stock</span><input type="number" min="0" value={variant.stock} onChange={event => updateVariant(variant.id, { stock: event.target.value })} className="mt-1 w-full rounded-lg bg-[#F4F4F1] p-2 text-[9px] outline-none"/></label>
+              <label className="min-w-0"><span className="block text-[7px] font-black uppercase text-black/35">Color</span><input value={variant.color} onChange={event => updateVariant(index, { color: event.target.value })} className="mt-1 w-full rounded-lg bg-[#F4F4F1] p-2 text-[9px] outline-none"/></label>
+              <label className="min-w-0"><span className="block text-[7px] font-black uppercase text-black/35">Size</span><input value={variant.size} onChange={event => updateVariant(index, { size: event.target.value })} className="mt-1 w-full rounded-lg bg-[#F4F4F1] p-2 text-[9px] outline-none"/></label>
+              <label className="min-w-0"><span className="block text-[7px] font-black uppercase text-black/35">Stock</span><input type="number" min="0" value={variant.stock} onChange={event => updateVariant(index, { stock: event.target.value })} className="mt-1 w-full rounded-lg bg-[#F4F4F1] p-2 text-[9px] outline-none"/></label>
               <div className="col-span-4 flex justify-end gap-1.5">
-                <button type="button" onClick={() => setEditingVariantId(null)} className="rounded-lg bg-[#0F6A5F] px-3 py-2 text-[8px] font-black text-white">Done</button>
-                <button type="button" disabled={disabled} onClick={() => removeVariant(variant.id)} className="inline-flex items-center gap-1 rounded-lg bg-red-50 px-3 py-2 text-[8px] font-black text-[#E1352B] disabled:opacity-40"><Trash2 size={10}/>Delete</button>
+                <button type="button" onClick={() => setEditingVariantIndex(null)} className="rounded-lg bg-[#0F6A5F] px-3 py-2 text-[8px] font-black text-white">Done</button>
+                <button type="button" disabled={disabled} onClick={() => removeVariant(index)} className="inline-flex items-center gap-1 rounded-lg bg-red-50 px-3 py-2 text-[8px] font-black text-[#E1352B] disabled:opacity-40"><Trash2 size={10}/>Delete</button>
               </div>
             </div> : <div className="flex items-center gap-2">
               <div className="h-11 w-11 shrink-0 overflow-hidden rounded-lg bg-[#F4F4F1]">{variant.imageUrl ? <img src={variant.imageUrl} alt="" className="h-full w-full object-cover"/> : null}</div>
@@ -589,8 +670,8 @@ function EditableProductRow({ product, draft, categories, priceBuckets, disabled
                 <p className="truncate text-[9px] font-black">{[variant.color, variant.size].filter(Boolean).join(' / ') || `Variant ${index + 1}`}</p>
                 <p className="mt-0.5 text-[8px] font-bold text-black/40">Stock: {variant.stock || '0'}</p>
               </div>
-              <button type="button" disabled={disabled} onClick={() => setEditingVariantId(variant.id)} className="inline-flex items-center gap-1 rounded-lg bg-[#0F6A5F]/10 px-2.5 py-2 text-[8px] font-black text-[#0F6A5F] disabled:opacity-40"><Pencil size={10}/>Edit</button>
-              <button type="button" disabled={disabled} onClick={() => removeVariant(variant.id)} className="inline-flex items-center gap-1 rounded-lg bg-red-50 px-2.5 py-2 text-[8px] font-black text-[#E1352B] disabled:opacity-40"><Trash2 size={10}/>Delete</button>
+              <button type="button" disabled={disabled} onClick={() => setEditingVariantIndex(index)} className="inline-flex items-center gap-1 rounded-lg bg-[#0F6A5F]/10 px-2.5 py-2 text-[8px] font-black text-[#0F6A5F] disabled:opacity-40"><Pencil size={10}/>Edit</button>
+              <button type="button" disabled={disabled} onClick={() => removeVariant(index)} className="inline-flex items-center gap-1 rounded-lg bg-red-50 px-2.5 py-2 text-[8px] font-black text-[#E1352B] disabled:opacity-40"><Trash2 size={10}/>Delete</button>
             </div>}
           </div>;
         })}
