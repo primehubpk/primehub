@@ -12,8 +12,6 @@ import { matchesSaleMelaBucket } from '@/lib/priceBucketUtils';
 import { cacheCatalogForNavigation, readCachedCatalog } from '@/lib/productNavigationCache';
 import { Product, Category, ShopCatalogModel, imageOf, priceOf, originalOf, productHasVariants, titleOf } from './ShopTypes';
 
-const NAVIGATION_CACHE_FRESH_MS = 45_000;
-
 export function useShopCatalog(initialCategory?: string, initialQuery = '', initialProducts: Product[] = [], initialCategories: Category[] = []): ShopCatalogModel {
   const { settings } = useSettings();
   const addItem = useCartStore((state) => state.addItem);
@@ -45,18 +43,12 @@ export function useShopCatalog(initialCategory?: string, initialQuery = '', init
   }, [initialQuery, urlQuery, urlMax]);
 
   useEffect(() => {
-    if (hasServerData) {
-      setLoading(false);
-      return;
-    }
-
     let cancelled = false;
-    const cached = readCachedCatalog<Product, Category>();
-    const hasWarmCatalog = Boolean(cached && cached.products.length > 0);
-    const cacheAge = cached ? Date.now() - cached.updatedAt : Number.POSITIVE_INFINITY;
-    const cacheIsFresh = hasWarmCatalog && cacheAge <= NAVIGATION_CACHE_FRESH_MS;
+    const cached = hasServerData ? null : readCachedCatalog<Product, Category>();
 
-    if (cached && cached.products.length > 0) {
+    // A navigation cache may paint immediately, but it is never authoritative.
+    // Always replace it with a no-store storefront read as soon as this view mounts.
+    if (!hasServerData && cached && cached.products.length > 0) {
       setProducts(cached.products);
       if (cached.categories.length > 0) setCategories(cached.categories);
       setLoading(false);
@@ -84,11 +76,8 @@ export function useShopCatalog(initialCategory?: string, initialQuery = '', init
       }
     }
 
-    if (!cacheIsFresh) {
-      void load();
-    } else {
-      setFiltersOpen(false);
-    }
+    if (hasServerData) setLoading(false);
+    void load();
 
     return () => {
       cancelled = true;
@@ -175,19 +164,37 @@ export function useShopCatalog(initialCategory?: string, initialQuery = '', init
 
   const resolvedCategoryLabel = useMemo(() => categoryLabel(category, categories), [category, categories]);
 
-  const addProduct = (product: Product) => {
-    const image = imageOf(product);
-    if (productHasVariants(product) && openVariantModal({ ...product, image, imageUrl: image }, 'cart')) return;
+  const addProduct = async (product: Product) => {
+    let currentProduct = product;
+
+    try {
+      const response = await fetch(
+        `/api/storefront/read?type=product&id=${encodeURIComponent(product.id)}`,
+        { cache: 'no-store' },
+      );
+      if (response.ok) {
+        const data = await response.json();
+        if (data?.product && String(data.product.id || '') === String(product.id)) {
+          currentProduct = data.product as Product;
+          setProducts((current) => current.map((item) => item.id === currentProduct.id ? currentProduct : item));
+        }
+      }
+    } catch (error) {
+      console.warn('fresh product read unavailable; using current catalog product', error);
+    }
+
+    const image = imageOf(currentProduct) || imageOf(product);
+    if (productHasVariants(currentProduct) && openVariantModal({ ...currentProduct, image, imageUrl: image }, 'cart')) return;
     addItem({
-      id: product.id,
-      name: titleOf(product),
-      price: priceOf(product),
-      originalPrice: originalOf(product) || priceOf(product),
+      id: currentProduct.id,
+      name: titleOf(currentProduct),
+      price: priceOf(currentProduct),
+      originalPrice: originalOf(currentProduct) || priceOf(currentProduct),
       image,
       imageUrl: image,
     });
-    setAddedId(product.id);
-    window.setTimeout(() => setAddedId((current) => (current === product.id ? null : current)), 1400);
+    setAddedId(currentProduct.id);
+    window.setTimeout(() => setAddedId((current) => (current === currentProduct.id ? null : current)), 1400);
   };
 
   return {

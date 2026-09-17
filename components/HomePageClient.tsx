@@ -100,14 +100,12 @@ export default function HomePageClient({
       }
     }
 
-    // The server already seeded healthy catalog data. Avoid immediately downloading
-    // the full catalog again on first paint; recovery still runs immediately when
-    // the server seed is unavailable.
-    if (initialProducts.length === 0) void refreshCatalog();
+    // Refresh immediately after hydration even when the server supplied data.
+    // This removes any navigation/prefetch lag and makes Admin variant edits
+    // visible from the Supabase-first no-store reader without waiting for a poll.
+    void refreshCatalog();
 
     // Keep an already-open storefront synchronized with Admin/Bot catalog writes.
-    // Direct refresh events remain immediate; the safety poll is intentionally
-    // lighter so customer devices do less background network/JSON work.
     const refreshTimer = window.setInterval(() => {
       if (document.visibilityState === "visible") void refreshCatalog();
     }, BACKGROUND_REFRESH_INTERVAL_MS);
