@@ -12,8 +12,6 @@ import { matchesSaleMelaBucket } from '@/lib/priceBucketUtils';
 import { cacheCatalogForNavigation, readCachedCatalog } from '@/lib/productNavigationCache';
 import { Product, Category, ShopCatalogModel, imageOf, priceOf, originalOf, productHasVariants, titleOf } from './ShopTypes';
 
-const NAVIGATION_CACHE_FRESH_MS = 45_000;
-
 export function useShopCatalog(initialCategory?: string, initialQuery = '', initialProducts: Product[] = [], initialCategories: Category[] = []): ShopCatalogModel {
   const { settings } = useSettings();
   const addItem = useCartStore((state) => state.addItem);
@@ -47,10 +45,9 @@ export function useShopCatalog(initialCategory?: string, initialQuery = '', init
   useEffect(() => {
     let cancelled = false;
     const cached = hasServerData ? null : readCachedCatalog<Product, Category>();
-    const hasWarmCatalog = Boolean(cached && cached.products.length > 0);
-    const cacheAge = cached ? Date.now() - cached.updatedAt : Number.POSITIVE_INFINITY;
-    const cacheIsFresh = hasWarmCatalog && cacheAge <= NAVIGATION_CACHE_FRESH_MS;
 
+    // A navigation cache may paint immediately, but it is never authoritative.
+    // Always replace it with a no-store storefront read as soon as this view mounts.
     if (!hasServerData && cached && cached.products.length > 0) {
       setProducts(cached.products);
       if (cached.categories.length > 0) setCategories(cached.categories);
@@ -79,16 +76,8 @@ export function useShopCatalog(initialCategory?: string, initialQuery = '', init
       }
     }
 
-    if (hasServerData) {
-      setLoading(false);
-      // Server-seeded category/shop data can be prefetched or cached. Refresh it once
-      // after mount so recent Admin edits (especially variants) replace stale seed data.
-      void load();
-    } else if (!cacheIsFresh) {
-      void load();
-    } else {
-      setFiltersOpen(false);
-    }
+    if (hasServerData) setLoading(false);
+    void load();
 
     return () => {
       cancelled = true;
