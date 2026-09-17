@@ -4,7 +4,6 @@ import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Check, Clock3, LockKeyhole, ShoppingCart } from 'lucide-react';
-import FastProductLink from '@/components/FastProductLink';
 import { useCartStore } from '@/lib/cartStore';
 import { WEEKDAY_LABELS, countdownParts, dealTiming } from '@/lib/weeklyDealUtils';
 import type { Product, WeeklyDeal } from '@/lib/types';
@@ -58,15 +57,15 @@ export default function WeeklyDealCalendar({ weeklyDeals, weeklyProducts, nowTic
             const canAdd = Boolean(item && dealP > 0 && stock > 0);
             return (
               <div key={deal.id} className="group w-[210px] shrink-0 snap-start overflow-hidden rounded-[22px] border border-black/8 bg-[#FCFCFA] transition hover:-translate-y-0.5 hover:shadow-md sm:w-[235px]">
-                <FastProductLink productId={deal.productId} product={item} className="block">
+                <Link href="/weekly-deals" className="block" aria-label={`Open ${deal.title || `${WEEKDAY_LABELS[deal.day]} Deal`} in Weekly Deals`}>
                   <div className="relative aspect-[4/3] overflow-hidden bg-[#F4F4F1]">
                     {displayImage !== '/placeholder.png' ? <Image src={displayImage} alt={deal.title} fill unoptimized sizes="(max-width: 640px) 210px, 235px" className="object-cover transition duration-300 group-hover:scale-[1.03]" onError={(event) => { event.currentTarget.src = '/placeholder.png'; }} /> : <div className="flex h-full items-center justify-center text-[9px] font-bold text-black/25">No image</div>}
                     <span className={`pointer-events-none absolute left-2 top-2 rounded-full px-2 py-1 text-[7px] font-black uppercase ${itemLive ? 'bg-[#E1352B] text-white' : 'bg-white/95 text-black'}`}>{itemLive ? '⚡ LIVE TODAY' : `🔒 ${WEEKDAY_LABELS[deal.day]}`}</span>
                   </div>
-                </FastProductLink>
-                <FastProductLink productId={deal.productId} product={item} className="block">
+                </Link>
+                <Link href="/weekly-deals" className="block" aria-label={`Open ${deal.title || `${WEEKDAY_LABELS[deal.day]} Deal`} in Weekly Deals`}>
                   <div className="p-3"><p className="text-[8px] font-black uppercase tracking-[0.16em] text-[#0F6A5F]">{WEEKDAY_LABELS[deal.day]} Deal</p><h3 className="mt-1 line-clamp-2 min-h-[36px] text-sm font-black">{item?.title || (item as any)?.name || deal.title}</h3><div className="mt-2 flex flex-wrap items-baseline gap-2"><span className="font-[family-name:var(--font-mono)] text-base font-black text-[#E1352B]">{money(dealP)}</span>{normal > dealP && <span className="text-[9px] font-bold text-black/35 line-through">{money(normal)}</span>}</div>{itemSave > 0 && <p className="mt-1 text-[8px] font-black text-[#0F6A5F]">SAVE {itemSave}% • {money(normal - dealP)} off</p>}<div className="mt-2 flex items-center gap-1 text-[8px] font-bold text-black/40">{itemLive ? <Clock3 size={10} /> : <LockKeyhole size={10} />}{itemLive ? `Ends in ${itemCountdown ? `${itemCountdown.hours.toString().padStart(2, '0')}:${itemCountdown.minutes.toString().padStart(2, '0')}:${itemCountdown.seconds.toString().padStart(2, '0')}` : '—'}` : `Unlocks ${WEEKDAY_LABELS[deal.day]}`}</div></div>
-                </FastProductLink>
+                </Link>
                 <button type="button" onClick={(event) => { event.stopPropagation(); addDeal(deal); }} disabled={!canAdd} className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-[#14140F] px-3 py-3 text-[9px] font-black text-white transition hover:bg-[#0F6A5F] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40" aria-label={canAdd ? `Add ${deal.title} to cart` : 'Deal out of stock'}>{addedId === deal.id ? <Check size={13} /> : <ShoppingCart size={13} />}{addedId === deal.id ? 'ADDED' : stock <= 0 ? 'OUT OF STOCK' : '🛒 ADD TO CART'}</button>
               </div>
             );
