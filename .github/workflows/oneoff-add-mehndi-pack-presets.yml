@@ -1,0 +1,56 @@
+name: One-off add mehndi pack presets
+
+on:
+  push:
+    branches:
+      - feat/mehndi-pack-variants
+    paths:
+      - .github/workflows/oneoff-add-mehndi-pack-presets.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/mehndi-pack-variants
+          fetch-depth: 0
+
+      - name: Add mehndi pack presets
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('components/admin/BulkProductEditor.tsx')
+          text = path.read_text()
+          anchor = "  { key: 'mix size box - 2.6 / 2.4 / 2.8', label: 'Mix Size Box — 2.6 / 2.4 / 2.8' },\n"
+          additions = (
+              "  { key: 'mehndi pack - 6 pieces', label: 'Mehndi Pack — 6 Pieces' },\n"
+              "  { key: 'mehndi box - 12 pieces', label: 'Mehndi Box — 12 Pieces' },\n"
+          )
+          if additions not in text:
+              if anchor not in text:
+                  raise SystemExit('Expected mixed-size preset anchor not found')
+              text = text.replace(anchor, anchor + additions, 1)
+
+          text = text.replace('          Size / Fit\n', '          Size / Fit / Pack\n', 1)
+          text = text.replace('Add size / fit variants', 'Add size / fit / pack variants', 1)
+          text = text.replace('Tap a size or adjustable fit to add only missing rows for every current design/color. Existing variants are never removed here.', 'Tap a size, adjustable fit or pack to add only missing rows for every current design/color. Existing variants are never removed here.', 1)
+          path.write_text(text)
+          PY
+
+      - name: Commit feature and remove one-off workflow
+        run: |
+          git rm .github/workflows/oneoff-add-mehndi-pack-presets.yml
+          if git diff --quiet -- components/admin/BulkProductEditor.tsx; then
+            echo "No feature change detected"
+            exit 1
+          fi
+          git config user.name "primehubpk"
+          git config user.email "primehubpk1@gmail.com"
+          git add components/admin/BulkProductEditor.tsx
+          git commit -m "feat(admin): add mehndi pack variant presets"
+          git push origin HEAD:feat/mehndi-pack-variants
