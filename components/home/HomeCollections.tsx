@@ -271,7 +271,9 @@ export default function HomeCollections({
                       : matchesPriceBucket(price, buckets, amount);
                   }),
                 );
-            const matches = shuffleWithNewArrivalPriority(baseMatches, shuffleSeed);
+            const matches = standalone && !wholesale
+              ? baseMatches
+              : shuffleWithNewArrivalPriority(baseMatches, shuffleSeed);
             const kidsMatches = standalone && wholesale
               ? shuffleWithNewArrivalPriority(
                   sortBySalePrice(kidsPacks),
