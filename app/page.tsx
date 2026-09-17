@@ -1,13 +1,14 @@
 import HomePageClient from '@/components/HomePageClient';
 import WeeklyDealNavigationWarmup from '@/components/home/WeeklyDealNavigationWarmup';
-import { getPublicCatalogSnapshot, getStorefrontSettingsResultSnapshot } from '@/lib/publicCatalogServer';
+import { getFreshPublicCatalogSnapshot, getStorefrontSettingsResultSnapshot } from '@/lib/publicCatalogServer';
 import { getWholesaleVideosSnapshot } from '@/lib/wholesaleVideosServer';
 import { normalizeImageUrl } from '@/lib/imageUrl';
 import { pakistanNowWeekday } from '@/lib/weeklyDealUtils';
 import type { Category, SiteSettings } from '@/lib/types';
 import type { Product } from '@/components/shop/ShopTypes';
 
-export const revalidate = 60;
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 function productImage(product: any) {
   if (!product) return '';
@@ -49,7 +50,7 @@ function hydrateBigDealImages(settings: Record<string, any>, products: any[]) {
 
 export default async function HomePage() {
   const [catalogResult, settingsResult, wholesaleResult] = await Promise.allSettled([
-    getPublicCatalogSnapshot(),
+    getFreshPublicCatalogSnapshot(),
     getStorefrontSettingsResultSnapshot(),
     getWholesaleVideosSnapshot(),
   ]);
