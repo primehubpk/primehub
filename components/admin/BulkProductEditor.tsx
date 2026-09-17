@@ -45,6 +45,8 @@ type SizePreset = { key: string; label: string };
 const SIZE_PRESETS: SizePreset[] = [
   { key: 'girls bracelet - openable / adjustable / fits most hands', label: 'Girls Bracelet — Openable / Adjustable / Fits most hands' },
   { key: 'kids bracelet - openable / adjustable / fits most kids', label: 'Kids Bracelet — Openable / Adjustable / Fits most kids' },
+  { key: 'mix size box - 8 / 10 / 12 number', label: 'Mix Size Box — 8 / 10 / 12 Number' },
+  { key: 'mix size box - 2.6 / 2.4 / 2.8', label: 'Mix Size Box — 2.6 / 2.4 / 2.8' },
   { key: '2.8', label: '2.8 — Large / Dhai size / bhari hand' },
   { key: '2.6', label: '2.6 — Sawa 2 / regular size' },
   { key: '2.4', label: '2.4 — Adpa 2 size' },
