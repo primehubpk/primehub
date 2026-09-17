@@ -2,8 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { onSnapshot } from 'firebase/firestore';
-import Image from 'next/image';
-import { ImagePlus, Layers3, Loader2, PackageSearch, Save, Search, Trash2 } from 'lucide-react';
+import { Eye, EyeOff, ImagePlus, Loader2, PackageSearch, Pencil, Save, Search, Star, Trash2 } from 'lucide-react';
 import { productMatchesCategory } from '@/lib/categoryUtils';
 import { isWholesalePriceBucket, sortPriceBuckets } from '@/lib/priceBucketUtils';
 import type { PriceBucket } from '@/lib/types';
@@ -18,6 +17,16 @@ import {
 } from './shared';
 import { imageOf, slugify } from './products/ProductTypes';
 
+type VariantDraft = {
+  id: string;
+  color: string;
+  size: string;
+  stock: string;
+  imageUrl: string;
+  active: boolean;
+  raw: Record<string, unknown>;
+};
+
 type ProductDraft = {
   title: string;
   originalPrice: string;
@@ -28,12 +37,40 @@ type ProductDraft = {
   published: boolean;
   isWholesale: boolean;
   images: string[];
+  variants: VariantDraft[];
 };
 
-type VariantImageOption = {
-  url: string;
-  label: string;
-};
+type SizePreset = { key: string; label: string };
+
+const SIZE_PRESETS: SizePreset[] = [
+  { key: 'girls bracelet - openable / adjustable / fits most hands', label: 'Girls Bracelet — Openable / Adjustable / Fits most hands' },
+  { key: 'kids bracelet - openable / adjustable / fits most kids', label: 'Kids Bracelet — Openable / Adjustable / Fits most kids' },
+  { key: 'mix size box - 8 / 10 / 12 number', label: 'Mix Size Box — 8 / 10 / 12 Number' },
+  { key: 'mix size box - 2.6 / 2.4 / 2.8', label: 'Mix Size Box — 2.6 / 2.4 / 2.8' },
+  { key: '2.8', label: '2.8 — Large / Dhai size / bhari hand' },
+  { key: '2.6', label: '2.6 — Sawa 2 / regular size' },
+  { key: '2.4', label: '2.4 — Adpa 2 size' },
+  { key: '2.2', label: '2.2 — Small / bareek hand / around 9–14 year girl' },
+  { key: '12-number', label: '12 Number — around 6–8/9 year girl' },
+  { key: '10-number', label: '10 Number — around 4–6 year girl' },
+  { key: '8-number', label: '8 Number — around 1–3/4 year girl' },
+  { key: '14-number', label: '14 Number' },
+  { key: '3-inch', label: '3inch — big size' },
+];
+
+function sizeKey(value: string) {
+  const normalized = value.toLowerCase().replace(/[–—]/g, '-').replace(/\s+/g, ' ').trim();
+  if (/^2\.8(?:\b|\s|-)/.test(normalized)) return '2.8';
+  if (/^2\.6(?:\b|\s|-)/.test(normalized)) return '2.6';
+  if (/^2\.4(?:\b|\s|-)/.test(normalized)) return '2.4';
+  if (/^2\.2(?:\b|\s|-)/.test(normalized)) return '2.2';
+  if (/^12(?:\s*number)?(?:\b|\s|-)/.test(normalized)) return '12-number';
+  if (/^10(?:\s*number)?(?:\b|\s|-)/.test(normalized)) return '10-number';
+  if (/^8(?:\s*number)?(?:\b|\s|-)/.test(normalized)) return '8-number';
+  if (/^14(?:\s*number)?(?:\b|\s|-)/.test(normalized)) return '14-number';
+  if (/^3\s*inch/.test(normalized) || /^3inch/.test(normalized)) return '3-inch';
+  return normalized;
+}
 
 function productImages(product: Product): string[] {
   const images = Array.isArray(product.images)
@@ -45,27 +82,76 @@ function productImages(product: Product): string[] {
   return Array.from(new Set(images.length ? images : fallback ? [fallback] : []));
 }
 
-function variantImageOptions(product: Product): VariantImageOption[] {
-  const options: VariantImageOption[] = [];
-  const seen = new Set<string>();
-  const add = (url: unknown, label: unknown) => {
-    if (typeof url !== 'string' || !url.trim() || seen.has(url)) return;
-    seen.add(url);
-    options.push({ url, label: String(label || `Variant ${options.length + 1}`) });
-  };
+function valueList(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.map(item => {
+    if (typeof item === 'string' || typeof item === 'number') return String(item).trim();
+    if (item && typeof item === 'object') {
+      const record = item as Record<string, unknown>;
+      return String(record.name ?? record.value ?? record.label ?? '').trim();
+    }
+    return '';
+  }).filter(Boolean);
+}
 
-  const matrix = Array.isArray((product as any).variantMatrix) ? (product as any).variantMatrix : [];
-  matrix.forEach((row: any) => add(row?.imageUrl, row?.label || [row?.color, row?.size].filter(Boolean).join(' / ')));
+function productVariantRows(product: Product): VariantDraft[] {
+  const record = product as any;
+  const matrixRows = Array.isArray(record.variantMatrix) ? record.variantMatrix : [];
+  const directRows = Array.isArray(record.variants) ? record.variants : [];
+  const sourceRows = matrixRows.length ? matrixRows : directRows;
+  const legacyStock = record.stock ?? record.quantity ?? record.inventory ?? 0;
+  const fallbackImage = productImages(product)[0] || imageOf(product);
+  const colorImages: Record<string, string> = record.colorImages && typeof record.colorImages === 'object' ? record.colorImages : {};
 
-  const colors = Array.isArray((product as any).variantColors) ? (product as any).variantColors : [];
-  colors.forEach((color: any) => add(color?.imageUrl, color?.name || color));
-
-  const colorImages = (product as any).colorImages;
-  if (colorImages && typeof colorImages === 'object') {
-    Object.entries(colorImages).forEach(([name, url]) => add(url, name));
+  if (sourceRows.length) {
+    return sourceRows.map((row: any, index: number) => {
+      const labelParts = String(row?.label || '').split('/').map((part: string) => part.trim());
+      const color = String(row?.color ?? row?.variantColor ?? labelParts[0] ?? '').trim();
+      const size = String(row?.size ?? row?.variantSize ?? labelParts[1] ?? '').trim();
+      return {
+        id: String(row?.id || `variant-${index}`),
+        color,
+        size,
+        stock: String(row?.stock ?? legacyStock ?? 0),
+        imageUrl: String(row?.imageUrl || colorImages[color] || fallbackImage || ''),
+        active: row?.active !== false && row?.hidden !== true,
+        raw: row && typeof row === 'object' ? { ...row } : {},
+      };
+    });
   }
 
-  return options;
+  const variantColors = Array.isArray(record.variantColors) ? record.variantColors : [];
+  const optionRows = Array.isArray(record.variantOptions) ? record.variantOptions : [];
+  const colorOption = optionRows.find((option: any) => /color/i.test(String(option?.id || option?.name || '')));
+  const sizeOption = optionRows.find((option: any) => /size/i.test(String(option?.id || option?.name || '')));
+  const colors = Array.from(new Set([
+    ...variantColors.map((item: any) => typeof item === 'string' ? item : item?.name).filter(Boolean).map(String),
+    ...valueList(colorOption?.values),
+    ...valueList(record.colors),
+  ].map(value => value.trim()).filter(Boolean)));
+  const sizes = Array.from(new Set([
+    ...valueList(sizeOption?.values),
+    ...valueList(record.variantSizes),
+    ...valueList(record.sizes),
+  ].map(value => value.trim()).filter(Boolean)));
+
+  if (!colors.length && !sizes.length) return [];
+  const normalizedColors = colors.length ? colors : ['Standard'];
+  const normalizedSizes = sizes.length ? sizes : ['Standard'];
+  const colorPhoto = (name: string) => {
+    const variantColor = variantColors.find((item: any) => typeof item === 'object' && String(item?.name || '') === name);
+    return String(variantColor?.imageUrl || colorImages[name] || fallbackImage || '');
+  };
+
+  return normalizedColors.flatMap((color, colorIndex) => normalizedSizes.map((size, sizeIndex) => ({
+    id: `variant-${colorIndex}-${sizeIndex}-${color}-${size}`,
+    color,
+    size,
+    stock: String(legacyStock ?? 0),
+    imageUrl: colorPhoto(color),
+    active: true,
+    raw: {},
+  })));
 }
 
 function draftOf(product: Product): ProductDraft {
@@ -80,7 +166,21 @@ function draftOf(product: Product): ProductDraft {
     published: product.published !== false,
     isWholesale: isWholesaleProduct(product),
     images: productImages(product),
+    variants: productVariantRows(product),
   };
+}
+
+function variantDraftsMatch(left: VariantDraft[], right: VariantDraft[]) {
+  return left.length === right.length && left.every((variant, index) => {
+    const other = right[index];
+    return Boolean(other)
+      && variant.id === other.id
+      && variant.color === other.color
+      && variant.size === other.size
+      && variant.stock === other.stock
+      && variant.imageUrl === other.imageUrl
+      && variant.active === other.active;
+  });
 }
 
 function draftsMatch(left: ProductDraft, right: ProductDraft) {
@@ -94,7 +194,8 @@ function draftsMatch(left: ProductDraft, right: ProductDraft) {
     && left.priceBucketIds.length === right.priceBucketIds.length
     && left.priceBucketIds.every((id, index) => id === right.priceBucketIds[index])
     && left.images.length === right.images.length
-    && left.images.every((url, index) => url === right.images[index]);
+    && left.images.every((url, index) => url === right.images[index])
+    && variantDraftsMatch(left.variants, right.variants);
 }
 
 function safeNumber(value: string, label: string) {
@@ -111,9 +212,38 @@ function updatePayload(product: Product, draft: ProductDraft) {
   if (!draft.category) throw new Error('Category is required.');
   if (price > originalPrice) throw new Error('Price cannot be higher than original price.');
 
-  const variantMatrix = Array.isArray(product.variantMatrix)
-    ? product.variantMatrix.map((row: any) => ({ ...row, price: String(price) }))
-    : product.variantMatrix;
+  const variantMatrix = draft.variants.map((variant, index) => {
+    const color = variant.color.trim();
+    const size = variant.size.trim();
+    const variantStock = safeNumber(variant.stock || '0', `Variant ${index + 1} stock`);
+    return {
+      ...variant.raw,
+      id: variant.id || `variant-${index}`,
+      label: [color, size].filter(Boolean).join(' / ') || `Variant ${index + 1}`,
+      color,
+      size,
+      stock: variantStock,
+      imageUrl: variant.imageUrl,
+      price: String(price),
+      active: variant.active !== false,
+      hidden: variant.active === false,
+    };
+  });
+
+  const colorNames = Array.from(new Set(variantMatrix.map(row => row.color).filter(Boolean)));
+  const sizeNames = Array.from(new Set(variantMatrix.map(row => row.size).filter(Boolean)));
+  const colorImages = Object.fromEntries(colorNames.map(name => [name, variantMatrix.find(row => row.color === name)?.imageUrl || draft.images[0] || '']));
+  const variantColors = colorNames.map(name => ({ name, imageUrl: colorImages[name] || '' }));
+  const variantOptions = [
+    { id: 'color', name: 'Color', values: colorNames },
+    { id: 'size', name: 'Size', values: sizeNames },
+  ];
+  const productRecord = product as any;
+  const hadVariantMetadata = draft.variants.length > 0
+    || Array.isArray(productRecord.variantMatrix)
+    || Array.isArray(productRecord.variants)
+    || Array.isArray(productRecord.variantColors)
+    || Array.isArray(productRecord.variantOptions);
 
   return {
     title: draft.title.trim(),
@@ -127,7 +257,14 @@ function updatePayload(product: Product, draft: ProductDraft) {
     isWholesale: draft.isWholesale,
     images: draft.images,
     imageUrl: draft.images[0] || '',
-    ...(variantMatrix ? { variantMatrix } : {}),
+    ...(hadVariantMetadata ? {
+      variantMatrix,
+      ...(Array.isArray(productRecord.variants) ? { variants: variantMatrix } : {}),
+      variantColors,
+      variantOptions,
+      colorImages,
+      hasVariants: variantMatrix.length > 0,
+    } : {}),
     updatedAt: new Date().toISOString(),
   };
 }
@@ -296,7 +433,7 @@ export default function BulkProductEditor() {
       <div>
         <p className="text-[9px] font-black uppercase tracking-[.22em] text-[#E1352B]">Bulk catalog control</p>
         <h2 className="mt-1 text-2xl font-black">Product Editor</h2>
-        <p className="mt-1 text-sm text-black/50">Edit multiple products, images and cover photos, then save every changed row together.</p>
+        <p className="mt-1 text-sm text-black/50">Edit products, images and variants, then save every changed row together.</p>
       </div>
     </div>
 
@@ -343,23 +480,44 @@ export default function BulkProductEditor() {
 }
 
 function EditableProductRow({ product, draft, categories, priceBuckets, disabled, deleting, onChange, onDelete }: { product: Product; draft: ProductDraft; categories: Category[]; priceBuckets: PriceBucket[]; disabled: boolean; deleting: boolean; onChange: (draft: ProductDraft) => void; onDelete: () => void }) {
-  const [mediaTab, setMediaTab] = useState<'images' | 'variants' | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [replacingIndex, setReplacingIndex] = useState<number | null>(null);
+  const [editingVariantIndex, setEditingVariantIndex] = useState<number | null>(null);
+  const [showSizeAdder, setShowSizeAdder] = useState(false);
   const [rowMessage, setRowMessage] = useState('');
   const hasLegacyCategory = Boolean(draft.category && !categories.some(category => category.id === draft.category));
-  const variantImages = useMemo(() => variantImageOptions(product), [product]);
-  const mainImage = draft.images[0] || imageOf(product);
-  const inputClass = 'min-w-0 w-full rounded-xl bg-[#F4F4F1] px-3 py-2.5 text-xs outline-none focus:ring-2 focus:ring-[#0F6A5F]/20 disabled:opacity-50';
+  const inputClass = 'min-w-0 w-full rounded-xl bg-[#F4F4F1] px-2 py-2.5 text-[10px] outline-none focus:ring-2 focus:ring-[#0F6A5F]/20 disabled:opacity-50 sm:px-3 sm:text-xs';
 
-  function makeMain(url: string) {
-    if (!url) return;
-    onChange({ ...draft, images: [url, ...draft.images.filter(item => item !== url)] });
-    setRowMessage('Main image changed. Press floating Save to keep it.');
+  function makeMain(index: number) {
+    if (index <= 0 || !draft.images[index]) return;
+    const images = [...draft.images];
+    const [selected] = images.splice(index, 1);
+    onChange({ ...draft, images: [selected, ...images] });
+    setRowMessage('Main image changed. Press Save to keep it.');
   }
 
-  function removeImage(url: string) {
-    onChange({ ...draft, images: draft.images.filter(item => item !== url) });
+  function removeImage(index: number) {
+    onChange({ ...draft, images: draft.images.filter((_, imageIndex) => imageIndex !== index) });
     setRowMessage('Image removed from this product. Press Save to keep the change.');
+  }
+
+  async function replaceImage(index: number, event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setReplacingIndex(index);
+    setRowMessage('');
+    try {
+      const url = await uploadImageToImgBB(file);
+      const nextImages = [...draft.images];
+      nextImages[index] = url;
+      onChange({ ...draft, images: nextImages });
+      setRowMessage(`Image ${index + 1} replaced. Press Save to keep it.`);
+    } catch (error) {
+      setRowMessage(error instanceof Error ? error.message : 'Image replacement failed.');
+    } finally {
+      setReplacingIndex(null);
+      event.target.value = '';
+    }
   }
 
   async function uploadFromGallery(event: React.ChangeEvent<HTMLInputElement>) {
@@ -372,7 +530,7 @@ function EditableProductRow({ product, draft, categories, priceBuckets, disabled
       for (const file of files) uploaded.push(await uploadImageToImgBB(file));
       const nextImages = Array.from(new Set([...draft.images, ...uploaded]));
       onChange({ ...draft, images: nextImages });
-      setRowMessage(`${uploaded.length} image${uploaded.length === 1 ? '' : 's'} added. Choose Main if needed, then press Save.`);
+      setRowMessage(`${uploaded.length} image${uploaded.length === 1 ? '' : 's'} added. Press Save to keep the change.`);
     } catch (error) {
       setRowMessage(error instanceof Error ? error.message : 'Image upload failed.');
     } finally {
@@ -381,11 +539,67 @@ function EditableProductRow({ product, draft, categories, priceBuckets, disabled
     }
   }
 
+  function updateVariant(index: number, patch: Partial<VariantDraft>) {
+    onChange({
+      ...draft,
+      variants: draft.variants.map((variant, variantIndex) => variantIndex === index ? { ...variant, ...patch } : variant),
+    });
+  }
+
+  function removeVariant(index: number) {
+    onChange({ ...draft, variants: draft.variants.filter((_, variantIndex) => variantIndex !== index) });
+    setEditingVariantIndex(null);
+    setRowMessage('Only this variant was removed. Press Save to keep the change.');
+  }
+
+  function toggleVariantVisibility(index: number) {
+    const variant = draft.variants[index];
+    if (!variant) return;
+    const nextActive = variant.active === false;
+    updateVariant(index, { active: nextActive });
+    setRowMessage(nextActive
+      ? 'Variant is visible again. Press Save to keep the change.'
+      : 'Variant hidden from customers. Press Save to keep the change.');
+  }
+
+  function sizePresetComplete(preset: SizePreset) {
+    const groups = Array.from(new Set(draft.variants.map(variant => variant.color.trim())));
+    const targetGroups = groups.length ? groups : [''];
+    return targetGroups.every(color => draft.variants.some(variant => variant.color.trim() === color && sizeKey(variant.size) === preset.key));
+  }
+
+  function addSizePreset(preset: SizePreset) {
+    const groups = Array.from(new Set(draft.variants.map(variant => variant.color.trim())));
+    const targetGroups = groups.length ? groups : [''];
+    const existing = new Set(draft.variants.map(variant => `${variant.color.trim()}::${sizeKey(variant.size)}`));
+    const createdAt = Date.now();
+    const additions: VariantDraft[] = [];
+
+    targetGroups.forEach((color, groupIndex) => {
+      if (existing.has(`${color}::${preset.key}`)) return;
+      const seed = draft.variants.find(variant => variant.color.trim() === color) || draft.variants[0];
+      additions.push({
+        id: `bulk-${createdAt}-${groupIndex}-${preset.key.replace(/[^a-z0-9]+/gi, '-')}`,
+        color,
+        size: preset.label,
+        stock: seed?.stock || draft.stock || '0',
+        imageUrl: seed?.imageUrl || draft.images[0] || '',
+        active: true,
+        raw: {},
+      });
+    });
+
+    if (!additions.length) {
+      setRowMessage(`${preset.label} is already added.`);
+      return;
+    }
+
+    onChange({ ...draft, variants: [...draft.variants, ...additions] });
+    setRowMessage(`${preset.label} added to ${additions.length} variant${additions.length === 1 ? '' : 's'}. Press Save to keep the change.`);
+  }
+
   return <article className="rounded-3xl border border-black/[.04] bg-white p-3 shadow-sm sm:p-4">
     <div className="flex items-start gap-3">
-      <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-[#F4F4F1] sm:h-[72px] sm:w-[72px]">
-        {mainImage ? <Image src={mainImage} alt="" fill unoptimized sizes="72px" className="object-cover"/> : <div className="grid h-full place-items-center text-center text-[8px] font-bold text-black/30">No image</div>}
-      </div>
       <label className="min-w-0 flex-1">
         <span className="mb-1 block text-[8px] font-black uppercase tracking-wider text-black/35">Product title</span>
         <textarea
@@ -400,54 +614,101 @@ function EditableProductRow({ product, draft, categories, priceBuckets, disabled
       <button type="button" disabled={disabled} onClick={onDelete} aria-label={`Delete ${product.title}`} className="shrink-0 rounded-xl bg-red-50 p-2.5 text-[#E1352B] disabled:opacity-40">{deleting ? <Loader2 size={14} className="animate-spin"/> : <Trash2 size={14}/>}</button>
     </div>
 
-    <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-4">
-      <label className="grid gap-1"><span className="text-[8px] font-black uppercase text-black/35">Original price</span><input aria-label="Original price" disabled={disabled} type="number" min="0" value={draft.originalPrice} onChange={event => onChange({ ...draft, originalPrice: event.target.value })} className={inputClass}/></label>
-      <label className="grid gap-1"><span className="text-[8px] font-black uppercase text-black/35">Sale price</span><input aria-label="Sale price" disabled={disabled} type="number" min="0" value={draft.price} onChange={event => onChange({ ...draft, price: event.target.value })} className={inputClass}/></label>
-      <label className="grid gap-1"><span className="text-[8px] font-black uppercase text-black/35">Stock</span><input aria-label="Stock" disabled={disabled} type="number" min="0" value={draft.stock} onChange={event => onChange({ ...draft, stock: event.target.value })} placeholder="Existing" className={inputClass}/></label>
-      <label className="grid gap-1"><span className="text-[8px] font-black uppercase text-black/35">Category</span><select aria-label="Category" disabled={disabled} value={draft.category} onChange={event => onChange({ ...draft, category: event.target.value })} className={inputClass}><option value="">Select category</option>{hasLegacyCategory && <option value={draft.category}>Current: {draft.category}</option>}{categories.map(category => <option key={category.id} value={category.id}>{category.title}</option>)}</select></label>
-    </div>
-
-    <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-black/5 pt-3">
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[10px] font-bold">
-        <label className="flex items-center gap-2"><input disabled={disabled} type="checkbox" checked={draft.published} onChange={event => onChange({ ...draft, published: event.target.checked })} className="accent-[#0F6A5F]"/>Published</label>
-        <label className="flex items-center gap-2"><input disabled={disabled} type="checkbox" checked={draft.isWholesale} onChange={event => { const enabled = event.target.checked; const wholesaleIds = new Set(priceBuckets.filter(isWholesalePriceBucket).map(bucket => bucket.id)); onChange({ ...draft, isWholesale: enabled, priceBucketIds: enabled ? Array.from(new Set([...draft.priceBucketIds, ...wholesaleIds])) : draft.priceBucketIds.filter(id => !wholesaleIds.has(id)) }); }} className="accent-[#E1352B]"/>Wholesale</label>
-      </div>
-      <div className="flex flex-wrap gap-2">
-        <button type="button" disabled={disabled} onClick={() => setMediaTab(current => current === 'images' ? null : 'images')} className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-[9px] font-black ${mediaTab === 'images' ? 'bg-[#0F6A5F] text-white' : 'bg-[#F4F4F1] text-black/65'}`}><ImagePlus size={13}/>Images ({draft.images.length})</button>
-        <button type="button" disabled={disabled} onClick={() => setMediaTab(current => current === 'variants' ? null : 'variants')} className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-[9px] font-black ${mediaTab === 'variants' ? 'bg-[#0F6A5F] text-white' : 'bg-[#F4F4F1] text-black/65'}`}><Layers3 size={13}/>Variants ({variantImages.length})</button>
-      </div>
-    </div>
-
-    {mediaTab === 'images' && <div className="mt-3 rounded-2xl bg-[#F7F7F3] p-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div><p className="text-[10px] font-black">Product images</p><p className="text-[9px] text-black/45">Tap any image to make it the main cover.</p></div>
-        <label className={`inline-flex items-center gap-1.5 rounded-xl bg-[#14140F] px-3 py-2 text-[9px] font-black text-white ${disabled || uploading ? 'pointer-events-none opacity-45' : 'cursor-pointer'}`}>
-          {uploading ? <Loader2 size={13} className="animate-spin"/> : <ImagePlus size={13}/>} {uploading ? 'Uploading…' : 'Add from gallery'}
+    <div className="mt-3 rounded-2xl bg-[#F7F7F3] p-3">
+      <div className="flex items-center justify-between gap-2">
+        <div><p className="text-[10px] font-black">Product images</p><p className="text-[9px] text-black/45">Main image stays first. Every image can be deleted, replaced or made main.</p></div>
+        <label className={`inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-[#14140F] px-3 py-2 text-[9px] font-black text-white ${disabled || uploading ? 'pointer-events-none opacity-45' : 'cursor-pointer'}`}>
+          {uploading ? <Loader2 size={13} className="animate-spin"/> : <ImagePlus size={13}/>} {uploading ? 'Uploading…' : 'Add'}
           <input type="file" accept="image/*" multiple disabled={disabled || uploading} onChange={uploadFromGallery} className="hidden"/>
         </label>
       </div>
-      {draft.images.length ? <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-5 md:grid-cols-6">
-        {draft.images.map((url, index) => <div key={`${url}-${index}`} className="relative aspect-square overflow-hidden rounded-xl border border-black/10 bg-white">
-          <button type="button" disabled={disabled} onClick={() => makeMain(url)} className="block h-full w-full disabled:opacity-60"><img src={url} alt={`Product image ${index + 1}`} className="h-full w-full object-cover"/></button>
-          {index === 0 ? <span className="absolute left-1 top-1 rounded-full bg-black/75 px-1.5 py-1 text-[7px] font-black text-white">MAIN</span> : <span className="pointer-events-none absolute bottom-1 left-1 rounded-full bg-white/95 px-1.5 py-1 text-[7px] font-black shadow">Make main</span>}
-          <button type="button" disabled={disabled} onClick={() => removeImage(url)} aria-label="Remove image" className="absolute right-1 top-1 rounded-full bg-red-600 p-1 text-white disabled:opacity-45"><Trash2 size={9}/></button>
+
+      {draft.images.length ? <div className="mt-3 space-y-2">
+        {draft.images.map((url, index) => <div key={`${url}-${index}`} className={`flex items-center gap-2 rounded-2xl bg-white p-2 ring-1 ${index === 0 ? 'ring-[#0F6A5F]/30' : 'ring-black/5'}`}>
+          <div className={`relative shrink-0 overflow-hidden rounded-xl bg-[#F4F4F1] ${index === 0 ? 'h-24 w-24' : 'h-16 w-16'}`}>
+            <img src={url} alt={`Product image ${index + 1}`} className="h-full w-full object-cover"/>
+            {index === 0 && <span className="absolute left-1 top-1 rounded-full bg-[#14140F]/90 px-2 py-1 text-[7px] font-black text-white">MAIN</span>}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[9px] font-black">{index === 0 ? 'Main image' : `Image ${index + 1}`}</p>
+            <div className="mt-2 grid grid-cols-3 gap-1.5">
+              <button type="button" disabled={disabled} onClick={() => removeImage(index)} className="inline-flex min-w-0 items-center justify-center gap-1 rounded-lg bg-red-50 px-2 py-2 text-[8px] font-black text-[#E1352B] disabled:opacity-40"><Trash2 size={10}/>Delete</button>
+              <label className={`inline-flex min-w-0 items-center justify-center gap-1 rounded-lg bg-[#F4F4F1] px-2 py-2 text-[8px] font-black ${disabled || replacingIndex !== null ? 'pointer-events-none opacity-45' : 'cursor-pointer'}`}>
+                {replacingIndex === index ? <Loader2 size={10} className="animate-spin"/> : <Pencil size={10}/>}Edit
+                <input type="file" accept="image/*" disabled={disabled || replacingIndex !== null} onChange={event => replaceImage(index, event)} className="hidden"/>
+              </label>
+              <button type="button" disabled={disabled || index === 0} onClick={() => makeMain(index)} className={`inline-flex min-w-0 items-center justify-center gap-1 rounded-lg px-2 py-2 text-[8px] font-black disabled:opacity-100 ${index === 0 ? 'bg-[#0F6A5F] text-white' : 'bg-[#0F6A5F]/10 text-[#0F6A5F]'}`}><Star size={10}/>{index === 0 ? 'Main' : 'Make main'}</button>
+            </div>
+          </div>
         </div>)}
       </div> : <div className="mt-3 rounded-xl border border-dashed border-black/15 bg-white p-5 text-center text-[9px] font-bold text-black/35">No product images yet. Add one from your gallery.</div>}
-    </div>}
+    </div>
 
-    {mediaTab === 'variants' && <div className="mt-3 rounded-2xl bg-[#F7F7F3] p-3">
-      <div><p className="text-[10px] font-black">Variant images</p><p className="text-[9px] text-black/45">Use an existing variant photo as the product main image without changing the variant itself.</p></div>
-      {variantImages.length ? <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-5 md:grid-cols-6">
-        {variantImages.map(option => {
-          const isMain = draft.images[0] === option.url;
-          return <button key={option.url} type="button" disabled={disabled} onClick={() => makeMain(option.url)} className={`overflow-hidden rounded-xl border-2 bg-white text-left disabled:opacity-50 ${isMain ? 'border-[#0F6A5F]' : 'border-transparent'}`}>
-            <img src={option.url} alt={option.label} className="aspect-square w-full object-cover"/>
-            <span className="block truncate px-2 pt-1.5 text-[8px] font-black">{option.label}</span>
-            <span className="block px-2 pb-2 text-[7px] font-bold text-black/40">{isMain ? '✓ Main image' : 'Set as main'}</span>
-          </button>;
+    <div className="mt-3 grid grid-cols-4 gap-1.5 sm:gap-2">
+      <label className="grid min-w-0 gap-1"><span className="truncate text-[7px] font-black uppercase text-black/35 sm:text-[8px]">Original price</span><input aria-label="Original price" disabled={disabled} type="number" min="0" value={draft.originalPrice} onChange={event => onChange({ ...draft, originalPrice: event.target.value })} className={inputClass}/></label>
+      <label className="grid min-w-0 gap-1"><span className="truncate text-[7px] font-black uppercase text-black/35 sm:text-[8px]">Sale price</span><input aria-label="Sale price" disabled={disabled} type="number" min="0" value={draft.price} onChange={event => onChange({ ...draft, price: event.target.value })} className={inputClass}/></label>
+      <label className="grid min-w-0 gap-1"><span className="truncate text-[7px] font-black uppercase text-black/35 sm:text-[8px]">Stock</span><input aria-label="Stock" disabled={disabled} type="number" min="0" value={draft.stock} onChange={event => onChange({ ...draft, stock: event.target.value })} placeholder="Stock" className={inputClass}/></label>
+      <label className="grid min-w-0 gap-1"><span className="truncate text-[7px] font-black uppercase text-black/35 sm:text-[8px]">Category</span><select aria-label="Category" disabled={disabled} value={draft.category} onChange={event => onChange({ ...draft, category: event.target.value })} className={`${inputClass} px-1 sm:px-2`}><option value="">Select</option>{hasLegacyCategory && <option value={draft.category}>Current: {draft.category}</option>}{categories.map(category => <option key={category.id} value={category.id}>{category.title}</option>)}</select></label>
+    </div>
+
+    <div className="mt-3 rounded-2xl border border-black/5 bg-[#F7F7F3] p-3">
+      <div className="flex items-center justify-between gap-2">
+        <div><p className="text-[10px] font-black">Variants ({draft.variants.length})</p><p className="text-[9px] text-black/45">Edit color, size or stock. Delete removes only the row you tap.</p></div>
+        <label className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-white px-3 py-2 text-[9px] font-black ring-1 ring-black/5">
+          <input type="checkbox" disabled={disabled} checked={showSizeAdder} onChange={event => setShowSizeAdder(event.target.checked)} className="h-3.5 w-3.5 accent-[#0F6A5F]"/>
+          Size / Fit
+        </label>
+      </div>
+      {showSizeAdder && <div className="mt-3 rounded-xl border border-[#0F6A5F]/15 bg-white p-3">
+        <p className="text-[9px] font-black text-[#0F6A5F]">Add size / fit variants</p>
+        <p className="mt-0.5 text-[8px] leading-4 text-black/45">Tap a size or adjustable fit to add only missing rows for every current design/color. Existing variants are never removed here.</p>
+        <div className="mt-2 grid gap-2 sm:grid-cols-2">
+          {SIZE_PRESETS.map(preset => {
+            const added = sizePresetComplete(preset);
+            return <button key={preset.key} type="button" disabled={disabled || added} onClick={() => addSizePreset(preset)} className={`flex items-start gap-2 rounded-xl px-3 py-2.5 text-left text-[8px] font-bold leading-4 transition ${added ? 'bg-[#0F6A5F]/10 text-[#0F6A5F]' : 'bg-[#F4F4F1] text-black/65'} disabled:opacity-70`}>
+              <span className="mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded border border-current text-[9px] font-black">{added ? '✓' : '+'}</span>
+              <span>{preset.label}</span>
+            </button>;
+          })}
+        </div>
+      </div>}
+      {draft.variants.length ? <div className="mt-3 space-y-2">
+        {draft.variants.map((variant, index) => {
+          const editing = editingVariantIndex === index;
+          return <div key={`${variant.id}-${index}`} className="rounded-xl bg-white p-2 ring-1 ring-black/5">
+            {editing ? <div className="grid grid-cols-[44px_1fr_1fr_72px] items-end gap-1.5">
+              <div className="h-11 w-11 overflow-hidden rounded-lg bg-[#F4F4F1]">{variant.imageUrl ? <img src={variant.imageUrl} alt="" className="h-full w-full object-cover"/> : null}</div>
+              <label className="min-w-0"><span className="block text-[7px] font-black uppercase text-black/35">Color</span><input value={variant.color} onChange={event => updateVariant(index, { color: event.target.value })} className="mt-1 w-full rounded-lg bg-[#F4F4F1] p-2 text-[9px] outline-none"/></label>
+              <label className="min-w-0"><span className="block text-[7px] font-black uppercase text-black/35">Size</span><input value={variant.size} onChange={event => updateVariant(index, { size: event.target.value })} className="mt-1 w-full rounded-lg bg-[#F4F4F1] p-2 text-[9px] outline-none"/></label>
+              <label className="min-w-0"><span className="block text-[7px] font-black uppercase text-black/35">Stock</span><input type="number" min="0" value={variant.stock} onChange={event => updateVariant(index, { stock: event.target.value })} className="mt-1 w-full rounded-lg bg-[#F4F4F1] p-2 text-[9px] outline-none"/></label>
+              <div className="col-span-4 flex flex-wrap justify-end gap-1.5">
+                <button type="button" onClick={() => setEditingVariantIndex(null)} className="rounded-lg bg-[#0F6A5F] px-3 py-2 text-[8px] font-black text-white">Done</button>
+                <button type="button" disabled={disabled} onClick={() => removeVariant(index)} className="inline-flex items-center gap-1 rounded-lg bg-red-50 px-3 py-2 text-[8px] font-black text-[#E1352B] disabled:opacity-40"><Trash2 size={10}/>Delete</button>
+                <button type="button" disabled={disabled} onClick={() => toggleVariantVisibility(index)} className={`inline-flex items-center gap-1 rounded-lg px-3 py-2 text-[8px] font-black disabled:opacity-40 ${variant.active === false ? 'bg-[#0F6A5F]/10 text-[#0F6A5F]' : 'bg-amber-50 text-amber-700'}`}>{variant.active === false ? <Eye size={10}/> : <EyeOff size={10}/>} {variant.active === false ? 'Unhide' : 'Hide'}</button>
+              </div>
+            </div> : <div className="flex items-center gap-2">
+              <div className="h-11 w-11 shrink-0 overflow-hidden rounded-lg bg-[#F4F4F1]">{variant.imageUrl ? <img src={variant.imageUrl} alt="" className="h-full w-full object-cover"/> : null}</div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[9px] font-black">{[variant.color, variant.size].filter(Boolean).join(' / ') || `Variant ${index + 1}`}</p>
+                <p className="mt-0.5 flex items-center gap-1.5 text-[8px] font-bold text-black/40">Stock: {variant.stock || '0'}{variant.active === false ? <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[7px] font-black text-amber-700">HIDDEN</span> : null}</p>
+              </div>
+              <div className="flex shrink-0 flex-col gap-1.5">
+                <div className="flex gap-1.5">
+                  <button type="button" disabled={disabled} onClick={() => setEditingVariantIndex(index)} className="inline-flex items-center gap-1 rounded-lg bg-[#0F6A5F]/10 px-2.5 py-2 text-[8px] font-black text-[#0F6A5F] disabled:opacity-40"><Pencil size={10}/>Edit</button>
+                  <button type="button" disabled={disabled} onClick={() => removeVariant(index)} className="inline-flex items-center gap-1 rounded-lg bg-red-50 px-2.5 py-2 text-[8px] font-black text-[#E1352B] disabled:opacity-40"><Trash2 size={10}/>Delete</button>
+                </div>
+                <button type="button" disabled={disabled} onClick={() => toggleVariantVisibility(index)} className={`inline-flex items-center justify-center gap-1 rounded-lg px-2.5 py-2 text-[8px] font-black disabled:opacity-40 ${variant.active === false ? 'bg-[#0F6A5F]/10 text-[#0F6A5F]' : 'bg-amber-50 text-amber-700'}`}>{variant.active === false ? <Eye size={10}/> : <EyeOff size={10}/>} {variant.active === false ? 'Unhide' : 'Hide'}</button>
+              </div>
+            </div>}
+          </div>;
         })}
-      </div> : <div className="mt-3 rounded-xl border border-dashed border-black/15 bg-white p-5 text-center text-[9px] font-bold text-black/35">No saved variant images on this product.</div>}
-    </div>}
+      </div> : <div className="mt-3 rounded-xl border border-dashed border-black/15 bg-white p-4 text-center text-[9px] font-bold text-black/35">No variants saved on this product.</div>}
+    </div>
+
+    <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-black/5 pt-3 text-[10px] font-bold">
+      <label className="flex items-center gap-2"><input disabled={disabled} type="checkbox" checked={draft.published} onChange={event => onChange({ ...draft, published: event.target.checked })} className="accent-[#0F6A5F]"/>Published</label>
+      <label className="flex items-center gap-2"><input disabled={disabled} type="checkbox" checked={draft.isWholesale} onChange={event => { const enabled = event.target.checked; const wholesaleIds = new Set(priceBuckets.filter(isWholesalePriceBucket).map(bucket => bucket.id)); onChange({ ...draft, isWholesale: enabled, priceBucketIds: enabled ? Array.from(new Set([...draft.priceBucketIds, ...wholesaleIds])) : draft.priceBucketIds.filter(id => !wholesaleIds.has(id)) }); }} className="accent-[#E1352B]"/>Wholesale</label>
+    </div>
 
     {rowMessage && <p className="mt-2 text-[9px] font-bold text-[#0F6A5F]">{rowMessage}</p>}
 

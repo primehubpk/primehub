@@ -14,6 +14,7 @@ type VisualBox = { height: number; top: number };
 type SalarShellStyle = CSSProperties & {
   '--salar-viewport-height': string;
   '--salar-viewport-top': string;
+  '--salar-icon-image': string;
 };
 
 function currentVisualBox(): VisualBox {
@@ -29,7 +30,7 @@ function routeIsStillLoading() {
   return Boolean(document.querySelector('main[role="status"][aria-label="Opening page"]'));
 }
 
-export default function SalarViewportShell() {
+export default function SalarViewportShell({ initialIconUrl = '' }: { initialIconUrl?: string }) {
   const [visualBox, setVisualBox] = useState<VisualBox>({ height: 800, top: 0 });
   const [enhancersReady, setEnhancersReady] = useState(false);
 
@@ -86,10 +87,11 @@ export default function SalarViewportShell() {
   const style: SalarShellStyle = {
     '--salar-viewport-height': `${visualBox.height}px`,
     '--salar-viewport-top': `${visualBox.top}px`,
+    '--salar-icon-image': initialIconUrl ? `url(${JSON.stringify(initialIconUrl)})` : 'none',
   };
 
   return (
-    <div id="salar-viewport-shell" style={style}>
+    <div id="salar-viewport-shell" className={initialIconUrl ? 'salar-has-initial-icon' : undefined} style={style}>
       <RewardWheelPresentationEnhancer />
       <SalarWidget />
       {enhancersReady ? (
@@ -158,6 +160,16 @@ export default function SalarViewportShell() {
           height: 46px !important;
           flex: 0 0 46px !important;
           border-radius: 9999px !important;
+        }
+        #salar-viewport-shell.salar-has-initial-icon > div:not(:has(button[aria-label="Close Salar"])) > div > button > span:first-child {
+          background-color: #14140f !important;
+          background-image: var(--salar-icon-image) !important;
+          background-position: center !important;
+          background-repeat: no-repeat !important;
+          background-size: cover !important;
+        }
+        #salar-viewport-shell.salar-has-initial-icon > div:not(:has(button[aria-label="Close Salar"])) > div > button > span:first-child > svg {
+          display: none !important;
         }
         #salar-viewport-shell > div:not(:has(button[aria-label="Close Salar"])) > div > button > span:last-child {
           display: none !important;

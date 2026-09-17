@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation';
 import { ArrowLeft, LayoutGrid } from 'lucide-react';
 import AdminAuthGuard from '@/components/AdminAuthGuard';
 import ProductsManager from '@/components/admin/ProductsManager';
-import BulkProductEditor from '@/components/admin/BulkProductEditor';
+import BulkProductEditor from '@/components/admin/BulkProductEditorLayout';
 import CategoriesManager from '@/components/admin/CategoriesManager';
 import DealScheduleManager from '@/components/admin/DealScheduleManager';
 import BigDealManager from '@/components/admin/BigDealManager';

@@ -117,7 +117,11 @@ function rowImage(row: ProductVariantRow, color: string, colorImageMap: Record<s
 export function normalizeProductVariants(product: VariantModalProduct): NormalizedProductVariants {
   const directRows = Array.isArray(product.variants) ? product.variants : [];
   const matrixRows = Array.isArray(product.variantMatrix) ? product.variantMatrix : [];
-  const sourceRows = [...directRows, ...matrixRows];
+  const allSourceRows = matrixRows.length ? matrixRows : directRows;
+  const sourceRows = allSourceRows.filter((row) => {
+    const record = row as Record<string, unknown>;
+    return record.active !== false && record.hidden !== true;
+  });
   const colorItems: Array<{ name: string; imageUrl?: string }> = [];
   const addColor = (name: string, imageUrl?: string) => {
     const clean = name.trim();
@@ -136,8 +140,6 @@ export function normalizeProductVariants(product: VariantModalProduct): Normaliz
   asStrings(product.colors).forEach((color) => addColor(color, findColorImage(color, product.colorImages || {})));
   const optionColors = product.variantOptions?.find((option) => /color/i.test(String(option.id)))?.values;
   asStrings(optionColors).forEach((color) => addColor(color, findColorImage(color, product.colorImages || {})));
-  const rawRows = sourceRows.map((row, index) => ({ ...row, id: row.id || `variant-${index}`, color: rowValue(row, 'color'), size: rowValue(row, 'size') }));
-  rawRows.forEach((row) => { if (row.color) addColor(row.color, rowImage(row, row.color, product.colorImages || {}, colorItems)); });
   const sizes: string[] = [];
   const addSize = (value: string) => {
     const clean = value.trim();
@@ -147,35 +149,58 @@ export function normalizeProductVariants(product: VariantModalProduct): Normaliz
   asStrings(product.sizes).forEach(addSize);
   const optionSizes = product.variantOptions?.find((option) => /size/i.test(String(option.id)))?.values;
   asStrings(optionSizes).forEach(addSize);
-  rawRows.forEach((row) => row.size && addSize(row.size));
-  const hasVariantMetadata = Boolean(product.hasVariants === true || colorItems.length > 0 || sizes.length > 0 || sourceRows.length > 0);
+  const hasVariantMetadata = Boolean(product.hasVariants === true || colorItems.length > 0 || sizes.length > 0 || allSourceRows.length > 0);
   if (!hasVariantMetadata) return { hasVariants: false, colors: [], sizes: [], rows: [] };
   if (!colorItems.length) addColor('Standard', product.imageUrl || product.image);
   if (!sizes.length) addSize('Standard');
-  const rowMap = new Map<string, ProductVariantRow>();
-  rawRows.forEach((row) => {
-    const color = row.color || colorItems[0].name;
-    const size = row.size || sizes[0];
-    const key = `${normalizeKey(color)}::${normalizeKey(size)}`;
-    if (rowMap.has(key)) return;
-    rowMap.set(key, {
+
+  const rawRows = sourceRows.map((row, index) => {
+    const color = rowValue(row, 'color') || colorItems[0]?.name || 'Standard';
+    const size = rowValue(row, 'size') || sizes[0] || 'Standard';
+    return {
       ...row,
+      id: row.id || `variant-${index}`,
       color,
       size,
       stock: Math.max(0, Number(row.stock ?? 0)),
       price: row.price == null ? Number(product.price ?? 0) : Number(row.price),
       imageUrl: rowImage(row, color, product.colorImages || {}, colorItems),
-    });
+    };
   });
-  const rows = colorItems.flatMap((color) => sizes.map((size) => rowMap.get(`${normalizeKey(color.name)}::${normalizeKey(size)}`) || {
-    id: `variant-${encodeURIComponent(color.name)}-${encodeURIComponent(size)}`,
-    color: color.name,
-    size,
-    stock: 0,
-    price: Number(product.price ?? 0),
-    imageUrl: color.imageUrl,
-  }));
-  return { hasVariants: true, colors: colorItems, sizes, rows };
+
+  if (!allSourceRows.length) {
+    const rows = colorItems.flatMap((color) => sizes.map((size) => ({
+      id: `variant-${encodeURIComponent(color.name)}-${encodeURIComponent(size)}`,
+      color: color.name,
+      size,
+      stock: 0,
+      price: Number(product.price ?? 0),
+      imageUrl: color.imageUrl,
+    })));
+    return { hasVariants: true, colors: colorItems, sizes, rows };
+  }
+
+  const rowMap = new Map<string, ProductVariantRow>();
+  rawRows.forEach((row) => {
+    const key = `${normalizeKey(row.color)}::${normalizeKey(row.size)}`;
+    if (!rowMap.has(key)) rowMap.set(key, row);
+  });
+  const rows = Array.from(rowMap.values());
+  const activeColorKeys = new Set(rows.map((row) => normalizeKey(row.color)));
+  const activeSizeKeys = new Set(rows.map((row) => normalizeKey(row.size)));
+  const visibleColors = colorItems.filter((item) => activeColorKeys.has(normalizeKey(item.name)));
+  rows.forEach((row) => {
+    const name = String(row.color || '').trim();
+    if (name && !visibleColors.some((item) => normalizeKey(item.name) === normalizeKey(name))) {
+      visibleColors.push({ name, imageUrl: rowImage(row, name, product.colorImages || {}, colorItems) });
+    }
+  });
+  const visibleSizes = sizes.filter((size) => activeSizeKeys.has(normalizeKey(size)));
+  rows.forEach((row) => {
+    const size = String(row.size || '').trim();
+    if (size && !visibleSizes.some((item) => normalizeKey(item) === normalizeKey(size))) visibleSizes.push(size);
+  });
+  return { hasVariants: true, colors: visibleColors, sizes: visibleSizes, rows };
 }
 
 function variantKey(variant?: ProductVariantSelection): string {
