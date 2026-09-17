@@ -12,6 +12,7 @@ import GlobalVariantSelector from '@/components/GlobalVariantSelector';
 import AdminQuickAccess from '@/components/AdminQuickAccess';
 import SalarViewportShell from '@/components/salar/SalarViewportShell';
 import { SettingsProvider } from '@/lib/useSettings';
+import { getSalarUiSettings } from '@/lib/salar/uiSettings';
 import './globals.css';
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL;
@@ -91,7 +92,9 @@ export const viewport: Viewport = {
   initialScale: 1,
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const salarUi = await getSalarUiSettings().catch(() => ({ iconUrl: '', updatedAt: null }));
+
   const websiteSchema = {
     '@context': 'https://schema.org',
     '@type': 'WebSite',
@@ -121,6 +124,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="preconnect" href="https://images.primehubmall.com" />
         <link rel="dns-prefetch" href="https://images.primehubmall.com" />
         <link rel="dns-prefetch" href="https://i.ibb.co" />
+        {salarUi.iconUrl ? <link rel="preload" as="image" href={salarUi.iconUrl} /> : null}
       </head>
       <body className="font-sans antialiased pb-24">
         <script
@@ -139,7 +143,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <CartMiniBar />
           <AdminQuickAccess />
           <PWARegister />
-          <SalarViewportShell />
+          <SalarViewportShell initialIconUrl={salarUi.iconUrl} />
         </SettingsProvider>
       </body>
     </html>

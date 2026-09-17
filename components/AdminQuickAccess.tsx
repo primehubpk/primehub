@@ -55,7 +55,7 @@ export default function AdminQuickAccess() {
       onFocus={() => router.prefetch('/admin')}
       aria-label="Open admin panel"
       title="Open Admin Panel"
-      className="group fixed bottom-[calc(72px+env(safe-area-inset-bottom)+14px)] right-3 z-[60] flex h-12 w-12 touch-manipulation items-center justify-center rounded-full border border-white/20 bg-[#14140F] text-white shadow-[0_12px_36px_rgba(0,0,0,.28)] transition active:scale-95 sm:right-5 sm:h-13 sm:w-auto sm:min-w-13 sm:gap-2 sm:px-4"
+      className="group fixed bottom-[calc(72px+env(safe-area-inset-bottom)+14px)] left-3 z-[60] flex h-12 w-12 touch-manipulation items-center justify-center rounded-full border border-white/20 bg-[#14140F] text-white shadow-[0_12px_36px_rgba(0,0,0,.28)] transition active:scale-95 sm:left-5 sm:h-13 sm:w-auto sm:min-w-13 sm:gap-2 sm:px-4"
     >
       <span className="relative flex h-7 w-7 items-center justify-center rounded-full bg-white/10">
         <ShieldCheck size={17} strokeWidth={2.2} />
