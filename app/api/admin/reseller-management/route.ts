@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getAdminDb } from '@/lib/firebaseAdmin';
+import { getAdminAuth, getAdminDb } from '@/lib/firebaseAdmin';
 import { reviewResellerTaskClaim, reviewResellerWithdrawal } from '@/lib/resellerServer';
 import { mirrorResellerDocAndProfile, mirrorResellerFirestoreDoc } from '@/lib/resellerDualMirror';
 
@@ -42,6 +42,14 @@ function payload(row: Row) {
   return row?.payload && typeof row.payload === 'object' ? row.payload : {};
 }
 
+function emailLabel(value: unknown) {
+  const email = String(value || '').trim();
+  const local = email.split('@')[0] || '';
+  const cleaned = local.replace(/[._-]+/g, ' ').replace(/\d+$/g, '').trim();
+  if (!cleaned) return '';
+  return cleaned.split(/\s+/).map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(' ');
+}
+
 function mapProfile(row: Row) {
   const p = payload(row);
   return {
@@ -58,6 +66,22 @@ function mapProfile(row: Row) {
     pointsBalance: Number(row.points_balance ?? p.pointsBalance ?? 0),
     createdAt: p.createdAt ?? row.created_at ?? null,
     updatedAt: p.updatedAt ?? row.updated_at ?? null,
+  };
+}
+
+function mapUserReward(row: Row) {
+  const p = payload(row);
+  return {
+    id: String(row.id || ''),
+    userId: String(row.user_id || row.id || ''),
+    points: Number(p.points || 0),
+    streak: Number(p.streak || 0),
+    lastCheckIn: p.lastCheckIn || null,
+    lastSpin: p.lastSpin || null,
+    history: Array.isArray(p.history) ? p.history : [],
+    vouchers: Array.isArray(p.vouchers) ? p.vouchers : [],
+    freeProducts: Array.isArray(p.freeProducts) ? p.freeProducts : [],
+    freeDeliveryCredits: Number(p.freeDeliveryCredits || 0),
   };
 }
 
@@ -142,9 +166,53 @@ function mapOrder(row: Row) {
   };
 }
 
+async function enrichProfiles(profiles: Row[], userRewards: Row[]) {
+  const rewardByUser = new Map(userRewards.map((reward) => [String(reward.userId || reward.id || ''), reward]));
+  const auth = getAdminAuth();
+
+  return Promise.all(profiles.map(async (profile) => {
+    const userId = String(profile.id || profile.userId || '');
+    const reward = rewardByUser.get(userId) || {};
+    const taskPoints = Number(profile.pointsBalance || 0);
+    const loyaltyPoints = Number(reward.points || 0);
+    let authName = '';
+    let authEmail = '';
+
+    if (userId) {
+      try {
+        const user = await auth.getUser(userId);
+        authName = String(user.displayName || '').trim();
+        authEmail = String(user.email || '').trim();
+      } catch {
+        // Admin member list should still render even if Firebase Auth identity lookup is unavailable.
+      }
+    }
+
+    const email = String(profile.email || authEmail || '').trim();
+    const displayName = String(profile.displayName || authName || emailLabel(email) || '').trim();
+
+    return {
+      ...profile,
+      email,
+      displayName,
+      taskPoints,
+      loyaltyPoints,
+      pointsBalance: taskPoints + loyaltyPoints,
+      rewardStreak: Number(reward.streak || 0),
+      rewardLastCheckIn: reward.lastCheckIn || null,
+      rewardLastSpin: reward.lastSpin || null,
+      rewardHistory: Array.isArray(reward.history) ? reward.history : [],
+      rewardVouchers: Array.isArray(reward.vouchers) ? reward.vouchers : [],
+      rewardFreeProducts: Array.isArray(reward.freeProducts) ? reward.freeProducts : [],
+      rewardFreeDeliveryCredits: Number(reward.freeDeliveryCredits || 0),
+    };
+  }));
+}
+
 async function readFromSupabase() {
-  const [profileRows, withdrawalRows, rewardRows, claimRows, pointRows, eventRows, orderRows] = await Promise.all([
+  const [profileRows, userRewardRows, withdrawalRows, rewardRows, claimRows, pointRows, eventRows, orderRows] = await Promise.all([
     supabaseRows('reseller_profiles', 'user_id,email,status,tier_id,monthly_orders,wallet_available,wallet_pending,points_balance,payload,created_at,updated_at', 'created_at.desc', 300),
+    supabaseRows('user_rewards', 'id,user_id,payload,created_at,updated_at', 'updated_at.desc', 500),
     supabaseRows('reseller_withdrawals', 'id,user_id,amount,method,status,payload,created_at,updated_at', 'created_at.desc', 300),
     supabaseRows('reseller_reward_ledger', 'id,user_id,order_id,reward_amount,status,available_at,payload,created_at,updated_at', 'created_at.desc', 700),
     supabaseRows('reseller_task_claims', 'id,user_id,task_id,proof,status,points,payload,created_at,updated_at', 'created_at.desc', 500),
@@ -153,8 +221,12 @@ async function readFromSupabase() {
     supabaseRows('orders', 'id,reseller_user_id,status,total,customer,payload,created_at,updated_at', 'created_at.desc', 700),
   ]);
 
+  const userRewards = userRewardRows.filter((row) => row.user_id).map(mapUserReward);
+  const profiles = await enrichProfiles(profileRows.map(mapProfile), userRewards);
+
   return {
-    profiles: profileRows.map(mapProfile),
+    profiles,
+    userRewards,
     withdrawals: withdrawalRows.map(mapWithdrawal),
     ledger: rewardRows.map(mapReward),
     claims: claimRows.map(mapClaim),
@@ -167,8 +239,9 @@ async function readFromSupabase() {
 
 async function readFromFirebase() {
   const db = getAdminDb();
-  const [profilesSnap, withdrawalsSnap, ledgerSnap, claimsSnap, pointsSnap, eventsSnap, ordersSnap] = await Promise.all([
+  const [profilesSnap, userRewardsSnap, withdrawalsSnap, ledgerSnap, claimsSnap, pointsSnap, eventsSnap, ordersSnap] = await Promise.all([
     db.collection('reseller_profiles').orderBy('createdAt', 'desc').limit(200).get(),
+    db.collection('user_rewards').limit(500).get(),
     db.collection('reseller_withdrawals').orderBy('createdAt', 'desc').limit(200).get(),
     db.collection('reseller_reward_ledger').orderBy('createdAt', 'desc').limit(500).get(),
     db.collection('reseller_task_claims').orderBy('createdAt', 'desc').limit(300).get(),
@@ -177,8 +250,22 @@ async function readFromFirebase() {
     db.collection('orders').where('resellerUserId', '!=', '').limit(500).get(),
   ]);
   const rows = (snap: FirebaseFirestore.QuerySnapshot) => snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  const userRewards = rows(userRewardsSnap).filter((row: any) => !String(row.id || '').startsWith('guest_')).map((row: any) => ({
+    id: String(row.id || ''),
+    userId: String(row.userId || row.id || ''),
+    points: Number(row.points || 0),
+    streak: Number(row.streak || 0),
+    lastCheckIn: row.lastCheckIn || null,
+    lastSpin: row.lastSpin || null,
+    history: Array.isArray(row.history) ? row.history : [],
+    vouchers: Array.isArray(row.vouchers) ? row.vouchers : [],
+    freeProducts: Array.isArray(row.freeProducts) ? row.freeProducts : [],
+    freeDeliveryCredits: Number(row.freeDeliveryCredits || 0),
+  }));
+  const profiles = await enrichProfiles(rows(profilesSnap), userRewards);
   return {
-    profiles: rows(profilesSnap),
+    profiles,
+    userRewards,
     withdrawals: rows(withdrawalsSnap),
     ledger: rows(ledgerSnap),
     claims: rows(claimsSnap),
