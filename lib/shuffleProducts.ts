@@ -40,12 +40,15 @@ function timestamp(value: unknown): number {
 function productTime(item: unknown): number {
   if (!item || typeof item !== 'object') return 0;
   const product = item as ShuffleableProduct;
-  return Math.max(
-    timestamp(product.createdAt),
-    timestamp(product.created_at),
-    timestamp(product.uploadedAt),
-    timestamp(product.updatedAt),
-    timestamp(product.updated_at),
+
+  // Upload/creation time is authoritative for "new arrivals". Updated time is
+  // only a fallback so editing an older wholesale product does not make it new.
+  return (
+    timestamp(product.createdAt) ||
+    timestamp(product.created_at) ||
+    timestamp(product.uploadedAt) ||
+    timestamp(product.updatedAt) ||
+    timestamp(product.updated_at)
   );
 }
 
