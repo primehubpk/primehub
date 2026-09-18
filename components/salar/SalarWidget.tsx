@@ -7,6 +7,7 @@ import { doc, getDoc } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
 import SalarAdminDrawer from '@/components/salar/SalarAdminDrawer';
+import { readSalarProductHelpContext, SALAR_PRODUCT_HELP_EVENT, type SalarProductHelpContext } from '@/lib/salar/clientProductHelp';
 
 type ProductCard = {
   id: string;
@@ -365,6 +366,7 @@ export default function SalarWidget() {
   const [orderError, setOrderError] = useState('');
   const [orderId, setOrderId] = useState('');
   const [imageEditor, setImageEditor] = useState<{ product: ProductCard; sourceUrl: string } | null>(null);
+  const [pendingProductHelp, setPendingProductHelp] = useState<SalarProductHelpContext | null>(null);
   const [editorZoom, setEditorZoom] = useState(1);
   const [editorReady, setEditorReady] = useState(false);
   const [editorError, setEditorError] = useState('');
@@ -376,6 +378,7 @@ export default function SalarWidget() {
   const sendingRef = useRef(false);
   const editorCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const editorDrawingRef = useRef(false);
+  const lastProductHelpKeyRef = useRef('');
 
   useEffect(() => {
     const stop = onAuthStateChanged(auth, (user) => {
