@@ -20,9 +20,9 @@ function timeOf(p: Product) {
   return typeof value?.toMillis === 'function' ? value.toMillis() : new Date(value || 0).getTime() || 0;
 }
 
-export function newestFirst(products: Product[]) {
+export function newestFirst(products: Product[], includeWholesale = false) {
   return [...products]
-    .filter((p) => p.published !== false && !isWholesaleProduct(p))
+    .filter((p) => p.published !== false && (includeWholesale || !isWholesaleProduct(p)))
     .sort((a, b) => timeOf(b) - timeOf(a) || b.id.localeCompare(a.id));
 }
 
@@ -53,7 +53,10 @@ export default function NewArrivalsRail({
     return () => stop();
   }, [liveUpdates]);
 
-  const newest = useMemo(() => newestFirst(products).slice(0, homeLayout ? 100 : products.length), [products, homeLayout]);
+  const newest = useMemo(
+    () => newestFirst(products, homeLayout).slice(0, homeLayout ? 100 : products.length),
+    [products, homeLayout],
+  );
 
   const addProduct = (product: Product) => {
     const image = imageOf(product);

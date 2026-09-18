@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { onAuthStateChanged } from "firebase/auth";
 import {
   collection,
@@ -75,6 +75,7 @@ type Reward = {
 type Sort = "featured" | "low" | "high" | "discount";
 
 const GUEST_KEY = "phdeals-guest-rewards";
+const HOME_PAGE_BATCH_SIZE = 30;
 
 const title = (p: Product) => p.title || p.name || "Untitled Product";
 
@@ -181,6 +182,8 @@ export default function ProductGridRewards({
   const [added, setAdded] = useState<string | null>(null);
   const [redeeming, setRedeeming] = useState<string | null>(null);
   const [notice, setNotice] = useState("");
+  const [homeVisibleCount, setHomeVisibleCount] = useState(HOME_PAGE_BATCH_SIZE);
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
 
   const addItem = useCartStore((s) => s.addItem);
   const openVariantModal = useCartStore((s) => s.openVariantModal);
@@ -435,10 +438,35 @@ export default function ProductGridRewards({
     }
   }
 
-  // The homepage is a discovery surface, not the full catalog. Rendering all
-  // 500+ cards creates hundreds of eager image requests and a multi-megabyte
-  // document. Keep a useful first selection here; /shop retains the full list.
-  const displayedProducts = homeLayout ? visible.slice(0, 30) : visible;
+  useEffect(() => {
+    if (!homeLayout) return;
+    setHomeVisibleCount(HOME_PAGE_BATCH_SIZE);
+  }, [homeLayout, selectedMaxPrice, wholesaleSelected, sort]);
+
+  const displayedProducts = homeLayout
+    ? visible.slice(0, homeVisibleCount)
+    : visible;
+  const hasMoreHomeProducts =
+    homeLayout && displayedProducts.length < visible.length;
+
+  useEffect(() => {
+    if (!hasMoreHomeProducts) return;
+    const target = loadMoreRef.current;
+    if (!target) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries.some((entry) => entry.isIntersecting)) return;
+        setHomeVisibleCount((current) =>
+          Math.min(current + HOME_PAGE_BATCH_SIZE, visible.length),
+        );
+      },
+      { rootMargin: "700px 0px" },
+    );
+
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [hasMoreHomeProducts, visible.length]);
 
   if (loading) {
     return (
@@ -712,6 +740,13 @@ export default function ProductGridRewards({
           })}
         </div>
       )}
+      {hasMoreHomeProducts ? (
+        <div
+          ref={loadMoreRef}
+          className="h-10"
+          aria-label="Loading more products"
+        />
+      ) : null}
 
       <div className="mt-6 flex items-center justify-center text-[9px] font-bold text-black/35">
         Reward badges appear on products linked to a reward image or product in

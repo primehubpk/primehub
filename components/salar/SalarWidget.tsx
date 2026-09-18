@@ -997,7 +997,7 @@ export default function SalarWidget() {
     : 'relative flex h-[min(620px,calc(100dvh-120px))] w-[min(390px,calc(100vw-24px))] flex-col overflow-hidden rounded-[26px] border border-black/10 bg-[#FFFDF8] shadow-2xl';
 
   return (
-    <div className={expanded && open ? 'fixed inset-0 z-[80]' : 'fixed bottom-[88px] right-3 z-50 sm:bottom-6 sm:right-5'}>
+    <div className={expanded && open ? 'fixed inset-0 z-[80]' : 'fixed bottom-[104px] right-3 z-50 sm:bottom-6 sm:right-5'}>
       {open ? (
         <div className={chatShellClass}>
           <div className="flex shrink-0 items-center justify-between bg-[#14140F] px-3 py-3 text-white">
