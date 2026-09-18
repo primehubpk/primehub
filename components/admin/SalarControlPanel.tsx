@@ -55,19 +55,22 @@ export default function SalarControlPanel() {
   const load = useCallback(async () => {
     setLoading(true);
     setMessage('');
+
+    void fetch('/api/admin/salar/ui', { credentials: 'same-origin', cache: 'no-store' })
+      .then(async (response) => ({ response, result: await response.json().catch(() => null) }))
+      .then(({ response, result }) => {
+        if (response.ok && result?.success) setIconUrl(String(result.ui?.iconUrl || ''));
+      })
+      .catch(() => undefined);
+
     try {
-      const [salarResponse, uiResponse] = await Promise.all([
-        fetch('/api/admin/salar', { credentials: 'same-origin', cache: 'no-store' }),
-        fetch('/api/admin/salar/ui', { credentials: 'same-origin', cache: 'no-store' }),
-      ]);
+      const salarResponse = await fetch('/api/admin/salar', { credentials: 'same-origin', cache: 'no-store' });
       const salarResult = await salarResponse.json().catch(() => null);
-      const uiResult = await uiResponse.json().catch(() => null);
       if (!salarResponse.ok || !salarResult?.success) throw new Error(salarResult?.error || 'Salar could not load.');
       setData(salarResult.salar);
       setInstructions(salarResult.salar.instructions || '');
       setOrderInstructions(salarResult.salar.orderInstructions || '');
       setEnabled(salarResult.salar.enabled !== false);
-      if (uiResponse.ok && uiResult?.success) setIconUrl(String(uiResult.ui?.iconUrl || ''));
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Salar could not load.');
     } finally {
