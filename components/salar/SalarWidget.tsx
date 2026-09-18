@@ -558,6 +558,51 @@ export default function SalarWidget() {
     return () => { image.src = ''; };
   }, [imageEditor, editorNonce]);
 
+  useEffect(() => {
+    if (!open || !chatId || sending || !pendingProductHelp) return;
+
+    const key = [
+      pendingProductHelp.productId,
+      pendingProductHelp.color || '',
+      pendingProductHelp.size || '',
+      pendingProductHelp.path,
+    ].join('|');
+
+    if (lastProductHelpKeyRef.current === key) {
+      setPendingProductHelp(null);
+      return;
+    }
+
+    lastProductHelpKeyRef.current = key;
+    const reference: ProductCard = {
+      id: pendingProductHelp.productId,
+      title: pendingProductHelp.title,
+      path: pendingProductHelp.path,
+      imageUrl: pendingProductHelp.imageUrl,
+      price: pendingProductHelp.price,
+      originalPrice: pendingProductHelp.originalPrice,
+      stock: pendingProductHelp.stock,
+      category: pendingProductHelp.category,
+      size: pendingProductHelp.size,
+    };
+
+    const details = [
+      `Product: ${pendingProductHelp.title}`,
+      `Product link: ${pendingProductHelp.path}`,
+      pendingProductHelp.color ? `Selected color: ${pendingProductHelp.color}` : '',
+      pendingProductHelp.size ? `Selected size: ${pendingProductHelp.size}` : '',
+    ].filter(Boolean).join('\n');
+
+    setPendingProductHelp(null);
+    void sendMessage(details, null, '', [reference]);
+  }, [open, chatId, sending, pendingProductHelp]);
+
+  function openSalarFromCurrentPage() {
+    const productContext = readSalarProductHelpContext();
+    if (productContext) setPendingProductHelp(productContext);
+    setOpen(true);
+  }
+
   if (pathname?.startsWith('/admin')) return null;
 
   function clearImage() {
@@ -1125,7 +1170,7 @@ export default function SalarWidget() {
         </div>
       ) : null}
 
-      {!open ? <div className="flex flex-col items-end gap-1.5"><span className="mr-3 rounded-full bg-white px-2.5 py-1 text-[9px] font-black text-[#14140F] shadow-md">Need help?</span><button type="button" onClick={() => setOpen(true)} className="ml-auto flex h-14 items-center gap-2 rounded-full bg-[#14140F] px-4 text-white shadow-xl"><span className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-[#FFB020] text-[#14140F]"><SalarIcon iconUrl={iconUrl} size={19}/></span><span className="pr-1 text-xs font-black">Salar</span></button></div> : null}
+      {!open ? <div className="flex flex-col items-end gap-1.5"><span className="mr-3 rounded-full bg-white px-2.5 py-1 text-[9px] font-black text-[#14140F] shadow-md">Need help?</span><button type="button" onClick={openSalarFromCurrentPage} className="ml-auto flex h-14 items-center gap-2 rounded-full bg-[#14140F] px-4 text-white shadow-xl"><span className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-[#FFB020] text-[#14140F]"><SalarIcon iconUrl={iconUrl} size={19}/></span><span className="pr-1 text-xs font-black">Salar</span></button></div> : null}
     </div>
   );
 }
