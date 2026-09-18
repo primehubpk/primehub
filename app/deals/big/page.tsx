@@ -5,7 +5,7 @@ import FastProductLink from '@/components/FastProductLink';
 import { getStorefrontSettingsSnapshot } from '@/lib/publicCatalogServer';
 import { normalizeImageUrl } from '@/lib/imageUrl';
 
-export const revalidate = 30;
+export const dynamic = 'force-dynamic';
 
 type BigDeal = {
   productId?: string;
