@@ -6,7 +6,6 @@ import { getStorefrontSettingsSnapshot } from '@/lib/publicCatalogServer';
 import { normalizeImageUrl } from '@/lib/imageUrl';
 
 export const dynamic = 'force-dynamic';
-export const revalidate = 30;
 
 type BigDeal = {
   productId?: string;
