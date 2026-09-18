@@ -29,10 +29,28 @@ function ProfessionalAdmin() {
   const [vendorRequests, setVendorRequests] = useState<VendorRequest[]>([]);
 
   useEffect(() => {
+    let active = true;
     const productsUnsub = onSnapshot(adminCollection('products'), (s) => setProducts(s.docs.map((d) => ({ id: d.id, ...d.data() }) as Product)));
-    const ordersUnsub = onSnapshot(adminCollection('orders'), (s) => setOrders(s.docs.map((d) => ({ id: d.id, ...d.data() }) as Order)));
     const vendorsUnsub = onSnapshot(adminCollection('vendor_submissions'), (s) => setVendorRequests(s.docs.map((d) => ({ id: d.id, ...d.data() }) as VendorRequest)));
-    return () => { productsUnsub(); ordersUnsub(); vendorsUnsub(); };
+
+    fetch('/api/admin/orders', { credentials: 'same-origin', cache: 'no-store' })
+      .then(async (response) => {
+        const data = await response.json().catch(() => null);
+        if (!response.ok || data?.success !== true) throw new Error(data?.error || 'Orders could not be loaded.');
+        return data;
+      })
+      .then((data) => {
+        if (active) setOrders(Array.isArray(data.orders) ? data.orders : []);
+      })
+      .catch((error) => {
+        console.error('Professional admin orders failed to load from primary store.', error);
+      });
+
+    return () => {
+      active = false;
+      productsUnsub();
+      vendorsUnsub();
+    };
   }, []);
 
   const handleTabChange = (tab: AdminTab) => {
