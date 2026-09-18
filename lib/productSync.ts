@@ -95,10 +95,10 @@ export function validateProductInput(body: unknown): ProductSyncInput {
 }
 
 function refreshProductCaches() {
-  revalidateTag('public-catalog');
-  revalidateTag('public-products');
-  revalidateTag('salaar-catalog');
-  revalidateTag('salaar-store-knowledge');
+  revalidateTag('public-catalog', 'max');
+  revalidateTag('public-products', 'max');
+  revalidateTag('salaar-catalog', 'max');
+  revalidateTag('salaar-store-knowledge', 'max');
 }
 
 async function legacyFirebaseProductBySlug(slug: string) {

@@ -42,7 +42,7 @@ async function blockedRow(id: string) {
   return rows?.[0]?.payload?.blocked === true;
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   if (request.method !== 'POST') return NextResponse.next();
   try {
     const { chatId, customerId } = await requestIdentity(request);

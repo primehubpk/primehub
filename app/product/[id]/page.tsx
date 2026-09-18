@@ -4,12 +4,13 @@ import { getPublicProductSnapshot } from '@/lib/publicCatalogServer';
 
 export const revalidate = 60;
 
-export default async function ProductDetailPage({
-  params,
-}: {
-  params: { id: string } | Promise<{ id: string }>;
-}) {
-  const resolved = await Promise.resolve(params);
+export default async function ProductDetailPage(
+  props: {
+    params: Promise<{ id: string }>;
+  }
+) {
+  const params = await props.params;
+  const resolved = params;
   const id = decodeURIComponent(String(resolved.id || '')).trim();
   let initialProduct: Product | null = null;
 

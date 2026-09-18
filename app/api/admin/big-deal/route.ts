@@ -291,8 +291,8 @@ export async function POST(request: Request) {
         console.warn('Big Deal Firebase fallback mirror skipped', mirrorError);
         warning = 'Big Deal saved to Supabase primary. Firebase fallback mirror could not be refreshed.';
       }
-      revalidateTag('storefront-settings');
-      revalidateTag('salaar-store-knowledge');
+      revalidateTag('storefront-settings', 'max');
+      revalidateTag('salaar-store-knowledge', 'max');
       return NextResponse.json({ success: true, source: 'supabase', dailyDeal, warning });
     }
 
@@ -306,7 +306,7 @@ export async function POST(request: Request) {
         { bigDeal: dailyDeal, dailyDeal: FieldValue.delete() },
         { merge: true },
       );
-      revalidateTag('storefront-settings');
+      revalidateTag('storefront-settings', 'max');
       return NextResponse.json({
         success: true,
         source: 'firebase-fallback',

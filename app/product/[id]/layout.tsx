@@ -8,12 +8,13 @@ function siteUrl() {
     : `https://${configured.replace(/\/$/, '')}`;
 }
 
-export async function generateMetadata({
-  params,
-}: {
-  params: { id: string } | Promise<{ id: string }>;
-}): Promise<Metadata> {
-  const resolved = await Promise.resolve(params);
+export async function generateMetadata(
+  props: {
+    params: Promise<{ id: string }>;
+  }
+): Promise<Metadata> {
+  const params = await props.params;
+  const resolved = params;
   const id = decodeURIComponent(resolved.id || '');
   const url = `${siteUrl()}/product/${encodeURIComponent(id)}`;
   const title = 'PrimeHubMall Product';
@@ -39,14 +40,19 @@ export async function generateMetadata({
   };
 }
 
-export default async function ProductLayout({
-  children,
-  params,
-}: {
-  children: React.ReactNode;
-  params: { id: string } | Promise<{ id: string }>;
-}) {
-  const resolved = await Promise.resolve(params);
+export default async function ProductLayout(
+  props: {
+    children: React.ReactNode;
+    params: Promise<{ id: string }>;
+  }
+) {
+  const params = await props.params;
+
+  const {
+    children
+  } = props;
+
+  const resolved = params;
   const id = decodeURIComponent(resolved.id || '');
 
   return (

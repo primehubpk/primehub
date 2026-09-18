@@ -2,6 +2,7 @@
 const nextConfig = {
   reactStrictMode: true,
   compress: true,
+  transpilePackages: ['firebase-admin', 'jwks-rsa', 'jose'],
     images: {
         // R2 already serves webp. Vercel Image Optimization returns 402
         // OPTIMIZED_IMAGE_REQUEST_PAYMENT_REQUIRED on this plan, which blanks catalog cards.

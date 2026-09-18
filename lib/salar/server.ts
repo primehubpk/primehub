@@ -335,7 +335,7 @@ async function persistSalarState(state: SalarState) {
   const row = mapDocumentToSupabase('settings', SALAR_SETTINGS_ID, state, 'supabase');
   if (!row) throw new Error('Could not build Salar settings row.');
   await supabasePrimaryUpsert({ table: 'settings', row });
-  revalidateTag(SALAR_STATE_TAG);
+  revalidateTag(SALAR_STATE_TAG, 'max');
   return state;
 }
 
