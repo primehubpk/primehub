@@ -15,6 +15,7 @@ export const dynamic = 'force-dynamic';
 const ADMIN_COOKIE = 'primehub_admin_auth';
 const ORDER_STATUSES = new Set(['pending', 'processing', 'shipped', 'delivered', 'cancelled']);
 const LEGACY_CACHE_MS = 5 * 60 * 1000;
+const ORDER_WHATSAPP_SETTING_ID = 'orders_whatsapp_forwarding';
 
 let legacyOrdersCache: Array<Record<string, any>> = [];
 let legacyOrdersCacheAt = 0;
@@ -76,6 +77,50 @@ async function listSupabaseOrders() {
   });
 }
 
+async function readOrderWhatsappNumber() {
+  if (isSupabaseWriteConfigured()) {
+    const { url, key } = supabaseConfig();
+    const params = new URLSearchParams({
+      id: `eq.${ORDER_WHATSAPP_SETTING_ID}`,
+      select: 'payload',
+      limit: '1',
+    });
+    const response = await fetch(`${url}/rest/v1/settings?${params.toString()}`, {
+      headers: { apikey: key, Authorization: `Bearer ${key}` },
+      cache: 'no-store',
+      signal: AbortSignal.timeout(6000),
+    });
+    if (!response.ok) throw new Error(`Supabase order WhatsApp setting read failed ${response.status}`);
+    const rows = await response.json() as Array<{ payload?: Record<string, unknown> }>;
+    return typeof rows?.[0]?.payload?.whatsappNumber === 'string' ? String(rows[0].payload.whatsappNumber).trim() : '';
+  }
+
+  const snapshot = await getAdminDb().collection('settings').doc(ORDER_WHATSAPP_SETTING_ID).get();
+  return snapshot.exists ? String(snapshot.data()?.whatsappNumber || '').trim() : '';
+}
+
+async function saveOrderWhatsappNumber(number: string) {
+  const payload = { whatsappNumber: number, updatedAt: new Date().toISOString() };
+
+  if (isSupabaseWriteConfigured()) {
+    const row = mapOrderToSupabase(ORDER_WHATSAPP_SETTING_ID, payload);
+    if (!row) throw new Error('Unable to map the Order WhatsApp setting for Supabase.');
+    await supabasePrimaryUpsert({ table: 'settings', row: { ...row, authoritative_source: 'supabase', mirror_status: 'synced', mirror_error: null } });
+
+    try {
+      await getAdminDb().collection('settings').doc(ORDER_WHATSAPP_SETTING_ID).set(payload, { merge: true });
+      return null;
+    } catch (error) {
+      const warning = error instanceof Error ? error.message : String(error);
+      await recordMirrorFailure('settings', ORDER_WHATSAPP_SETTING_ID, 'upsert', payload, 'firebase');
+      return warning;
+    }
+  }
+
+  await getAdminDb().collection('settings').doc(ORDER_WHATSAPP_SETTING_ID).set(payload, { merge: true });
+  return null;
+}
+
 async function readLegacyFirebaseOrders() {
   const now = Date.now();
   if (legacyOrdersCache.length && now - legacyOrdersCacheAt < LEGACY_CACHE_MS) {
@@ -115,10 +160,14 @@ export async function GET(request: Request) {
 
   if (isSupabaseWriteConfigured()) {
     try {
-      const orders = await listSupabaseOrders();
+      const [orders, whatsappNumber] = await Promise.all([
+        listSupabaseOrders(),
+        readOrderWhatsappNumber().catch(() => ''),
+      ]);
       return NextResponse.json({
         success: true,
         orders,
+        whatsappNumber,
         primary: 'supabase',
         warning: null,
       });
@@ -126,9 +175,11 @@ export async function GET(request: Request) {
       const supabaseWarning = error instanceof Error ? error.message : 'Supabase orders could not be loaded.';
       try {
         const legacy = await readLegacyFirebaseOrders();
+        const whatsappNumber = await readOrderWhatsappNumber().catch(() => '');
         return NextResponse.json({
           success: true,
           orders: legacy.orders,
+          whatsappNumber,
           primary: 'firebase-fallback',
           warning: `Supabase orders could not be loaded. Showing Firebase fallback. ${supabaseWarning}`,
         });
@@ -144,9 +195,11 @@ export async function GET(request: Request) {
 
   try {
     const legacy = await readLegacyFirebaseOrders();
+    const whatsappNumber = await readOrderWhatsappNumber().catch(() => '');
     return NextResponse.json({
       success: true,
       orders: legacy.orders,
+      whatsappNumber,
       primary: 'firebase',
       warning: 'Supabase order storage is not configured on this deployment.',
     });
@@ -166,6 +219,22 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     const action = String(body?.action || '');
+
+    if (action === 'save-whatsapp') {
+      const number = String(body?.whatsappNumber || '').trim();
+      const digits = number.replace(/\D/g, '');
+      if (digits.length < 8 || digits.length > 15) {
+        return NextResponse.json({ error: 'A valid WhatsApp number is required.' }, { status: 400 });
+      }
+
+      const mirrorWarning = await saveOrderWhatsappNumber(number);
+      return NextResponse.json({
+        success: true,
+        primary: isSupabaseWriteConfigured() ? 'supabase' : 'firebase',
+        whatsappNumber: number,
+        mirrorWarning,
+      });
+    }
 
     if (action === 'sync-legacy') {
       if (!isSupabaseWriteConfigured()) {
