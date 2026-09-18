@@ -90,11 +90,12 @@ async function readLegacyFirebaseOrders() {
 }
 
 async function backfillLegacyOrdersToSupabase(orders: Array<Record<string, any>>, knownIds: Set<string>) {
-  if (!isSupabaseWriteConfigured()) return;
+  if (!isSupabaseWriteConfigured()) return 0;
   const missing = orders.filter((order) => order.id && !knownIds.has(String(order.id))).slice(0, 100);
-  if (!missing.length) return;
+  if (!missing.length) return 0;
 
-  await Promise.allSettled(missing.map(async (order) => {
+  let copied = 0;
+  for (const order of missing) {
     const row = {
       ...mapOrderToSupabase(String(order.id), order),
       authoritative_source: 'supabase',
@@ -102,18 +103,9 @@ async function backfillLegacyOrdersToSupabase(orders: Array<Record<string, any>>
       mirror_error: null,
     };
     await supabasePrimaryUpsert({ table: 'orders', row });
-  }));
-}
-
-function mergeOrders(primary: Array<Record<string, any>>, legacy: Array<Record<string, any>>) {
-  const merged = new Map<string, Record<string, any>>();
-  for (const order of legacy) {
-    if (order?.id) merged.set(String(order.id), order);
+    copied += 1;
   }
-  for (const order of primary) {
-    if (order?.id) merged.set(String(order.id), { ...(merged.get(String(order.id)) || {}), ...order });
-  }
-  return [...merged.values()];
+  return copied;
 }
 
 export async function GET(request: Request) {
@@ -121,43 +113,49 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Authentication required.' }, { status: 401 });
   }
 
-  let supabaseOrders: Array<Record<string, any>> = [];
-  let legacyOrders: Array<Record<string, any>> = [];
-  let warning = '';
-
   if (isSupabaseWriteConfigured()) {
     try {
-      supabaseOrders = await listSupabaseOrders();
+      const orders = await listSupabaseOrders();
+      return NextResponse.json({
+        success: true,
+        orders,
+        primary: 'supabase',
+        warning: null,
+      });
     } catch (error) {
-      warning = error instanceof Error ? error.message : 'Supabase orders could not be loaded.';
+      const supabaseWarning = error instanceof Error ? error.message : 'Supabase orders could not be loaded.';
+      try {
+        const legacy = await readLegacyFirebaseOrders();
+        return NextResponse.json({
+          success: true,
+          orders: legacy.orders,
+          primary: 'firebase-fallback',
+          warning: `Supabase orders could not be loaded. Showing Firebase fallback. ${supabaseWarning}`,
+        });
+      } catch (legacyError) {
+        const legacyMessage = legacyError instanceof Error ? legacyError.message : String(legacyError);
+        return NextResponse.json(
+          { error: `Orders could not be loaded from Supabase or the Firebase fallback. ${supabaseWarning} ${legacyMessage}` },
+          { status: 503 },
+        );
+      }
     }
   }
 
   try {
     const legacy = await readLegacyFirebaseOrders();
-    legacyOrders = legacy.orders;
-    if (isSupabaseWriteConfigured() && legacyOrders.length) {
-      void backfillLegacyOrdersToSupabase(legacyOrders, new Set(supabaseOrders.map((order) => String(order.id))));
-    }
+    return NextResponse.json({
+      success: true,
+      orders: legacy.orders,
+      primary: 'firebase',
+      warning: 'Supabase order storage is not configured on this deployment.',
+    });
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    const quotaExceeded = /RESOURCE_EXHAUSTED|quota exceeded/i.test(message);
-    warning = warning || (quotaExceeded
-      ? 'Firebase legacy order sync is temporarily unavailable because its quota is exhausted. Supabase orders are still available.'
-      : 'Legacy Firebase orders could not be refreshed. Supabase orders are still available.');
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Orders could not be loaded.' },
+      { status: 503 },
+    );
   }
-
-  const orders = mergeOrders(supabaseOrders, legacyOrders);
-  if (!orders.length && warning) {
-    return NextResponse.json({ error: warning }, { status: 503 });
-  }
-
-  return NextResponse.json({
-    success: true,
-    orders,
-    primary: isSupabaseWriteConfigured() ? 'supabase' : 'firebase',
-    warning: warning || null,
-  });
 }
 
 export async function POST(request: Request) {
@@ -168,8 +166,42 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     const action = String(body?.action || '');
-    const orderId = String(body?.orderId || '').trim();
 
+    if (action === 'sync-legacy') {
+      if (!isSupabaseWriteConfigured()) {
+        return NextResponse.json({ error: 'Supabase order storage is not configured.' }, { status: 503 });
+      }
+
+      try {
+        const [supabaseOrders, legacy] = await Promise.all([
+          listSupabaseOrders(),
+          readLegacyFirebaseOrders(),
+        ]);
+        const copied = await backfillLegacyOrdersToSupabase(
+          legacy.orders,
+          new Set(supabaseOrders.map((order) => String(order.id))),
+        );
+        return NextResponse.json({
+          success: true,
+          primary: 'supabase',
+          copied,
+          totalLegacyOrders: legacy.orders.length,
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        const quotaExceeded = /RESOURCE_EXHAUSTED|quota exceeded/i.test(message);
+        return NextResponse.json(
+          {
+            error: quotaExceeded
+              ? 'Firebase legacy order sync is temporarily unavailable because its quota is exhausted.'
+              : message || 'Legacy order sync failed.',
+          },
+          { status: 503 },
+        );
+      }
+    }
+
+    const orderId = String(body?.orderId || '').trim();
     if (!orderId) {
       return NextResponse.json({ error: 'Order id is required.' }, { status: 400 });
     }
