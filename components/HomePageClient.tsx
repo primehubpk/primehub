@@ -100,10 +100,10 @@ export default function HomePageClient({
       }
     }
 
-    // Refresh immediately after hydration even when the server supplied data.
-    // This removes any navigation/prefetch lag and makes Admin variant edits
-    // visible from the Supabase-first no-store reader without waiting for a poll.
-    void refreshCatalog();
+    // A populated server seed is already fresh within the page revalidation
+    // window. Avoid downloading the complete catalog again during hydration;
+    // this otherwise competes with above-the-fold images on slow connections.
+    if (initialProducts.length === 0) void refreshCatalog();
 
     // Keep an already-open storefront synchronized with Admin/Bot catalog writes.
     const refreshTimer = window.setInterval(() => {
