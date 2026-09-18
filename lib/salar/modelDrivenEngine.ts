@@ -62,7 +62,7 @@ type ModelDecision = {
   orderCustomer: OrderCustomerDraft;
 };
 
-const MAX_KEYS_PER_PROVIDER = 12;
+const MAX_KEYS_PER_PROVIDER = 9;
 const MAX_HISTORY = 12;
 const MAX_HISTORY_PROMPT_CHARS = 2600;
 const MAX_SHOWN_IDS = 200;
@@ -71,7 +71,7 @@ const MAX_CATEGORY_CONTEXT = 16;
 const MAX_RENDER_PRODUCTS = 400;
 const MAX_RENDER_CATEGORIES = 30;
 const MAX_ORDER_PRODUCTS = 30;
-const TEXT_TIMEOUT_MS = 14000;
+const TEXT_TIMEOUT_MS = 4000;
 const VISION_TIMEOUT_MS = 18000;
 const REFERENCE_IMAGE_CACHE_TTL_MS = 30 * 60 * 1000;
 
@@ -468,6 +468,7 @@ async function callOpenAiCompatible(
   history: ChatMessage[],
   user: string,
   images: SalarModelImageInput[],
+  externalSignal?: AbortSignal,
 ) {
   const model = modelForTarget(target, images.length > 0);
   if (!model) throw new Error(`${target.provider} model is not configured`);
@@ -502,7 +503,9 @@ async function callOpenAiCompatible(
       ...(!images.length ? { response_format: { type: 'json_object' } } : {}),
     }),
     cache: 'no-store',
-    signal: AbortSignal.timeout(images.length ? VISION_TIMEOUT_MS : TEXT_TIMEOUT_MS),
+    signal: externalSignal
+      ? AbortSignal.any([externalSignal, AbortSignal.timeout(images.length ? VISION_TIMEOUT_MS : TEXT_TIMEOUT_MS)])
+      : AbortSignal.timeout(images.length ? VISION_TIMEOUT_MS : TEXT_TIMEOUT_MS),
   });
 
   if (!response.ok) {
@@ -521,6 +524,7 @@ async function callGemini(
   history: ChatMessage[],
   user: string,
   images: SalarModelImageInput[],
+  externalSignal?: AbortSignal,
 ) {
   const model = modelForTarget(target, images.length > 0);
   if (!model) throw new Error('gemini model is not configured');
@@ -544,7 +548,9 @@ async function callGemini(
         },
       }),
       cache: 'no-store',
-      signal: AbortSignal.timeout(images.length ? VISION_TIMEOUT_MS : TEXT_TIMEOUT_MS),
+      signal: externalSignal
+      ? AbortSignal.any([externalSignal, AbortSignal.timeout(images.length ? VISION_TIMEOUT_MS : TEXT_TIMEOUT_MS)])
+      : AbortSignal.timeout(images.length ? VISION_TIMEOUT_MS : TEXT_TIMEOUT_MS),
     },
   );
 
@@ -564,10 +570,11 @@ async function runTarget(
   history: ChatMessage[],
   user: string,
   images: SalarModelImageInput[],
+  externalSignal?: AbortSignal,
 ) {
   return target.provider === 'gemini'
-    ? callGemini(target, system, history, user, images)
-    : callOpenAiCompatible(target, system, history, user, images);
+    ? callGemini(target, system, history, user, images, externalSignal)
+    : callOpenAiCompatible(target, system, history, user, images, externalSignal);
 }
 
 function shouldAttachReferenceImages(message: string) {
@@ -812,6 +819,10 @@ export async function answerWithModelDrivenSalar(input: {
   let lastError: unknown = null;
   let skipProvider: ProviderName | null = null;
 
+  // Strict provider/key priority requested for PrimeHub:
+  // Groq key 1 -> 9, then Gemini key 1 -> 9, then OpenRouter key 1 -> 9.
+  // A healthy first key normally answers immediately; failed/rate-limited keys
+  // move to the next key without changing Salar's admin instructions or logic.
   for (const target of targets) {
     if (skipProvider === target.provider) continue;
     try {
@@ -819,7 +830,9 @@ export async function answerWithModelDrivenSalar(input: {
       const parsed = parseDecision(result.text);
       if (!parsed) {
         lastError = new Error(`${target.provider} invalid structured response`);
-        console.warn(`Salar ${target.provider} key ${target.keyIndex} returned an unusable response; trying next key/provider.`);
+        console.warn(
+          `Salar ${target.provider} key ${target.keyIndex} returned an unusable response; trying next key/provider.`,
+        );
         continue;
       }
       finalProvider = result;
@@ -828,6 +841,8 @@ export async function answerWithModelDrivenSalar(input: {
     } catch (error) {
       lastError = error;
       const errorMessage = error instanceof Error ? error.message : 'unknown';
+      // A 413 is payload/provider-wide, so trying the same provider's other
+      // keys cannot help; move directly to the next provider.
       if (/\b413\b.*request too large/i.test(errorMessage)) skipProvider = target.provider;
       console.warn(
         `Salar ${target.provider} key ${target.keyIndex} failed; trying next key/provider.`,
