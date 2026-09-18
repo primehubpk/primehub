@@ -1,7 +1,7 @@
 'use client';
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, Ban, Bot, PauseCircle, PlayCircle, RefreshCw, Send, Trash2, X } from 'lucide-react';
+import { ArrowLeft, Ban, Bot, PauseCircle, PlayCircle, RefreshCw, Send, Trash2, Unlock, X } from 'lucide-react';
 
 type ChatSummary = {
   id: string;
@@ -16,6 +16,7 @@ type ChatSummary = {
   lastActor: 'customer' | 'salar' | 'admin' | null;
   messageCount: number;
   imageUrl?: string;
+  blocked?: boolean;
 };
 
 type ChatMessage = {
@@ -40,7 +41,7 @@ type Props = {
   onClose: () => void;
 };
 
-type ChatAction = 'pause' | 'resume' | 'reply' | 'delete' | 'block';
+type ChatAction = 'pause' | 'resume' | 'reply' | 'delete' | 'block' | 'unblock';
 
 function timeLabel(value: string) {
   try {
@@ -58,6 +59,9 @@ export default function SalarAdminDrawer({ open, onClose }: Props) {
   const [reply, setReply] = useState('');
   const [loading, setLoading] = useState(false);
   const [acting, setActing] = useState(false);
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
   const [error, setError] = useState('');
 
   const loadList = useCallback(async (quiet = false) => {
@@ -112,6 +116,64 @@ export default function SalarAdminDrawer({ open, onClose }: Props) {
     return true;
   }), [chats, filter]);
 
+  const visibleChatIds = useMemo(() => visibleChats.map((chat) => chat.id), [visibleChats]);
+  const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds]);
+  const allVisibleSelected = visibleChatIds.length > 0 && visibleChatIds.every((id) => selectedSet.has(id));
+
+  function beginSelectAll() {
+    setSelectionMode(true);
+    setSelectedIds(visibleChatIds);
+  }
+
+  function toggleSelected(chatId: string) {
+    setSelectionMode(true);
+    setSelectedIds((current) => current.includes(chatId)
+      ? current.filter((id) => id !== chatId)
+      : [...current, chatId]);
+  }
+
+  function selectAllVisible() {
+    setSelectedIds(visibleChatIds);
+  }
+
+  function cancelSelection() {
+    setSelectionMode(false);
+    setSelectedIds([]);
+  }
+
+  async function deleteSelectedChats() {
+    const ids = selectedIds.filter((id) => chats.some((chat) => chat.id === id));
+    if (!ids.length || bulkDeleting) return;
+    if (!window.confirm(`Delete ${ids.length} selected chat${ids.length === 1 ? '' : 's'}? This cannot be undone.`)) return;
+
+    setBulkDeleting(true);
+    setError('');
+    try {
+      const response = await fetch('/api/admin/salar/chats', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        cache: 'no-store',
+        body: JSON.stringify({ action: 'bulk-delete', chatIds: ids }),
+      });
+      const result = await response.json().catch(() => null);
+      if (!response.ok || !result?.success) throw new Error(result?.error || 'Selected chats could not be deleted.');
+
+      const deletedIds = new Set(Array.isArray(result.deletedIds) ? result.deletedIds : ids);
+      setChats((current) => current.filter((chat) => !deletedIds.has(chat.id)));
+      if (selectedId && deletedIds.has(selectedId)) {
+        setSelectedId('');
+        setDetail(null);
+      }
+      cancelSelection();
+      await loadList(true);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Selected chats could not be deleted.');
+    } finally {
+      setBulkDeleting(false);
+    }
+  }
+
   async function action(actionName: ChatAction, message = '', pauseSalar = false, targetChatId = selectedId) {
     if (!targetChatId || acting) return;
     setActing(true);
@@ -152,6 +214,11 @@ export default function SalarAdminDrawer({ open, onClose }: Props) {
 
   async function confirmBlock(chat: ChatSummary) {
     const label = chat.customerName || chat.customerEmail || 'this customer';
+    if (chat.blocked) {
+      if (!window.confirm(`Unblock ${label}? Salar will be available to this customer again.`)) return;
+      await action('unblock', '', false, chat.id);
+      return;
+    }
     if (!window.confirm(`Block ${label}? Salar chat access will be stopped for this guest/session or logged-in account.`)) return;
     await action('block', '', false, chat.id);
   }
@@ -182,18 +249,49 @@ export default function SalarAdminDrawer({ open, onClose }: Props) {
 
       {!selectedId ? (
         <>
-          <div className="flex shrink-0 items-center gap-2 border-b border-black/8 bg-white px-3 py-2.5">
-            {(['active', 'inactive', 'all'] as const).map((value) => (
-              <button key={value} type="button" onClick={() => setFilter(value)} className={`rounded-full px-3 py-2 text-[9px] font-black capitalize ${filter === value ? 'bg-[#14140F] text-white' : 'bg-[#F1F1ED] text-black/55'}`}>{value}</button>
-            ))}
-            <button type="button" onClick={() => void loadList()} className="ml-auto flex h-8 w-8 items-center justify-center rounded-full bg-[#F1F1ED] text-black/55" aria-label="Refresh chats"><RefreshCw size={14}/></button>
+          <div className="shrink-0 border-b border-black/8 bg-white">
+            <div className="flex items-center gap-2 px-3 py-2.5">
+              {(['active', 'inactive', 'all'] as const).map((value) => (
+                <button key={value} type="button" onClick={() => setFilter(value)} className={`rounded-full px-3 py-2 text-[9px] font-black capitalize ${filter === value ? 'bg-[#14140F] text-white' : 'bg-[#F1F1ED] text-black/55'}`}>{value}</button>
+              ))}
+              <button type="button" onClick={() => void loadList()} className="ml-auto flex h-8 w-8 items-center justify-center rounded-full bg-[#F1F1ED] text-black/55" aria-label="Refresh chats"><RefreshCw size={14}/></button>
+            </div>
+            {!selectionMode ? (
+              <div className="flex items-center justify-between border-t border-black/6 px-3 py-2">
+                <p className="text-[8px] font-bold text-black/35">{visibleChats.length} chats shown</p>
+                <button type="button" disabled={!visibleChats.length} onClick={beginSelectAll} className="rounded-full bg-[#F1F1ED] px-3 py-2 text-[8px] font-black text-black/65 disabled:opacity-40">
+                  Select all
+                </button>
+              </div>
+            ) : (
+              <div className="flex flex-wrap items-center gap-2 border-t border-black/6 px-3 py-2">
+                <span className="mr-auto text-[8px] font-black text-black/55">{selectedIds.length} selected</span>
+                {!allVisibleSelected ? (
+                  <button type="button" onClick={selectAllVisible} className="rounded-full bg-[#F1F1ED] px-3 py-2 text-[8px] font-black text-black/65">Select all</button>
+                ) : null}
+                <button type="button" onClick={cancelSelection} className="rounded-full bg-[#F1F1ED] px-3 py-2 text-[8px] font-black text-black/65">Cancel</button>
+                <button type="button" disabled={!selectedIds.length || bulkDeleting} onClick={() => void deleteSelectedChats()} className="inline-flex items-center gap-1 rounded-full bg-[#C62E25] px-3 py-2 text-[8px] font-black text-white disabled:opacity-40">
+                  <Trash2 size={11}/>{bulkDeleting ? 'Deleting…' : 'Delete selected'}
+                </button>
+              </div>
+            )}
           </div>
           <div className="flex-1 overflow-y-auto overscroll-contain p-3">
             {loading ? <div className="rounded-2xl bg-white p-4 text-xs font-bold text-black/40">Loading chats…</div> : null}
             {!loading && visibleChats.length === 0 ? <div className="rounded-2xl bg-white p-4 text-xs text-black/45">No {filter === 'all' ? '' : filter} chats yet.</div> : null}
             <div className="space-y-2">
               {visibleChats.map((chat) => (
-                <div key={chat.id} className="flex items-stretch gap-2 rounded-2xl border border-black/7 bg-white p-2 shadow-sm">
+                <div key={chat.id} className={`flex items-stretch gap-2 rounded-2xl border bg-white p-2 shadow-sm ${selectionMode && selectedSet.has(chat.id) ? 'border-[#0F6A5F]/35 ring-1 ring-[#0F6A5F]/15' : 'border-black/7'}`}>
+                  {selectionMode ? (
+                    <label className="flex shrink-0 items-center pl-1" aria-label={`Select ${chat.customerName || 'customer chat'}`}>
+                      <input
+                        type="checkbox"
+                        checked={selectedSet.has(chat.id)}
+                        onChange={() => toggleSelected(chat.id)}
+                        className="h-4 w-4 accent-[#0F6A5F]"
+                      />
+                    </label>
+                  ) : null}
                   <button type="button" onClick={() => setSelectedId(chat.id)} className="flex min-w-0 flex-1 items-center gap-3 rounded-xl p-1 text-left">
                     <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-xl bg-[#F1F1ED]">
                       {chat.imageUrl ? <img src={chat.imageUrl} alt="" className="h-full w-full object-cover"/> : <div className="flex h-full w-full items-center justify-center text-sm font-black text-black/25">{(chat.customerName || 'C').slice(0, 1).toUpperCase()}</div>}
@@ -209,10 +307,21 @@ export default function SalarAdminDrawer({ open, onClose }: Props) {
                       <p className="mt-1 text-[7px] font-bold text-black/30">{chat.messageCount} msgs · {timeLabel(chat.updatedAt)}</p>
                     </div>
                   </button>
-                  <div className="flex shrink-0 flex-col justify-center gap-1.5">
-                    <button type="button" disabled={acting} onClick={() => void confirmBlock(chat)} className="flex h-8 w-8 items-center justify-center rounded-full bg-[#FFF1D6] text-[#9A6200] disabled:opacity-40" aria-label={`Block ${chat.customerName || 'customer'}`} title="Block customer"><Ban size={13}/></button>
-                    <button type="button" disabled={acting} onClick={() => void confirmDelete(chat)} className="flex h-8 w-8 items-center justify-center rounded-full bg-[#FFE8E5] text-[#C62E25] disabled:opacity-40" aria-label={`Delete ${chat.customerName || 'chat'}`} title="Delete chat"><Trash2 size={13}/></button>
-                  </div>
+                  {!selectionMode ? (
+                    <div className="flex shrink-0 flex-col justify-center gap-1.5">
+                      <button
+                        type="button"
+                        disabled={acting}
+                        onClick={() => void confirmBlock(chat)}
+                        className={`flex h-8 w-8 items-center justify-center rounded-full disabled:opacity-40 ${chat.blocked ? 'bg-[#DDF5F0] text-[#0F6A5F]' : 'bg-[#FFF1D6] text-[#9A6200]'}`}
+                        aria-label={`${chat.blocked ? 'Unblock' : 'Block'} ${chat.customerName || 'customer'}`}
+                        title={chat.blocked ? 'Unblock customer' : 'Block customer'}
+                      >
+                        {chat.blocked ? <Unlock size={13}/> : <Ban size={13}/>}
+                      </button>
+                      <button type="button" disabled={acting} onClick={() => void confirmDelete(chat)} className="flex h-8 w-8 items-center justify-center rounded-full bg-[#FFE8E5] text-[#C62E25] disabled:opacity-40" aria-label={`Delete ${chat.customerName || 'chat'}`} title="Delete chat"><Trash2 size={13}/></button>
+                    </div>
+                  ) : null}
                 </div>
               ))}
             </div>
@@ -229,11 +338,11 @@ export default function SalarAdminDrawer({ open, onClose }: Props) {
               <button
                 type="button"
                 disabled={acting || !detail}
-                onClick={() => void action(detail?.salarPaused ? 'resume' : 'pause')}
-                className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-2 text-[8px] font-black text-white disabled:opacity-40 ${detail?.salarPaused ? 'bg-[#0F6A5F]' : 'bg-[#E1352B]'}`}
+                onClick={() => void action(detail?.blocked ? 'unblock' : detail?.salarPaused ? 'resume' : 'pause')}
+                className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-2 text-[8px] font-black text-white disabled:opacity-40 ${detail?.blocked || detail?.salarPaused ? 'bg-[#0F6A5F]' : 'bg-[#E1352B]'}`}
               >
-                {detail?.salarPaused ? <PlayCircle size={13}/> : <PauseCircle size={13}/>}
-                {detail?.salarPaused ? 'Continue Salar' : 'Stop Salar'}
+                {detail?.blocked ? <Unlock size={13}/> : detail?.salarPaused ? <PlayCircle size={13}/> : <PauseCircle size={13}/>}
+                {detail?.blocked ? 'Unblock' : detail?.salarPaused ? 'Continue Salar' : 'Stop Salar'}
               </button>
             </div>
           </div>
@@ -268,7 +377,7 @@ export default function SalarAdminDrawer({ open, onClose }: Props) {
           </div>
 
           <div className="shrink-0 border-t border-black/8 bg-white p-3">
-            {detail?.salarPaused ? <p className="mb-2 rounded-xl bg-[#FFF1D6] px-3 py-2 text-[8px] font-bold text-[#8A5A00]">Salar is stopped only for this customer chat. Other customers continue normally.</p> : null}
+            {detail?.blocked ? <p className="mb-2 rounded-xl bg-[#FFE8E5] px-3 py-2 text-[8px] font-bold text-[#A32720]">This customer is blocked. Tap Unblock above to restore Salar access.</p> : detail?.salarPaused ? <p className="mb-2 rounded-xl bg-[#FFF1D6] px-3 py-2 text-[8px] font-bold text-[#8A5A00]">Salar is stopped only for this customer chat. Other customers continue normally.</p> : null}
             <form onSubmit={(event) => void submitReply(event, false)}>
               <textarea value={reply} onChange={(event) => setReply(event.target.value.slice(0, 6000))} rows={2} placeholder="Reply as PrimeHub Admin…" className="w-full resize-none rounded-xl bg-[#F1F1ED] px-3 py-2.5 text-[10px] outline-none"/>
               <div className="mt-2 flex gap-2">
