@@ -71,8 +71,9 @@ const MAX_CATEGORY_CONTEXT = 16;
 const MAX_RENDER_PRODUCTS = 400;
 const MAX_RENDER_CATEGORIES = 30;
 const MAX_ORDER_PRODUCTS = 30;
-const TEXT_TIMEOUT_MS = 14000;
+const TEXT_TIMEOUT_MS = 6000;
 const VISION_TIMEOUT_MS = 18000;
+const MAX_FAST_FAILOVER_ROUNDS = 3;
 const REFERENCE_IMAGE_CACHE_TTL_MS = 30 * 60 * 1000;
 
 type ImageCacheEntry = { expiresAt: number; image: SalarModelImageInput };
@@ -468,6 +469,7 @@ async function callOpenAiCompatible(
   history: ChatMessage[],
   user: string,
   images: SalarModelImageInput[],
+  externalSignal?: AbortSignal,
 ) {
   const model = modelForTarget(target, images.length > 0);
   if (!model) throw new Error(`${target.provider} model is not configured`);
@@ -502,7 +504,9 @@ async function callOpenAiCompatible(
       ...(!images.length ? { response_format: { type: 'json_object' } } : {}),
     }),
     cache: 'no-store',
-    signal: AbortSignal.timeout(images.length ? VISION_TIMEOUT_MS : TEXT_TIMEOUT_MS),
+    signal: externalSignal
+      ? AbortSignal.any([externalSignal, AbortSignal.timeout(images.length ? VISION_TIMEOUT_MS : TEXT_TIMEOUT_MS)])
+      : AbortSignal.timeout(images.length ? VISION_TIMEOUT_MS : TEXT_TIMEOUT_MS),
   });
 
   if (!response.ok) {
@@ -521,6 +525,7 @@ async function callGemini(
   history: ChatMessage[],
   user: string,
   images: SalarModelImageInput[],
+  externalSignal?: AbortSignal,
 ) {
   const model = modelForTarget(target, images.length > 0);
   if (!model) throw new Error('gemini model is not configured');
@@ -544,7 +549,9 @@ async function callGemini(
         },
       }),
       cache: 'no-store',
-      signal: AbortSignal.timeout(images.length ? VISION_TIMEOUT_MS : TEXT_TIMEOUT_MS),
+      signal: externalSignal
+      ? AbortSignal.any([externalSignal, AbortSignal.timeout(images.length ? VISION_TIMEOUT_MS : TEXT_TIMEOUT_MS)])
+      : AbortSignal.timeout(images.length ? VISION_TIMEOUT_MS : TEXT_TIMEOUT_MS),
     },
   );
 
@@ -564,10 +571,11 @@ async function runTarget(
   history: ChatMessage[],
   user: string,
   images: SalarModelImageInput[],
+  externalSignal?: AbortSignal,
 ) {
   return target.provider === 'gemini'
-    ? callGemini(target, system, history, user, images)
-    : callOpenAiCompatible(target, system, history, user, images);
+    ? callGemini(target, system, history, user, images, externalSignal)
+    : callOpenAiCompatible(target, system, history, user, images, externalSignal);
 }
 
 function shouldAttachReferenceImages(message: string) {
@@ -810,29 +818,51 @@ export async function answerWithModelDrivenSalar(input: {
   let finalProvider: { text: string; provider: ProviderName; model: string } | null = null;
   let decision: ModelDecision | null = null;
   let lastError: unknown = null;
-  let skipProvider: ProviderName | null = null;
+  const skipProviders = new Set<ProviderName>();
+  const maxConfiguredKeyIndex = Math.max(...targets.map((target) => target.keyIndex));
+  const failoverRounds = Math.min(MAX_FAST_FAILOVER_ROUNDS, maxConfiguredKeyIndex);
 
-  for (const target of targets) {
-    if (skipProvider === target.provider) continue;
+  // Fast failover: try the same key slot across providers in parallel and use
+  // the first valid structured reply. This keeps Salar's admin instructions,
+  // history and catalogue logic unchanged while avoiding long serial waits.
+  for (let keyIndex = 1; keyIndex <= failoverRounds; keyIndex += 1) {
+    const roundTargets = targets.filter(
+      (target) => target.keyIndex === keyIndex && !skipProviders.has(target.provider),
+    );
+    if (!roundTargets.length) continue;
+
+    const roundAbort = new AbortController();
     try {
-      const result = await runTarget(target, system, history, user, images);
-      const parsed = parseDecision(result.text);
-      if (!parsed) {
-        lastError = new Error(`${target.provider} invalid structured response`);
-        console.warn(`Salar ${target.provider} key ${target.keyIndex} returned an unusable response; trying next key/provider.`);
-        continue;
-      }
-      finalProvider = result;
-      decision = parsed;
+      const winner = await Promise.any(roundTargets.map(async (target) => {
+        try {
+          const result = await runTarget(target, system, history, user, images, roundAbort.signal);
+          const parsed = parseDecision(result.text);
+          if (!parsed) throw new Error(`${target.provider} invalid structured response`);
+          return { result, parsed };
+        } catch (error) {
+          if (roundAbort.signal.aborted) throw error;
+          lastError = error;
+          const errorMessage = error instanceof Error ? error.message : 'unknown';
+          if (/\b413\b.*request too large/i.test(errorMessage)) skipProviders.add(target.provider);
+          console.warn(
+            `Salar ${target.provider} key ${target.keyIndex} failed; trying next key/provider.`,
+            errorMessage,
+          );
+          throw error;
+        }
+      }));
+
+      finalProvider = winner.result;
+      decision = winner.parsed;
+      roundAbort.abort();
       break;
-    } catch (error) {
-      lastError = error;
-      const errorMessage = error instanceof Error ? error.message : 'unknown';
-      if (/\b413\b.*request too large/i.test(errorMessage)) skipProvider = target.provider;
-      console.warn(
-        `Salar ${target.provider} key ${target.keyIndex} failed; trying next key/provider.`,
-        errorMessage,
-      );
+    } catch (roundError) {
+      roundAbort.abort();
+      if (roundError instanceof AggregateError && roundError.errors.length) {
+        lastError = roundError.errors[roundError.errors.length - 1];
+      } else {
+        lastError = roundError;
+      }
     }
   }
 
