@@ -7,7 +7,7 @@ import { getWholesaleVideosSnapshot } from '@/lib/wholesaleVideosServer';
 const CATALOG_RETRY_DELAYS_MS = [0];
 const SETTINGS_RETRY_DELAYS_MS = [0];
 const PUBLIC_PRIMARY_TIMEOUT_MS = 8000;
-const CATALOG_READ_CACHE = { revalidate: 3600, tags: ['public-catalog'], timeoutMs: PUBLIC_PRIMARY_TIMEOUT_MS };
+const CATALOG_READ_CACHE = { revalidate: 30, tags: ['public-catalog'], timeoutMs: PUBLIC_PRIMARY_TIMEOUT_MS };
 const PRODUCT_READ_CACHE = { revalidate: 60, tags: ['public-products'], timeoutMs: PUBLIC_PRIMARY_TIMEOUT_MS };
 const SETTINGS_READ_CACHE = { revalidate: 60, tags: ['storefront-settings'], timeoutMs: PUBLIC_PRIMARY_TIMEOUT_MS };
 const SKILLS_READ_CACHE = { revalidate: 600, tags: ['prime-skills', 'storefront-settings'], timeoutMs: PUBLIC_PRIMARY_TIMEOUT_MS };
@@ -39,8 +39,8 @@ async function loadPublicCatalog() {
 
 export const getPublicCatalogSnapshot = unstable_cache(
   loadPublicCatalog,
-  ['primehub-public-catalog-dual-v6'],
-  { revalidate: 3600, tags: ['public-catalog'] },
+  ['primehub-public-catalog-dual-v7'],
+  { revalidate: 30, tags: ['public-catalog'] },
 );
 
 const CATALOG_SEED_HEAVY_FIELDS = new Set([
