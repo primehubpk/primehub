@@ -36,7 +36,7 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     const result = await saveWholesaleVideosSupabasePrimary(body?.videos);
-    revalidateTag('storefront-settings');
+    revalidateTag('storefront-settings', 'max');
     return NextResponse.json({ success: true, ...result });
   } catch (error) {
     console.error('Wholesale package admin save failed', error);

@@ -52,6 +52,6 @@ export async function saveSalarUiSettings(input: { iconUrl?: unknown }) {
   const row = mapDocumentToSupabase('settings', SETTINGS_ID, next, 'supabase');
   if (!row) throw new Error('Could not build Salar UI settings row.');
   await supabasePrimaryUpsert({ table: 'settings', row });
-  revalidateTag(SETTINGS_TAG);
+  revalidateTag(SETTINGS_TAG, 'max');
   return next;
 }
