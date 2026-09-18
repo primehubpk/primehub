@@ -156,7 +156,7 @@ function labelForKey(key: string) {
   return labels[key] || key.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[_-]+/g, ' ').replace(/^./, (letter) => letter.toUpperCase());
 }
 
-function messageValue(value: unknown) {
+function messageValue(value: unknown): string {
   if (value == null) return '';
   if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return String(value).trim();
   if (Array.isArray(value)) return value.map(messageValue).filter(Boolean).join(', ');
