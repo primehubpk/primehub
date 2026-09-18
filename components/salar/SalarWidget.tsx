@@ -422,12 +422,33 @@ export default function SalarWidget() {
     }
   }, []);
 
-  useEffect(() => {
-    void fetch('/api/admin/session', { credentials: 'same-origin', cache: 'no-store' })
-      .then((response) => response.json())
-      .then((result) => setAdminAuthenticated(result?.authenticated === true))
-      .catch(() => setAdminAuthenticated(false));
+  const refreshAdminSession = useCallback(async () => {
+    try {
+      const response = await fetch('/api/admin/session', { credentials: 'same-origin', cache: 'no-store' });
+      const result = await response.json().catch(() => null);
+      setAdminAuthenticated(result?.authenticated === true);
+    } catch {
+      setAdminAuthenticated(false);
+    }
   }, []);
+
+  useEffect(() => {
+    void refreshAdminSession();
+    const onFocus = () => void refreshAdminSession();
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') void refreshAdminSession();
+    };
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [refreshAdminSession]);
+
+  useEffect(() => {
+    if (open) void refreshAdminSession();
+  }, [open, refreshAdminSession]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -914,7 +935,7 @@ export default function SalarWidget() {
             <div className="flex min-w-0 items-center gap-2">
               {adminAuthenticated ? <button type="button" onClick={() => setAdminDrawerOpen(true)} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10" aria-label="Open customer chats"><Menu size={18}/></button> : null}
               <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#FFB020] text-[#14140F]"><SalarIcon iconUrl={iconUrl} size={19}/></span>
-              <div className="min-w-0"><p className="truncate text-sm font-black">Salar</p><p className="truncate text-[9px] font-bold text-white/55">PrimeHubMall AI Salesman</p></div>
+              <div className="min-w-0"><div className="flex min-w-0 items-center gap-2"><p className="truncate text-sm font-black">Salar</p><span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[8px] font-black text-emerald-300"><span className="h-1.5 w-1.5 rounded-full bg-emerald-400"/>Online</span></div><p className="truncate text-[9px] font-bold text-white/55">PrimeHubMall AI Salesman</p></div>
             </div>
             <div className="flex items-center gap-2">
               <button type="button" onClick={() => setExpanded((value) => !value)} aria-label={expanded ? 'Make chat smaller' : 'Open full chat'} className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 transition active:scale-95">{expanded ? <Minimize2 size={17}/> : <Maximize2 size={17}/>}</button>
