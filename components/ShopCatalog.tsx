@@ -162,24 +162,11 @@ export default function ShopCatalog({
     [categorySections],
   );
 
-  const followingSections = useMemo(() => {
-    const remaining = categorySections.filter((section) => !section.selected);
-    if (!currentSection) return remaining;
+  // A category route should render only the requested category. Rendering every
+  // other category below it multiplies HTML size and starts hundreds of image
+  // requests; customers can switch categories with the directory immediately below.
+  const followingSections: typeof categorySections = [];
 
-    const selectedLabel = categoryLabel(currentSection.category);
-    const sourceOrder = new Map(
-      categorySections.map((section, index) => [section.value, index]),
-    );
-
-    return [...remaining].sort((a, b) => {
-      const relationDifference =
-        relatedScore(selectedLabel, categoryLabel(b.category)) -
-        relatedScore(selectedLabel, categoryLabel(a.category));
-
-      if (relationDifference !== 0) return relationDifference;
-      return (sourceOrder.get(a.value) || 0) - (sourceOrder.get(b.value) || 0);
-    });
-  }, [categorySections, currentSection]);
 
   const recommendations = useMemo(() => {
     if (budgetView) {
