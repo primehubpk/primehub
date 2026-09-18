@@ -3,7 +3,7 @@ import { Suspense } from 'react';
 import ShopLandingCatalog from '@/components/shop/ShopLandingCatalog';
 import ShopRouteLoading from '@/components/shop/ShopRouteLoading';
 import { SettingsProvider } from '@/lib/useSettings';
-import { getPublicCatalogSnapshot, getStorefrontSettingsSnapshot } from '@/lib/publicCatalogServer';
+import { compactPublicCatalogSnapshot, getPublicCatalogSnapshot, getStorefrontSettingsSnapshot } from '@/lib/publicCatalogServer';
 import type { SiteSettings } from '@/lib/types';
 import type { Product, Category } from '@/components/shop/ShopTypes';
 
@@ -28,7 +28,7 @@ async function SeededShopCatalog() {
   ]);
 
   const catalog = catalogResult.status === 'fulfilled'
-    ? catalogResult.value
+    ? compactPublicCatalogSnapshot(catalogResult.value)
     : { products: [], categories: [] };
   const initialSettings = settingsResult.status === 'fulfilled'
     ? settingsResult.value
