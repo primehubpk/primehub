@@ -1,0 +1,28 @@
+name: Active Branch Type Check
+
+on:
+  push:
+    branches:
+      - fix/supabase-orders-primary-20260918
+    paths:
+      - components/product-detail/**
+      - components/salar/**
+      - lib/salar/**
+      - .github/workflows/active-typecheck.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  typecheck:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx tsc --noEmit
