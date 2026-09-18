@@ -183,6 +183,11 @@ export async function POST(request: Request) {
         await getAdminDb().collection('orders').doc(orderId).set(orderData);
       } catch (error) {
         console.warn('Order Firebase mirror skipped after Supabase primary success.', error instanceof Error ? error.message : 'unknown');
+        try {
+          await recordMirrorFailure('orders', orderId, 'upsert', orderData, 'firebase');
+        } catch (outboxError) {
+          console.error('Order Firebase mirror retry could not be queued.', outboxError instanceof Error ? outboxError.message : 'unknown');
+        }
       }
     } else {
       await getAdminDb().collection('orders').doc(orderId).set(orderData);
