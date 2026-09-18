@@ -15,6 +15,7 @@ function adminView(state: Awaited<ReturnType<typeof getSalarState>>) {
   return {
     enabled: state.enabled,
     instructions: state.instructions,
+    orderInstructions: state.orderInstructions,
     updatedAt: state.updatedAt,
     catalogue: state.catalogue ? {
       updatedAt: state.catalogue.updatedAt,
@@ -51,6 +52,7 @@ export async function PUT(request: Request) {
     const state = await saveSalarSettings({
       enabled: body?.enabled,
       instructions: body?.instructions,
+      orderInstructions: body?.orderInstructions,
     });
     return NextResponse.json({ success: true, salar: adminView(state) });
   } catch (error) {
