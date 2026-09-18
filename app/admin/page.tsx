@@ -21,10 +21,28 @@ function AdminPanel() {
   const [vendorRequests, setVendorRequests] = useState<VendorRequest[]>([]);
 
   useEffect(() => {
+    let active = true;
     const stopProducts = onSnapshot(adminCollection('products'), (snapshot) => setProducts(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Product)));
-    const stopOrders = onSnapshot(adminCollection('orders'), (snapshot) => setOrders(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Order)));
     const stopVendors = onSnapshot(adminCollection('vendor_submissions'), (snapshot) => setVendorRequests(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as VendorRequest)));
-    return () => { stopProducts(); stopOrders(); stopVendors(); };
+
+    fetch('/api/admin/orders', { credentials: 'same-origin', cache: 'no-store' })
+      .then(async (response) => {
+        const data = await response.json().catch(() => null);
+        if (!response.ok || data?.success !== true) throw new Error(data?.error || 'Orders could not be loaded.');
+        return data;
+      })
+      .then((data) => {
+        if (active) setOrders(Array.isArray(data.orders) ? data.orders : []);
+      })
+      .catch((error) => {
+        console.error('Admin dashboard orders failed to load from primary store.', error);
+      });
+
+    return () => {
+      active = false;
+      stopProducts();
+      stopVendors();
+    };
   }, []);
 
   async function logout() {
