@@ -1,5 +1,6 @@
 import 'server-only';
 
+import { unstable_cache } from 'next/cache';
 import { getAdminDb } from '@/lib/firebaseAdmin';
 import type { WholesaleVideo, VideoPlatform } from '@/lib/wholesaleVideos';
 
@@ -216,6 +217,12 @@ export async function getWholesaleVideosSnapshot() {
     };
   }
 }
+
+export const getCachedWholesaleVideosSnapshot = unstable_cache(
+  getWholesaleVideosSnapshot,
+  ['primehub-wholesale-videos-v1'],
+  { revalidate: 300, tags: ['storefront-settings', 'wholesale-videos'] },
+);
 
 export async function saveWholesaleVideosSupabasePrimary(values: unknown) {
   const videos = sanitizeWholesaleVideos(values);
