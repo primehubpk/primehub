@@ -3,6 +3,7 @@ import { getAdminDb } from '@/lib/firebaseAdmin';
 import {
   getSupabasePrimaryPayload,
   isSupabaseWriteConfigured,
+  mapDocumentToSupabase,
   mapOrderToSupabase,
   recordMirrorFailure,
   supabasePrimaryDelete,
@@ -103,7 +104,7 @@ async function saveOrderWhatsappNumber(number: string) {
   const payload = { whatsappNumber: number, updatedAt: new Date().toISOString() };
 
   if (isSupabaseWriteConfigured()) {
-    const row = mapOrderToSupabase(ORDER_WHATSAPP_SETTING_ID, payload);
+    const row = mapDocumentToSupabase('settings', ORDER_WHATSAPP_SETTING_ID, payload, 'supabase');
     if (!row) throw new Error('Unable to map the Order WhatsApp setting for Supabase.');
     await supabasePrimaryUpsert({ table: 'settings', row: { ...row, authoritative_source: 'supabase', mirror_status: 'synced', mirror_error: null } });
 
