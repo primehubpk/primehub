@@ -172,22 +172,6 @@ function updateCustomerMeta(chat: SalarCustomerChat, input: {
   } satisfies SalarCustomerChat;
 }
 
-async function persistedBusyReply(chat: SalarCustomerChat) {
-  const reply = 'Salar ke AI providers abhi busy hain. Aapka message save ho gaya hai — please ek dafa dobara send karein, Salar next available provider se reply karega.';
-  try {
-    const saved = await saveSalarChat(appendSalarMessage(chat, {
-      role: 'assistant',
-      actor: 'salar',
-      content: reply,
-      displayMode: 'none',
-    }));
-    return { reply, chat: saved };
-  } catch (error) {
-    console.error('Salar busy reply could not be persisted', error);
-    return { reply, chat };
-  }
-}
-
 export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
@@ -339,24 +323,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: 'Salar AI providers are not configured in the existing environment.' }, { status: 503 });
     }
     if (chat && isSalarProviderFailure(error)) {
-      const busy = await persistedBusyReply(chat);
+      // Never expose AI/provider internals to the customer and do not persist a
+      // fake Salar reply into the conversation. The customer's message is
+      // already safely stored, while the UI gets a short customer-safe retry.
       return NextResponse.json({
-        success: true,
-        reply: busy.reply,
-        provider: null,
-        model: null,
-        understandingProvider: null,
-        understandingModel: null,
-        displayMode: 'none',
-        products: [],
-        categories: [],
-        context: busy.chat.context,
-        orderAction: 'none',
-        orderProducts: [],
-        orderCustomer: {},
-        salarPaused: false,
-        chat: publicChat(busy.chat),
-      }, { headers: { 'Cache-Control': 'private, no-store, max-age=0' } });
+        success: false,
+        error: 'Reply send nahi ho saka. Please ek dafa message dobara send karein.',
+      }, {
+        status: 503,
+        headers: { 'Cache-Control': 'private, no-store, max-age=0' },
+      });
     }
     return NextResponse.json({ success: false, error: 'Salar could not respond right now. Please try again.' }, { status: 503 });
   }
