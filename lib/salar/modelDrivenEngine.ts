@@ -62,7 +62,7 @@ type ModelDecision = {
   orderCustomer: OrderCustomerDraft;
 };
 
-const MAX_KEYS_PER_PROVIDER = 12;
+const MAX_KEYS_PER_PROVIDER = 9;
 const MAX_HISTORY = 12;
 const MAX_HISTORY_PROMPT_CHARS = 2600;
 const MAX_SHOWN_IDS = 200;
@@ -71,9 +71,8 @@ const MAX_CATEGORY_CONTEXT = 16;
 const MAX_RENDER_PRODUCTS = 400;
 const MAX_RENDER_CATEGORIES = 30;
 const MAX_ORDER_PRODUCTS = 30;
-const TEXT_TIMEOUT_MS = 6000;
+const TEXT_TIMEOUT_MS = 4000;
 const VISION_TIMEOUT_MS = 18000;
-const MAX_FAST_FAILOVER_ROUNDS = 3;
 const REFERENCE_IMAGE_CACHE_TTL_MS = 30 * 60 * 1000;
 
 type ImageCacheEntry = { expiresAt: number; image: SalarModelImageInput };
@@ -818,51 +817,37 @@ export async function answerWithModelDrivenSalar(input: {
   let finalProvider: { text: string; provider: ProviderName; model: string } | null = null;
   let decision: ModelDecision | null = null;
   let lastError: unknown = null;
-  const skipProviders = new Set<ProviderName>();
-  const maxConfiguredKeyIndex = Math.max(...targets.map((target) => target.keyIndex));
-  const failoverRounds = Math.min(MAX_FAST_FAILOVER_ROUNDS, maxConfiguredKeyIndex);
+  let skipProvider: ProviderName | null = null;
 
-  // Fast failover: try the same key slot across providers in parallel and use
-  // the first valid structured reply. This keeps Salar's admin instructions,
-  // history and catalogue logic unchanged while avoiding long serial waits.
-  for (let keyIndex = 1; keyIndex <= failoverRounds; keyIndex += 1) {
-    const roundTargets = targets.filter(
-      (target) => target.keyIndex === keyIndex && !skipProviders.has(target.provider),
-    );
-    if (!roundTargets.length) continue;
-
-    const roundAbort = new AbortController();
+  // Strict provider/key priority requested for PrimeHub:
+  // Groq key 1 -> 9, then Gemini key 1 -> 9, then OpenRouter key 1 -> 9.
+  // A healthy first key normally answers immediately; failed/rate-limited keys
+  // move to the next key without changing Salar's admin instructions or logic.
+  for (const target of targets) {
+    if (skipProvider === target.provider) continue;
     try {
-      const winner = await Promise.any(roundTargets.map(async (target) => {
-        try {
-          const result = await runTarget(target, system, history, user, images, roundAbort.signal);
-          const parsed = parseDecision(result.text);
-          if (!parsed) throw new Error(`${target.provider} invalid structured response`);
-          return { result, parsed };
-        } catch (error) {
-          if (roundAbort.signal.aborted) throw error;
-          lastError = error;
-          const errorMessage = error instanceof Error ? error.message : 'unknown';
-          if (/\b413\b.*request too large/i.test(errorMessage)) skipProviders.add(target.provider);
-          console.warn(
-            `Salar ${target.provider} key ${target.keyIndex} failed; trying next key/provider.`,
-            errorMessage,
-          );
-          throw error;
-        }
-      }));
-
-      finalProvider = winner.result;
-      decision = winner.parsed;
-      roundAbort.abort();
-      break;
-    } catch (roundError) {
-      roundAbort.abort();
-      if (roundError instanceof AggregateError && roundError.errors.length) {
-        lastError = roundError.errors[roundError.errors.length - 1];
-      } else {
-        lastError = roundError;
+      const result = await runTarget(target, system, history, user, images);
+      const parsed = parseDecision(result.text);
+      if (!parsed) {
+        lastError = new Error(`${target.provider} invalid structured response`);
+        console.warn(
+          `Salar ${target.provider} key ${target.keyIndex} returned an unusable response; trying next key/provider.`,
+        );
+        continue;
       }
+      finalProvider = result;
+      decision = parsed;
+      break;
+    } catch (error) {
+      lastError = error;
+      const errorMessage = error instanceof Error ? error.message : 'unknown';
+      // A 413 is payload/provider-wide, so trying the same provider's other
+      // keys cannot help; move directly to the next provider.
+      if (/\b413\b.*request too large/i.test(errorMessage)) skipProvider = target.provider;
+      console.warn(
+        `Salar ${target.provider} key ${target.keyIndex} failed; trying next key/provider.`,
+        errorMessage,
+      );
     }
   }
 
