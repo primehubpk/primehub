@@ -338,6 +338,7 @@ async function adminWhatsAppNumber() {
 
 export default function SalarWidget() {
   const pathname = usePathname();
+  const isAdminRoute = pathname?.startsWith('/admin') === true;
   const [open, setOpen] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -381,6 +382,7 @@ export default function SalarWidget() {
   const lastProductHelpKeyRef = useRef('');
 
   useEffect(() => {
+    if (isAdminRoute) return;
     const stop = onAuthStateChanged(auth, (user) => {
       const name = String(user?.displayName || '').trim().slice(0, 120);
       const email = String(user?.email || '').trim().slice(0, 240);
@@ -390,9 +392,13 @@ export default function SalarWidget() {
       setOrderCustomer((current) => ({ ...current, name: current.name || name, email: current.email || email }));
     });
     return stop;
-  }, []);
+  }, [isAdminRoute]);
 
   useEffect(() => {
+    if (isAdminRoute) {
+      setHydrated(true);
+      return;
+    }
     try {
       let storedChatId = window.localStorage.getItem(CHAT_ID_KEY) || '';
       if (!/^[A-Za-z0-9_-]{12,80}$/.test(storedChatId)) {
@@ -423,9 +429,10 @@ export default function SalarWidget() {
     } finally {
       setHydrated(true);
     }
-  }, []);
+  }, [isAdminRoute]);
 
   const refreshAdminSession = useCallback(async () => {
+    if (isAdminRoute) return;
     try {
       const response = await fetch('/api/admin/session', { credentials: 'same-origin', cache: 'no-store' });
       const result = await response.json().catch(() => null);
@@ -433,9 +440,10 @@ export default function SalarWidget() {
     } catch {
       setAdminAuthenticated(false);
     }
-  }, []);
+  }, [isAdminRoute]);
 
   useEffect(() => {
+    if (isAdminRoute) return;
     void refreshAdminSession();
     const onFocus = () => void refreshAdminSession();
     const onVisibility = () => {
@@ -447,13 +455,15 @@ export default function SalarWidget() {
       window.removeEventListener('focus', onFocus);
       document.removeEventListener('visibilitychange', onVisibility);
     };
-  }, [refreshAdminSession]);
+  }, [isAdminRoute, refreshAdminSession]);
 
   useEffect(() => {
+    if (isAdminRoute) return;
     if (open) void refreshAdminSession();
-  }, [open, refreshAdminSession]);
+  }, [isAdminRoute, open, refreshAdminSession]);
 
   useEffect(() => {
+    if (isAdminRoute) return;
     const handleProductHelp = (event: Event) => {
       const detail = (event as CustomEvent<SalarProductHelpContext>).detail;
       if (!detail?.productId || !detail?.title || !detail?.path) return;
@@ -462,7 +472,7 @@ export default function SalarWidget() {
     };
     window.addEventListener(SALAR_PRODUCT_HELP_EVENT, handleProductHelp as EventListener);
     return () => window.removeEventListener(SALAR_PRODUCT_HELP_EVENT, handleProductHelp as EventListener);
-  }, []);
+  }, [isAdminRoute]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -497,11 +507,11 @@ export default function SalarWidget() {
   }, [chatId]);
 
   useEffect(() => {
-    if (!hydrated || !chatId) return;
+    if (isAdminRoute || !hydrated || !chatId) return;
     void syncChat();
     const interval = window.setInterval(() => void syncChat(), open ? 4000 : 15000);
     return () => window.clearInterval(interval);
-  }, [hydrated, chatId, open, syncChat]);
+  }, [isAdminRoute, hydrated, chatId, open, syncChat]);
 
   useEffect(() => {
     if (!open) return;
@@ -603,7 +613,7 @@ export default function SalarWidget() {
     setOpen(true);
   }
 
-  if (pathname?.startsWith('/admin')) return null;
+  if (isAdminRoute) return null;
 
   function clearImage() {
     setImageFile(null);
