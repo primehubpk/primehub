@@ -77,7 +77,7 @@ export function useShopCatalog(initialCategory?: string, initialQuery = '', init
     }
 
     if (hasServerData) setLoading(false);
-    void load();
+    else void load();
 
     return () => {
       cancelled = true;

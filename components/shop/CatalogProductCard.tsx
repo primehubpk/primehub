@@ -48,7 +48,7 @@ export default function CatalogProductCard({ product, addedId, addProduct, compa
                 alt={titleOf(product)}
                 fill
                 priority={priority}
-                loading="eager"
+                loading={priority ? 'eager' : 'lazy'}
                 fetchPriority={priority ? 'high' : 'auto'}
                 unoptimized={isDirectStorefrontImage(image)}
                 sizes="(max-width: 900px) 50vw, 430px"
@@ -111,7 +111,7 @@ export default function CatalogProductCard({ product, addedId, addProduct, compa
               alt={titleOf(product)}
               fill
               priority={priority}
-              loading="eager"
+              loading={priority ? 'eager' : 'lazy'}
               fetchPriority={priority ? 'high' : 'auto'}
               unoptimized={isDirectStorefrontImage(image)}
               sizes={dense ? '(max-width: 639px) 50vw, (max-width: 1279px) 33vw, 25vw' : '(max-width: 767px) 50vw, 25vw'}

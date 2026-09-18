@@ -3,7 +3,7 @@ import { Suspense } from 'react';
 import ShopCatalog from '@/components/ShopCatalog';
 import { slugifyCategory } from '@/lib/categoryUtils';
 import { SettingsProvider } from '@/lib/useSettings';
-import { getPublicCatalogSnapshot, getStorefrontSettingsSnapshot } from '@/lib/publicCatalogServer';
+import { compactPublicCatalogSnapshot, getPublicCatalogSnapshot, getStorefrontSettingsSnapshot } from '@/lib/publicCatalogServer';
 import type { SiteSettings } from '@/lib/types';
 import type { Product, Category } from '@/components/shop/ShopTypes';
 
@@ -75,7 +75,7 @@ async function SeededCategoryCatalog({ slug }: { slug: string }) {
   ]);
 
   const catalog = catalogResult.status === 'fulfilled'
-    ? catalogResult.value
+    ? compactPublicCatalogSnapshot(catalogResult.value)
     : { products: [], categories: [] };
   const initialSettings = settingsResult.status === 'fulfilled'
     ? settingsResult.value

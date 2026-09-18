@@ -1,14 +1,13 @@
 import HomePageClient from '@/components/HomePageClient';
 import WeeklyDealNavigationWarmup from '@/components/home/WeeklyDealNavigationWarmup';
-import { getFreshPublicCatalogSnapshot, getStorefrontSettingsResultSnapshot } from '@/lib/publicCatalogServer';
+import { compactPublicCatalogSnapshot, getPublicCatalogSnapshot, getStorefrontSettingsResultSnapshot } from '@/lib/publicCatalogServer';
 import { getWholesaleVideosSnapshot } from '@/lib/wholesaleVideosServer';
 import { normalizeImageUrl } from '@/lib/imageUrl';
 import { pakistanNowWeekday } from '@/lib/weeklyDealUtils';
 import type { Category, SiteSettings } from '@/lib/types';
 import type { Product } from '@/components/shop/ShopTypes';
 
-export const dynamic = 'force-dynamic';
-export const revalidate = 0;
+export const revalidate = 300;
 
 function productImage(product: any) {
   if (!product) return '';
@@ -50,13 +49,13 @@ function hydrateBigDealImages(settings: Record<string, any>, products: any[]) {
 
 export default async function HomePage() {
   const [catalogResult, settingsResult, wholesaleResult] = await Promise.allSettled([
-    getFreshPublicCatalogSnapshot(),
+    getPublicCatalogSnapshot(),
     getStorefrontSettingsResultSnapshot(),
     getWholesaleVideosSnapshot(),
   ]);
 
   const snapshot = catalogResult.status === 'fulfilled'
-    ? catalogResult.value
+    ? compactPublicCatalogSnapshot(catalogResult.value)
     : { products: [], categories: [] };
   const settingsDocuments = settingsResult.status === 'fulfilled'
     ? (settingsResult.value.documents as Record<string, any>)

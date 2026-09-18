@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getConfiguredReadMode } from '@/lib/dualReadServer';
 import {
+  compactPublicCatalogSnapshot,
   getFreshPublicCatalogSnapshot,
   getFreshPublicProductSnapshot,
   getFreshStorefrontSettingsDocumentsSnapshot,
@@ -78,7 +79,7 @@ export async function GET(request: Request) {
         { headers: FRESH_BROWSER_HEADERS },
       );
     }
-    const result = await getFreshPublicCatalogSnapshot();
+    const result = compactPublicCatalogSnapshot(await getFreshPublicCatalogSnapshot());
     return NextResponse.json(
       { ...result, source: 'fresh', mode: getConfiguredReadMode() },
       { headers: FRESH_BROWSER_HEADERS },
