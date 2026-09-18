@@ -1,7 +1,7 @@
 import HomePageClient from '@/components/HomePageClient';
 import WeeklyDealNavigationWarmup from '@/components/home/WeeklyDealNavigationWarmup';
 import { compactPublicCatalogSnapshot, getPublicCatalogSnapshot, getStorefrontSettingsResultSnapshot } from '@/lib/publicCatalogServer';
-import { getWholesaleVideosSnapshot } from '@/lib/wholesaleVideosServer';
+import { getCachedWholesaleVideosSnapshot } from '@/lib/wholesaleVideosServer';
 import { normalizeImageUrl } from '@/lib/imageUrl';
 import { pakistanNowWeekday } from '@/lib/weeklyDealUtils';
 import type { Category, SiteSettings } from '@/lib/types';
@@ -51,7 +51,7 @@ export default async function HomePage() {
   const [catalogResult, settingsResult, wholesaleResult] = await Promise.allSettled([
     getPublicCatalogSnapshot(),
     getStorefrontSettingsResultSnapshot(),
-    getWholesaleVideosSnapshot(),
+    getCachedWholesaleVideosSnapshot(),
   ]);
 
   const snapshot = catalogResult.status === 'fulfilled'
