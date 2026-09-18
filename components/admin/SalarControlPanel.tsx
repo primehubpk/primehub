@@ -14,6 +14,7 @@ type ProviderStatus = {
 type SalarAdminView = {
   enabled: boolean;
   instructions: string;
+  orderInstructions: string;
   updatedAt: string | null;
   catalogue: null | {
     updatedAt: string;
@@ -39,6 +40,7 @@ function providerLabel(value: ProviderStatus['provider']) {
 export default function SalarControlPanel() {
   const [data, setData] = useState<SalarAdminView | null>(null);
   const [instructions, setInstructions] = useState('');
+  const [orderInstructions, setOrderInstructions] = useState('');
   const [enabled, setEnabled] = useState(true);
   const [iconUrl, setIconUrl] = useState('');
   const [loading, setLoading] = useState(true);
@@ -63,6 +65,7 @@ export default function SalarControlPanel() {
       if (!salarResponse.ok || !salarResult?.success) throw new Error(salarResult?.error || 'Salar could not load.');
       setData(salarResult.salar);
       setInstructions(salarResult.salar.instructions || '');
+      setOrderInstructions(salarResult.salar.orderInstructions || '');
       setEnabled(salarResult.salar.enabled !== false);
       if (uiResponse.ok && uiResult?.success) setIconUrl(String(uiResult.ui?.iconUrl || ''));
     } catch (error) {
@@ -162,6 +165,7 @@ export default function SalarControlPanel() {
       if (!response.ok || !result?.success) throw new Error(result?.error || 'Catalogue update failed.');
       setData(result.salar);
       setInstructions(result.salar.instructions || instructions);
+      setOrderInstructions(result.salar.orderInstructions || orderInstructions);
       setEnabled(result.salar.enabled !== false);
       setMessage('Catalogue updated from live PrimeHubMall data.');
     } catch (error) {
