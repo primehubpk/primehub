@@ -16,10 +16,9 @@ import {
   X,
 } from 'lucide-react';
 import { auth } from '@/lib/firebase';
-import { getAdminDocument, setAdminDocument, type Order } from './shared';
+import { type Order } from './shared';
 
 const ORDER_STATUSES = ['pending', 'processing', 'shipped', 'delivered', 'cancelled'] as const;
-const ORDER_WHATSAPP_SETTING_ID = 'orders_whatsapp_forwarding';
 type OrderStatus = (typeof ORDER_STATUSES)[number];
 type OrderItem = Order['items'][number];
 
@@ -31,6 +30,7 @@ type ActionMessage = {
 type OrdersResponse = {
   success: true;
   orders: Order[];
+  whatsappNumber?: string;
   primary?: string;
   warning?: string | null;
 };
@@ -304,6 +304,9 @@ export default function OrdersManager() {
       .then((data) => {
         if (!active) return;
         setOrders(Array.isArray(data.orders) ? data.orders : []);
+        const number = textValue(data.whatsappNumber);
+        setWhatsappNumber(number);
+        setSavedWhatsappNumber(number);
         setLoadWarning(data.warning || '');
       })
       .catch((error) => {
@@ -316,22 +319,6 @@ export default function OrdersManager() {
     return () => { active = false; };
   }, []);
 
-  useEffect(() => {
-    let active = true;
-    getAdminDocument('settings', ORDER_WHATSAPP_SETTING_ID)
-      .then((snapshot) => {
-        if (!active || !snapshot.exists()) return;
-        const data = snapshot.data() as Record<string, unknown> | undefined;
-        const number = textValue(data?.whatsappNumber);
-        setWhatsappNumber(number);
-        setSavedWhatsappNumber(number);
-      })
-      .catch((error) => {
-        if (!active) return;
-        console.error('Order WhatsApp number could not be loaded.', error);
-      });
-    return () => { active = false; };
-  }, []);
 
   const filteredOrders = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -362,6 +349,9 @@ export default function OrdersManager() {
     try {
       const data = await fetchAdminOrders();
       setOrders(Array.isArray(data.orders) ? data.orders : []);
+      const number = textValue(data.whatsappNumber);
+      setWhatsappNumber(number);
+      setSavedWhatsappNumber(number);
       setLoadWarning(data.warning || '');
     } catch (error) {
       setActionMessage({ kind: 'error', text: error instanceof Error ? error.message : 'Orders could not be refreshed.' });
@@ -438,12 +428,22 @@ export default function OrdersManager() {
     setSavingWhatsappNumber(true);
     setActionMessage(null);
     try {
-      await setAdminDocument('settings', ORDER_WHATSAPP_SETTING_ID, {
-        whatsappNumber: number,
-        updatedAt: new Date().toISOString(),
+      const response = await fetch('/api/admin/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        cache: 'no-store',
+        body: JSON.stringify({ action: 'save-whatsapp', whatsappNumber: number }),
       });
-      setSavedWhatsappNumber(number);
+      const data = await response.json().catch(() => null);
+      if (!response.ok || data?.success !== true) {
+        throw new Error(data?.error || 'WhatsApp number could not be saved.');
+      }
+      const savedNumber = textValue(data.whatsappNumber) || number;
+      setWhatsappNumber(savedNumber);
+      setSavedWhatsappNumber(savedNumber);
       setActionMessage({ kind: 'success', text: 'Order WhatsApp number saved. Send Order is now ready on every order.' });
+      if (data.mirrorWarning) setLoadWarning('WhatsApp number saved in Supabase. Firebase mirror is temporarily unavailable.');
     } catch (error) {
       setActionMessage({ kind: 'error', text: error instanceof Error ? error.message : 'WhatsApp number could not be saved.' });
     } finally {
