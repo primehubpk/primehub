@@ -315,8 +315,6 @@ export default function ProductGridRewards({
         return Number(Boolean(b.isFlashSale)) - Number(Boolean(a.isFlashSale));
       });
     }
-    // Keep the homepage card layout and full catalog available without deferred
-    // product-image loading; customers can scroll through every matching product.
     return filtered;
   }, [products, selectedMaxPrice, wholesaleSelected, sort, homeLayout]);
 
@@ -437,6 +435,11 @@ export default function ProductGridRewards({
     }
   }
 
+  // The homepage is a discovery surface, not the full catalog. Rendering all
+  // 500+ cards creates hundreds of eager image requests and a multi-megabyte
+  // document. Keep a useful first selection here; /shop retains the full list.
+  const displayedProducts = homeLayout ? visible.slice(0, 30) : visible;
+
   if (loading) {
     return (
       <section className="mt-8 px-4">
@@ -508,7 +511,7 @@ export default function ProductGridRewards({
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-2 md:grid-cols-3 md:gap-3 lg:grid-cols-4 xl:grid-cols-5">
-          {visible.map((p, index) => {
+          {displayedProducts.map((p, index) => {
             const r = rewards[p.id];
             const pts = points;
             const need = r ? Math.max(0, r.points - pts) : 0;
@@ -531,7 +534,7 @@ export default function ProductGridRewards({
                           alt={title(p)}
                           fill
                           priority={index < 4}
-                          loading="eager"
+                          loading={index < 4 ? "eager" : "lazy"}
                           fetchPriority={index < 4 ? "high" : "auto"}
                           sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
                           quality={72}
