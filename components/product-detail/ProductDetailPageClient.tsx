@@ -106,12 +106,8 @@ function ProductDetailContent() {
     confirmVariant,
   } = model;
 
-  if (loading) return <ProductRouteLoading />;
-
-  // If a fresh background read fails but we already have a server/navigation
-  // product, keep the usable product visible. A real missing product is still
-  // handled because product remains null.
   useEffect(() => {
+    if (!product) return;
     const path = typeof window !== 'undefined' ? window.location.href : `/product/${product.id}`;
     rememberSalarProductHelpContext({
       productId: String(product.id),
@@ -126,6 +122,11 @@ function ProductDetailContent() {
     });
   }, [product, images, activeImage, currentPrice, normalForDeal, stock]);
 
+  if (loading) return <ProductRouteLoading />;
+
+  // If a fresh background read fails but we already have a server/navigation
+  // product, keep the usable product visible. A real missing product is still
+  // handled because product remains null.
   if (!product) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#F4F4F1] px-5">
