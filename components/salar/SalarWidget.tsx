@@ -454,6 +454,17 @@ export default function SalarWidget() {
   }, [open, refreshAdminSession]);
 
   useEffect(() => {
+    const handleProductHelp = (event: Event) => {
+      const detail = (event as CustomEvent<SalarProductHelpContext>).detail;
+      if (!detail?.productId || !detail?.title || !detail?.path) return;
+      setPendingProductHelp(detail);
+      setOpen(true);
+    };
+    window.addEventListener(SALAR_PRODUCT_HELP_EVENT, handleProductHelp as EventListener);
+    return () => window.removeEventListener(SALAR_PRODUCT_HELP_EVENT, handleProductHelp as EventListener);
+  }, []);
+
+  useEffect(() => {
     if (!hydrated) return;
     try {
       const persistable = messages.slice(-MAX_SAVED_MESSAGES).map(({ imagePreview: _preview, ...message }) => message);
