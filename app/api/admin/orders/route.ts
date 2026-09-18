@@ -93,7 +93,8 @@ async function readOrderWhatsappNumber() {
     });
     if (!response.ok) throw new Error(`Supabase order WhatsApp setting read failed ${response.status}`);
     const rows = await response.json() as Array<{ payload?: Record<string, unknown> }>;
-    return typeof rows?.[0]?.payload?.whatsappNumber === 'string' ? String(rows[0].payload.whatsappNumber).trim() : '';
+    const value = rows?.[0]?.payload?.whatsappNumber;
+    return typeof value === 'string' ? value.trim() : '';
   }
 
   const snapshot = await getAdminDb().collection('settings').doc(ORDER_WHATSAPP_SETTING_ID).get();
