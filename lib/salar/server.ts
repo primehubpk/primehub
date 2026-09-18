@@ -50,6 +50,7 @@ export type SalarState = {
   version: 1;
   enabled: boolean;
   instructions: string;
+  orderInstructions: string;
   updatedAt: string | null;
   catalogue: SalarCatalogue | null;
 };
@@ -59,11 +60,13 @@ const SALAR_STATE_TAG = 'salar-state';
 const MAX_PAGE_COUNT = 24;
 const MAX_PAGE_TEXT = 7000;
 const MAX_KEYS_PER_PROVIDER = 12;
+export const MAX_SALAR_INSTRUCTION_SECTION_CHARS = 20000;
 
 const DEFAULT_STATE: SalarState = {
   version: 1,
   enabled: true,
   instructions: '',
+  orderInstructions: '',
   updatedAt: null,
   catalogue: null,
 };
@@ -77,7 +80,8 @@ function cleanInstructions(value: unknown) {
     .replace(/\r\n?/g, '\n')
     .replace(/[ \t]+/g, ' ')
     .replace(/\n{3,}/g, '\n\n')
-    .trim();
+    .trim()
+    .slice(0, MAX_SALAR_INSTRUCTION_SECTION_CHARS);
 }
 
 function finiteNumber(value: unknown) {
@@ -304,6 +308,7 @@ function normalizeState(payload: Record<string, any> | null): SalarState {
     version: 1,
     enabled: payload.enabled !== false,
     instructions: cleanInstructions(payload.instructions),
+    orderInstructions: cleanInstructions(payload.orderInstructions),
     updatedAt: typeof payload.updatedAt === 'string' ? payload.updatedAt : null,
     catalogue: payload.catalogue && typeof payload.catalogue === 'object'
       ? payload.catalogue as SalarCatalogue
@@ -334,12 +339,13 @@ async function persistSalarState(state: SalarState) {
   return state;
 }
 
-export async function saveSalarSettings(input: { enabled?: unknown; instructions?: unknown }) {
+export async function saveSalarSettings(input: { enabled?: unknown; instructions?: unknown; orderInstructions?: unknown }) {
   const current = await readSalarStateFromDatabase();
   const next: SalarState = {
     ...current,
     enabled: typeof input.enabled === 'boolean' ? input.enabled : current.enabled,
     instructions: cleanInstructions(input.instructions ?? current.instructions),
+    orderInstructions: cleanInstructions(input.orderInstructions ?? current.orderInstructions),
     updatedAt: new Date().toISOString(),
   };
   return persistSalarState(next);
