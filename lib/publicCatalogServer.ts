@@ -43,6 +43,42 @@ export const getPublicCatalogSnapshot = unstable_cache(
   { revalidate: 3600, tags: ['public-catalog'] },
 );
 
+const CATALOG_SEED_HEAVY_FIELDS = new Set([
+  'description',
+  'variantMatrix',
+  'variantOptions',
+  'variantColors',
+  'variantSizes',
+  'variants',
+  'options',
+  'colorImages',
+]);
+
+/**
+ * Catalog pages only need card/search metadata. Full descriptions and variant
+ * matrices are fetched from the single-product endpoint when a customer opens
+ * or adds an item, so serializing them into every catalog response wastes more
+ * than a megabyte on the current catalog (and roughly twice that in RSC HTML).
+ */
+export function compactPublicCatalogSnapshot<
+  T extends { products?: any[]; categories?: any[]; [key: string]: any },
+>(snapshot: T): T {
+  const products = Array.isArray(snapshot.products)
+    ? snapshot.products.map((product) => {
+        if (!product || typeof product !== 'object') return product;
+        const compact = Object.fromEntries(
+          Object.entries(product).filter(([key]) => !CATALOG_SEED_HEAVY_FIELDS.has(key)),
+        );
+        if (Array.isArray(compact.images) && compact.images.length > 1) {
+          compact.images = compact.images.slice(0, 1);
+        }
+        return compact;
+      })
+    : [];
+
+  return { ...snapshot, products };
+}
+
 export async function getFreshPublicCatalogSnapshot() {
   const result = await getDualCatalog({ cache: 'no-store', timeoutMs: PUBLIC_PRIMARY_TIMEOUT_MS });
   if (result.source === 'empty' || result.products.length === 0) {
