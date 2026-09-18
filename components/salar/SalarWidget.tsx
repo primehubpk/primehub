@@ -7,6 +7,7 @@ import { doc, getDoc } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
 import SalarAdminDrawer from '@/components/salar/SalarAdminDrawer';
+import { readSalarProductHelpContext, SALAR_PRODUCT_HELP_EVENT, type SalarProductHelpContext } from '@/lib/salar/clientProductHelp';
 
 type ProductCard = {
   id: string;
@@ -365,6 +366,7 @@ export default function SalarWidget() {
   const [orderError, setOrderError] = useState('');
   const [orderId, setOrderId] = useState('');
   const [imageEditor, setImageEditor] = useState<{ product: ProductCard; sourceUrl: string } | null>(null);
+  const [pendingProductHelp, setPendingProductHelp] = useState<SalarProductHelpContext | null>(null);
   const [editorZoom, setEditorZoom] = useState(1);
   const [editorReady, setEditorReady] = useState(false);
   const [editorError, setEditorError] = useState('');
@@ -376,6 +378,7 @@ export default function SalarWidget() {
   const sendingRef = useRef(false);
   const editorCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const editorDrawingRef = useRef(false);
+  const lastProductHelpKeyRef = useRef('');
 
   useEffect(() => {
     const stop = onAuthStateChanged(auth, (user) => {
@@ -422,11 +425,43 @@ export default function SalarWidget() {
     }
   }, []);
 
+  const refreshAdminSession = useCallback(async () => {
+    try {
+      const response = await fetch('/api/admin/session', { credentials: 'same-origin', cache: 'no-store' });
+      const result = await response.json().catch(() => null);
+      setAdminAuthenticated(result?.authenticated === true);
+    } catch {
+      setAdminAuthenticated(false);
+    }
+  }, []);
+
   useEffect(() => {
-    void fetch('/api/admin/session', { credentials: 'same-origin', cache: 'no-store' })
-      .then((response) => response.json())
-      .then((result) => setAdminAuthenticated(result?.authenticated === true))
-      .catch(() => setAdminAuthenticated(false));
+    void refreshAdminSession();
+    const onFocus = () => void refreshAdminSession();
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') void refreshAdminSession();
+    };
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [refreshAdminSession]);
+
+  useEffect(() => {
+    if (open) void refreshAdminSession();
+  }, [open, refreshAdminSession]);
+
+  useEffect(() => {
+    const handleProductHelp = (event: Event) => {
+      const detail = (event as CustomEvent<SalarProductHelpContext>).detail;
+      if (!detail?.productId || !detail?.title || !detail?.path) return;
+      setPendingProductHelp(detail);
+      setOpen(true);
+    };
+    window.addEventListener(SALAR_PRODUCT_HELP_EVENT, handleProductHelp as EventListener);
+    return () => window.removeEventListener(SALAR_PRODUCT_HELP_EVENT, handleProductHelp as EventListener);
   }, []);
 
   useEffect(() => {
@@ -522,6 +557,51 @@ export default function SalarWidget() {
     image.src = `/api/salar/image-proxy?url=${encodeURIComponent(imageEditor.sourceUrl)}&v=${editorNonce}`;
     return () => { image.src = ''; };
   }, [imageEditor, editorNonce]);
+
+  useEffect(() => {
+    if (!open || !chatId || sending || !pendingProductHelp) return;
+
+    const key = [
+      pendingProductHelp.productId,
+      pendingProductHelp.color || '',
+      pendingProductHelp.size || '',
+      pendingProductHelp.path,
+    ].join('|');
+
+    if (lastProductHelpKeyRef.current === key) {
+      setPendingProductHelp(null);
+      return;
+    }
+
+    lastProductHelpKeyRef.current = key;
+    const reference: ProductCard = {
+      id: pendingProductHelp.productId,
+      title: pendingProductHelp.title,
+      path: pendingProductHelp.path,
+      imageUrl: pendingProductHelp.imageUrl,
+      price: pendingProductHelp.price,
+      originalPrice: pendingProductHelp.originalPrice,
+      stock: pendingProductHelp.stock,
+      category: pendingProductHelp.category,
+      size: pendingProductHelp.size,
+    };
+
+    const details = [
+      `Product: ${pendingProductHelp.title}`,
+      `Product link: ${pendingProductHelp.path}`,
+      pendingProductHelp.color ? `Selected color: ${pendingProductHelp.color}` : '',
+      pendingProductHelp.size ? `Selected size: ${pendingProductHelp.size}` : '',
+    ].filter(Boolean).join('\n');
+
+    setPendingProductHelp(null);
+    void sendMessage(details, null, '', [reference]);
+  }, [open, chatId, sending, pendingProductHelp]);
+
+  function openSalarFromCurrentPage() {
+    const productContext = readSalarProductHelpContext();
+    if (productContext) setPendingProductHelp(productContext);
+    setOpen(true);
+  }
 
   if (pathname?.startsWith('/admin')) return null;
 
@@ -914,7 +994,7 @@ export default function SalarWidget() {
             <div className="flex min-w-0 items-center gap-2">
               {adminAuthenticated ? <button type="button" onClick={() => setAdminDrawerOpen(true)} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10" aria-label="Open customer chats"><Menu size={18}/></button> : null}
               <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#FFB020] text-[#14140F]"><SalarIcon iconUrl={iconUrl} size={19}/></span>
-              <div className="min-w-0"><p className="truncate text-sm font-black">Salar</p><p className="truncate text-[9px] font-bold text-white/55">PrimeHubMall AI Salesman</p></div>
+              <div className="min-w-0"><div className="flex min-w-0 items-center gap-2"><p className="truncate text-sm font-black">Salar</p><span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[8px] font-black text-emerald-300"><span className="h-1.5 w-1.5 rounded-full bg-emerald-400"/>Online</span></div><p className="truncate text-[9px] font-bold text-white/55">PrimeHubMall AI Salesman</p></div>
             </div>
             <div className="flex items-center gap-2">
               <button type="button" onClick={() => setExpanded((value) => !value)} aria-label={expanded ? 'Make chat smaller' : 'Open full chat'} className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 transition active:scale-95">{expanded ? <Minimize2 size={17}/> : <Maximize2 size={17}/>}</button>
@@ -1090,7 +1170,7 @@ export default function SalarWidget() {
         </div>
       ) : null}
 
-      {!open ? <div className="flex flex-col items-end gap-1.5"><span className="mr-3 rounded-full bg-white px-2.5 py-1 text-[9px] font-black text-[#14140F] shadow-md">Need help?</span><button type="button" onClick={() => setOpen(true)} className="ml-auto flex h-14 items-center gap-2 rounded-full bg-[#14140F] px-4 text-white shadow-xl"><span className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-[#FFB020] text-[#14140F]"><SalarIcon iconUrl={iconUrl} size={19}/></span><span className="pr-1 text-xs font-black">Salar</span></button></div> : null}
+      {!open ? <div className="flex flex-col items-end gap-1.5"><span className="mr-3 rounded-full bg-white px-2.5 py-1 text-[9px] font-black text-[#14140F] shadow-md">Need help?</span><button type="button" onClick={openSalarFromCurrentPage} className="ml-auto flex h-14 items-center gap-2 rounded-full bg-[#14140F] px-4 text-white shadow-xl"><span className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-[#FFB020] text-[#14140F]"><SalarIcon iconUrl={iconUrl} size={19}/></span><span className="pr-1 text-xs font-black">Salar</span></button></div> : null}
     </div>
   );
 }

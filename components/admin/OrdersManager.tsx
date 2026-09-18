@@ -9,7 +9,9 @@ import {
   Package,
   Phone,
   RefreshCw,
+  Save,
   Search,
+  Send,
   Trash2,
   X,
 } from 'lucide-react';
@@ -28,6 +30,7 @@ type ActionMessage = {
 type OrdersResponse = {
   success: true;
   orders: Order[];
+  whatsappNumber?: string;
   primary?: string;
   warning?: string | null;
 };
@@ -123,12 +126,131 @@ function orderDate(value: unknown) {
   }
 }
 
-function whatsappUrl(order: Order) {
+function whatsappPhone(value: unknown) {
+  let digits = textValue(value).replace(/\D/g, '');
+  if (digits.startsWith('00')) digits = digits.slice(2);
+  if (/^03\d{9}$/.test(digits)) digits = `92${digits.slice(1)}`;
+  if (/^3\d{9}$/.test(digits)) digits = `92${digits}`;
+  return digits;
+}
+
+function customerWhatsappUrl(order: Order) {
   const customer = order.customer || {};
-  const phone = String(customer.phone || '').replace(/\D/g, '');
+  const phone = whatsappPhone(customer.phone);
   const items = itemsFor(order).map((item) => `${item.title || 'Item'} x${item.quantity || 1}`).join(', ');
   const message = `Hi ${customer.name || 'there'}, this is PrimeHub Deals regarding your order #${order.id.slice(-6)} (Rs ${money(order.total)}): ${items}. Current status: ${normalizedStatus(order.status)}.`;
   return phone ? `https://wa.me/${phone}?text=${encodeURIComponent(message)}` : '';
+}
+
+function labelForKey(key: string) {
+  const labels: Record<string, string> = {
+    name: 'Name',
+    phone: 'Phone',
+    email: 'Email',
+    city: 'City',
+    address: 'Address',
+    area: 'Area',
+    postalCode: 'Postal Code',
+    notes: 'Notes',
+  };
+  return labels[key] || key.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[_-]+/g, ' ').replace(/^./, (letter) => letter.toUpperCase());
+}
+
+function messageValue(value: unknown): string {
+  if (value == null) return '';
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return String(value).trim();
+  if (Array.isArray(value)) return value.map(messageValue).filter(Boolean).join(', ');
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return '';
+  }
+}
+
+function orderForwardMessage(order: Order) {
+  const lines: string[] = [
+    '🧾 *PrimeHub Order*',
+    `Order ID: ${order.id}`,
+    `Order #: #${order.id.slice(-6)}`,
+    `Date: ${orderDate(order.createdAt)}`,
+    `Status: ${normalizedStatus(order.status)}`,
+  ];
+
+  const source = textValue(order.source);
+  const fulfillment = textValue(order.fulfillment);
+  const paymentMethod = textValue(order.paymentMethod);
+  if (source) lines.push(`Source: ${source}`);
+  if (fulfillment) lines.push(`Fulfillment: ${fulfillment}`);
+  if (paymentMethod) lines.push(`Payment: ${paymentMethod}`);
+
+  lines.push('', '👤 *Customer Details*');
+  const customer = (order.customer || {}) as Record<string, unknown>;
+  const priorityCustomerKeys = ['name', 'phone', 'email', 'city', 'address', 'area', 'postalCode', 'notes'];
+  const usedCustomerKeys = new Set<string>();
+
+  for (const key of priorityCustomerKeys) {
+    const value = messageValue(customer[key]);
+    if (value) {
+      lines.push(`${labelForKey(key)}: ${value}`);
+      usedCustomerKeys.add(key);
+    }
+  }
+  for (const [key, rawValue] of Object.entries(customer)) {
+    if (usedCustomerKeys.has(key)) continue;
+    const value = messageValue(rawValue);
+    if (value) lines.push(`${labelForKey(key)}: ${value}`);
+  }
+
+  const items = itemsFor(order);
+  lines.push('', `🛍️ *Ordered Products (${items.length})*`);
+
+  items.forEach((item, index) => {
+    const quantity = Math.max(1, Number(item.quantity || 1));
+    const price = Number(item.price || 0);
+    const originalPrice = Number(item.originalPrice || 0);
+    const image = itemImage(item);
+    const variant = itemVariant(item);
+    const category = textValue(item.category);
+    const productId = textValue(item.productId);
+
+    lines.push('', `*${index + 1}. ${textValue(item.title) || 'Item'}*`);
+    if (variant) lines.push(variant.replace(/ • /g, ' | '));
+    if (category) lines.push(`Category: ${category}`);
+    if (productId) lines.push(`Product ID: ${productId}`);
+    lines.push(`Quantity: ${quantity}`);
+    lines.push(`Price each: Rs. ${money(price)}`);
+    if (originalPrice > 0 && originalPrice !== price) lines.push(`Original price: Rs. ${money(originalPrice)}`);
+    if (price > 0) lines.push(`Line total: Rs. ${money(price * quantity)}`);
+    if (item.isWholesale === true) lines.push('Wholesale: Yes');
+    if (image) lines.push(`Image: ${image}`);
+  });
+
+  lines.push('', '💰 *Order Total*');
+  const rawSubtotal = Number(order.rawSubtotal || 0);
+  const subtotal = Number(order.subtotal || 0);
+  const tierDiscount = Number(order.tierDiscount || 0);
+  const baseDelivery = Number(order.baseDelivery || 0);
+  const wholesaleSurcharge = Number(order.wholesaleSurcharge || 0);
+  const deliveryCharge = Number(order.deliveryCharge || 0);
+  if (rawSubtotal > 0 && rawSubtotal !== subtotal) lines.push(`Items subtotal: Rs. ${money(rawSubtotal)}`);
+  if (tierDiscount > 0) lines.push(`Discount: Rs. ${money(tierDiscount)}`);
+  lines.push(`Subtotal: Rs. ${money(order.subtotal)}`);
+  if (baseDelivery > 0) lines.push(`Base delivery: Rs. ${money(baseDelivery)}`);
+  if (wholesaleSurcharge > 0) lines.push(`Wholesale delivery surcharge: Rs. ${money(wholesaleSurcharge)}`);
+  lines.push(`Delivery: Rs. ${money(deliveryCharge)}`);
+  lines.push(`*TOTAL: Rs. ${money(order.total)}*`);
+
+  const totalItems = Number(order.totalItems || 0);
+  if (totalItems > 0) lines.push(`Total items: ${totalItems}`);
+  const currency = textValue(order.currency);
+  if (currency) lines.push(`Currency: ${currency}`);
+
+  return lines.join('\n');
+}
+
+function orderForwardWhatsappUrl(order: Order, savedNumber: string) {
+  const phone = whatsappPhone(savedNumber);
+  return phone ? `https://wa.me/${phone}?text=${encodeURIComponent(orderForwardMessage(order))}` : '';
 }
 
 async function fetchAdminOrders() {
@@ -172,6 +294,9 @@ export default function OrdersManager() {
   const [actionMessage, setActionMessage] = useState<ActionMessage | null>(null);
   const [loadWarning, setLoadWarning] = useState('');
   const [loadingOrders, setLoadingOrders] = useState(true);
+  const [whatsappNumber, setWhatsappNumber] = useState('');
+  const [savedWhatsappNumber, setSavedWhatsappNumber] = useState('');
+  const [savingWhatsappNumber, setSavingWhatsappNumber] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -179,6 +304,9 @@ export default function OrdersManager() {
       .then((data) => {
         if (!active) return;
         setOrders(Array.isArray(data.orders) ? data.orders : []);
+        const number = textValue(data.whatsappNumber);
+        setWhatsappNumber(number);
+        setSavedWhatsappNumber(number);
         setLoadWarning(data.warning || '');
       })
       .catch((error) => {
@@ -190,6 +318,7 @@ export default function OrdersManager() {
       });
     return () => { active = false; };
   }, []);
+
 
   const filteredOrders = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -220,6 +349,9 @@ export default function OrdersManager() {
     try {
       const data = await fetchAdminOrders();
       setOrders(Array.isArray(data.orders) ? data.orders : []);
+      const number = textValue(data.whatsappNumber);
+      setWhatsappNumber(number);
+      setSavedWhatsappNumber(number);
       setLoadWarning(data.warning || '');
     } catch (error) {
       setActionMessage({ kind: 'error', text: error instanceof Error ? error.message : 'Orders could not be refreshed.' });
@@ -285,9 +417,52 @@ export default function OrdersManager() {
     }
   }
 
+  async function saveWhatsappNumber() {
+    const number = whatsappNumber.trim();
+    const normalized = whatsappPhone(number);
+    if (normalized.length < 8 || normalized.length > 15) {
+      setActionMessage({ kind: 'error', text: 'Please enter a valid WhatsApp number with country code, for example +923001234567.' });
+      return;
+    }
+
+    setSavingWhatsappNumber(true);
+    setActionMessage(null);
+    try {
+      const response = await fetch('/api/admin/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        cache: 'no-store',
+        body: JSON.stringify({ action: 'save-whatsapp', whatsappNumber: number }),
+      });
+      const data = await response.json().catch(() => null);
+      if (!response.ok || data?.success !== true) {
+        throw new Error(data?.error || 'WhatsApp number could not be saved.');
+      }
+      const savedNumber = textValue(data.whatsappNumber) || number;
+      setWhatsappNumber(savedNumber);
+      setSavedWhatsappNumber(savedNumber);
+      setActionMessage({ kind: 'success', text: 'Order WhatsApp number saved. Send Order is now ready on every order.' });
+      if (data.mirrorWarning) setLoadWarning('WhatsApp number saved in Supabase. Firebase mirror is temporarily unavailable.');
+    } catch (error) {
+      setActionMessage({ kind: 'error', text: error instanceof Error ? error.message : 'WhatsApp number could not be saved.' });
+    } finally {
+      setSavingWhatsappNumber(false);
+    }
+  }
+
   function chatWithCustomer(order: Order) {
-    const url = whatsappUrl(order);
+    const url = customerWhatsappUrl(order);
     if (url) window.open(url, '_blank', 'noopener,noreferrer');
+  }
+
+  function sendOrderToWhatsapp(order: Order) {
+    const url = orderForwardWhatsappUrl(order, savedWhatsappNumber);
+    if (!url) {
+      setActionMessage({ kind: 'error', text: 'Save the Order WhatsApp number at the top first.' });
+      return;
+    }
+    window.open(url, '_blank', 'noopener,noreferrer');
   }
 
   return (
@@ -307,6 +482,41 @@ export default function OrdersManager() {
         >
           <RefreshCw size={14} className={loadingOrders ? 'animate-spin' : ''} /> {loadingOrders ? 'Loading…' : 'Refresh'}
         </button>
+      </div>
+
+      <div className="mt-4 rounded-3xl border border-[#0F6A5F]/20 bg-white p-3.5 shadow-sm sm:p-4">
+        <div className="flex items-start gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#DDF5F0] text-[#0F6A5F]">
+            <MessageCircle size={18} />
+          </div>
+          <div className="min-w-0">
+            <p className="text-xs font-black">Order WhatsApp</p>
+            <p className="mt-1 text-[10px] font-medium leading-4 text-black/45">
+              Save one WhatsApp number here. Every order will get a Send Order button that sends complete customer, product, image-link and total details.
+            </p>
+          </div>
+        </div>
+        <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+          <input
+            type="tel"
+            inputMode="tel"
+            value={whatsappNumber}
+            onChange={(event) => setWhatsappNumber(event.target.value)}
+            placeholder="+923001234567"
+            className="min-w-0 rounded-xl border border-black/10 bg-[#F7F7F4] px-3 py-3 text-xs font-bold outline-none focus:border-[#0F6A5F]/40"
+          />
+          <button
+            type="button"
+            disabled={savingWhatsappNumber}
+            onClick={() => void saveWhatsappNumber()}
+            className="flex min-h-[42px] items-center justify-center gap-1.5 rounded-xl bg-[#14140F] px-4 text-[11px] font-black text-white disabled:opacity-50"
+          >
+            <Save size={14} /> {savingWhatsappNumber ? 'Saving…' : 'Save Number'}
+          </button>
+        </div>
+        {savedWhatsappNumber && (
+          <p className="mt-2 text-[9px] font-bold text-[#0F6A5F]">Saved: {savedWhatsappNumber}</p>
+        )}
       </div>
 
       {rewardMessage && (
@@ -501,14 +711,22 @@ export default function OrdersManager() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2 sm:flex lg:justify-end">
+                  <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap lg:justify-end">
+                    <button
+                      type="button"
+                      disabled={!savedWhatsappNumber || deletingOrderId === order.id}
+                      onClick={() => sendOrderToWhatsapp(order)}
+                      className="col-span-2 flex min-h-[42px] items-center justify-center gap-1.5 rounded-xl bg-[#0F6A5F] px-4 text-[11px] font-black text-white disabled:opacity-40 sm:col-span-1"
+                    >
+                      <Send size={15} /> Send Order
+                    </button>
                     <button
                       type="button"
                       disabled={!hasPhone || deletingOrderId === order.id}
                       onClick={() => chatWithCustomer(order)}
-                      className="flex min-h-[42px] items-center justify-center gap-1.5 rounded-xl bg-[#0F6A5F] px-4 text-[11px] font-black text-white disabled:opacity-40"
+                      className="flex min-h-[42px] items-center justify-center gap-1.5 rounded-xl border border-[#0F6A5F]/20 bg-[#DDF5F0] px-4 text-[11px] font-black text-[#0F6A5F] disabled:opacity-40"
                     >
-                      <MessageCircle size={15} /> Chat
+                      <MessageCircle size={15} /> Customer Chat
                     </button>
                     <button
                       type="button"

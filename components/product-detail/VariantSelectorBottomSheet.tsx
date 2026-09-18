@@ -1,11 +1,12 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Minus, Plus, ShoppingCart, X, Zap } from 'lucide-react';
+import { Bot, Minus, Plus, ShoppingCart, X, Zap } from 'lucide-react';
 import type { ProductVariantRow, ProductVariantSelection } from '@/lib/types';
 import { normalizeProductVariants, type VariantModalProduct } from '@/lib/cartStore';
 import { normalizeImageUrl } from '@/lib/imageUrl';
 import { money, titleOf } from './ProductDetailTypes';
+import { requestSalarProductHelp } from '@/lib/salar/clientProductHelp';
 
 type Props = {
   product: VariantModalProduct;
@@ -147,6 +148,7 @@ export default function VariantSelectorBottomSheet({
   }, [effectiveRows, fallbackImage, imageForColor]);
 
   const [, setImageReadyVersion] = useState(0);
+  const [salarIconUrl, setSalarIconUrl] = useState('');
 
   useEffect(() => {
     let active = true;
@@ -161,6 +163,22 @@ export default function VariantSelectorBottomSheet({
       active = false;
     };
   }, [preloadImages]);
+
+  useEffect(() => {
+    if (!open) return;
+    let active = true;
+    fetch('/api/salar/chat', { cache: 'no-store' })
+      .then((response) => response.json().catch(() => null))
+      .then((result) => {
+        if (!active) return;
+        const icon = String(result?.settings?.iconUrl || '').trim();
+        if (icon) setSalarIconUrl(icon);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [open]);
 
   const displayReadyImage = (target: string) => {
     if (!target) return fallbackImage;
@@ -206,6 +224,30 @@ export default function VariantSelectorBottomSheet({
   const visibleSelectedImage = displayReadyImage(selectedImage);
   const valid = Boolean(selected && stock > 0 && displayPrice > 0);
   const safeQty = Math.min(Math.max(1, qty), Math.max(1, stock));
+
+  function askSalarAboutCurrentVariant() {
+    if (typeof window === 'undefined') return;
+    const productId = String(product.id || '').trim();
+    const title = titleOf(product as any);
+    if (!productId || !title) return;
+
+    const context = {
+      productId,
+      title,
+      path: window.location.href,
+      imageUrl: visibleSelectedImage || fallbackImage || '',
+      price: displayPrice,
+      originalPrice,
+      stock,
+      category: String((product as any).category || ''),
+      color: color || undefined,
+      size: size || undefined,
+      source: 'variant-selector' as const,
+    };
+
+    onClose();
+    window.setTimeout(() => requestSalarProductHelp(context), 0);
+  }
 
   if (!open) {
     return (
@@ -268,9 +310,22 @@ export default function VariantSelectorBottomSheet({
 
         <div className="max-h-[55vh] overflow-y-auto py-4 pr-1">
           <div>
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2">
               <p className="text-[10px] font-black uppercase tracking-[0.18em] text-black/45">Color</p>
-              <span className="text-[9px] font-bold text-black/30">{color || 'Choose one'}</span>
+              <div className="flex min-w-0 items-center gap-2">
+                <span className="truncate text-[9px] font-bold text-black/30">{color || 'Choose one'}</span>
+                <button
+                  type="button"
+                  onClick={askSalarAboutCurrentVariant}
+                  className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[#FFF1D6] px-2.5 py-1.5 text-[8px] font-black text-[#7A5100] shadow-sm ring-1 ring-[#E9C677]/60"
+                  aria-label="Ask Salar about this product option"
+                >
+                  <span className="flex h-5 w-5 items-center justify-center overflow-hidden rounded-full bg-[#FFB020] text-[#14140F]">
+                    {salarIconUrl ? <img src={salarIconUrl} alt="" className="h-full w-full object-cover" /> : <Bot size={11} />}
+                  </span>
+                  Need help?
+                </button>
+              </div>
             </div>
 
             <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">

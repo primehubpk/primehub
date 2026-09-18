@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useLayoutEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useState } from 'react';
 import {
   ArrowLeft,
   Heart,
@@ -23,6 +23,7 @@ import VariantSelectorBottomSheet from '@/components/product-detail/VariantSelec
 import { useProductDetail } from '@/components/product-detail/useProductDetail';
 import { cacheProductForNavigation } from '@/lib/productNavigationCache';
 import type { Product } from '@/components/product-detail/ProductDetailTypes';
+import { rememberSalarProductHelpContext } from '@/lib/salar/clientProductHelp';
 
 type Props = {
   initialProduct?: Product | null;
@@ -104,6 +105,22 @@ function ProductDetailContent() {
     closeVariantSelector,
     confirmVariant,
   } = model;
+
+  useEffect(() => {
+    if (!product) return;
+    const path = typeof window !== 'undefined' ? window.location.href : `/product/${product.id}`;
+    rememberSalarProductHelpContext({
+      productId: String(product.id),
+      title: String(product.title || product.name || 'PrimeHub Product'),
+      path,
+      imageUrl: images[activeImage] || images[0] || String(product.imageUrl || product.image || ''),
+      price: currentPrice,
+      originalPrice: normalForDeal,
+      stock,
+      category: String(product.category || ''),
+      source: 'product-page',
+    });
+  }, [product, images, activeImage, currentPrice, normalForDeal, stock]);
 
   if (loading) return <ProductRouteLoading />;
 

@@ -3,6 +3,7 @@ import { getAdminDb } from '@/lib/firebaseAdmin';
 import {
   getSupabasePrimaryPayload,
   isSupabaseWriteConfigured,
+  mapDocumentToSupabase,
   mapOrderToSupabase,
   recordMirrorFailure,
   supabasePrimaryDelete,
@@ -15,6 +16,7 @@ export const dynamic = 'force-dynamic';
 const ADMIN_COOKIE = 'primehub_admin_auth';
 const ORDER_STATUSES = new Set(['pending', 'processing', 'shipped', 'delivered', 'cancelled']);
 const LEGACY_CACHE_MS = 5 * 60 * 1000;
+const ORDER_WHATSAPP_SETTING_ID = 'orders_whatsapp_forwarding';
 
 let legacyOrdersCache: Array<Record<string, any>> = [];
 let legacyOrdersCacheAt = 0;
@@ -76,6 +78,51 @@ async function listSupabaseOrders() {
   });
 }
 
+async function readOrderWhatsappNumber() {
+  if (isSupabaseWriteConfigured()) {
+    const { url, key } = supabaseConfig();
+    const params = new URLSearchParams({
+      id: `eq.${ORDER_WHATSAPP_SETTING_ID}`,
+      select: 'payload',
+      limit: '1',
+    });
+    const response = await fetch(`${url}/rest/v1/settings?${params.toString()}`, {
+      headers: { apikey: key, Authorization: `Bearer ${key}` },
+      cache: 'no-store',
+      signal: AbortSignal.timeout(6000),
+    });
+    if (!response.ok) throw new Error(`Supabase order WhatsApp setting read failed ${response.status}`);
+    const rows = await response.json() as Array<{ payload?: Record<string, unknown> }>;
+    const value = rows?.[0]?.payload?.whatsappNumber;
+    return typeof value === 'string' ? value.trim() : '';
+  }
+
+  const snapshot = await getAdminDb().collection('settings').doc(ORDER_WHATSAPP_SETTING_ID).get();
+  return snapshot.exists ? String(snapshot.data()?.whatsappNumber || '').trim() : '';
+}
+
+async function saveOrderWhatsappNumber(number: string) {
+  const payload = { whatsappNumber: number, updatedAt: new Date().toISOString() };
+
+  if (isSupabaseWriteConfigured()) {
+    const row = mapDocumentToSupabase('settings', ORDER_WHATSAPP_SETTING_ID, payload, 'supabase');
+    if (!row) throw new Error('Unable to map the Order WhatsApp setting for Supabase.');
+    await supabasePrimaryUpsert({ table: 'settings', row: { ...row, authoritative_source: 'supabase', mirror_status: 'synced', mirror_error: null } });
+
+    try {
+      await getAdminDb().collection('settings').doc(ORDER_WHATSAPP_SETTING_ID).set(payload, { merge: true });
+      return null;
+    } catch (error) {
+      const warning = error instanceof Error ? error.message : String(error);
+      await recordMirrorFailure('settings', ORDER_WHATSAPP_SETTING_ID, 'upsert', payload, 'firebase');
+      return warning;
+    }
+  }
+
+  await getAdminDb().collection('settings').doc(ORDER_WHATSAPP_SETTING_ID).set(payload, { merge: true });
+  return null;
+}
+
 async function readLegacyFirebaseOrders() {
   const now = Date.now();
   if (legacyOrdersCache.length && now - legacyOrdersCacheAt < LEGACY_CACHE_MS) {
@@ -90,11 +137,12 @@ async function readLegacyFirebaseOrders() {
 }
 
 async function backfillLegacyOrdersToSupabase(orders: Array<Record<string, any>>, knownIds: Set<string>) {
-  if (!isSupabaseWriteConfigured()) return;
+  if (!isSupabaseWriteConfigured()) return 0;
   const missing = orders.filter((order) => order.id && !knownIds.has(String(order.id))).slice(0, 100);
-  if (!missing.length) return;
+  if (!missing.length) return 0;
 
-  await Promise.allSettled(missing.map(async (order) => {
+  let copied = 0;
+  for (const order of missing) {
     const row = {
       ...mapOrderToSupabase(String(order.id), order),
       authoritative_source: 'supabase',
@@ -102,18 +150,9 @@ async function backfillLegacyOrdersToSupabase(orders: Array<Record<string, any>>
       mirror_error: null,
     };
     await supabasePrimaryUpsert({ table: 'orders', row });
-  }));
-}
-
-function mergeOrders(primary: Array<Record<string, any>>, legacy: Array<Record<string, any>>) {
-  const merged = new Map<string, Record<string, any>>();
-  for (const order of legacy) {
-    if (order?.id) merged.set(String(order.id), order);
+    copied += 1;
   }
-  for (const order of primary) {
-    if (order?.id) merged.set(String(order.id), { ...(merged.get(String(order.id)) || {}), ...order });
-  }
-  return [...merged.values()];
+  return copied;
 }
 
 export async function GET(request: Request) {
@@ -121,43 +160,57 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: 'Authentication required.' }, { status: 401 });
   }
 
-  let supabaseOrders: Array<Record<string, any>> = [];
-  let legacyOrders: Array<Record<string, any>> = [];
-  let warning = '';
-
   if (isSupabaseWriteConfigured()) {
     try {
-      supabaseOrders = await listSupabaseOrders();
+      const [orders, whatsappNumber] = await Promise.all([
+        listSupabaseOrders(),
+        readOrderWhatsappNumber().catch(() => ''),
+      ]);
+      return NextResponse.json({
+        success: true,
+        orders,
+        whatsappNumber,
+        primary: 'supabase',
+        warning: null,
+      });
     } catch (error) {
-      warning = error instanceof Error ? error.message : 'Supabase orders could not be loaded.';
+      const supabaseWarning = error instanceof Error ? error.message : 'Supabase orders could not be loaded.';
+      try {
+        const legacy = await readLegacyFirebaseOrders();
+        const whatsappNumber = await readOrderWhatsappNumber().catch(() => '');
+        return NextResponse.json({
+          success: true,
+          orders: legacy.orders,
+          whatsappNumber,
+          primary: 'firebase-fallback',
+          warning: `Supabase orders could not be loaded. Showing Firebase fallback. ${supabaseWarning}`,
+        });
+      } catch (legacyError) {
+        const legacyMessage = legacyError instanceof Error ? legacyError.message : String(legacyError);
+        return NextResponse.json(
+          { error: `Orders could not be loaded from Supabase or the Firebase fallback. ${supabaseWarning} ${legacyMessage}` },
+          { status: 503 },
+        );
+      }
     }
   }
 
   try {
     const legacy = await readLegacyFirebaseOrders();
-    legacyOrders = legacy.orders;
-    if (isSupabaseWriteConfigured() && legacyOrders.length) {
-      void backfillLegacyOrdersToSupabase(legacyOrders, new Set(supabaseOrders.map((order) => String(order.id))));
-    }
+    const whatsappNumber = await readOrderWhatsappNumber().catch(() => '');
+    return NextResponse.json({
+      success: true,
+      orders: legacy.orders,
+      whatsappNumber,
+      primary: 'firebase',
+      warning: 'Supabase order storage is not configured on this deployment.',
+    });
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    const quotaExceeded = /RESOURCE_EXHAUSTED|quota exceeded/i.test(message);
-    warning = warning || (quotaExceeded
-      ? 'Firebase legacy order sync is temporarily unavailable because its quota is exhausted. Supabase orders are still available.'
-      : 'Legacy Firebase orders could not be refreshed. Supabase orders are still available.');
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Orders could not be loaded.' },
+      { status: 503 },
+    );
   }
-
-  const orders = mergeOrders(supabaseOrders, legacyOrders);
-  if (!orders.length && warning) {
-    return NextResponse.json({ error: warning }, { status: 503 });
-  }
-
-  return NextResponse.json({
-    success: true,
-    orders,
-    primary: isSupabaseWriteConfigured() ? 'supabase' : 'firebase',
-    warning: warning || null,
-  });
 }
 
 export async function POST(request: Request) {
@@ -168,8 +221,58 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     const action = String(body?.action || '');
-    const orderId = String(body?.orderId || '').trim();
 
+    if (action === 'save-whatsapp') {
+      const number = String(body?.whatsappNumber || '').trim();
+      const digits = number.replace(/\D/g, '');
+      if (digits.length < 8 || digits.length > 15) {
+        return NextResponse.json({ error: 'A valid WhatsApp number is required.' }, { status: 400 });
+      }
+
+      const mirrorWarning = await saveOrderWhatsappNumber(number);
+      return NextResponse.json({
+        success: true,
+        primary: isSupabaseWriteConfigured() ? 'supabase' : 'firebase',
+        whatsappNumber: number,
+        mirrorWarning,
+      });
+    }
+
+    if (action === 'sync-legacy') {
+      if (!isSupabaseWriteConfigured()) {
+        return NextResponse.json({ error: 'Supabase order storage is not configured.' }, { status: 503 });
+      }
+
+      try {
+        const [supabaseOrders, legacy] = await Promise.all([
+          listSupabaseOrders(),
+          readLegacyFirebaseOrders(),
+        ]);
+        const copied = await backfillLegacyOrdersToSupabase(
+          legacy.orders,
+          new Set(supabaseOrders.map((order) => String(order.id))),
+        );
+        return NextResponse.json({
+          success: true,
+          primary: 'supabase',
+          copied,
+          totalLegacyOrders: legacy.orders.length,
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        const quotaExceeded = /RESOURCE_EXHAUSTED|quota exceeded/i.test(message);
+        return NextResponse.json(
+          {
+            error: quotaExceeded
+              ? 'Firebase legacy order sync is temporarily unavailable because its quota is exhausted.'
+              : message || 'Legacy order sync failed.',
+          },
+          { status: 503 },
+        );
+      }
+    }
+
+    const orderId = String(body?.orderId || '').trim();
     if (!orderId) {
       return NextResponse.json({ error: 'Order id is required.' }, { status: 400 });
     }
