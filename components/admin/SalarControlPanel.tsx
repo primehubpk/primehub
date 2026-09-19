@@ -45,6 +45,7 @@ export default function SalarControlPanel() {
   const [iconUrl, setIconUrl] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [savingEnabled, setSavingEnabled] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [uploadingIcon, setUploadingIcon] = useState(false);
   const [editorSection, setEditorSection] = useState<'core' | 'order' | null>(null);
@@ -100,6 +101,33 @@ export default function SalarControlPanel() {
       setMessage(error instanceof Error ? error.message : 'Could not save Salar instructions.');
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function saveEnabled(nextEnabled: boolean) {
+    const previousEnabled = enabled;
+    setEnabled(nextEnabled);
+    setSavingEnabled(true);
+    setMessage('');
+    try {
+      const response = await fetch('/api/admin/salar', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        cache: 'no-store',
+        body: JSON.stringify({ enabled: nextEnabled }),
+      });
+      const result = await response.json().catch(() => null);
+      if (!response.ok || !result?.success) throw new Error(result?.error || 'Could not update Salar status.');
+      const savedEnabled = result.salar?.enabled !== false;
+      setData(result.salar);
+      setEnabled(savedEnabled);
+      setMessage(savedEnabled ? 'Salar is now ON on the storefront.' : 'Salar is now OFF on the storefront.');
+    } catch (error) {
+      setEnabled(previousEnabled);
+      setMessage(error instanceof Error ? error.message : 'Could not update Salar status.');
+    } finally {
+      setSavingEnabled(false);
     }
   }
 
@@ -227,10 +255,16 @@ export default function SalarControlPanel() {
             <h2 className="mt-1 text-lg font-black">Your salesman training</h2>
             <p className="mt-1 max-w-2xl text-[11px] leading-5 text-black/45">Keep core sales behaviour separate from the order/payment flow. Both sections are combined for Salar at runtime; nothing is hardcoded into customer replies.</p>
           </div>
-          <label className="flex items-center gap-2 rounded-full bg-[#F4F4F1] px-3 py-2 text-[10px] font-black">
-            <input type="checkbox" checked={enabled} onChange={(event) => setEnabled(event.target.checked)} className="h-4 w-4"/>
-            Salar enabled
-          </label>
+          <button
+            type="button"
+            onClick={() => void saveEnabled(!enabled)}
+            disabled={savingEnabled}
+            aria-pressed={enabled}
+            className={`inline-flex items-center gap-2 rounded-full px-3 py-2 text-[10px] font-black transition disabled:opacity-50 ${enabled ? 'bg-[#0F6A5F] text-white' : 'bg-[#F1F1ED] text-black/55'}`}
+          >
+            <span className={`h-2.5 w-2.5 rounded-full ${enabled ? 'bg-white' : 'bg-black/25'}`}/>
+            {savingEnabled ? 'Saving…' : enabled ? 'Salar ON' : 'Salar OFF'}
+          </button>
         </div>
 
         <div className="mt-5 rounded-2xl border border-black/8 bg-[#FAFAF7] p-3 sm:p-4">

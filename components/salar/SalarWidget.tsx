@@ -356,6 +356,7 @@ export default function SalarWidget() {
   const [lastSharedProducts, setLastSharedProducts] = useState<ProductCard[]>([]);
   const [hydrated, setHydrated] = useState(false);
   const [salarPaused, setSalarPaused] = useState(false);
+  const [salarEnabled, setSalarEnabled] = useState<boolean | null>(null);
   const [iconUrl, setIconUrl] = useState('');
   const [adminAuthenticated, setAdminAuthenticated] = useState(false);
   const [runtimeTrace, setRuntimeTrace] = useState<{ understanding: string; reply: string; vision: string } | null>(null);
@@ -496,6 +497,13 @@ export default function SalarWidget() {
       const response = await fetch(`/api/salar/chat?chatId=${encodeURIComponent(chatId)}`, { cache: 'no-store' });
       const result = await response.json().catch(() => null);
       if (!response.ok || !result?.success) return;
+      const nextEnabled = result.settings?.enabled !== false;
+      setSalarEnabled(nextEnabled);
+      if (!nextEnabled) {
+        setOpen(false);
+        setExpanded(false);
+        setAdminDrawerOpen(false);
+      }
       setIconUrl(String(result.settings?.iconUrl || ''));
       if (sendingRef.current) return;
       if (result.chat && Array.isArray(result.chat.messages)) {
@@ -613,7 +621,7 @@ export default function SalarWidget() {
     setOpen(true);
   }
 
-  if (isAdminRoute) return null;
+  if (isAdminRoute || salarEnabled !== true) return null;
 
   function clearImage() {
     setImageFile(null);
