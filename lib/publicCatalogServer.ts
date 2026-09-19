@@ -7,7 +7,9 @@ import { getWholesaleVideosSnapshot } from '@/lib/wholesaleVideosServer';
 const CATALOG_RETRY_DELAYS_MS = [0];
 const SETTINGS_RETRY_DELAYS_MS = [0];
 const PUBLIC_PRIMARY_TIMEOUT_MS = 8000;
-// Admin/product writes explicitly invalidate the public-catalog tag, so a longer\n// fallback TTL cuts repeated Supabase egress without delaying normal updates.\nconst CATALOG_READ_CACHE = { revalidate: 600, tags: ['public-catalog'], timeoutMs: PUBLIC_PRIMARY_TIMEOUT_MS };
+// Admin/product writes explicitly invalidate the public-catalog tag, so a longer
+// fallback TTL cuts repeated Supabase egress without delaying normal updates.
+const CATALOG_READ_CACHE = { revalidate: 600, tags: ['public-catalog'], timeoutMs: PUBLIC_PRIMARY_TIMEOUT_MS };
 const PRODUCT_READ_CACHE = { revalidate: 60, tags: ['public-products'], timeoutMs: PUBLIC_PRIMARY_TIMEOUT_MS };
 const SETTINGS_READ_CACHE = { revalidate: 60, tags: ['storefront-settings'], timeoutMs: PUBLIC_PRIMARY_TIMEOUT_MS };
 const SKILLS_READ_CACHE = { revalidate: 600, tags: ['prime-skills', 'storefront-settings'], timeoutMs: PUBLIC_PRIMARY_TIMEOUT_MS };
