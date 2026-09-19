@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { getConfiguredReadMode } from '@/lib/dualReadServer';
 import {
   compactPublicCatalogSnapshot,
-  getFreshPublicCatalogSnapshot,
+  getPublicCatalogSnapshot,
   getFreshPublicProductSnapshot,
   getFreshStorefrontSettingsDocumentsSnapshot,
   getPrimeSkillsSnapshot,
@@ -79,9 +79,13 @@ export async function GET(request: Request) {
         { headers: FRESH_BROWSER_HEADERS },
       );
     }
-    const result = compactPublicCatalogSnapshot(await getFreshPublicCatalogSnapshot());
+    // Browser requests stay no-store, but the server-side catalog read is shared
+    // through the tagged cache. Admin/product writes invalidate that tag, so open
+    // storefronts still see updates on their existing refresh cycle without every
+    // customer tab triggering another full Supabase catalog transfer.
+    const result = compactPublicCatalogSnapshot(await getPublicCatalogSnapshot());
     return NextResponse.json(
-      { ...result, source: 'fresh', mode: getConfiguredReadMode() },
+      { ...result, mode: getConfiguredReadMode() },
       { headers: FRESH_BROWSER_HEADERS },
     );
   } catch (error) {
