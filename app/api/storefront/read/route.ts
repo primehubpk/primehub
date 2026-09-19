@@ -3,7 +3,6 @@ import { getConfiguredReadMode } from '@/lib/dualReadServer';
 import {
   compactPublicCatalogSnapshot,
   getPublicCatalogSnapshot,
-  getFreshPublicCatalogSnapshot,
   getFreshPublicProductSnapshot,
   getFreshStorefrontSettingsDocumentsSnapshot,
   getPrimeSkillsSnapshot,
