@@ -13,6 +13,48 @@ type SkillsSnapshot = { skills: any[]; source: 'firebase' | 'supabase' | 'empty'
 
 const SUPABASE_READ_TIMEOUT_MS = 3500;
 
+// Catalog pages only need card/filter metadata. Fetching the full products row
+// sends descriptions and variant matrices across Supabase on every catalog
+// refresh, even though those heavy fields are only needed after opening/adding
+// one product. JSON-path projection keeps the storefront shape intact while
+// leaving full single-product reads unchanged for variant/cart correctness.
+const SUPABASE_CATALOG_PRODUCT_SELECT = [
+  'id',
+  'title',
+  'name',
+  'category_id',
+  'category',
+  'price',
+  'original_price',
+  'stock',
+  'active',
+  'image_url',
+  'images',
+  'payloadTitle:payload->>title',
+  'payloadName:payload->>name',
+  'payloadCategory:payload->>category',
+  'payloadPrice:payload->price',
+  'payloadOriginalPrice:payload->originalPrice',
+  'payloadStock:payload->stock',
+  'payloadQuantity:payload->quantity',
+  'payloadActive:payload->active',
+  'payloadImageUrl:payload->>imageUrl',
+  'payloadImage:payload->>image',
+  'payloadImages:payload->images',
+  'featured:payload->featured',
+  'isFlashSale:payload->isFlashSale',
+  'isWeekendSpecial:payload->isWeekendSpecial',
+  'priceBucketIds:payload->priceBucketIds',
+  'published:payload->published',
+  'slug:payload->>slug',
+  'videoUrl:payload->>videoUrl',
+  'isWholesale:payload->isWholesale',
+  'hasVariants:payload->hasVariants',
+  'createdAt:payload->>createdAt',
+  'updatedAt:payload->>updatedAt',
+  'brand:payload->>brand',
+].join(',');
+
 function envValue(...names: string[]) {
   for (const name of names) {
     const value = String(process.env[name] || '').trim();
@@ -151,6 +193,36 @@ function productFromSupabase(row: any) {
   };
 }
 
+function catalogProductFromSupabase(row: any) {
+  return {
+    id: row.id,
+    title: row.payloadTitle ?? row.title ?? row.payloadName ?? row.name,
+    name: row.payloadName ?? row.name ?? row.payloadTitle ?? row.title,
+    categoryId: row.category_id,
+    category: row.payloadCategory ?? row.category,
+    price: row.payloadPrice ?? row.price,
+    originalPrice: row.payloadOriginalPrice ?? row.original_price,
+    stock: row.payloadStock ?? row.payloadQuantity ?? row.stock,
+    active: row.payloadActive ?? row.active,
+    imageUrl: row.payloadImageUrl ?? row.payloadImage ?? row.image_url,
+    images: Array.isArray(row.payloadImages)
+      ? row.payloadImages
+      : (Array.isArray(row.images) ? row.images : []),
+    featured: row.featured,
+    isFlashSale: row.isFlashSale,
+    isWeekendSpecial: row.isWeekendSpecial,
+    priceBucketIds: row.priceBucketIds,
+    published: row.published,
+    slug: row.slug,
+    videoUrl: row.videoUrl,
+    isWholesale: row.isWholesale,
+    hasVariants: row.hasVariants,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+    brand: row.brand,
+  };
+}
+
 function categoryFromSupabase(row: any) {
   const payload = row?.payload && typeof row.payload === 'object' ? row.payload : {};
   return {
@@ -193,11 +265,11 @@ async function firebaseCatalog(): Promise<CatalogSnapshot> {
 
 async function supabaseCatalog(options?: DualReadCacheOptions): Promise<CatalogSnapshot> {
   const [products, categories] = await Promise.all([
-    sbRows('products', '*', false, options),
+    sbRows('products', SUPABASE_CATALOG_PRODUCT_SELECT, false, options),
     sbRows('categories', '*', false, options),
   ]);
   return {
-    products: products.map(productFromSupabase),
+    products: products.map(catalogProductFromSupabase),
     categories: categories.map(categoryFromSupabase),
     source: 'supabase',
   };
