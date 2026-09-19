@@ -160,6 +160,35 @@ function safeContext(value: unknown): ChatContext {
   };
 }
 
+function instantOrderProcessReply(message: string) {
+  const normalized = normalizeSearchText(message);
+  if (!normalized || !/\border\b/i.test(normalized)) return '';
+
+  const isProcessQuestion =
+    /\b(how|process|procedure|method)\b/i.test(normalized) ||
+    /\b(kais[ae]y|kaise|kese|kesy|kasy|kaisay|tarika|tareeqa|karun|karoon|karon|krun|karna|krna)\b/i.test(normalized) ||
+    /\b(kar sakti|kar sakta|kr skti|kr skta|dena hai|place kar)\b/i.test(normalized);
+
+  const isSpecificOrderIssue =
+    /\b(change|remove|cancel|track|status|payment|advance|address|bill|total|refund|return|delivery|edit|modify)\b/i.test(normalized);
+
+  if (!isProcessQuestion || isSpecificOrderIssue) return '';
+
+  if (/[\u0600-\u06FF]/.test(message)) {
+    return 'جی۔ پہلے اپنی پسند کے پروڈکٹس منتخب/کنفرم کریں۔ شاپنگ مکمل ہو جائے تو میں فائنل بل دوں گا۔ بل کنفرم ہونے کے بعد نام، فون، شہر اور مکمل پتہ لیا جائے گا، پھر Rs.500 ایڈوانس کے بعد ویب سائٹ آرڈر کنفرم کیا جائے گا۔';
+  }
+
+  const looksEnglish =
+    /\b(how|can i|do i|place an order|order process|purchase|buy)\b/i.test(message) &&
+    !/\b(bhai|kaise|kesy|kasy|kr|kar|mujhe|mai|main|order k)\b/i.test(message);
+
+  if (looksEnglish) {
+    return 'Sure. First select and confirm the products you want. When you finish shopping, I’ll show the final bill. After you confirm it, we’ll take your name, phone, city and full address, then the Rs.500 advance; after that the website order can be confirmed.';
+  }
+
+  return 'Ji 😊 Pehle jo products pasand hon unhein select/confirm karein. Shopping complete ho to main final bill bana dunga. Bill confirm hone ke baad name, contact number, city aur complete address lenge, phir Rs.500 advance ke baad website order confirm hoga.';
+}
+
 function configuredKeys(...values: Array<string | undefined>) {
   return [...new Set(values
     .flatMap((value) => String(value || '').split(/[\n,;]+/))
@@ -784,6 +813,34 @@ export async function answerWithModelDrivenSalar(input: {
     };
   }
   if (!state.catalogue) throw new Error('Salar catalogue is not ready.');
+
+  const instantReply = !input.image && !(context.confirmedOrderProductIds || []).length
+    ? instantOrderProcessReply(message)
+    : '';
+  if (instantReply) {
+    console.info('Salar instant rule decision', { rule: 'order-process' });
+    return {
+      reply: instantReply,
+      provider: null,
+      model: null,
+      understandingProvider: null,
+      understandingModel: null,
+      displayMode: 'none' as DisplayMode,
+      products: [],
+      categories: [],
+      context,
+      resultScope: 'focused' as const,
+      shoppingMode: 'all' as ShoppingMode,
+      matchingProductCount: 0,
+      showAllMatches: false,
+      orderAction: 'none' as OrderAction,
+      orderProducts: [],
+      orderCustomer: {},
+      vision: null,
+      imageUnderstanding: '',
+      catalogueUpdatedAt: state.catalogue.updatedAt,
+    };
+  }
 
   const history = safeHistory(input.history);
   const customerName = cleanText(input.customerName, 120);
