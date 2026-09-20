@@ -66,7 +66,7 @@ function text(value: unknown, max = 20_000) {
 function titleText(value: unknown) {
   return text(value, 500)
     .replace(/[\u{1F000}-\u{1FAFF}\u2600-\u27BF]/gu, ' ')
-    .replace(/\b(?:free shipping|free delivery|wholesale deal|limited[- ]time deal)\b/gi, ' ')
+    .replace(/\b(?:free shipping|free delivery|wholesale(?: deal)?|limited[- ]time deal)\b/gi, ' ')
     .replace(/\s+/g, ' ')
     .replace(/\s+([,.:;\-])/g, '$1')
     .trim()
