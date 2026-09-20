@@ -11,6 +11,7 @@ globalThis.__salarTestState = fixture;
 async function engine() {
   const code = stripTypeScriptTypes(source
     .replace("import 'server-only';", '')
+    .replace(/import \{ getProviderCredentials[^\n]+\n/, 'const getProviderCredentials = async () => ({});\n')
     .replaceAll("'@/lib/salar/providerConfig'", JSON.stringify(configUrl))
     .replace(/import \{ getSalarState[^\n]+\n/, 'const getSalarState = async () => globalThis.__salarTestState;\n')
     .replace(/import \{ normalizeSearchText[^\n]+\n/, 'const normalizeSearchText = value => value; const productSearchScore = () => 0;\n'));
@@ -21,7 +22,7 @@ const ok = () => Response.json({ choices: [{ message: { content: JSON.stringify(
 function setup() {
   for (const name of Object.keys(process.env)) if (/^(CLOUDFLARE|CF_|GROQ|GEMINI|GOOGLE_GEMINI|SALAAR_|OPENROUTER|OPEN_ROUTER)/.test(name)) delete process.env[name];
   process.env.CLOUDFLARE_ACCOUNT_ID = 'a'.repeat(32);
-  process.env.CLOUDFLARE_API_TOKEN = 'test-cloudflare';
+  process.env.CLOUDFLARE_AI_API_TOKEN = 'test-cloudflare';
   process.env.GROQ_API_KEYS = 'test-groq-1,test-groq-2';
   process.env.GROQ_MODEL = 'test-model';
   fixture.providerSelection = config.normalizeProviderSelection(null);
@@ -46,6 +47,7 @@ test('Cloudflare request uses account endpoint, admin guidance and bounded outpu
     assert.ok(body.messages[0].content.includes(fixture.orderInstructions));
     assert.equal(body.options.rejectIfBusy, true);
     assert.equal(body.max_completion_tokens, 1200);
+    assert.equal(body.chat_template_kwargs.enable_thinking, false);
     return ok();
   };
   const result = await model.answerWithModelDrivenSalar({ message: 'Hello' });
@@ -53,7 +55,7 @@ test('Cloudflare request uses account endpoint, admin guidance and bounded outpu
 });
 
 test('auth/quota failure rotates keys; successful model response is preserved', async () => {
-  setup(); process.env.CLOUDFLARE_API_TOKEN = ''; const model = await engine(); const keys = [];
+  setup(); process.env.CLOUDFLARE_AI_API_TOKEN = ''; const model = await engine(); const keys = [];
   globalThis.fetch = async (_url, init) => { keys.push(init.headers.Authorization); return keys.length === 1 ? new Response('', { status: 429 }) : ok(); };
   const result = await model.answerWithModelDrivenSalar({ message: 'Hello' });
   assert.deepEqual(keys, ['Bearer test-groq-1', 'Bearer test-groq-2']); assert.equal(result.provider, 'groq');

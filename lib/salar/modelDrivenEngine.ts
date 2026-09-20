@@ -1,4 +1,5 @@
 import 'server-only';
+import { getProviderCredentials } from '@/lib/salar/credentialStore';
 import { createHash } from 'node:crypto';
 import { cloudflareAccountId, providerTargets, type ProviderName, type ProviderTarget } from '@/lib/salar/providerConfig';
 
@@ -412,7 +413,7 @@ async function callOpenAiCompatible(
   const model = modelForTarget(target, images.length > 0);
   if (!model) throw new Error(`${target.provider} model is not configured`);
   const baseUrl = target.provider === 'cloudflare'
-    ? `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(cloudflareAccountId())}/ai/v1`
+    ? `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(target.accountId || cloudflareAccountId())}/ai/v1`
     : target.provider === 'groq' ? 'https://api.groq.com/openai/v1' : 'https://openrouter.ai/api/v1';
   const headers: Record<string, string> = {
     Authorization: `Bearer ${target.apiKey}`,
@@ -441,7 +442,7 @@ async function callOpenAiCompatible(
         { role: 'user', content: userContent },
       ],
       temperature: 0.2,
-      ...(target.provider === 'cloudflare' ? { max_completion_tokens: 1200, reasoning_effort: 'low', options: { rejectIfBusy: true } } : {}),
+      ...(target.provider === 'cloudflare' ? { max_completion_tokens: 1200, chat_template_kwargs: { enable_thinking: false }, options: { rejectIfBusy: true } } : {}),
       ...(!images.length ? { response_format: { type: 'json_object' } } : {}),
     }),
     cache: 'no-store',
@@ -753,7 +754,7 @@ export async function answerWithModelDrivenSalar(input: {
   });
   const user = message || 'Customer shared an image. Handle the customer according to the admin instructions and live store context.';
 
-  const targets = providerTargets(images.length > 0, state.providerSelection);
+  const targets = providerTargets(images.length > 0, state.providerSelection, await getProviderCredentials());
   if (!targets.length) throw new Error('No Salar AI provider is configured in the existing environment.');
 
   let finalProvider: { text: string; provider: ProviderName; model: string } | null = null;
@@ -873,7 +874,7 @@ export async function answerWithModelDrivenSalar(input: {
 
 // Admin-only diagnostic: no customer history, order creation, or fallback.
 export async function testSalarProvider(selection: unknown) {
-  const targets = providerTargets(false, selection);
+  const targets = providerTargets(false, selection, await getProviderCredentials());
   const { normalizeProviderSelection } = await import('@/lib/salar/providerConfig');
   const config = normalizeProviderSelection(selection);
   const target = targets.find(item => item.provider === config.preferredProvider);

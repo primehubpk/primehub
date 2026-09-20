@@ -1,4 +1,5 @@
 import 'server-only';
+import { getProviderCredentials } from '@/lib/salar/credentialStore';
 import { normalizeProviderSelection, providerDefinitions, type ProviderSelection } from '@/lib/salar/providerConfig';
 
 import { revalidateTag, unstable_cache } from 'next/cache';
@@ -394,8 +395,8 @@ export async function refreshSalarCatalogue(origin: string) {
   return next;
 }
 
-export function getSalarRuntimeStatus(selection?: unknown) {
-  const providers = providerDefinitions(selection).map(item => ({
+export async function getSalarRuntimeStatus(selection?: unknown) {
+  const providers = providerDefinitions(selection, await getProviderCredentials()).map(item => ({
     provider: item.provider, configured: Boolean(item.keys.length && item.model && item.accountReady),
     keyCount: item.keys.length, model: item.model,
     visionConfigured: Boolean(item.keys.length && item.visionModel && item.accountReady),

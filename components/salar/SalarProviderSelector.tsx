@@ -1,5 +1,6 @@
 'use client';
 
+import SalarCredentialManager from './SalarCredentialManager';
 import { useEffect, useId, useState } from 'react';
 
 type Provider = 'cloudflare' | 'groq' | 'gemini' | 'openrouter';
@@ -13,18 +14,19 @@ export default function SalarProviderSelector() {
   const [providers, setProviders] = useState<Status[]>([]);
   const [busy, setBusy] = useState(true);
   const [message, setMessage] = useState('');
+  const [revision, setRevision] = useState(0);
   useEffect(() => {
     const controller = new AbortController();
     fetch('/api/admin/salar', { cache: 'no-store', credentials: 'same-origin', signal: controller.signal })
       .then(async response => {
         const result = await response.json();
-        if (!response.ok || !result.success) throw new Error('Could not load AI settings.');
+        if (!response.ok || !result.success) throw new Error('Verify admin with Google below to load AI settings.');
         setSelection(result.salar.providerSelection);
         setProviders(result.salar.runtime.providers);
       }).catch(error => { if (!controller.signal.aborted) setMessage(error.message); })
       .finally(() => { if (!controller.signal.aborted) setBusy(false); });
     return () => controller.abort();
-  }, []);
+  }, [revision]);
 
   async function apply(test: boolean) {
     setBusy(true); setMessage('');
@@ -44,6 +46,7 @@ export default function SalarProviderSelector() {
 
   const provider = selection.preferredProvider;
   return <section className="rounded-2xl border border-black/10 bg-white p-3 text-[#14140F]">
+    <SalarCredentialManager provider={provider} onVerified={() => setRevision(value => value + 1)} />
     <label htmlFor={`${id}-provider`} className="block text-xs font-bold">Salar AI provider</label>
     <select id={`${id}-provider`} value={provider} disabled={busy} onChange={event => setSelection(current => ({ ...current, preferredProvider: event.target.value as Provider }))} className="mt-2 w-full rounded-lg border p-2 text-xs">
       {(Object.keys(labels) as Provider[]).map(value => <option key={value} value={value}>{labels[value]}{providers.find(item => item.provider === value)?.configured ? '' : ' (not configured)'}</option>)}
