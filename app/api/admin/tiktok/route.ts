@@ -51,6 +51,7 @@ export async function POST(request: Request) {
         payload: { currency: 'PKR' },
         pageUrl: new URL(request.url).origin,
         forceTestCode: testCode,
+        forceSend: true,
       });
       return NextResponse.json({ success: true, test: result }, { headers });
     }
