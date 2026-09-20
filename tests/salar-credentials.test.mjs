@@ -32,3 +32,11 @@ test('saved admin keys define provider targets and account ID', () => {
 test('disabled provider stays unavailable even if environment keys exist', () => {
   assert.equal(providerTargets(false, undefined, { cloudflare: { keys: [], disabled: true } }).some(x => x.provider === 'cloudflare'), false);
 });
+
+test('custom provider uses only saved admin endpoint and key', () => {
+  const targets = providerTargets(false, { preferredProvider: 'custom', models: { custom: 'model-x' } }, { custom: { keys: ['custom-key'], baseUrl: 'https://api.example.test/v1', label: 'Example AI' } });
+  assert.equal(targets.length, 1);
+  assert.equal(targets[0].provider, 'custom');
+  assert.equal(targets[0].baseUrl, 'https://api.example.test/v1');
+  assert.equal(targets[0].apiKey, 'custom-key');
+});
