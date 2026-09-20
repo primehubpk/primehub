@@ -122,11 +122,10 @@ export function decodeImageToken(file: string) {
   }
 }
 
-function imageProxyUrl(requestOrigin: string, kind: 'p' | 's', id: string, version?: unknown) {
+function imageProxyUrl(requestOrigin: string, kind: 'p' | 's', id: string, _version?: unknown) {
   const origin = String(requestOrigin || CANONICAL_SITE_ORIGIN).replace(/\/+$/, '');
   const token = imageToken(kind, id);
-  const versionValue = text(version || '1', 80);
-  return `${origin}/api/tiktok/catalog/image/${token}?v=${encodeURIComponent(versionValue)}`;
+  return `${origin}/api/tiktok/catalog/image/${token}`;
 }
 
 function productImage(product: any) {
@@ -353,7 +352,15 @@ function priceState(product: any, settings: SettingsShape, now: Date) {
   }
 
   if (!(regular > 0)) regular = current;
-  if (!(sale > 0 && sale < regular)) sale = 0;
+  if (sale > 0 && sale >= regular && (state === 'weekly-deal-live' || state === 'big-deal-live')) {
+    // Defensive parity with the storefront if an old/manual deal was saved
+    // above its displayed normal price: the deal value is still what the
+    // customer sees, so publish it as the current price rather than a fake sale.
+    regular = sale;
+    sale = 0;
+  } else if (!(sale > 0 && sale < regular)) {
+    sale = 0;
+  }
 
   return {
     regular,
