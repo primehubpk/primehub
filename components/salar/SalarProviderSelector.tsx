@@ -20,7 +20,7 @@ export default function SalarProviderSelector({ onVerified }: { onVerified?: () 
     fetch('/api/admin/salar', { cache: 'no-store', credentials: 'same-origin', signal: controller.signal })
       .then(async response => {
         const result = await response.json();
-        if (!response.ok || !result.success) throw new Error('Verify admin with Google to load AI settings.');
+        if (!response.ok || !result.success) throw new Error(result?.error || 'Admin session expired. Please log in again.');
         setSelection(result.salar.providerSelection);
         setProviders(result.salar.runtime.providers);
       }).catch(error => { if (!controller.signal.aborted) setMessage(error.message); })
@@ -39,7 +39,7 @@ export default function SalarProviderSelector({ onVerified }: { onVerified?: () 
       const result = await response.json();
       if (!response.ok || !result.success) throw new Error(result.error || 'Could not update AI settings.');
       if (test) setMessage(`${labels[result.test.provider as Provider]} · ${result.test.model} · ${(result.test.elapsedMs / 1000).toFixed(2)}s · ${result.test.ok ? 'Test passed' : result.test.error}`);
-      else { setSelection(result.salar.providerSelection); setProviders(result.salar.runtime.providers); setMessage('Saved. New messages use this provider first, with automatic fallback.'); }
+      else { setSelection(result.salar.providerSelection); setProviders(result.salar.runtime.providers); setMessage('Saved. New messages use this provider first, with automatic fallback to other admin-configured providers.'); }
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Request failed.'); }
     finally { setBusy(false); }
   }
@@ -49,7 +49,7 @@ export default function SalarProviderSelector({ onVerified }: { onVerified?: () 
     <SalarCredentialManager provider={provider} onVerified={() => { setRevision(value => value + 1); onVerified?.(); }} />
     <label htmlFor={`${id}-provider`} className="block text-xs font-bold">Salar AI provider</label>
     <select id={`${id}-provider`} value={provider} disabled={busy} onChange={event => setSelection(current => ({ ...current, preferredProvider: event.target.value as Provider }))} className="mt-2 w-full rounded-lg border p-2 text-xs">
-      {(Object.keys(labels) as Provider[]).map(value => <option key={value} value={value}>{labels[value]}{providers.length ? (providers.find(item => item.provider === value)?.configured ? '' : ' (not configured)') : ' (verify to check)'}</option>)}
+      {(Object.keys(labels) as Provider[]).map(value => <option key={value} value={value}>{labels[value]}{providers.length ? (providers.find(item => item.provider === value)?.configured ? '' : ' (not configured)') : ''}</option>)}
     </select>
     <label htmlFor={`${id}-model`} className="mt-3 block text-xs font-bold">Text model</label>
     <input id={`${id}-model`} value={selection.models[provider] || ''} maxLength={200} disabled={busy} placeholder={providers.find(item => item.provider === provider)?.model || 'Enter provider model ID'} onChange={event => setSelection(current => ({ ...current, models: { ...current.models, [provider]: event.target.value } }))} className="mt-1 w-full rounded-lg border p-2 text-xs"/>
