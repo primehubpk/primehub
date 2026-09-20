@@ -1,25 +1,19 @@
 import 'server-only';
+import { getProviderCredentials } from '@/lib/salar/credentialStore';
+import { createHash } from 'node:crypto';
+import { cloudflareAccountId, providerTargets, type ProviderName, type ProviderTarget } from '@/lib/salar/providerConfig';
 
 import { getSalarState, type SalarCatalogue, type SalarImageInput as BaseSalarImageInput } from '@/lib/salar/server';
 import { normalizeSearchText, productSearchScore } from '@/lib/smartSearch';
 
 export type SalarModelImageInput = BaseSalarImageInput;
 
-type ProviderName = 'groq' | 'gemini' | 'openrouter';
 type DisplayMode = 'none' | 'products' | 'categories' | 'product_images';
 type ShoppingMode = 'retail' | 'wholesale' | 'all';
 type OrderAction = 'none' | 'draft' | 'place';
 type ChatMessage = { role: 'user' | 'assistant'; content: string };
 type ChatContext = { lastProductQuery?: string; shownProductIds?: string[]; confirmedOrderProductIds?: string[] };
 type ExactProductReference = { id: string; imageUrl?: string };
-
-type ProviderTarget = {
-  provider: ProviderName;
-  apiKey: string;
-  keyIndex: number;
-  model: string;
-  visionModel: string;
-};
 
 type ProductCard = {
   id: string;
@@ -62,7 +56,6 @@ type ModelDecision = {
   orderCustomer: OrderCustomerDraft;
 };
 
-const MAX_KEYS_PER_PROVIDER = 9;
 const MAX_HISTORY = 12;
 const MAX_HISTORY_PROMPT_CHARS = 2600;
 const MAX_SHOWN_IDS = 200;
@@ -71,7 +64,11 @@ const MAX_CATEGORY_CONTEXT = 16;
 const MAX_RENDER_PRODUCTS = 400;
 const MAX_RENDER_CATEGORIES = 30;
 const MAX_ORDER_PRODUCTS = 30;
-const TEXT_TIMEOUT_MS = 4000;
+const TEXT_TIMEOUT_MS = 6000;
+const failedTargets = new Map<string, number>();
+function targetCooldownKey(target: ProviderTarget, vision: boolean) {
+  return createHash('sha256').update(`${target.provider}:${vision ? target.visionModel : target.model}:${target.apiKey}`).digest('hex');
+}
 const VISION_TIMEOUT_MS = 18000;
 const REFERENCE_IMAGE_CACHE_TTL_MS = 30 * 60 * 1000;
 
@@ -158,63 +155,6 @@ function safeContext(value: unknown): ChatContext {
     shownProductIds: uniqueIds(source.shownProductIds, MAX_SHOWN_IDS),
     ...(confirmed.length ? { confirmedOrderProductIds: confirmed } : {}),
   };
-}
-
-function configuredKeys(...values: Array<string | undefined>) {
-  return [...new Set(values
-    .flatMap((value) => String(value || '').split(/[\n,;]+/))
-    .map((value) => value.trim())
-    .filter(Boolean))].slice(0, MAX_KEYS_PER_PROVIDER);
-}
-
-function numberedKeys(...bases: string[]) {
-  const values: Array<string | undefined> = [];
-  for (const base of bases) {
-    values.push(process.env[base], process.env[`${base}S`]);
-    for (let index = 1; index <= MAX_KEYS_PER_PROVIDER; index += 1) {
-      values.push(process.env[`${base}_${index}`], process.env[`${base}${index}`]);
-    }
-  }
-  return configuredKeys(...values);
-}
-
-function envValue(...names: string[]) {
-  for (const name of names) {
-    const value = cleanText(process.env[name], 300);
-    if (value) return value;
-  }
-  return '';
-}
-
-function providerTargets(useVision: boolean): ProviderTarget[] {
-  const definitions: Array<{ provider: ProviderName; keys: string[]; model: string; visionModel: string }> = [
-    {
-      provider: 'groq',
-      keys: numberedKeys('GROQ_API_KEY', 'SALAAR_GROQ_API_KEY'),
-      model: envValue('GROQ_MODEL', 'SALAAR_GROQ_MODEL'),
-      visionModel: envValue('GROQ_VISION_MODEL', 'SALAAR_GROQ_VISION_MODEL'),
-    },
-    {
-      provider: 'gemini',
-      keys: numberedKeys('GEMINI_API_KEY', 'GOOGLE_GEMINI_API_KEY', 'SALAAR_GEMINI_API_KEY'),
-      model: envValue('GEMINI_MODEL', 'SALAAR_GEMINI_MODEL'),
-      visionModel: envValue('GEMINI_VISION_MODEL', 'SALAAR_GEMINI_VISION_MODEL'),
-    },
-    {
-      provider: 'openrouter',
-      keys: numberedKeys('OPENROUTER_API_KEY', 'OPEN_ROUTER_API_KEY', 'SALAAR_OPENROUTER_API_KEY'),
-      model: envValue('OPENROUTER_MODEL', 'OPEN_ROUTER_MODEL', 'SALAAR_OPENROUTER_MODEL'),
-      visionModel: envValue('OPENROUTER_VISION_MODEL', 'OPEN_ROUTER_VISION_MODEL', 'SALAAR_OPENROUTER_VISION_MODEL'),
-    },
-  ];
-
-  return definitions.flatMap((definition) => definition.keys.map((apiKey, index) => ({
-    provider: definition.provider,
-    apiKey,
-    keyIndex: index + 1,
-    model: definition.model,
-    visionModel: definition.visionModel,
-  }))).filter((target) => target.apiKey && (useVision ? target.visionModel : target.model));
 }
 
 function productImageUrls(product: any) {
@@ -472,7 +412,9 @@ async function callOpenAiCompatible(
 ) {
   const model = modelForTarget(target, images.length > 0);
   if (!model) throw new Error(`${target.provider} model is not configured`);
-  const baseUrl = target.provider === 'groq' ? 'https://api.groq.com/openai/v1' : 'https://openrouter.ai/api/v1';
+  const baseUrl = target.provider === 'cloudflare'
+    ? `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(target.accountId || cloudflareAccountId())}/ai/v1`
+    : target.provider === 'groq' ? 'https://api.groq.com/openai/v1' : 'https://openrouter.ai/api/v1';
   const headers: Record<string, string> = {
     Authorization: `Bearer ${target.apiKey}`,
     'Content-Type': 'application/json',
@@ -500,6 +442,7 @@ async function callOpenAiCompatible(
         { role: 'user', content: userContent },
       ],
       temperature: 0.2,
+      ...(target.provider === 'cloudflare' ? { max_completion_tokens: 1200, chat_template_kwargs: { enable_thinking: false }, options: { rejectIfBusy: true } } : {}),
       ...(!images.length ? { response_format: { type: 'json_object' } } : {}),
     }),
     cache: 'no-store',
@@ -509,8 +452,8 @@ async function callOpenAiCompatible(
   });
 
   if (!response.ok) {
-    const detail = cleanText(await response.text().catch(() => ''), 260);
-    throw new Error(`${target.provider} ${response.status}${detail ? ` ${detail}` : ''}`);
+    await response.body?.cancel();
+    throw new Error(`${target.provider} HTTP ${response.status}`);
   }
   const data = await response.json() as any;
   const text = cleanText(data?.choices?.[0]?.message?.content);
@@ -555,8 +498,8 @@ async function callGemini(
   );
 
   if (!response.ok) {
-    const detail = cleanText(await response.text().catch(() => ''), 260);
-    throw new Error(`gemini ${response.status}${detail ? ` ${detail}` : ''}`);
+    await response.body?.cancel();
+    throw new Error(`gemini HTTP ${response.status}`);
   }
   const data = await response.json() as any;
   const text = cleanText(data?.candidates?.[0]?.content?.parts?.map((part: any) => part?.text || '').join('\n'));
@@ -811,25 +754,30 @@ export async function answerWithModelDrivenSalar(input: {
   });
   const user = message || 'Customer shared an image. Handle the customer according to the admin instructions and live store context.';
 
-  const targets = providerTargets(images.length > 0);
+  const targets = providerTargets(images.length > 0, state.providerSelection, await getProviderCredentials());
   if (!targets.length) throw new Error('No Salar AI provider is configured in the existing environment.');
 
   let finalProvider: { text: string; provider: ProviderName; model: string } | null = null;
   let decision: ModelDecision | null = null;
   let lastError: unknown = null;
   let skipProvider: ProviderName | null = null;
+  const startedAt = Date.now();
+  const deadline = AbortSignal.timeout(images.length ? 30000 : 16000);
 
-  // Strict provider/key priority requested for PrimeHub:
-  // Groq key 1 -> 9, then Gemini key 1 -> 9, then OpenRouter key 1 -> 9.
-  // A healthy first key normally answers immediately; failed/rate-limited keys
-  // move to the next key without changing Salar's admin instructions or logic.
+  // Rotate keys for credential/quota failures. Provider-wide failures skip
+  // redundant same-model attempts; the whole turn has a shared deadline.
   for (const target of targets) {
+    if (deadline.aborted) break;
     if (skipProvider === target.provider) continue;
+    const cooldownKey = targetCooldownKey(target, images.length > 0);
+    if ((failedTargets.get(cooldownKey) || 0) > Date.now()) continue;
+    failedTargets.delete(cooldownKey);
     try {
-      const result = await runTarget(target, system, history, user, images);
+      const result = await runTarget(target, system, history, user, images, deadline);
       const parsed = parseDecision(result.text);
       if (!parsed) {
         lastError = new Error(`${target.provider} invalid structured response`);
+        skipProvider = target.provider;
         console.warn(
           `Salar ${target.provider} key ${target.keyIndex} returned an unusable response; trying next key/provider.`,
         );
@@ -841,9 +789,12 @@ export async function answerWithModelDrivenSalar(input: {
     } catch (error) {
       lastError = error;
       const errorMessage = error instanceof Error ? error.message : 'unknown';
-      // A 413 is payload/provider-wide, so trying the same provider's other
-      // keys cannot help; move directly to the next provider.
-      if (/\b413\b.*request too large/i.test(errorMessage)) skipProvider = target.provider;
+      const timedOut = error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError');
+      if (timedOut || /HTTP (400|404|413|422|5\d\d)\b/.test(errorMessage)) skipProvider = target.provider;
+      if (!deadline.aborted) {
+        if (failedTargets.size > 200) failedTargets.clear();
+        failedTargets.set(cooldownKey, Date.now() + (/HTTP (401|403|429)\b/.test(errorMessage) ? 60000 : 15000));
+      }
       console.warn(
         `Salar ${target.provider} key ${target.keyIndex} failed; trying next key/provider.`,
         errorMessage,
@@ -880,6 +831,9 @@ export async function answerWithModelDrivenSalar(input: {
   console.info('Salar autonomous decision', {
     provider: finalProvider.provider,
     model: finalProvider.model,
+    modelLatencyMs: Date.now() - startedAt,
+    instructionChars: state.instructions.length + state.orderInstructions.length,
+    promptChars: system.length,
     display: decision.display,
     safeDisplay: safeDecision.display,
     renderedDisplay: displayMode,
@@ -915,4 +869,24 @@ export async function answerWithModelDrivenSalar(input: {
     imageUnderstanding: '',
     catalogueUpdatedAt: state.catalogue.updatedAt,
   };
+}
+
+
+// Admin-only diagnostic: no customer history, order creation, or fallback.
+export async function testSalarProvider(selection: unknown) {
+  const targets = providerTargets(false, selection, await getProviderCredentials());
+  const { normalizeProviderSelection } = await import('@/lib/salar/providerConfig');
+  const config = normalizeProviderSelection(selection);
+  const target = targets.find(item => item.provider === config.preferredProvider);
+  if (!target) return { ok: false, provider: config.preferredProvider, model: config.models[config.preferredProvider] || '', elapsedMs: 0, error: 'Missing token, model, or valid account ID in this deployment.' };
+  const started = Date.now();
+  try {
+    const result = await runTarget(target, 'Return exactly one JSON object with a nonempty reply string and display="none". No other text.', [], 'Say hello briefly.', [], AbortSignal.timeout(8000));
+    if (!parseDecision(result.text)) throw new Error('Invalid JSON response');
+    return { ok: true, provider: target.provider, model: result.model, elapsedMs: Date.now() - started };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '';
+    const status = message.match(/HTTP (\d{3})/)?.[1];
+    return { ok: false, provider: target.provider, model: target.model, elapsedMs: Date.now() - started, error: status ? `HTTP ${status}: check token permissions, model access, account and quota.` : 'Request timed out or did not return valid JSON.' };
+  }
 }

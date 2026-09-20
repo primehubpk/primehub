@@ -1,5 +1,6 @@
 'use client';
 
+import SalarProviderSelector from '@/components/salar/SalarProviderSelector';
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, Ban, Bot, PauseCircle, PlayCircle, RefreshCw, Send, Trash2, Unlock, X } from 'lucide-react';
 
@@ -277,6 +278,7 @@ export default function SalarAdminDrawer({ open, onClose }: Props) {
             )}
           </div>
           <div className="flex-1 overflow-y-auto overscroll-contain p-3">
+            <details className="mb-3 rounded-2xl bg-white p-3"><summary className="cursor-pointer text-xs font-bold">AI provider / model</summary><SalarProviderSelector/></details>
             {loading ? <div className="rounded-2xl bg-white p-4 text-xs font-bold text-black/40">Loading chats…</div> : null}
             {!loading && visibleChats.length === 0 ? <div className="rounded-2xl bg-white p-4 text-xs text-black/45">No {filter === 'all' ? '' : filter} chats yet.</div> : null}
             <div className="space-y-2">
@@ -393,3 +395,4 @@ export default function SalarAdminDrawer({ open, onClose }: Props) {
     </div>
   );
 }
+

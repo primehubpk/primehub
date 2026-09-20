@@ -1,4 +1,6 @@
 import 'server-only';
+import { getProviderCredentials } from '@/lib/salar/credentialStore';
+import { normalizeProviderSelection, providerDefinitions, type ProviderSelection } from '@/lib/salar/providerConfig';
 
 import { revalidateTag, unstable_cache } from 'next/cache';
 import { getFreshPublicCatalogSnapshot, getFreshStorefrontSettingsSnapshot } from '@/lib/publicCatalogServer';
@@ -49,6 +51,7 @@ export type SalarCatalogue = {
 export type SalarState = {
   version: 1;
   enabled: boolean;
+  providerSelection: ProviderSelection;
   instructions: string;
   orderInstructions: string;
   updatedAt: string | null;
@@ -59,12 +62,12 @@ const SALAR_SETTINGS_ID = 'salar';
 const SALAR_STATE_TAG = 'salar-state';
 const MAX_PAGE_COUNT = 24;
 const MAX_PAGE_TEXT = 7000;
-const MAX_KEYS_PER_PROVIDER = 12;
 export const MAX_SALAR_INSTRUCTION_SECTION_CHARS = 20000;
 
 const DEFAULT_STATE: SalarState = {
   version: 1,
   enabled: true,
+  providerSelection: normalizeProviderSelection(null),
   instructions: '',
   orderInstructions: '',
   updatedAt: null,
@@ -307,6 +310,7 @@ function normalizeState(payload: Record<string, any> | null): SalarState {
   return {
     version: 1,
     enabled: payload.enabled !== false,
+    providerSelection: normalizeProviderSelection(payload.providerSelection),
     instructions: cleanInstructions(payload.instructions),
     orderInstructions: cleanInstructions(payload.orderInstructions),
     updatedAt: typeof payload.updatedAt === 'string' ? payload.updatedAt : null,
@@ -335,14 +339,15 @@ async function persistSalarState(state: SalarState) {
   const row = mapDocumentToSupabase('settings', SALAR_SETTINGS_ID, state, 'supabase');
   if (!row) throw new Error('Could not build Salar settings row.');
   await supabasePrimaryUpsert({ table: 'settings', row });
-  revalidateTag(SALAR_STATE_TAG, 'max');
+  revalidateTag(SALAR_STATE_TAG, { expire: 0 });
   return state;
 }
 
-export async function saveSalarSettings(input: { enabled?: unknown; instructions?: unknown; orderInstructions?: unknown }) {
+export async function saveSalarSettings(input: { enabled?: unknown; instructions?: unknown; orderInstructions?: unknown; providerSelection?: unknown }) {
   const current = await readSalarStateFromDatabase();
   const next: SalarState = {
     ...current,
+    providerSelection: input.providerSelection === undefined ? current.providerSelection : normalizeProviderSelection(input.providerSelection),
     enabled: typeof input.enabled === 'boolean' ? input.enabled : current.enabled,
     instructions: cleanInstructions(input.instructions ?? current.instructions),
     orderInstructions: cleanInstructions(input.orderInstructions ?? current.orderInstructions),
@@ -390,59 +395,12 @@ export async function refreshSalarCatalogue(origin: string) {
   return next;
 }
 
-function configuredKeys(...bases: string[]) {
-  const raw: Array<string | undefined> = [];
-  for (const base of bases) {
-    raw.push(process.env[base], process.env[`${base}S`]);
-    for (let index = 1; index <= MAX_KEYS_PER_PROVIDER; index += 1) {
-      raw.push(process.env[`${base}_${index}`], process.env[`${base}${index}`]);
-    }
-  }
-  return [...new Set(raw
-    .flatMap((value) => String(value || '').split(/[\n,;]+/))
-    .map((value) => value.trim())
-    .filter(Boolean))].slice(0, MAX_KEYS_PER_PROVIDER);
-}
-
-function envValue(...names: string[]) {
-  for (const name of names) {
-    const value = cleanText(process.env[name], 300);
-    if (value) return value;
-  }
-  return '';
-}
-
-export function getSalarRuntimeStatus() {
-  const providers = [
-    {
-      provider: 'groq',
-      keys: configuredKeys('GROQ_API_KEY', 'SALAAR_GROQ_API_KEY'),
-      model: envValue('GROQ_MODEL', 'SALAAR_GROQ_MODEL'),
-      visionModel: envValue('GROQ_VISION_MODEL', 'SALAAR_GROQ_VISION_MODEL'),
-    },
-    {
-      provider: 'gemini',
-      keys: configuredKeys('GEMINI_API_KEY', 'GOOGLE_GEMINI_API_KEY', 'SALAAR_GEMINI_API_KEY'),
-      model: envValue('GEMINI_MODEL', 'SALAAR_GEMINI_MODEL'),
-      visionModel: envValue('GEMINI_VISION_MODEL', 'SALAAR_GEMINI_VISION_MODEL'),
-    },
-    {
-      provider: 'openrouter',
-      keys: configuredKeys('OPENROUTER_API_KEY', 'OPEN_ROUTER_API_KEY', 'SALAAR_OPENROUTER_API_KEY'),
-      model: envValue('OPENROUTER_MODEL', 'OPEN_ROUTER_MODEL', 'SALAAR_OPENROUTER_MODEL'),
-      visionModel: envValue('OPENROUTER_VISION_MODEL', 'OPEN_ROUTER_VISION_MODEL', 'SALAAR_OPENROUTER_VISION_MODEL'),
-    },
-  ].map((provider) => ({
-    provider: provider.provider,
-    configured: Boolean(provider.keys.length && provider.model),
-    keyCount: provider.keys.length,
-    model: provider.model,
-    visionConfigured: Boolean(provider.keys.length && provider.visionModel),
-    visionModel: provider.visionModel,
+export async function getSalarRuntimeStatus(selection?: unknown) {
+  const providers = providerDefinitions(selection, await getProviderCredentials()).map(item => ({
+    provider: item.provider, configured: Boolean(item.keys.length && item.model && item.accountReady),
+    keyCount: item.keys.length, model: item.model,
+    visionConfigured: Boolean(item.keys.length && item.visionModel && item.accountReady),
+    visionModel: item.visionModel, accountReady: item.accountReady,
   }));
-
-  return {
-    providers,
-    ready: providers.some((provider) => provider.configured),
-  };
+  return { providers, ready: providers.some(item => item.configured) };
 }

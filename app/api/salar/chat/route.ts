@@ -320,7 +320,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: 'Salar is getting ready. Please try again after the catalogue is updated.' }, { status: 503 });
     }
     if (message.includes('No Salar AI provider is configured')) {
-      return NextResponse.json({ success: false, error: 'Salar AI providers are not configured in the existing environment.' }, { status: 503 });
+      return NextResponse.json({ success: false, error: 'Reply send nahi ho saka. Please thori dair baad dobara try karein.' }, { status: 503 });
     }
     if (chat && isSalarProviderFailure(error)) {
       // Never expose AI/provider internals to the customer and do not persist a
@@ -337,3 +337,4 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: false, error: 'Salar could not respond right now. Please try again.' }, { status: 503 });
   }
 }
+

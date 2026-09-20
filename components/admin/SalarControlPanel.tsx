@@ -1,10 +1,11 @@
 'use client';
 
+import SalarProviderSelector from '@/components/salar/SalarProviderSelector';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Bot, Database, ImagePlus, Maximize2, RefreshCw, Save, Trash2, X } from 'lucide-react';
 
 type ProviderStatus = {
-  provider: 'groq' | 'gemini' | 'openrouter';
+  provider: 'cloudflare' | 'groq' | 'gemini' | 'openrouter';
   configured: boolean;
   model: string;
   visionConfigured: boolean;
@@ -32,6 +33,7 @@ type SalarAdminView = {
 const INSTRUCTION_LIMIT = 20000;
 
 function providerLabel(value: ProviderStatus['provider']) {
+  if (value === 'cloudflare') return 'Cloudflare';
   if (value === 'openrouter') return 'OpenRouter';
   if (value === 'gemini') return 'Gemini';
   return 'Groq';
@@ -217,8 +219,11 @@ export default function SalarControlPanel() {
     return <section className="mx-auto max-w-5xl px-4 py-8 sm:px-6"><div className="rounded-3xl bg-white p-6 text-sm font-bold text-black/45 shadow-sm">Loading Salar…</div></section>;
   }
 
+  if (!data) return <section className="mx-auto max-w-5xl space-y-4 px-4 py-8"><SalarProviderSelector onVerified={() => void load()} /><p role="status" className="text-xs">{message}</p></section>;
+
   return (
     <section className="mx-auto max-w-5xl space-y-4 px-4 py-8 sm:px-6">
+      <SalarProviderSelector/>
       <div className="grid gap-3 sm:grid-cols-3">
         <div className="rounded-3xl bg-white p-5 shadow-sm">
           <div className="flex items-center gap-2 text-[#E1352B]"><Bot size={18}/><span className="text-[10px] font-black uppercase tracking-[0.16em]">Salar</span></div>
@@ -232,7 +237,7 @@ export default function SalarControlPanel() {
               </div>
             ))}
           </div>
-          <p className="mt-2 text-[9px] leading-4 text-black/35">Uses the existing Vercel environment only. API keys are never shown here.</p>
+          <p className="mt-2 text-[9px] leading-4 text-black/35">Uses saved admin keys or Vercel environment settings. API keys are never shown here.</p>
         </div>
         <div className="rounded-3xl bg-white p-5 shadow-sm">
           <div className="flex items-center gap-2 text-[#0F6A5F]"><Database size={18}/><span className="text-[10px] font-black uppercase tracking-[0.16em]">Cached Catalogue</span></div>
@@ -343,3 +348,4 @@ export default function SalarControlPanel() {
     </section>
   );
 }
+

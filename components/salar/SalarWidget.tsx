@@ -378,6 +378,7 @@ export default function SalarWidget() {
   const endRef = useRef<HTMLDivElement | null>(null);
   const lastMessageRef = useRef<HTMLDivElement | null>(null);
   const sendingRef = useRef(false);
+  const syncingRef = useRef(false);
   const editorCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const editorDrawingRef = useRef(false);
   const lastProductHelpKeyRef = useRef('');
@@ -492,9 +493,12 @@ export default function SalarWidget() {
   }, [messages, context, hydrated, lastSharedProducts, orderItems, orderCustomer, orderQuote, orderId]);
 
   const syncChat = useCallback(async () => {
-    if (!chatId) return;
+    if (!chatId || syncingRef.current || sendingRef.current || document.visibilityState !== 'visible') return;
+    syncingRef.current = true;
     try {
-      const response = await fetch(`/api/salar/chat?chatId=${encodeURIComponent(chatId)}`, { cache: 'no-store' });
+      // Closed widgets only refresh shared settings, never customer history.
+      const url = open ? `/api/salar/chat?chatId=${encodeURIComponent(chatId)}` : '/api/salar/chat';
+      const response = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(10000) });
       const result = await response.json().catch(() => null);
       if (!response.ok || !result?.success) return;
       const nextEnabled = result.settings?.enabled !== false;
@@ -511,14 +515,33 @@ export default function SalarWidget() {
         if (result.chat.context && typeof result.chat.context === 'object') setContext(result.chat.context as ChatContext);
         setSalarPaused(result.chat.salarPaused === true);
       }
-    } catch {}
-  }, [chatId]);
+    } catch {} finally { syncingRef.current = false; }
+  }, [chatId, open]);
 
   useEffect(() => {
     if (isAdminRoute || !hydrated || !chatId) return;
-    void syncChat();
-    const interval = window.setInterval(() => void syncChat(), open ? 4000 : 15000);
-    return () => window.clearInterval(interval);
+    let stopped = false;
+    let polling = false;
+    let timer: number | undefined;
+    const poll = async () => {
+      if (stopped || polling || document.visibilityState !== 'visible') return;
+      polling = true;
+      window.clearTimeout(timer);
+      await syncChat();
+      polling = false;
+      if (!stopped && document.visibilityState === 'visible') timer = window.setTimeout(() => void poll(), open ? 8000 : 60000);
+    };
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void poll();
+      else window.clearTimeout(timer);
+    };
+    void poll();
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      stopped = true;
+      window.clearTimeout(timer);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
   }, [isAdminRoute, hydrated, chatId, open, syncChat]);
 
   useEffect(() => {
@@ -1192,3 +1215,4 @@ export default function SalarWidget() {
     </div>
   );
 }
+

@@ -1,5 +1,6 @@
 'use client';
 
+import { adminSignInError } from '@/lib/salar/verifyAdminClient';
 import { FormEvent, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Eye, EyeOff, LockKeyhole, LogOut, ShieldCheck } from 'lucide-react';
@@ -63,6 +64,17 @@ export default function AdminAuthGuard({ children }: Props) {
     }
   }
 
+  async function googleLogin() {
+    setBusy(true); setError('');
+    try {
+      const { verifySalarAdmin } = await import('@/lib/salar/verifyAdminClient');
+      await verifySalarAdmin();
+      setAuthenticated(true); router.replace('/admin'); router.refresh();
+    } catch (error) {
+      setError(adminSignInError(error));
+    } finally { setBusy(false); }
+  }
+
   async function logout() {
     setBusy(true);
     try {
@@ -87,7 +99,8 @@ export default function AdminAuthGuard({ children }: Props) {
           <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#14140F] text-white"><ShieldCheck size={24} /></div>
           <p className="mt-5 text-[9px] font-black uppercase tracking-[0.25em] text-[#E1352B]">PrimeHub Admin</p>
           <h1 className="mt-1 text-2xl font-black">Admin Login</h1>
-          <p className="mt-2 text-xs leading-5 text-black/40">Sirf admin password enter karein.</p>
+          <p className="mt-2 text-xs leading-5 text-black/40">API keys aur Salar settings ke liye admin Google account se sign in karein.</p>
+          <button type="button" disabled={busy} onClick={() => void googleLogin()} className="mt-4 w-full rounded-2xl border border-black/20 py-3 text-xs font-bold">Continue with Google</button>
           {error && <div className="mt-4 rounded-2xl bg-[#E1352B]/10 p-3 text-[10px] font-bold leading-4 text-[#E1352B]">{error}</div>}
           <label className="mt-5 block"><span className="mb-1.5 block text-[9px] font-black uppercase tracking-wider text-black/40">Password</span><div className="flex items-center gap-2 rounded-2xl bg-[#F4F4F1] px-3"><LockKeyhole size={15} className="text-black/30" /><input required type={showPassword ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-transparent py-3.5 text-xs font-bold outline-none" placeholder="Enter password" autoComplete="current-password" /><button type="button" onClick={() => setShowPassword((value) => !value)} className="p-1 text-black/40" aria-label={showPassword ? 'Hide password' : 'Show password'}>{showPassword ? <EyeOff size={16} /> : <Eye size={16} />}</button></div></label>
           <button type="submit" disabled={busy} className="mt-5 w-full rounded-2xl bg-[#14140F] py-4 text-xs font-black text-white disabled:opacity-50">{busy ? 'Opening...' : 'Open Admin'}</button>
@@ -103,3 +116,4 @@ export default function AdminAuthGuard({ children }: Props) {
     </div>
   );
 }
+
