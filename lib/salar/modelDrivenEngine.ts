@@ -414,7 +414,12 @@ async function callOpenAiCompatible(
   if (!model) throw new Error(`${target.provider} model is not configured`);
   const baseUrl = target.provider === 'cloudflare'
     ? `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(target.accountId || cloudflareAccountId())}/ai/v1`
-    : target.provider === 'groq' ? 'https://api.groq.com/openai/v1' : 'https://openrouter.ai/api/v1';
+    : target.provider === 'groq'
+      ? 'https://api.groq.com/openai/v1'
+      : target.provider === 'openrouter'
+        ? 'https://openrouter.ai/api/v1'
+        : String(target.baseUrl || '').replace(/\/+$/, '');
+  if (!baseUrl) throw new Error(`${target.provider} base URL is not configured`);
   const headers: Record<string, string> = {
     Authorization: `Bearer ${target.apiKey}`,
     'Content-Type': 'application/json',
@@ -686,7 +691,7 @@ function resolveOrderProducts(catalogue: SalarCatalogue, decision: ModelDecision
 
 export function isSalarProviderFailure(error: unknown) {
   const message = error instanceof Error ? error.message : String(error || '');
-  return /No working Salar AI provider|No Salar AI provider is configured|groq \d|gemini \d|openrouter \d|empty response|invalid structured response/i.test(message);
+  return /No working Salar AI provider|No Salar AI provider is configured|groq \d|gemini \d|openrouter \d|custom \d|empty response|invalid structured response/i.test(message);
 }
 
 export async function answerWithModelDrivenSalar(input: {
@@ -878,7 +883,7 @@ export async function testSalarProvider(selection: unknown) {
   const { normalizeProviderSelection } = await import('@/lib/salar/providerConfig');
   const config = normalizeProviderSelection(selection);
   const target = targets.find(item => item.provider === config.preferredProvider);
-  if (!target) return { ok: false, provider: config.preferredProvider, model: config.models[config.preferredProvider] || '', elapsedMs: 0, error: 'Missing token, model, or valid account ID in this deployment.' };
+  if (!target) return { ok: false, provider: config.preferredProvider, model: config.models[config.preferredProvider] || '', elapsedMs: 0, error: 'Missing API key, model, account ID, or custom Base URL in Admin settings.' };
   const started = Date.now();
   try {
     const result = await runTarget(target, 'Return exactly one JSON object with a nonempty reply string and display="none". No other text.', [], 'Say hello briefly.', [], AbortSignal.timeout(8000));
