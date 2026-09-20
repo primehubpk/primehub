@@ -33,10 +33,10 @@ export async function credentialSummary() {
   const rows = await readRows();
   return Object.fromEntries(rows.map(row => {
     const value = openCredentials(row.provider, row.envelope);
-    return [row.provider, { keyCount: value.keys.length, accountId: value.accountId || '', disabled: value.disabled === true }];
+    return [row.provider, { keyCount: value.keys.length, accountId: value.accountId || '', disabled: value.disabled === true, baseUrl: value.baseUrl || '', label: value.label || '' }];
   }));
 }
-export async function saveProviderCredentials(provider: ProviderName, input: { keys?: unknown; accountId?: unknown; disabled?: unknown; reset?: unknown }) {
+export async function saveProviderCredentials(provider: ProviderName, input: { keys?: unknown; accountId?: unknown; disabled?: unknown; reset?: unknown; baseUrl?: unknown; label?: unknown }) {
   if (!PROVIDER_ORDER.includes(provider)) throw new Error('Unknown provider.');
   if (input.reset === true) {
     await database(`?provider=eq.${provider}`, { method: 'DELETE' });
@@ -49,7 +49,13 @@ export async function saveProviderCredentials(provider: ProviderName, input: { k
     if (!keys || keys.length > 9 || keys.some((key: string) => key.length < 8 || key.length > 4096 || /\s/.test(key))) throw new Error('Enter up to 9 valid API keys.');
     const accountId = input.accountId === undefined ? current.accountId || '' : String(input.accountId).trim();
     if (provider === 'cloudflare' && accountId && !/^[a-f0-9]{32}$/i.test(accountId)) throw new Error('Cloudflare account ID must contain 32 hexadecimal characters.');
-    const envelope = sealCredentials(provider, { keys, accountId, disabled: input.disabled === true });
+    const baseUrl = input.baseUrl === undefined ? String(current.baseUrl || '') : String(input.baseUrl || '').trim().replace(/\/+$/, '');
+    const label = input.label === undefined ? String(current.label || '') : String(input.label || '').trim();
+    if (provider === 'custom') {
+      if (baseUrl && (!/^https:\/\//i.test(baseUrl) || baseUrl.length > 500 || /\s/.test(baseUrl))) throw new Error('Custom provider base URL must be a valid HTTPS URL.');
+      if (label.length > 80) throw new Error('Custom provider name is too long.');
+    }
+    const envelope = sealCredentials(provider, { keys, accountId, disabled: input.disabled === true, baseUrl, label });
     await database('?on_conflict=provider', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ provider, envelope, updated_at: new Date().toISOString() }) });
   }
   revalidateTag(TAG, { expire: 0 });

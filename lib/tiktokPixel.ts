@@ -19,7 +19,11 @@ export type TikTokEventPayload = {
 declare global {
   interface Window {
     ttq?: {
-      track?: (eventName: string, payload?: TikTokEventPayload) => void;
+      track?: (
+        eventName: string,
+        payload?: TikTokEventPayload,
+        options?: { event_id?: string },
+      ) => void;
     };
   }
 }
@@ -49,24 +53,66 @@ export function makeTikTokContent(input: {
   };
 }
 
-function sendTikTokEvent(eventName: string, payload: TikTokEventPayload | undefined, retriesLeft: number) {
+function makeEventId(eventName: string) {
+  const prefix = eventName.replace(/[^A-Za-z0-9]/g, '').slice(0, 24) || 'event';
+  try {
+    return `${prefix}_${crypto.randomUUID().replace(/-/g, '')}`;
+  } catch {
+    return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 12)}`;
+  }
+}
+
+function sendTikTokEvent(
+  eventName: string,
+  payload: TikTokEventPayload | undefined,
+  eventId: string,
+  retriesLeft: number,
+) {
   if (typeof window === 'undefined') return;
   const tracker = window.ttq?.track;
 
   if (typeof tracker !== 'function') {
     if (retriesLeft > 0) {
-      window.setTimeout(() => sendTikTokEvent(eventName, payload, retriesLeft - 1), 250);
+      window.setTimeout(
+        () => sendTikTokEvent(eventName, payload, eventId, retriesLeft - 1),
+        250,
+      );
     }
     return;
   }
 
   try {
-    tracker(eventName, payload);
+    tracker(eventName, payload, { event_id: eventId });
   } catch (error) {
     console.warn('[tiktok-pixel] event tracking failed', eventName, error);
   }
 }
 
-export function trackTikTokEvent(eventName: string, payload?: TikTokEventPayload) {
-  sendTikTokEvent(eventName, payload, 6);
+function sendServerCopy(eventName: string, payload: TikTokEventPayload | undefined, eventId: string) {
+  if (typeof window === 'undefined') return;
+
+  void fetch('/api/tiktok/events', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'same-origin',
+    keepalive: true,
+    body: JSON.stringify({
+      event: eventName,
+      eventId,
+      payload,
+      pageUrl: window.location.href,
+      referrer: document.referrer || '',
+    }),
+  }).catch(() => undefined);
+}
+
+export function trackTikTokEvent(
+  eventName: string,
+  payload?: TikTokEventPayload,
+  options: { eventId?: string; server?: boolean } = {},
+) {
+  const eventId = String(options.eventId || '').trim() || makeEventId(eventName);
+  sendTikTokEvent(eventName, payload, eventId, 6);
+  if (options.server !== false) sendServerCopy(eventName, payload, eventId);
+  return eventId;
 }

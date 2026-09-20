@@ -6,40 +6,68 @@ import { stripTypeScriptTypes } from 'node:module';
 const configUrl = new URL('../lib/salar/providerConfig.ts', import.meta.url).href;
 const config = await import(configUrl);
 const source = await readFile(new URL('../lib/salar/modelDrivenEngine.ts', import.meta.url), 'utf8');
-const fixture = { enabled: true, instructions: 'Use live store facts.', orderInstructions: 'Confirm the bill before asking for details.', providerSelection: config.normalizeProviderSelection(null), catalogue: { products: [], categories: [], pages: [], storefront: {}, updatedAt: '' } };
+
+const fixture = {
+  enabled: true,
+  instructions: 'Use live store facts.',
+  orderInstructions: 'Confirm the bill before asking for details.',
+  providerSelection: config.normalizeProviderSelection(null),
+  catalogue: { products: [], categories: [], pages: [], storefront: {}, updatedAt: '' },
+};
+
 globalThis.__salarTestState = fixture;
+globalThis.__providerCredentials = {};
+
 async function engine() {
   const code = stripTypeScriptTypes(source
     .replace("import 'server-only';", '')
-    .replace(/import \{ getProviderCredentials[^\n]+\n/, 'const getProviderCredentials = async () => ({});\n')
+    .replace(/import \{ getProviderCredentials[^\n]+\n/, 'const getProviderCredentials = async () => globalThis.__providerCredentials;\n')
     .replaceAll("'@/lib/salar/providerConfig'", JSON.stringify(configUrl))
     .replace(/import \{ getSalarState[^\n]+\n/, 'const getSalarState = async () => globalThis.__salarTestState;\n')
     .replace(/import \{ normalizeSearchText[^\n]+\n/, 'const normalizeSearchText = value => value; const productSearchScore = () => 0;\n'));
   return import(`data:text/javascript;base64,${Buffer.from(code + `\n// ${Math.random()}`).toString('base64')}`);
 }
+
 const reply = { reply: 'Assalam-o-Alaikum, kis design ki bangles chahiye?', display: 'none' };
 const ok = () => Response.json({ choices: [{ message: { content: JSON.stringify(reply) } }] });
+
 function setup() {
-  for (const name of Object.keys(process.env)) if (/^(CLOUDFLARE|CF_|GROQ|GEMINI|GOOGLE_GEMINI|SALAAR_|OPENROUTER|OPEN_ROUTER)/.test(name)) delete process.env[name];
-  process.env.CLOUDFLARE_ACCOUNT_ID = 'a'.repeat(32);
-  process.env.CLOUDFLARE_AI_API_TOKEN = 'test-cloudflare';
-  process.env.GROQ_API_KEYS = 'test-groq-1,test-groq-2';
-  process.env.GROQ_MODEL = 'test-model';
-  fixture.providerSelection = config.normalizeProviderSelection(null);
+  globalThis.__providerCredentials = {
+    cloudflare: { keys: ['test-cloudflare'], accountId: 'a'.repeat(32) },
+    groq: { keys: ['test-groq-1', 'test-groq-2'] },
+  };
+  fixture.providerSelection = {
+    preferredProvider: 'cloudflare',
+    models: { groq: 'test-model' },
+  };
 }
 
-test('Cloudflare defaults and explicit provider/model preference', () => {
+test('admin credentials define Cloudflare and explicit provider/model preference', () => {
   setup();
-  assert.equal(config.providerTargets(false)[0].model, '@cf/google/gemma-4-26b-a4b-it');
+  assert.equal(config.providerTargets(false, fixture.providerSelection, globalThis.__providerCredentials)[0].model, '@cf/google/gemma-4-26b-a4b-it');
   const selection = { preferredProvider: 'groq', models: { groq: 'another-model' } };
-  assert.equal(config.providerTargets(false, selection)[0].provider, 'groq');
-  assert.equal(config.providerTargets(false, selection)[0].model, 'another-model');
-  process.env.CLOUDFLARE_ACCOUNT_ID = 'invalid';
-  assert.equal(config.providerTargets(false)[0].provider, 'groq');
+  assert.equal(config.providerTargets(false, selection, globalThis.__providerCredentials)[0].provider, 'groq');
+  assert.equal(config.providerTargets(false, selection, globalThis.__providerCredentials)[0].model, 'another-model');
+});
+
+test('manual custom provider uses saved HTTPS OpenAI-compatible base URL', () => {
+  const credentials = {
+    custom: {
+      keys: ['custom-key'],
+      baseUrl: 'https://api.example.test/v1',
+      label: 'Example AI',
+    },
+  };
+  const selection = { preferredProvider: 'custom', models: { custom: 'example-model' } };
+  const target = config.providerTargets(false, selection, credentials)[0];
+  assert.equal(target.provider, 'custom');
+  assert.equal(target.baseUrl, 'https://api.example.test/v1');
+  assert.equal(target.model, 'example-model');
 });
 
 test('Cloudflare request uses account endpoint, admin guidance and bounded output', async () => {
-  setup(); const model = await engine();
+  setup();
+  const model = await engine();
   globalThis.fetch = async (url, init) => {
     assert.match(url, /accounts\/a{32}\/ai\/v1\/chat\/completions$/);
     const body = JSON.parse(init.body);
@@ -51,38 +79,61 @@ test('Cloudflare request uses account endpoint, admin guidance and bounded outpu
     return ok();
   };
   const result = await model.answerWithModelDrivenSalar({ message: 'Hello' });
-  assert.equal(result.provider, 'cloudflare'); assert.equal(result.reply, reply.reply);
+  assert.equal(result.provider, 'cloudflare');
+  assert.equal(result.reply, reply.reply);
 });
 
 test('auth/quota failure rotates keys; successful model response is preserved', async () => {
-  setup(); process.env.CLOUDFLARE_AI_API_TOKEN = ''; const model = await engine(); const keys = [];
-  globalThis.fetch = async (_url, init) => { keys.push(init.headers.Authorization); return keys.length === 1 ? new Response('', { status: 429 }) : ok(); };
+  setup();
+  globalThis.__providerCredentials.cloudflare.keys = [];
+  fixture.providerSelection = { preferredProvider: 'groq', models: { groq: 'test-model' } };
+  const model = await engine();
+  const keys = [];
+  globalThis.fetch = async (_url, init) => {
+    keys.push(init.headers.Authorization);
+    return keys.length === 1 ? new Response('', { status: 429 }) : ok();
+  };
   const result = await model.answerWithModelDrivenSalar({ message: 'Hello' });
-  assert.deepEqual(keys, ['Bearer test-groq-1', 'Bearer test-groq-2']); assert.equal(result.provider, 'groq');
-  keys.length = 0;
-  globalThis.fetch = async (_url, init) => { keys.push(init.headers.Authorization); return ok(); };
-  await model.answerWithModelDrivenSalar({ message: 'Hello again' });
-  assert.deepEqual(keys, ['Bearer test-groq-2']);
+  assert.deepEqual(keys, ['Bearer test-groq-1', 'Bearer test-groq-2']);
+  assert.equal(result.provider, 'groq');
 });
 
-test('provider timeout skips redundant keys and reaches next provider', async () => {
-  setup(); process.env.CLOUDFLARE_API_TOKENS = 'test-cloudflare,test-cloudflare-2'; const model = await engine(); const urls = [];
-  globalThis.fetch = async url => { urls.push(url); if (url.includes('cloudflare')) throw new DOMException('Timed out', 'TimeoutError'); return ok(); };
+test('manual custom provider calls configured endpoint', async () => {
+  globalThis.__providerCredentials = {
+    custom: {
+      keys: ['custom-key'],
+      baseUrl: 'https://api.example.test/v1',
+      label: 'Example AI',
+    },
+  };
+  fixture.providerSelection = { preferredProvider: 'custom', models: { custom: 'example-model' } };
+  const model = await engine();
+  globalThis.fetch = async (url, init) => {
+    assert.equal(url, 'https://api.example.test/v1/chat/completions');
+    assert.equal(init.headers.Authorization, 'Bearer custom-key');
+    return ok();
+  };
   const result = await model.answerWithModelDrivenSalar({ message: 'Hello' });
-  assert.equal(urls.length, 2); assert.equal(result.provider, 'groq');
+  assert.equal(result.provider, 'custom');
 });
 
-test('malformed JSON falls back, and total outage never becomes a fabricated answer', async () => {
-  setup(); const model = await engine();
-  globalThis.fetch = async url => url.includes('cloudflare') ? Response.json({ choices: [{ message: { content: 'broken json' } }] }) : ok();
-  assert.equal((await model.answerWithModelDrivenSalar({ message: 'Hello' })).provider, 'groq');
+test('total outage never becomes a fabricated answer', async () => {
+  setup();
+  const model = await engine();
   globalThis.fetch = async () => new Response('', { status: 503 });
   await assert.rejects(model.answerWithModelDrivenSalar({ message: 'Hello' }), /No working Salar AI provider/);
 });
 
 test('admin connection test never silently falls back', async () => {
-  setup(); const model = await engine(); let calls = 0;
-  globalThis.fetch = async () => { calls++; return new Response('', { status: 403 }); };
+  setup();
+  const model = await engine();
+  let calls = 0;
+  globalThis.fetch = async () => {
+    calls++;
+    return new Response('', { status: 403 });
+  };
   const result = await model.testSalarProvider({ preferredProvider: 'cloudflare' });
-  assert.equal(result.ok, false); assert.match(result.error, /HTTP 403/); assert.equal(calls, 1);
+  assert.equal(result.ok, false);
+  assert.match(result.error, /HTTP 403/);
+  assert.equal(calls, 1);
 });

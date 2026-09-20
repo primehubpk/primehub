@@ -19,6 +19,7 @@ import ResellerWhatsAppRequests from '@/components/admin/ResellerWhatsAppRequest
 import WhatsAppCoexistenceSetup from '@/components/admin/WhatsAppCoexistenceSetup';
 import WholesaleVideoManager from '@/components/admin/WholesaleVideoManager';
 import SalarControlPanel from '@/components/admin/SalarControlPanel';
+import TikTokEventsManager from '@/components/admin/TikTokEventsManager';
 
 type SectionDefinition = {
   title: string;
@@ -99,6 +100,12 @@ const SECTIONS: Record<string, SectionDefinition> = {
     eyebrow: 'AI Salesman',
     description: 'Manage Salar instructions and refresh his cached PrimeHubMall catalogue.',
     content: <SalarControlPanel />,
+  },
+  tiktok: {
+    title: 'TikTok',
+    eyebrow: 'Tracking',
+    description: 'Manage TikTok Pixel and server-side Events API from Admin.',
+    content: <TikTokEventsManager />,
   },
   suppliers: {
     title: 'Suppliers',
