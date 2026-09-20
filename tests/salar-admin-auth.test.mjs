@@ -9,7 +9,7 @@ const adminSessionSource = await readFile(new URL('../lib/adminSession.ts', impo
 let code = source.replace(/^import .*;\n/gm, '');
 code = `const NextResponse = {json(value, init) { return Response.json(value, init); }};
 const verifyPrimeHubAdminRequest=async request=>request.headers.get('cookie')==='primehub_admin_auth=true' ? {admin:true} : null;
-const PROVIDER_ORDER=['cloudflare','groq','gemini','openrouter'];
+const PROVIDER_ORDER=['cloudflare','groq','gemini','openrouter','custom'];
 const credentialSummary=async()=>({groq:{keyCount:2}});
 const saveProviderCredentials=async()=>{globalThis.__writes++};
 ` + stripTypeScriptTypes(code);
