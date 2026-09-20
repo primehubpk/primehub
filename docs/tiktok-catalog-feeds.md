@@ -38,10 +38,7 @@ Only products that are not hidden/unpublished and that have a valid title,
 image and price are emitted. Stock is calculated from active variants when
 variant stock exists.
 
-If a product later gains an explicit weight field, the feed automatically emits
-`shipping_weight` when the value includes a supported unit (kg, g, lb, oz), or
-when the field name itself identifies the unit. No fake/default package weight
-is invented.
+Products Manager now includes **Package weight for shipping**. Enter the real packed parcel weight such as `0.5 kg` or `250 g`; the feed emits it as `shipping_weight`. Existing products with no saved weight remain blank rather than receiving a fake/default value.
 
 ## Prime Skills feed
 
