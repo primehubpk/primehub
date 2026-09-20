@@ -2,10 +2,8 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
-import { collection, onSnapshot } from 'firebase/firestore';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowRight, Sparkles } from 'lucide-react';
-import { db } from '@/lib/firebase';
 import { PRIME_SKILLS_SEED } from '@/lib/primeSkillsSeed';
 import { normalizeImageUrl } from '@/lib/imageUrl';
 
@@ -18,13 +16,42 @@ type SkillItem = {
 };
 
 export default function PrimeSkillsHomeRail() {
-  const [items, setItems] = useState<SkillItem[]>([]);
+  const [items, setItems] = useState<SkillItem[]>(PRIME_SKILLS_SEED as SkillItem[]);
+  const sectionRef = useRef<HTMLElement | null>(null);
 
-  useEffect(() => onSnapshot(
-    collection(db, 'prime_skills'),
-    (snapshot) => setItems(snapshot.docs.map((item) => ({ id: item.id, ...item.data() } as SkillItem))),
-    () => setItems([]),
-  ), []);
+  useEffect(() => {
+    let cancelled = false;
+    let started = false;
+    const load = () => {
+      if (started) return;
+      started = true;
+      fetch('/api/storefront/read?type=skills', { cache: 'no-store' })
+        .then((response) => response.ok ? response.json() : null)
+        .then((data) => {
+          if (!cancelled && Array.isArray(data?.skills) && data.skills.length) {
+            setItems(data.skills as SkillItem[]);
+          }
+        })
+        .catch(() => undefined);
+    };
+
+    const node = sectionRef.current;
+    if (!node || typeof IntersectionObserver === 'undefined') {
+      load();
+      return () => { cancelled = true; };
+    }
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) {
+        observer.disconnect();
+        load();
+      }
+    }, { rootMargin: '700px 0px' });
+    observer.observe(node);
+    return () => {
+      cancelled = true;
+      observer.disconnect();
+    };
+  }, []);
 
   const visible = useMemo(() => {
     const source = items.length ? items : PRIME_SKILLS_SEED;
@@ -37,7 +64,7 @@ export default function PrimeSkillsHomeRail() {
   if (!visible.length) return null;
 
   return (
-    <section className="col-span-full my-3 min-w-0 overflow-hidden rounded-[24px] border border-black/5 bg-[#FFFCF7] py-4 shadow-[0_12px_30px_rgba(20,20,15,0.07)] sm:rounded-[28px] sm:py-5">
+    <section ref={sectionRef} className="col-span-full my-3 min-w-0 overflow-hidden rounded-[24px] border border-black/5 bg-[#FFFCF7] py-4 shadow-[0_12px_30px_rgba(20,20,15,0.07)] sm:rounded-[28px] sm:py-5">
       <div className="mb-3 flex items-center justify-between gap-3 px-4 sm:px-5">
         <Link href="/skills" prefetch={false} className="group flex min-w-0 items-center gap-2.5">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#0F6A5F] text-white shadow-[0_8px_18px_rgba(15,106,95,0.22)]"><Sparkles size={19} /></span>

@@ -172,22 +172,83 @@ export default function RewardsPage() {
   useEffect(() => onAuthStateChanged(auth, setUser), []);
 
   useEffect(() => {
-    const unsub = onSnapshot(doc(db, 'settings', 'rewards'), snapshot => {
-      const data = snapshot.data() || {};
-      const merged = { ...defaultSettings, ...data } as RewardSettings;
-      setSettings(merged);
-      setPrizes(Array.isArray(data.spinWheelSlots) ? data.spinWheelSlots : []);
-    });
-    const giftUnsub = onSnapshot(collection(db, 'reward_gifts'), snapshot => {
-      setGifts(snapshot.docs.map(d => ({ id: d.id, ...d.data() }) as RewardGift).filter(g => g.active !== false && Number(g.pointsCost) > 0));
-    });
-    const productUnsub = onSnapshot(collection(db, 'products'), snapshot => {
-      const next: Record<string, Product> = {};
-      snapshot.docs.forEach(d => { next[d.id] = { id: d.id, ...d.data() } as Product; });
-      setProducts(next);
-    });
-    return () => { unsub(); giftUnsub(); productUnsub(); };
+    let cancelled = false;
+
+    async function loadPublicRewards() {
+      try {
+        const response = await fetch('/api/storefront/read?type=rewards', { cache: 'no-store' });
+        if (!response.ok) return;
+        const data = await response.json();
+        if (cancelled) return;
+
+        const nextSettings = { ...defaultSettings, ...(data?.settings || {}) } as RewardSettings;
+        const nextPrizes = Array.isArray(nextSettings.spinWheelSlots) ? nextSettings.spinWheelSlots : [];
+        const nextGifts = (Array.isArray(data?.gifts) ? data.gifts : [])
+          .filter((gift: RewardGift) => gift.active !== false && Number(gift.pointsCost) > 0);
+
+        setSettings(nextSettings);
+        setPrizes(nextPrizes);
+        setGifts(nextGifts);
+
+        const productIds = Array.from(new Set([
+          ...nextGifts.map((gift: RewardGift) => String(gift.productId || '').trim()),
+          ...nextPrizes
+            .filter((prize: Prize) => prize.type === 'product')
+            .map((prize: Prize) => String(prize.productId || '').trim()),
+        ].filter(Boolean))).slice(0, 24);
+
+        if (!productIds.length) return;
+        const productResponse = await fetch(
+          `/api/storefront/read?type=products&ids=${encodeURIComponent(JSON.stringify(productIds))}`,
+          { cache: 'no-store' },
+        );
+        if (!productResponse.ok) return;
+        const productData = await productResponse.json();
+        if (cancelled || !Array.isArray(productData?.products)) return;
+        const next: Record<string, Product> = {};
+        productData.products.forEach((product: Product) => {
+          if (product?.id) next[String(product.id)] = product;
+        });
+        setProducts(next);
+      } catch {
+        // Rewards remain usable with server/default settings if metadata refresh fails.
+      }
+    }
+
+    void loadPublicRewards();
+    return () => {
+      cancelled = true;
+    };
   }, []);
+
+  useEffect(() => {
+    const missingIds = Array.from(new Set(
+      wins
+        .map((win) => String(win.productId || '').trim())
+        .filter((id) => id && !products[id]),
+    )).slice(0, 24);
+    if (!missingIds.length) return;
+
+    let cancelled = false;
+    fetch(
+      `/api/storefront/read?type=products&ids=${encodeURIComponent(JSON.stringify(missingIds))}`,
+      { cache: 'no-store' },
+    )
+      .then((response) => response.ok ? response.json() : null)
+      .then((data) => {
+        if (cancelled || !Array.isArray(data?.products)) return;
+        const next: Record<string, Product> = {};
+        data.products.forEach((product: Product) => {
+          if (product?.id) next[String(product.id)] = product;
+        });
+        if (Object.keys(next).length) setProducts((current) => ({ ...current, ...next }));
+      })
+      .catch(() => undefined);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [wins, products]);
 
   useEffect(() => {
     if (!user) {

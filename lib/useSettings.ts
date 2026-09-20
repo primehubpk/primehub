@@ -115,6 +115,8 @@ function buildSettings(documents: Record<string, any>): SiteSettings {
   } as SiteSettings;
 }
 
+const SETTINGS_REFRESH_INTERVAL_MS = 5 * 60 * 1000;
+
 const SettingsContext = createContext<SettingsContextValue | null>(null);
 
 export function SettingsProvider({ initialSettings, children }: { initialSettings?: Partial<SiteSettings>; children: ReactNode }) {
@@ -185,12 +187,14 @@ export function SettingsProvider({ initialSettings, children }: { initialSetting
     if (!ownsNetworkRefresh) return;
 
     if (!hasInitialSettings) void refreshSettings();
-    const timer = window.setInterval(() => { void refreshSettings(); }, 60_000);
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === 'visible') void refreshSettings();
+    }, SETTINGS_REFRESH_INTERVAL_MS);
     const refreshWhenVisible = () => {
-      if (document.visibilityState === 'visible' && Date.now() - lastRefreshRef.current >= 60_000) void refreshSettings();
+      if (document.visibilityState === 'visible' && Date.now() - lastRefreshRef.current >= SETTINGS_REFRESH_INTERVAL_MS) void refreshSettings();
     };
     const refreshOnFocus = () => {
-      if (Date.now() - lastRefreshRef.current >= 60_000) void refreshSettings();
+      if (Date.now() - lastRefreshRef.current >= SETTINGS_REFRESH_INTERVAL_MS) void refreshSettings();
     };
 
     document.addEventListener('visibilitychange', refreshWhenVisible);

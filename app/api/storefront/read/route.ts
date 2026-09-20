@@ -6,12 +6,21 @@ import {
   getFreshPublicProductSnapshot,
   getFreshStorefrontSettingsDocumentsSnapshot,
   getPrimeSkillsSnapshot,
+  getPublicRewardGiftsSnapshot,
+  getRewardSettingsSnapshot,
 } from '@/lib/publicCatalogServer';
 
 export const runtime = 'nodejs';
 
 const FRESH_BROWSER_HEADERS = {
   'Cache-Control': 'private, no-store, max-age=0, must-revalidate',
+};
+
+const PUBLIC_SHORT_CACHE_HEADERS = {
+  'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300',
+};
+const PUBLIC_LONG_CACHE_HEADERS = {
+  'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600',
 };
 
 function requestedProductIds(url: URL) {
@@ -37,15 +46,25 @@ export async function GET(request: Request) {
     if (type === 'settings') {
       const documents = await getFreshStorefrontSettingsDocumentsSnapshot();
       return NextResponse.json(
-        { documents, source: 'fresh', mode: getConfiguredReadMode() },
-        { headers: FRESH_BROWSER_HEADERS },
+        { documents, source: 'cached-public', mode: getConfiguredReadMode() },
+        { headers: PUBLIC_SHORT_CACHE_HEADERS },
       );
     }
     if (type === 'skills') {
       const result = await getPrimeSkillsSnapshot();
       return NextResponse.json(
         { skills: result.skills, source: result.source, mode: getConfiguredReadMode() },
-        { headers: FRESH_BROWSER_HEADERS },
+        { headers: PUBLIC_LONG_CACHE_HEADERS },
+      );
+    }
+    if (type === 'rewards') {
+      const [gifts, settings] = await Promise.all([
+        getPublicRewardGiftsSnapshot(),
+        getRewardSettingsSnapshot(),
+      ]);
+      return NextResponse.json(
+        { gifts, settings, source: 'supabase-cache', mode: getConfiguredReadMode() },
+        { headers: PUBLIC_LONG_CACHE_HEADERS },
       );
     }
     if (type === 'products') {
@@ -86,7 +105,7 @@ export async function GET(request: Request) {
     const result = compactPublicCatalogSnapshot(await getPublicCatalogSnapshot());
     return NextResponse.json(
       { ...result, mode: getConfiguredReadMode() },
-      { headers: FRESH_BROWSER_HEADERS },
+      { headers: PUBLIC_SHORT_CACHE_HEADERS },
     );
   } catch (error) {
     console.error('storefront dual read failed', error);

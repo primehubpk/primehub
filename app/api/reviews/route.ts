@@ -1,7 +1,7 @@
 import { createHash } from 'crypto';
 import { NextResponse } from 'next/server';
 import { getAdminDb } from '@/lib/firebaseAdmin';
-import { mapReviewToSupabase, mirrorSupabaseUpsert, recordMirrorFailure } from '@/lib/dualWriteServer';
+import { isSupabaseWriteConfigured, mapReviewToSupabase, supabasePrimaryUpsert } from '@/lib/dualWriteServer';
 
 export const runtime = 'nodejs';
 
@@ -22,11 +22,90 @@ function reviewDocId(orderId: string, productId: string) {
   return createHash('sha256').update(`${orderId}:${productId}`).digest('hex');
 }
 
+function supabaseConfig() {
+  const url = String(process.env.SUPABASE_URL || '').replace(/\/+$/, '');
+  const key = String(process.env.SUPABASE_SERVICE_ROLE_KEY || '');
+  if (!url || !key) throw new Error('Supabase review access is not configured.');
+  return { url, key };
+}
+
+async function supabaseGet(path: string) {
+  const { url, key } = supabaseConfig();
+  const response = await fetch(`${url}/rest/v1/${path}`, {
+    headers: { apikey: key, Authorization: `Bearer ${key}` },
+    cache: 'no-store',
+    signal: AbortSignal.timeout(5000),
+  });
+  if (!response.ok) throw new Error(`Supabase review read failed ${response.status}`);
+  return response;
+}
+
+async function readSupabaseReviews(productId: string) {
+  const params = new URLSearchParams();
+  params.set('select', 'id,name,rating,comment,image_url,photos,verified,created_at');
+  params.set('product_id', `eq.${productId}`);
+  params.set('verified', 'eq.true');
+  params.set('order', 'created_at.desc');
+  params.set('limit', '100');
+  const response = await supabaseGet(`reviews?${params.toString()}`);
+  return await response.json() as any[];
+}
+
+async function readSupabaseOrder(orderId: string) {
+  const params = new URLSearchParams();
+  params.set('select', 'id,items,payload');
+  params.set('id', `eq.${orderId}`);
+  params.set('limit', '1');
+  const response = await supabaseGet(`orders?${params.toString()}`);
+  const rows = await response.json() as any[];
+  if (!rows?.[0]) return null;
+  const row = rows[0];
+  const payload = row?.payload && typeof row.payload === 'object' ? row.payload : {};
+  return { ...payload, items: Array.isArray(row.items) ? row.items : (Array.isArray(payload.items) ? payload.items : []) };
+}
+
+async function supabaseReviewExists(id: string) {
+  const params = new URLSearchParams();
+  params.set('select', 'id');
+  params.set('id', `eq.${id}`);
+  params.set('limit', '1');
+  const response = await supabaseGet(`reviews?${params.toString()}`);
+  const rows = await response.json() as any[];
+  return Boolean(rows?.[0]?.id);
+}
+
+function publicReview(row: any) {
+  return {
+    id: String(row?.id || ''),
+    name: cleanText(row?.name, 80),
+    rating: Math.max(1, Math.min(5, Number(row?.rating || 0))),
+    comment: cleanText(row?.comment, 1200),
+    imageUrl: cleanText(row?.image_url ?? row?.imageUrl, 1200),
+    photos: Array.isArray(row?.photos) ? row.photos.slice(0, 3).map((value: unknown) => cleanText(value, 1200)).filter(Boolean) : [],
+    verified: true,
+    createdAt: typeof row?.created_at === 'string'
+      ? row.created_at
+      : row?.createdAt?.toDate?.()?.toISOString?.() || null,
+  };
+}
+
 export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
     const productId = cleanText(url.searchParams.get('productId'), 160);
     if (!productId) return NextResponse.json({ reviews: [] });
+
+    if (isSupabaseWriteConfigured()) {
+      try {
+        const rows = await readSupabaseReviews(productId);
+        return NextResponse.json(
+          { reviews: rows.map(publicReview) },
+          { headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' } },
+        );
+      } catch (error) {
+        console.warn('Supabase review read failed; Firebase recovery allowed.', error instanceof Error ? error.message : 'unknown');
+      }
+    }
 
     const snapshot = await getAdminDb().collection('reviews').where('productId', '==', productId).get();
     const reviews = snapshot.docs
@@ -37,18 +116,12 @@ export async function GET(request: Request) {
         const bTime = b.createdAt?.toMillis?.() ?? b.createdAt?.seconds * 1000 ?? 0;
         return bTime - aTime;
       })
-      .map((review) => ({
-        id: review.id,
-        name: cleanText(review.name, 80),
-        rating: Math.max(1, Math.min(5, Number(review.rating || 0))),
-        comment: cleanText(review.comment, 1200),
-        imageUrl: cleanText(review.imageUrl, 1200),
-        photos: Array.isArray(review.photos) ? review.photos.slice(0, 3).map((value: unknown) => cleanText(value, 1200)).filter(Boolean) : [],
-        verified: true,
-        createdAt: review.createdAt?.toDate?.()?.toISOString?.() || null,
-      }));
+      .map(publicReview);
 
-    return NextResponse.json({ reviews });
+    return NextResponse.json(
+      { reviews },
+      { headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' } },
+    );
   } catch (error) {
     console.error('Review read failed:', error);
     return NextResponse.json({ reviews: [] });
@@ -70,12 +143,24 @@ export async function POST(request: Request) {
     }
 
     const db = getAdminDb();
-    const orderSnapshot = await db.collection('orders').doc(orderId).get();
-    if (!orderSnapshot.exists) {
+    let order: any = null;
+
+    if (isSupabaseWriteConfigured()) {
+      try {
+        order = await readSupabaseOrder(orderId);
+      } catch (error) {
+        console.warn('Supabase review order verification failed; Firebase recovery allowed.', error instanceof Error ? error.message : 'unknown');
+      }
+    }
+
+    if (!order) {
+      const orderSnapshot = await db.collection('orders').doc(orderId).get();
+      if (orderSnapshot.exists) order = orderSnapshot.data() || {};
+    }
+    if (!order) {
       return NextResponse.json({ error: 'This order could not be verified.' }, { status: 403 });
     }
 
-    const order = orderSnapshot.data() || {};
     const items = Array.isArray(order.items) ? order.items : [];
     const purchased = items.some((item: any) => String(item?.productId || item?.id || '') === productId);
     if (!purchased) {
@@ -83,9 +168,22 @@ export async function POST(request: Request) {
     }
 
     const id = reviewDocId(orderId, productId);
-    const ref = db.collection('reviews').doc(id);
-    const existing = await ref.get();
-    if (existing.exists) {
+    let exists = false;
+    if (isSupabaseWriteConfigured()) {
+      try {
+        exists = await supabaseReviewExists(id);
+      } catch (error) {
+        console.warn('Supabase duplicate review check failed; Firebase recovery allowed.', error instanceof Error ? error.message : 'unknown');
+      }
+    }
+    if (!exists) {
+      try {
+        exists = (await db.collection('reviews').doc(id).get()).exists;
+      } catch {
+        // Supabase remains authoritative when Firebase quota is unavailable.
+      }
+    }
+    if (exists) {
       return NextResponse.json({ error: 'You already reviewed this product from this order.' }, { status: 409 });
     }
 
@@ -101,13 +199,17 @@ export async function POST(request: Request) {
       source: 'verified_order',
       createdAt: new Date(),
     };
-    await ref.set(reviewData);
 
     const supabaseRow = mapReviewToSupabase(id, reviewData);
-    const mirror = await mirrorSupabaseUpsert({ table: 'reviews', row: supabaseRow });
-    if (mirror.attempted && !mirror.ok) {
-      console.error('Review Supabase mirror failed:', mirror.error);
-      await recordMirrorFailure('reviews', id, 'upsert', supabaseRow);
+    if (isSupabaseWriteConfigured()) {
+      await supabasePrimaryUpsert({ table: 'reviews', row: supabaseRow });
+      try {
+        await db.collection('reviews').doc(id).set(reviewData);
+      } catch (error) {
+        console.warn('Review Firebase mirror skipped after Supabase success.', error instanceof Error ? error.message : 'unknown');
+      }
+    } else {
+      await db.collection('reviews').doc(id).set(reviewData);
     }
 
     return NextResponse.json({ ok: true });

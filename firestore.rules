@@ -5,6 +5,9 @@ service cloud.firestore {
     function signedIn() { return request.auth != null; }
     function adminUid() { return "BZfIarsxGkXwZUIEcfFXa9u7Ge02"; }
     function isAdmin() { return signedIn() && request.auth.uid == adminUid(); }
+    function isPublicSetting(settingId) {
+      return settingId in ['main', 'general', 'policy', 'contact', 'rewards', 'home', 'salar_ui'];
+    }
 
     match /products/{productId} {
       allow read: if true;
@@ -15,7 +18,7 @@ service cloud.firestore {
       allow create, update, delete: if isAdmin();
     }
     match /settings/{settingId} {
-      allow read: if true;
+      allow read: if isAdmin() || isPublicSetting(settingId);
       allow create, update, delete: if isAdmin();
     }
     match /orders/{orderId} {

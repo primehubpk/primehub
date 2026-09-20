@@ -1,7 +1,7 @@
 import 'server-only';
 import { unstable_cache } from 'next/cache';
 import { getAdminDb } from '@/lib/firebaseAdmin';
-import { getDualSettings, type DualReadCacheOptions } from '@/lib/dualReadServer';
+import { getDualStorefrontSettings, type DualReadCacheOptions } from '@/lib/dualReadServer';
 
 const SLOT_COUNT = 7;
 
@@ -48,7 +48,7 @@ function legacyManagerRotation(main: any) {
   return legacy && completeBigDealSlotCount(legacy) >= SLOT_COUNT ? legacy : null;
 }
 
-function withStorefrontBigDeal(result: Awaited<ReturnType<typeof getDualSettings>>, deal: any) {
+function withStorefrontBigDeal(result: Awaited<ReturnType<typeof getDualStorefrontSettings>>, deal: any) {
   const main = result.documents?.main && typeof result.documents.main === 'object'
     ? result.documents.main
     : {};
@@ -77,17 +77,18 @@ async function readFirebaseBigDealCandidates() {
 const getCachedFirebaseBigDealCandidates = unstable_cache(
   readFirebaseBigDealCandidates,
   ['primehub-storefront-big-deal-dedicated-recovery-v1'],
-  { revalidate: 60, tags: ['storefront-settings'] },
+  { revalidate: 600, tags: ['storefront-settings'] },
 );
 
-async function getFirebaseBigDealCandidates(cacheOptions?: DualReadCacheOptions) {
-  return cacheOptions?.cache === 'no-store'
-    ? readFirebaseBigDealCandidates()
-    : getCachedFirebaseBigDealCandidates();
+async function getFirebaseBigDealCandidates(_cacheOptions?: DualReadCacheOptions) {
+  // Firebase is recovery-only after Supabase cutover. Keep this lookup cached even
+  // when the caller asks for fresh Supabase settings so client refreshes cannot
+  // turn into repeated Firestore reads.
+  return getCachedFirebaseBigDealCandidates();
 }
 
 export async function getStorefrontSettingsWithBigDealRecovery(cacheOptions?: DualReadCacheOptions) {
-  const result = await getDualSettings(cacheOptions);
+  const result = await getDualStorefrontSettings(cacheOptions);
   const main = result.documents?.main && typeof result.documents.main === 'object'
     ? result.documents.main
     : {};
@@ -95,31 +96,25 @@ export async function getStorefrontSettingsWithBigDealRecovery(cacheOptions?: Du
   const primaryDedicated = dedicatedDeal(main);
   if (primaryDedicated) return withStorefrontBigDeal(result, primaryDedicated);
 
-  let firebaseCandidates: Awaited<ReturnType<typeof readFirebaseBigDealCandidates>> | null = null;
-  if (result.source === 'supabase') {
-    try {
-      firebaseCandidates = await getFirebaseBigDealCandidates(cacheOptions);
-      if (firebaseCandidates.dedicated) {
-        console.warn('PrimeHub Big Deal storefront recovered the dedicated Firebase copy while Supabase catches up.');
-        return withStorefrontBigDeal(result, firebaseCandidates.dedicated);
-      }
-    } catch (error) {
-      console.warn('PrimeHub dedicated Big Deal Firebase recovery lookup skipped', error);
-    }
-  }
-
+  // Trust complete Supabase data before consulting the recovery database. The old
+  // order performed a Firebase read even when a valid legacy rotation was already
+  // present in Supabase.
   const primaryLegacyRotation = legacyManagerRotation(main);
   if (primaryLegacyRotation) return withStorefrontBigDeal(result, primaryLegacyRotation);
 
   if (result.source === 'supabase') {
     try {
-      firebaseCandidates = firebaseCandidates || await getFirebaseBigDealCandidates(cacheOptions);
+      const firebaseCandidates = await getFirebaseBigDealCandidates(cacheOptions);
+      if (firebaseCandidates.dedicated) {
+        console.warn('PrimeHub Big Deal storefront recovered the dedicated Firebase copy while Supabase catches up.');
+        return withStorefrontBigDeal(result, firebaseCandidates.dedicated);
+      }
       if (firebaseCandidates.legacyRotation) {
         console.warn('PrimeHub Big Deal storefront recovered a legacy 7-slot manager rotation for migration.');
         return withStorefrontBigDeal(result, firebaseCandidates.legacyRotation);
       }
     } catch (error) {
-      console.warn('PrimeHub legacy Big Deal migration lookup skipped', error);
+      console.warn('PrimeHub Big Deal Firebase recovery lookup skipped', error);
     }
   }
 

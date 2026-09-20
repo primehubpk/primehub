@@ -4,8 +4,6 @@ import { unstable_cache } from 'next/cache';
 import { getAdminDb } from '@/lib/firebaseAdmin';
 import type { WholesaleVideo, VideoPlatform } from '@/lib/wholesaleVideos';
 
-const HOME_PACKAGE_TARGET = 4;
-
 type SupabaseSettingsRow = {
   id: string;
   payload?: Record<string, any>;
@@ -153,17 +151,22 @@ async function markSupabaseMirror(status: 'synced' | 'failed', error?: string) {
 export async function getWholesaleVideosSnapshot() {
   let primaryVideos: WholesaleVideo[] = [];
   let supabaseAvailable = false;
+  let primaryConfigured = false;
 
   try {
     const row = await readSupabaseMainRow();
     supabaseAvailable = true;
+    primaryConfigured = Array.isArray(row?.payload?.wholesaleVideos);
     primaryVideos = sanitizeWholesaleVideos(row?.payload?.wholesaleVideos);
   } catch (error) {
     console.warn('Wholesale packages Supabase primary read failed', error);
   }
 
   if (supabaseAvailable) {
-    if (primaryVideos.length < HOME_PACKAGE_TARGET) {
+    // An explicit Supabase array (including 0-3 items) is authoritative. Falling
+    // back merely because fewer than four packages are configured makes every
+    // legitimate small list hit Firebase forever.
+    if (!primaryConfigured) {
       try {
         const fallbackVideos = await readFirebaseVideos();
         const recovered = mergeMissing(primaryVideos, fallbackVideos);

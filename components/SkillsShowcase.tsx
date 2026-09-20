@@ -1,11 +1,9 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { ArrowRight, Image as ImageIcon, MessageCircle, Sparkles } from 'lucide-react';
-import { collection, doc, getDoc, onSnapshot } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
 import { PRIME_SKILLS_SEED } from '@/lib/primeSkillsSeed';
 import { normalizeImageUrl } from '@/lib/imageUrl';
 
@@ -68,26 +66,9 @@ function displayPrice(item: SkillItem) {
 }
 
 export default function SkillsShowcase({ initialItems = [], initialPage = null }: { initialItems?: SkillItem[]; initialPage?: Partial<PageSettings> | null }) {
-  const hasInitial = initialItems.length > 0;
-  const [items, setItems] = useState<SkillItem[]>(initialItems);
-  const [page, setPage] = useState<PageSettings>({ ...DEFAULT_PAGE, ...(initialPage || {}), description: DEFAULT_PAGE.description });
-  const [loading, setLoading] = useState(!hasInitial);
-
-  useEffect(() => {
-    const unsubscribe = onSnapshot(collection(db, 'prime_skills'), (snapshot) => {
-      setItems(snapshot.docs.map((entry) => ({ id: entry.id, ...entry.data() } as SkillItem)));
-      setLoading(false);
-    }, () => setLoading(false));
-
-    getDoc(doc(db, 'settings', 'main'))
-      .then((snapshot) => {
-        const saved = snapshot.exists() ? snapshot.data()?.skillsPage : null;
-        if (saved) setPage({ ...DEFAULT_PAGE, ...saved, description: DEFAULT_PAGE.description });
-      })
-      .catch(() => undefined);
-
-    return unsubscribe;
-  }, []);
+  const items = initialItems;
+  const page: PageSettings = { ...DEFAULT_PAGE, ...(initialPage || {}), description: DEFAULT_PAGE.description };
+  const loading = false;
 
   const visibleItems = useMemo(() => {
     const source: SkillItem[] = items.length ? items : PRIME_SKILLS_SEED;

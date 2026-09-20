@@ -46,6 +46,7 @@ function refreshCachesForCollection(name: string) {
     revalidateTag('prime-skills', 'max');
   }
   if (name === 'prime_skills') revalidateTag('prime-skills', 'max');
+  if (name === 'reward_gifts') revalidateTag('rewards', 'max');
   if (name === 'settings' || name === 'categories' || name === 'prime_skills' || name === 'products') {
     revalidateTag('salaar-store-knowledge', 'max');
   }

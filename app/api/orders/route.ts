@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { calculateDeliveryCharge } from '@/lib/deliveryCharges';
-import { getDualProduct, getDualSettings } from '@/lib/dualReadServer';
+import { getDualProduct, getDualStorefrontSettings } from '@/lib/dualReadServer';
 import { getAdminAuth, getAdminDb } from '@/lib/firebaseAdmin';
 import { isSupabaseWriteConfigured, mapOrderToSupabase, mirrorSupabaseUpsert, recordMirrorFailure, supabasePrimaryUpsert } from '@/lib/dualWriteServer';
 import { isWholesaleProduct } from '@/lib/wholesale';
@@ -39,7 +39,7 @@ async function buildAuthoritativeItems(items: IncomingItem[]) {
   if (!uniqueIds.length) throw new Error('Cart does not contain valid product IDs.');
 
   const [settingsResult, productResults] = await Promise.all([
-    getDualSettings({ cache: 'no-store', timeoutMs: 5000 }),
+    getDualStorefrontSettings({ cache: 'no-store', timeoutMs: 5000 }),
     Promise.all(uniqueIds.map(id => getDualProduct(id, { cache: 'no-store', timeoutMs: 5000 }))),
   ]);
   const settings = settingsResult.documents.main || {};
@@ -112,7 +112,7 @@ async function optionalReseller(request: Request) {
   }
   if (!data || data.status !== 'active') return null;
 
-  const settingsResult = await getDualSettings({ cache: 'no-store', timeoutMs: 5000 });
+  const settingsResult = await getDualStorefrontSettings({ cache: 'no-store', timeoutMs: 5000 });
   const configured = Array.isArray(settingsResult.documents.main?.resellerTiers) ? settingsResult.documents.main.resellerTiers : [];
   const tiers = configured.length === 4 ? configured : [{ id: 'starter', minMonthlyOrders: 0, discountPercent: 0 }, { id: 'prime', minMonthlyOrders: 10, discountPercent: 2 }, { id: 'pro', minMonthlyOrders: 20, discountPercent: 5 }, { id: 'elite', minMonthlyOrders: 30, discountPercent: 8 }];
   const monthlyOrders = Math.max(0, Number(data.monthlyOrders || 0));
