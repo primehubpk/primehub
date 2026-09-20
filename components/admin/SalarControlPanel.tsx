@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Bot, Database, ImagePlus, Maximize2, RefreshCw, Save, Trash2, X } from 'lucide-react';
 
 type ProviderStatus = {
-  provider: 'cloudflare' | 'groq' | 'gemini' | 'openrouter';
+  provider: 'cloudflare' | 'groq' | 'gemini' | 'openrouter' | 'custom';
   configured: boolean;
   model: string;
   visionConfigured: boolean;
@@ -34,6 +34,7 @@ const INSTRUCTION_LIMIT = 20000;
 
 function providerLabel(value: ProviderStatus['provider']) {
   if (value === 'cloudflare') return 'Cloudflare';
+  if (value === 'custom') return 'Manual / Custom';
   if (value === 'openrouter') return 'OpenRouter';
   if (value === 'gemini') return 'Gemini';
   return 'Groq';
