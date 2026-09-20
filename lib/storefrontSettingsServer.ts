@@ -1,7 +1,7 @@
 import 'server-only';
 import { unstable_cache } from 'next/cache';
 import { getAdminDb } from '@/lib/firebaseAdmin';
-import { getDualSettings, type DualReadCacheOptions } from '@/lib/dualReadServer';
+import { getDualStorefrontSettings, type DualReadCacheOptions } from '@/lib/dualReadServer';
 
 const SLOT_COUNT = 7;
 
@@ -88,7 +88,7 @@ async function getFirebaseBigDealCandidates(_cacheOptions?: DualReadCacheOptions
 }
 
 export async function getStorefrontSettingsWithBigDealRecovery(cacheOptions?: DualReadCacheOptions) {
-  const result = await getDualSettings(cacheOptions);
+  const result = await getDualStorefrontSettings(cacheOptions);
   const main = result.documents?.main && typeof result.documents.main === 'object'
     ? result.documents.main
     : {};
