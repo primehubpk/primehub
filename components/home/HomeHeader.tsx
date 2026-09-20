@@ -16,6 +16,7 @@ import {
 import LiveSearchBar from "@/components/LiveSearchBar";
 import { useCartStore } from "@/lib/cartStore";
 import { useSettings } from "@/lib/useSettings";
+import { trackTikTokEvent } from "@/lib/tiktokPixel";
 import {
   buildSmartSearchHref,
   interpretSearchQuery,
@@ -42,13 +43,15 @@ export default function HomeHeader() {
       router.push("/shop");
       return;
     }
+    const searchQuery = query.trim();
+    trackTikTokEvent("Search", { search_string: searchQuery });
     setSearching(true);
     try {
       router.push(
-        buildSmartSearchHref(await interpretSearchQuery(query.trim())),
+        buildSmartSearchHref(await interpretSearchQuery(searchQuery)),
       );
     } catch {
-      router.push(`/shop?q=${encodeURIComponent(query.trim())}`);
+      router.push(`/shop?q=${encodeURIComponent(searchQuery)}`);
     } finally {
       setSearching(false);
     }
