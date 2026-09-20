@@ -3,7 +3,6 @@
 import { FormEvent, PointerEvent as ReactPointerEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { Bot, Check, Forward, ImagePlus, Maximize2, Menu, Minus, Minimize2, Pencil, Plus, RotateCcw, Send, ShoppingCart, X, ZoomIn, ZoomOut } from 'lucide-react';
 import { usePathname } from 'next/navigation';
-import { doc, getDoc } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth, db } from '@/lib/firebase';
 import SalarAdminDrawer from '@/components/salar/SalarAdminDrawer';
@@ -322,17 +321,17 @@ function cleanWhatsAppNumber(value: unknown) {
 }
 
 async function adminWhatsAppNumber() {
-  for (const reference of [doc(db, 'settings', 'main'), doc(db, 'settings', 'contact')]) {
-    try {
-      const snapshot = await getDoc(reference);
-      if (!snapshot.exists()) continue;
-      const data: any = snapshot.data() || {};
+  try {
+    const response = await fetch('/api/storefront/read?type=settings', { cache: 'no-store' });
+    if (!response.ok) return '';
+    const payload = await response.json();
+    for (const data of [payload?.documents?.main || {}, payload?.documents?.contact || {}]) {
       const value = data.adminWhatsappNumber ?? data.whatsappNumber ?? data.whatsapp ?? data.phone
         ?? data.contact?.adminWhatsappNumber ?? data.contact?.whatsappNumber ?? data.contact?.whatsapp ?? data.contact?.phone;
       const number = cleanWhatsAppNumber(value);
       if (number) return number;
-    } catch {}
-  }
+    }
+  } catch {}
   return '';
 }
 
@@ -529,7 +528,7 @@ export default function SalarWidget() {
       window.clearTimeout(timer);
       await syncChat();
       polling = false;
-      if (!stopped && document.visibilityState === 'visible') timer = window.setTimeout(() => void poll(), open ? 8000 : 60000);
+      if (!stopped && document.visibilityState === 'visible') timer = window.setTimeout(() => void poll(), open ? 15000 : 5 * 60_000);
     };
     const onVisible = () => {
       if (document.visibilityState === 'visible') void poll();
