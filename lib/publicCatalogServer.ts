@@ -2,7 +2,7 @@ import 'server-only';
 import { unstable_cache } from 'next/cache';
 import { getDualCatalog, getDualProduct, getDualSettings, getDualSkills } from '@/lib/dualReadServer';
 import { getStorefrontSettingsWithBigDealRecovery } from '@/lib/storefrontSettingsServer';
-import { getWholesaleVideosSnapshot } from '@/lib/wholesaleVideosServer';
+import { getCachedWholesaleVideosSnapshot } from '@/lib/wholesaleVideosServer';
 
 const CATALOG_RETRY_DELAYS_MS = [0];
 const SETTINGS_RETRY_DELAYS_MS = [0];
@@ -10,8 +10,8 @@ const PUBLIC_PRIMARY_TIMEOUT_MS = 8000;
 // Admin/product writes explicitly invalidate the public-catalog tag, so a longer
 // fallback TTL cuts repeated Supabase egress without delaying normal updates.
 const CATALOG_READ_CACHE = { revalidate: 600, tags: ['public-catalog'], timeoutMs: PUBLIC_PRIMARY_TIMEOUT_MS };
-const PRODUCT_READ_CACHE = { revalidate: 60, tags: ['public-products'], timeoutMs: PUBLIC_PRIMARY_TIMEOUT_MS };
-const SETTINGS_READ_CACHE = { revalidate: 60, tags: ['storefront-settings'], timeoutMs: PUBLIC_PRIMARY_TIMEOUT_MS };
+const PRODUCT_READ_CACHE = { revalidate: 300, tags: ['public-products'], timeoutMs: PUBLIC_PRIMARY_TIMEOUT_MS };
+const SETTINGS_READ_CACHE = { revalidate: 300, tags: ['storefront-settings'], timeoutMs: PUBLIC_PRIMARY_TIMEOUT_MS };
 const SKILLS_READ_CACHE = { revalidate: 600, tags: ['prime-skills', 'storefront-settings'], timeoutMs: PUBLIC_PRIMARY_TIMEOUT_MS };
 
 async function wait(ms: number) {
@@ -161,7 +161,7 @@ async function mergeFreshStorefrontSettings(
   // Wholesale packages have one authoritative reader. Supabase stays primary and
   // Firebase is consulted only when the primary list is incomplete/unavailable.
   // The wholesale reader also repairs missing fallback items back into Supabase.
-  const wholesaleResult = await getWholesaleVideosSnapshot();
+  const wholesaleResult = await getCachedWholesaleVideosSnapshot();
   return wholesaleResult.videos.length
     ? { ...merged, wholesaleVideos: wholesaleResult.videos }
     : merged;
