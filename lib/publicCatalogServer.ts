@@ -1,6 +1,6 @@
 import 'server-only';
 import { unstable_cache } from 'next/cache';
-import { getDualCatalog, getDualProduct, getDualSettings, getDualSkills } from '@/lib/dualReadServer';
+import { getDualCatalog, getDualProduct, getDualStorefrontSettings, getDualSkills } from '@/lib/dualReadServer';
 import { getStorefrontSettingsWithBigDealRecovery } from '@/lib/storefrontSettingsServer';
 import { getCachedWholesaleVideosSnapshot } from '@/lib/wholesaleVideosServer';
 
@@ -13,6 +13,39 @@ const CATALOG_READ_CACHE = { revalidate: 600, tags: ['public-catalog'], timeoutM
 const PRODUCT_READ_CACHE = { revalidate: 300, tags: ['public-products'], timeoutMs: PUBLIC_PRIMARY_TIMEOUT_MS };
 const SETTINGS_READ_CACHE = { revalidate: 300, tags: ['storefront-settings'], timeoutMs: PUBLIC_PRIMARY_TIMEOUT_MS };
 const SKILLS_READ_CACHE = { revalidate: 600, tags: ['prime-skills', 'storefront-settings'], timeoutMs: PUBLIC_PRIMARY_TIMEOUT_MS };
+
+function supabaseServiceConfig() {
+  const url = String(process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '').replace(/\/+$/, '');
+  const key = String(
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.SUPABASE_SECRET_KEY ||
+    process.env.SUPABASE_SERVICE_KEY ||
+    '',
+  ).trim();
+  if (!url || !key) throw new Error('Supabase storefront reward access is not configured.');
+  return { url, key };
+}
+
+export async function getPublicRewardGiftsSnapshot() {
+  const { url, key } = supabaseServiceConfig();
+  const params = new URLSearchParams();
+  params.set('select', 'id,active,payload');
+  params.set('active', 'eq.true');
+  params.set('order', 'updated_at.desc');
+  params.set('limit', '100');
+  const response = await fetch(`${url}/rest/v1/reward_gifts?${params.toString()}`, {
+    headers: { apikey: key, Authorization: `Bearer ${key}` },
+    next: { revalidate: 600, tags: ['rewards'] },
+    signal: AbortSignal.timeout(PUBLIC_PRIMARY_TIMEOUT_MS),
+  });
+  if (!response.ok) throw new Error(`Supabase reward gifts read failed ${response.status}`);
+  const rows = await response.json() as any[];
+  return (Array.isArray(rows) ? rows : []).map((row) => ({
+    ...(row?.payload && typeof row.payload === 'object' ? row.payload : {}),
+    id: String(row?.id || ''),
+    active: row?.payload?.active ?? row?.active ?? true,
+  })).filter((gift) => gift.id && gift.active !== false && Number(gift.pointsCost || 0) > 0);
+}
 
 async function wait(ms: number) {
   if (ms <= 0) return;
@@ -135,12 +168,12 @@ export async function getStorefrontSettingsSnapshot() {
 }
 
 export async function getFreshRewardSettingsSnapshot() {
-  const result = await getDualSettings({ cache: 'no-store' });
+  const result = await getDualStorefrontSettings({ cache: 'no-store' });
   return result.documents?.rewards || {};
 }
 
 async function loadRewardSettings() {
-  const result = await getDualSettings(SETTINGS_READ_CACHE);
+  const result = await getDualStorefrontSettings(SETTINGS_READ_CACHE);
   return result.documents?.rewards || {};
 }
 
@@ -184,7 +217,7 @@ export async function getFreshStorefrontSettingsSnapshot() {
 async function loadPrimeSkills() {
   const [skillsResult, settingsResult] = await Promise.all([
     getDualSkills(SKILLS_READ_CACHE),
-    getDualSettings(SKILLS_READ_CACHE),
+    getDualStorefrontSettings(SKILLS_READ_CACHE),
   ]);
   const main = settingsResult.documents.main || {};
   return {
