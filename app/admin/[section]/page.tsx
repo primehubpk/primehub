@@ -101,6 +101,12 @@ const SECTIONS: Record<string, SectionDefinition> = {
     description: 'Manage Salar instructions and refresh his cached PrimeHubMall catalogue.',
     content: <SalarControlPanel />,
   },
+  tiktok: {
+    title: 'TikTok',
+    eyebrow: 'Tracking',
+    description: 'Manage TikTok Pixel and server-side Events API from Admin.',
+    content: <TikTokEventsManager />,
+  },
   suppliers: {
     title: 'Suppliers',
     eyebrow: 'Supply',
