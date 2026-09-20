@@ -105,7 +105,7 @@ export async function saveTikTokEventsSettings(input: {
     throw new Error('TikTok access token format is invalid.');
   }
 
-  const enabled = input.enabled === true;
+  const enabled = input.removeToken === true ? false : input.enabled === true;
   if (enabled && !accessToken) throw new Error('Add the TikTok Events API access token before enabling server events.');
 
   const next: TikTokEventsSettings = { pixelId, accessToken, enabled, testEventCode };
