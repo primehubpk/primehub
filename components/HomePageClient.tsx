@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, type MouseEvent } from "react";
+import { useEffect, useRef, useState, type MouseEvent } from "react";
 import Header from "@/components/home/HomeHeader";
 import HomeCollections from "@/components/home/HomeCollections";
 import BigDealNextPreviewSync from "@/components/home/BigDealNextPreviewSync";
@@ -41,7 +41,7 @@ type Props = {
 };
 
 const RECOVERY_DELAYS_MS = [0, 350, 900];
-const BACKGROUND_REFRESH_INTERVAL_MS = 60_000;
+const BACKGROUND_REFRESH_INTERVAL_MS = 5 * 60_000;
 
 export default function HomePageClient({
   initialProducts,
@@ -57,6 +57,7 @@ export default function HomePageClient({
     initialProducts.length === 0,
   );
   const catalogUnavailable = products.length === 0;
+  const lastCatalogRefreshRef = useRef(initialProducts.length > 0 ? Date.now() : 0);
 
   useEffect(() => {
     setProducts(initialProducts);
@@ -64,7 +65,8 @@ export default function HomePageClient({
     setRecoveringCatalog(initialProducts.length === 0);
 
     let cancelled = false;
-    async function refreshCatalog() {
+    async function refreshCatalog(force = false) {
+      if (!force && Date.now() - lastCatalogRefreshRef.current < BACKGROUND_REFRESH_INTERVAL_MS) return;
       try {
         for (const delay of RECOVERY_DELAYS_MS) {
           if (delay > 0)
@@ -89,6 +91,7 @@ export default function HomePageClient({
               if (cancelled) return;
               setProducts(nextProducts);
               setCategories(nextCategories);
+              lastCatalogRefreshRef.current = Date.now();
               return;
             }
           } catch (error) {
@@ -103,7 +106,7 @@ export default function HomePageClient({
     // A populated server seed is already fresh within the page revalidation
     // window. Avoid downloading the complete catalog again during hydration;
     // this otherwise competes with above-the-fold images on slow connections.
-    if (initialProducts.length === 0) void refreshCatalog();
+    if (initialProducts.length === 0) void refreshCatalog(true);
 
     // Keep an already-open storefront synchronized with Admin/Bot catalog writes.
     const refreshTimer = window.setInterval(() => {
@@ -112,7 +115,7 @@ export default function HomePageClient({
     const refreshWhenVisible = () => {
       if (document.visibilityState === "visible") void refreshCatalog();
     };
-    const refreshAfterAdminWrite = () => void refreshCatalog();
+    const refreshAfterAdminWrite = () => void refreshCatalog(true);
     const refreshFromStorage = (event: StorageEvent) => {
       if (event.key === CATALOG_REFRESH_EVENT) void refreshCatalog();
     };
