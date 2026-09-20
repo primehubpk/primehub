@@ -8,6 +8,7 @@ import {
 import VariantSelectorBottomSheet from '@/components/product-detail/VariantSelectorBottomSheet';
 import type { ProductVariantSelection } from '@/lib/types';
 import { getEffectivePrice, getPakistanDay } from '@/lib/dealPricing';
+import { makeTikTokContent, trackTikTokEvent } from '@/lib/tiktokPixel';
 
 type GlobalProduct = VariantModalProduct & {
   stock?: number;
@@ -81,6 +82,7 @@ export default function GlobalVariantSelector() {
       addItem({
         id,
         productId: product.id,
+        category: String(product.category || ''),
         name: title,
         price: finalPrice,
         originalPrice: originalPrice || finalPrice,
@@ -89,6 +91,20 @@ export default function GlobalVariantSelector() {
         variant: selection,
       });
     }
+
+    trackTikTokEvent('AddToCart', {
+      contents: [
+        makeTikTokContent({
+          id: product.id,
+          name: title,
+          category: product.category,
+          price: finalPrice,
+          quantity,
+        }),
+      ],
+      value: finalPrice * quantity,
+      currency: 'PKR',
+    });
 
     close();
     if (mode === 'buy') {
