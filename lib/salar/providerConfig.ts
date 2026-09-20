@@ -21,34 +21,21 @@ export function envValue(...names: string[]) {
   return '';
 }
 
-function keys(...bases: string[]) {
-  const values: string[] = [];
-  for (const base of bases) {
-    for (const name of [base, `${base}S`, ...Array.from({ length: 9 }, (_, i) => [`${base}_${i + 1}`, `${base}${i + 1}`]).flat()]) {
-      values.push(...String(process.env[name] || '').split(/[\n,;]+/).map(value => value.trim()).filter(Boolean));
-    }
-  }
-  return [...new Set(values)].slice(0, 9);
-}
-
-export function cloudflareAccountId() {
-  return envValue('CLOUDFLARE_ACCOUNT_ID', 'CF_ACCOUNT_ID');
-}
 
 export type ProviderCredentials = Partial<Record<ProviderName, { keys: string[]; accountId?: string; disabled?: boolean }>>;
 
 export function providerDefinitions(selection?: unknown, credentials: ProviderCredentials = {}) {
   const config = normalizeProviderSelection(selection);
   const definitions = [
-    { provider: 'cloudflare' as const, keys: keys('CLOUDFLARE_AI_API_TOKEN', 'CLOUDFLARE_API_TOKEN', 'CLOUDFLARE_WORKERS_AI_API_TOKEN', 'CLOUDFLARE_AUTH_TOKEN', 'CLOUDFLARE_API_KEY', 'CF_API_TOKEN'), model: envValue('CLOUDFLARE_MODEL', 'CLOUDFLARE_AI_MODEL') || CLOUDFLARE_DEFAULT_MODEL, visionModel: envValue('CLOUDFLARE_VISION_MODEL') || CLOUDFLARE_DEFAULT_MODEL, accountReady: /^[a-f0-9]{32}$/i.test(cloudflareAccountId()) },
-    { provider: 'groq' as const, keys: keys('GROQ_API_KEY', 'SALAAR_GROQ_API_KEY'), model: envValue('GROQ_MODEL', 'SALAAR_GROQ_MODEL'), visionModel: envValue('GROQ_VISION_MODEL', 'SALAAR_GROQ_VISION_MODEL'), accountReady: true },
-    { provider: 'gemini' as const, keys: keys('GEMINI_API_KEY', 'GOOGLE_GEMINI_API_KEY', 'SALAAR_GEMINI_API_KEY'), model: envValue('GEMINI_MODEL', 'SALAAR_GEMINI_MODEL'), visionModel: envValue('GEMINI_VISION_MODEL', 'SALAAR_GEMINI_VISION_MODEL'), accountReady: true },
-    { provider: 'openrouter' as const, keys: keys('OPENROUTER_API_KEY', 'OPEN_ROUTER_API_KEY', 'SALAAR_OPENROUTER_API_KEY'), model: envValue('OPENROUTER_MODEL', 'OPEN_ROUTER_MODEL', 'SALAAR_OPENROUTER_MODEL'), visionModel: envValue('OPENROUTER_VISION_MODEL', 'OPEN_ROUTER_VISION_MODEL', 'SALAAR_OPENROUTER_VISION_MODEL'), accountReady: true },
+    { provider: 'cloudflare' as const, keys: [] as string[], model: envValue('CLOUDFLARE_MODEL', 'CLOUDFLARE_AI_MODEL') || CLOUDFLARE_DEFAULT_MODEL, visionModel: envValue('CLOUDFLARE_VISION_MODEL') || CLOUDFLARE_DEFAULT_MODEL, accountReady: false },
+    { provider: 'groq' as const, keys: [] as string[], model: envValue('GROQ_MODEL', 'SALAAR_GROQ_MODEL'), visionModel: envValue('GROQ_VISION_MODEL', 'SALAAR_GROQ_VISION_MODEL'), accountReady: true },
+    { provider: 'gemini' as const, keys: [] as string[], model: envValue('GEMINI_MODEL', 'SALAAR_GEMINI_MODEL'), visionModel: envValue('GEMINI_VISION_MODEL', 'SALAAR_GEMINI_VISION_MODEL'), accountReady: true },
+    { provider: 'openrouter' as const, keys: [] as string[], model: envValue('OPENROUTER_MODEL', 'OPEN_ROUTER_MODEL', 'SALAAR_OPENROUTER_MODEL'), visionModel: envValue('OPENROUTER_VISION_MODEL', 'OPEN_ROUTER_VISION_MODEL', 'SALAAR_OPENROUTER_VISION_MODEL'), accountReady: true },
   ];
   return definitions.map(item => {
     const saved = credentials[item.provider];
-    const accountId = item.provider === 'cloudflare' ? saved?.accountId || cloudflareAccountId() : '';
-    return { ...item, keys: saved?.disabled ? [] : saved?.keys.length ? saved.keys : item.keys, accountId, accountReady: item.provider !== 'cloudflare' || /^[a-f0-9]{32}$/i.test(accountId), model: config.models[item.provider] || item.model };
+    const accountId = item.provider === 'cloudflare' ? saved?.accountId || '' : '';
+    return { ...item, keys: saved?.disabled ? [] : saved?.keys || [], accountId, accountReady: item.provider !== 'cloudflare' || /^[a-f0-9]{32}$/i.test(accountId), model: config.models[item.provider] || item.model };
   })
     .sort((a, b) => Number(b.provider === config.preferredProvider) - Number(a.provider === config.preferredProvider));
 }
