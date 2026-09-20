@@ -71,6 +71,23 @@ export async function isSalarChatBlocked(chatIdInput: unknown) {
   return payload?.blocked === true;
 }
 
+export async function isSalarIdentityBlocked(chatIdInput: unknown, customerIdInput?: unknown) {
+  const chatId = cleanIdentity(chatIdInput, 80);
+  const customerId = cleanIdentity(customerIdInput, 200);
+  const checks: Array<Promise<Record<string, any> | null>> = [];
+
+  if (/^[A-Za-z0-9_-]{12,80}$/.test(chatId)) {
+    checks.push(getSupabasePrimaryPayload('settings', `${BLOCK_CHAT_PREFIX}${chatId}`));
+  }
+  if (customerId) {
+    checks.push(getSupabasePrimaryPayload('settings', `${BLOCK_CUSTOMER_PREFIX}${customerId}`));
+  }
+  if (!checks.length) return false;
+
+  const rows = await Promise.all(checks);
+  return rows.some((payload) => payload?.blocked === true);
+}
+
 export async function listBlockedSalarChatIds() {
   const { url, key, configured } = supabaseConfig();
   if (!configured) return new Set<string>();
