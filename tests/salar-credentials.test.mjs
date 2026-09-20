@@ -21,14 +21,14 @@ test('credential envelopes reject tampering, wrong provider and wrong root', () 
   assert.throws(() => openCredentials('groq', envelope));
   process.env.SALAR_KEYS_ENCRYPTION_KEY = root;
 });
-test('saved keys override environment in fallback order and account matches target', () => {
+test('saved admin keys define provider targets and account ID', () => {
   process.env.CLOUDFLARE_AI_API_TOKEN = 'environment-key';
   process.env.CLOUDFLARE_ACCOUNT_ID = 'a'.repeat(32);
   const targets = providerTargets(false, undefined, { cloudflare: { keys: ['saved-1', 'saved-2'], accountId: 'b'.repeat(32) } });
   assert.deepEqual(targets.filter(x => x.provider === 'cloudflare').map(x => x.apiKey), ['saved-1', 'saved-2']);
   assert.equal(targets[0].accountId, 'b'.repeat(32));
-  assert.equal(providerTargets(false)[0].apiKey, 'environment-key');
+  assert.equal(providerTargets(false).some(x => x.provider === 'cloudflare'), false);
 });
-test('disabled provider cannot fall through to environment keys', () => {
+test('disabled provider stays unavailable even if environment keys exist', () => {
   assert.equal(providerTargets(false, undefined, { cloudflare: { keys: [], disabled: true } }).some(x => x.provider === 'cloudflare'), false);
 });
