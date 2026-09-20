@@ -30,6 +30,8 @@ export async function POST(request: Request) {
       const session = await auth.createSessionCookie(token, { expiresIn: PRIMEHUB_ADMIN_SESSION_MAX_AGE * 1000 });
       const response = NextResponse.json({ success: true }, { headers });
       response.cookies.set(PRIMEHUB_ADMIN_SESSION_COOKIE, session, adminSessionCookieOptions());
+      // Compatibility for existing admin screens; secret routes only trust the verified session.
+      response.cookies.set('primehub_admin_auth', 'true', adminSessionCookieOptions());
       return response;
     }
     if (!await verifyPrimeHubAdminRequest(request)) return NextResponse.json({ success: false, error: 'Admin Google verification required.' }, { status: 401, headers });
