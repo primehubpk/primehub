@@ -4,7 +4,7 @@ import { FormEvent, PointerEvent as ReactPointerEvent, useCallback, useEffect, u
 import { Bot, Check, Forward, ImagePlus, Maximize2, Menu, Minus, Minimize2, Pencil, Plus, RotateCcw, Send, ShoppingCart, X, ZoomIn, ZoomOut } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { onAuthStateChanged } from 'firebase/auth';
-import { auth, db } from '@/lib/firebase';
+import { auth } from '@/lib/firebase';
 import SalarAdminDrawer from '@/components/salar/SalarAdminDrawer';
 import { readSalarProductHelpContext, SALAR_PRODUCT_HELP_EVENT, type SalarProductHelpContext } from '@/lib/salar/clientProductHelp';
 
