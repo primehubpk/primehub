@@ -13,6 +13,7 @@ type SkillsSnapshot = { skills: any[]; source: 'firebase' | 'supabase' | 'empty'
 
 const SUPABASE_READ_TIMEOUT_MS = 3500;
 const FIREBASE_FALLBACK_QUOTA_COOLDOWN_MS = 5 * 60 * 1000;
+const STOREFRONT_SETTING_IDS = ['main', 'general', 'policy', 'contact', 'rewards'] as const;
 let firebaseFallbackBlockedUntil = 0;
 
 class FirebaseFallbackCircuitOpenError extends Error {
@@ -349,6 +350,36 @@ async function supabaseSettings(options?: DualReadCacheOptions): Promise<Setting
   return { documents, source: 'supabase' };
 }
 
+async function firebaseStorefrontSettings(): Promise<SettingsSnapshot> {
+  const db = getAdminDb();
+  const snapshots = await Promise.all(
+    STOREFRONT_SETTING_IDS.map((id) => db.collection('settings').doc(id).get()),
+  );
+  const documents: Record<string, any> = {};
+  snapshots.forEach((snapshot, index) => {
+    if (snapshot.exists) documents[STOREFRONT_SETTING_IDS[index]] = serial(snapshot.data());
+  });
+  if (Object.keys(documents).length === 0) throw new Error('Firebase storefront settings read returned no rows.');
+  return { documents, source: 'firebase' };
+}
+
+async function supabaseStorefrontSettings(options?: DualReadCacheOptions): Promise<SettingsSnapshot> {
+  const { url, key } = supabaseServiceConfig();
+  const params = new URLSearchParams();
+  params.set('select', 'id,payload');
+  params.set('id', `in.(${STOREFRONT_SETTING_IDS.join(',')})`);
+  const response = await fetch(`${url}/rest/v1/settings?${params.toString()}`, {
+    headers: { apikey: key, Authorization: `Bearer ${key}` },
+    ...supabaseReadInit(options),
+  });
+  if (!response.ok) throw new Error(`Supabase storefront settings read failed ${response.status}`);
+  const rows = await response.json() as any[];
+  if (!Array.isArray(rows) || rows.length === 0) throw new Error('Supabase storefront settings read returned no rows.');
+  const documents: Record<string, any> = {};
+  for (const row of rows) documents[String(row.id)] = row?.payload && typeof row.payload === 'object' ? row.payload : {};
+  return { documents, source: 'supabase' };
+}
+
 async function firebaseSkills(): Promise<SkillsSnapshot> {
   const snap = await getAdminDb().collection('prime_skills').get();
   return { skills: snap.docs.map((doc) => ({ id: doc.id, ...serial(doc.data()) })), source: 'firebase' };
@@ -439,6 +470,14 @@ export function getDualSettings(options?: DualReadCacheOptions) {
   return withFallback(
     firebaseSettings,
     () => supabaseSettings(options),
+    { documents: {}, source: 'empty' as const },
+  );
+}
+
+export function getDualStorefrontSettings(options?: DualReadCacheOptions) {
+  return withFallback(
+    firebaseStorefrontSettings,
+    () => supabaseStorefrontSettings(options),
     { documents: {}, source: 'empty' as const },
   );
 }
