@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useSettings } from '@/lib/useSettings';
 import { useCartStore } from '@/lib/cartStore';
@@ -33,7 +33,6 @@ export function useShopCatalog(initialCategory?: string, initialQuery = '', init
   const [addedId, setAddedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(!hasServerData);
   const [wholesaleOnly, setWholesaleOnly] = useState(['true', '1'].includes(searchParams.get('wholesale') || ''));
-  const lastTrackedSearch = useRef('');
 
   useEffect(() => {
     setCategory(initialCategory ? slugifyCategory(decodeURIComponent(initialCategory)) || initialCategory : 'all');
@@ -44,16 +43,6 @@ export function useShopCatalog(initialCategory?: string, initialQuery = '', init
     setMaxPrice(urlMax);
   }, [initialQuery, urlQuery, urlMax]);
 
-  useEffect(() => {
-    const query = search.trim();
-    if (query.length < 2) return;
-    const timer = window.setTimeout(() => {
-      if (lastTrackedSearch.current === query) return;
-      trackTikTokEvent('Search', { search_string: query });
-      lastTrackedSearch.current = query;
-    }, 650);
-    return () => window.clearTimeout(timer);
-  }, [search]);
 
   useEffect(() => {
     let cancelled = false;
