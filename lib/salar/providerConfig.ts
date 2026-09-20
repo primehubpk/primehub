@@ -22,6 +22,10 @@ export function envValue(...names: string[]) {
 }
 
 
+export function cloudflareAccountId() {
+  return '';
+}
+
 export type ProviderCredentials = Partial<Record<ProviderName, { keys: string[]; accountId?: string; disabled?: boolean }>>;
 
 export function providerDefinitions(selection?: unknown, credentials: ProviderCredentials = {}) {
