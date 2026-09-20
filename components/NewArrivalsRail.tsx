@@ -13,6 +13,7 @@ import { useCartStore } from '@/lib/cartStore';
 import { imageOf, originalOf, priceOf, productHasVariants, titleOf, type Product } from '@/components/shop/ShopTypes';
 import { isDirectStorefrontImage, normalizeImageUrl } from '@/lib/imageUrl';
 import { isWholesaleProduct } from '@/lib/wholesale';
+import { makeTikTokContent, trackTikTokEvent } from '@/lib/tiktokPixel';
 import '@/components/home/NewArrivalsPremium.css';
 
 function timeOf(p: Product) {
@@ -61,13 +62,21 @@ export default function NewArrivalsRail({
   const addProduct = (product: Product) => {
     const image = imageOf(product);
     if (productHasVariants(product) && openVariantModal({ ...product, image, imageUrl: image }, 'cart')) return;
+    const currentPrice = priceOf(product);
     addItem({
       id: product.id,
+      productId: product.id,
+      category: String(product.category || ''),
       name: titleOf(product),
-      price: priceOf(product),
-      originalPrice: originalOf(product) || priceOf(product),
+      price: currentPrice,
+      originalPrice: originalOf(product) || currentPrice,
       image,
       imageUrl: image,
+    });
+    trackTikTokEvent('AddToCart', {
+      contents: [makeTikTokContent({ id: product.id, name: titleOf(product), category: product.category, price: currentPrice, quantity: 1 })],
+      value: currentPrice,
+      currency: 'PKR',
     });
     setAddedId(product.id);
     window.setTimeout(() => setAddedId((current) => current === product.id ? null : current), 1400);

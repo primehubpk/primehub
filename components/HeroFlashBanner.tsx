@@ -20,6 +20,7 @@ import { useCartStore } from "@/lib/cartStore";
 import { db } from "@/lib/firebase";
 import { getEffectivePrice } from "@/lib/dealPricing";
 import { normalizeImageUrl } from "@/lib/imageUrl";
+import { makeTikTokContent, trackTikTokEvent } from "@/lib/tiktokPixel";
 import type { Product, Weekday } from "@/lib/types";
 import {
   WEEKDAY_LABELS,
@@ -185,12 +186,19 @@ export default function HeroFlashBanner({ initialProducts = [], liveUpdates = tr
     if (hasProductVariants(productWithDealPrice) && openVariantModal(productWithDealPrice, "cart")) return;
     addItem({
       id: deal.productId,
+      productId: deal.productId,
+      category: String(product?.category || ""),
       name: productWithDealPrice.title || deal.title,
       price,
       originalPrice: productWithDealPrice.originalPrice || price,
       image,
       imageUrl: image,
       dealDay: isLive ? deal.day : undefined,
+    });
+    trackTikTokEvent("AddToCart", {
+      contents: [makeTikTokContent({ id: deal.productId, name: productWithDealPrice.title || deal.title, category: product?.category, price, quantity: 1 })],
+      value: price,
+      currency: "PKR",
     });
   }
 
@@ -205,7 +213,12 @@ export default function HeroFlashBanner({ initialProducts = [], liveUpdates = tr
     const image = normalizeImageUrl(productData?.imageUrl || bigDeal.imageUrl || "");
     const productWithDealPrice = { ...product, id: bigDeal.productId, title: product?.title || bigDeal.title, price: currentPrice, originalPrice: normalPrice, image, imageUrl: image } as Product;
     if (hasProductVariants(productWithDealPrice) && openVariantModal(productWithDealPrice, "cart")) return;
-    addItem({ id: bigDeal.productId, name: productWithDealPrice.title || bigDeal.title, price: currentPrice, originalPrice: productWithDealPrice.originalPrice || currentPrice, image, imageUrl: image });
+    addItem({ id: bigDeal.productId, productId: bigDeal.productId, category: String(product?.category || ""), name: productWithDealPrice.title || bigDeal.title, price: currentPrice, originalPrice: productWithDealPrice.originalPrice || currentPrice, image, imageUrl: image });
+    trackTikTokEvent("AddToCart", {
+      contents: [makeTikTokContent({ id: bigDeal.productId, name: productWithDealPrice.title || bigDeal.title, category: product?.category, price: currentPrice, quantity: 1 })],
+      value: currentPrice,
+      currency: "PKR",
+    });
   }
 
   if (homeLayout) {

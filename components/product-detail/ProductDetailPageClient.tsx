@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useLayoutEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   ArrowLeft,
   Heart,
@@ -24,6 +24,7 @@ import { useProductDetail } from '@/components/product-detail/useProductDetail';
 import { cacheProductForNavigation } from '@/lib/productNavigationCache';
 import type { Product } from '@/components/product-detail/ProductDetailTypes';
 import { rememberSalarProductHelpContext } from '@/lib/salar/clientProductHelp';
+import { makeTikTokContent, trackTikTokEvent } from '@/lib/tiktokPixel';
 
 type Props = {
   initialProduct?: Product | null;
@@ -66,6 +67,7 @@ export default function ProductDetailPageClient({ initialProduct = null }: Props
 
 function ProductDetailContent() {
   const model = useProductDetail();
+  const viewedTikTokProduct = useRef('');
   const {
     product,
     weeklyProducts,
@@ -105,6 +107,27 @@ function ProductDetailContent() {
     closeVariantSelector,
     confirmVariant,
   } = model;
+
+  useEffect(() => {
+    if (!product || currentPrice <= 0) return;
+    const productId = String(product.id || '').trim();
+    if (!productId || viewedTikTokProduct.current === productId) return;
+
+    trackTikTokEvent('ViewContent', {
+      contents: [
+        makeTikTokContent({
+          id: productId,
+          name: product.title || product.name || 'PrimeHub Product',
+          category: product.category,
+          price: currentPrice,
+          quantity: 1,
+        }),
+      ],
+      value: currentPrice,
+      currency: 'PKR',
+    });
+    viewedTikTokProduct.current = productId;
+  }, [product, currentPrice]);
 
   useEffect(() => {
     if (!product) return;
