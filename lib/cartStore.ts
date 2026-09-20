@@ -17,6 +17,7 @@ export interface CartItem {
   qty: number;
   dealDay?: Weekday;
   productId?: string;
+  category?: string;
   variant?: ProductVariantSelection;
 }
 
