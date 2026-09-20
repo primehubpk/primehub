@@ -274,6 +274,7 @@ export function useProductsManager() {
       description: String(product.description || ''),
       category: String(product.category || ''),
       stock: legacyStock == null ? '' : String(legacyStock),
+      shippingWeight: String((product as any).shippingWeight || ''),
       videoUrl: String((product as any).videoUrl || ''),
       images: normalizedImages,
       featured: Boolean((product as any).featured),
@@ -375,7 +376,9 @@ export function useProductsManager() {
       const colorImages = Object.fromEntries(cleanColors.map(color => [color.name, color.imageUrl]));
       const variantMatrix = variantRows.map(row => ({ id: row.id, label: `${row.color} / ${row.size}`, color: row.color, size: row.size, stock: Math.max(0, Number(row.stock || 0)), imageUrl: row.imageUrl || colorImages[row.color] || form.images[0] || '', sku: '', price: String(salePrice), salePrice: '', active: row.active !== false && row.hidden !== true, hidden: row.active === false || row.hidden === true }));
       const stockValue = form.stock.trim();
-      const payload = { title: form.title.trim(), slug: slugify(form.title), price: salePrice, originalPrice, description: form.description, category: form.category, ...(stockValue !== '' ? { stock: Math.max(0, Number(stockValue)) } : {}), videoUrl: form.videoUrl.trim(), imageUrl: form.images[0] || '', images: form.images, colorImages, variantColors: cleanColors, variantOptions, variantMatrix, featured: form.featured, published: form.published, isWholesale: form.isWholesale === true, priceBucketIds: bucketIds, updatedAt: new Date().toISOString() };
+      const shippingWeight = form.shippingWeight.trim();
+      if (shippingWeight && !/^\d+(?:\.\d+)?\s*(kg|g|lb|oz)$/i.test(shippingWeight)) throw new Error('Package weight must look like 0.5 kg, 250 g, 1 lb or 8 oz.');
+      const payload = { title: form.title.trim(), slug: slugify(form.title), price: salePrice, originalPrice, description: form.description, category: form.category, ...(stockValue !== '' ? { stock: Math.max(0, Number(stockValue)) } : {}), ...(shippingWeight ? { shippingWeight } : {}), videoUrl: form.videoUrl.trim(), imageUrl: form.images[0] || '', images: form.images, colorImages, variantColors: cleanColors, variantOptions, variantMatrix, featured: form.featured, published: form.published, isWholesale: form.isWholesale === true, priceBucketIds: bucketIds, updatedAt: new Date().toISOString() };
       let productId = editing?.id || '';
       if (editing) await updateAdminDocument('products', editing.id, payload);
       else productId = (await createAdminDocument('products', { ...payload, isFlashSale: false, isWeekendSpecial: false, createdAt: new Date().toISOString() })).id;
