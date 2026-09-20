@@ -23,14 +23,10 @@ const readRows = unstable_cache(async () => {
 }, ['salar-provider-credentials-v1'], { revalidate: 300, tags: [TAG] });
 
 export async function getProviderCredentials(): Promise<ProviderCredentials> {
-  try {
-    const rows = await readRows();
-    return Object.fromEntries(rows.filter(row => PROVIDER_ORDER.includes(row.provider)).map(row => [row.provider, openCredentials(row.provider, row.envelope)]));
-  } catch {
-    // Environment credentials keep existing chats available during a storage outage.
-    console.warn('[Salar] Saved provider credentials unavailable; using environment configuration.');
-    return {};
-  }
+  // Fail closed on storage/decryption errors: a disabled provider must not be
+  // silently re-enabled via environment keys when its saved settings are unreadable.
+  const rows = await readRows();
+  return Object.fromEntries(rows.filter(row => PROVIDER_ORDER.includes(row.provider)).map(row => [row.provider, openCredentials(row.provider, row.envelope)]));
 }
 export async function credentialSummary() {
   // Admin reads fail visibly, rather than claiming missing keys during an outage.

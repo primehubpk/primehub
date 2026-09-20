@@ -1,5 +1,6 @@
 'use client';
 
+import { adminSignInError } from '@/lib/salar/verifyAdminClient';
 import { FormEvent, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Eye, EyeOff, LockKeyhole, LogOut, ShieldCheck } from 'lucide-react';
@@ -69,8 +70,8 @@ export default function AdminAuthGuard({ children }: Props) {
       const { verifySalarAdmin } = await import('@/lib/salar/verifyAdminClient');
       await verifySalarAdmin();
       setAuthenticated(true); router.replace('/admin'); router.refresh();
-    } catch {
-      setError('Google sign-in failed. Use the authorized admin account. This domain must be enabled in Firebase Authentication.');
+    } catch (error) {
+      setError(adminSignInError(error));
     } finally { setBusy(false); }
   }
 

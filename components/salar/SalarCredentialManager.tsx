@@ -1,4 +1,5 @@
 'use client';
+import { adminSignInError } from '@/lib/salar/verifyAdminClient';
 import { useEffect, useId, useState } from 'react';
 
 type Provider = 'cloudflare' | 'groq' | 'gemini' | 'openrouter';
@@ -21,7 +22,7 @@ export default function SalarCredentialManager({ provider, onVerified }: { provi
     }).catch(() => {});
     return () => { active = false; };
   }, []);
-  useEffect(() => { setKeys(''); setAccountId(summary[provider]?.accountId || ''); setDisabled(summary[provider]?.disabled || false); setMessage(''); }, [provider, summary]);
+  useEffect(() => { setKeys(''); setAccountId(summary[provider]?.accountId || ''); setDisabled(summary[provider]?.disabled || false); }, [provider, summary]);
   async function verify() {
     setBusy(true); setMessage('');
     try {
@@ -31,7 +32,7 @@ export default function SalarCredentialManager({ provider, onVerified }: { provi
       const saved = await fetch('/api/admin/salar/credentials', { cache: 'no-store' });
       if (saved.ok) setSummary((await saved.json()).providers);
       setMessage('Admin verified. You can now save keys and AI settings.');
-    } catch { setMessage('Google verification failed. Use the authorized admin account; this site domain must be enabled in Firebase Authentication.'); }
+    } catch (error) { setMessage(adminSignInError(error)); }
     finally { setBusy(false); }
   }
   async function save(reset: boolean) {

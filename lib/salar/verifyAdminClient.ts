@@ -12,3 +12,16 @@ export async function verifySalarAdmin() {
   const result = await response.json();
   if (!response.ok || !result.success) throw new Error(result.error || 'Admin verification failed.');
 }
+
+export function adminSignInError(error: unknown) {
+  const code = error && typeof error === 'object' && 'code' in error ? String(error.code) : '';
+  const messages: Record<string, string> = {
+    'auth/unauthorized-domain': 'This preview domain is not authorized in Firebase Authentication. Add this hostname to Authorized domains before Google sign-in.',
+    'auth/operation-not-allowed': 'Google sign-in is not enabled in Firebase Authentication for this project.',
+    'auth/popup-blocked': 'The browser blocked the Google sign-in popup. Allow popups for this site and try again.',
+    'auth/popup-closed-by-user': 'Google sign-in was closed before verification completed.',
+    'auth/cancelled-popup-request': 'Another Google sign-in is already open.',
+    'auth/network-request-failed': 'Google sign-in could not connect. Check the connection and try again.',
+  };
+  return messages[code] || 'Admin verification failed. Sign in using the authorized admin Google account.';
+}
