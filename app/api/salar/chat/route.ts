@@ -15,12 +15,14 @@ import {
   type SalarStoredProduct,
 } from '@/lib/salar/chatStore';
 import { getSalarUiSettings } from '@/lib/salar/uiSettings';
+import { isSalarIdentityBlocked } from '@/lib/salar/blockStore';
 import { compressForR2, isR2PublicUrl, r2ObjectKey, uploadWebpToR2 } from '@/lib/r2';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 const MAX_IMAGE_BYTES = 3 * 1024 * 1024;
+const BLOCK_MESSAGE = 'Aapka chat access filhaal block hai. Unblock request ke liye primehubpk1@gmail.com par contact karein.';
 
 function cleanText(value: unknown, max?: number) {
   const text = String(value ?? '').replace(/\s+/g, ' ').trim();
@@ -206,7 +208,18 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: 'Please enter a message or attach an image.' }, { status: 400 });
     }
 
-    chat = await getSalarChat(chatId) || createEmptySalarChat(chatId, {
+    const [blocked, storedChat] = await Promise.all([
+      isSalarIdentityBlocked(chatId, input.customerId),
+      getSalarChat(chatId),
+    ]);
+    if (blocked) {
+      return NextResponse.json(
+        { success: false, blocked: true, error: BLOCK_MESSAGE },
+        { status: 403, headers: { 'Cache-Control': 'private, no-store, max-age=0' } },
+      );
+    }
+
+    chat = storedChat || createEmptySalarChat(chatId, {
       customerId: input.customerId,
       customerName: input.customerName,
       customerEmail: input.customerEmail,
