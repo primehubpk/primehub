@@ -7,6 +7,7 @@ import { bigDealConfiguredSlotCount, bigDealRotationIndex } from '@/lib/bigDealR
 import { cacheProductForNavigation, loadProductsForNavigation, readCachedProduct } from '@/lib/productNavigationCache';
 import { normalizeImageUrl } from '@/lib/imageUrl';
 import { rememberProduct } from '@/lib/recentlyViewedHistory';
+import { makeTikTokContent, trackTikTokEvent } from '@/lib/tiktokPixel';
 import type { ProductVariantSelection, WeeklyDeal } from '@/lib/types';
 import { dealDiscount, imagesOf, originalPriceOf, regularPriceOf, titleOf, type Product, type ProductDetailModel, money } from './ProductDetailTypes';
 
@@ -303,6 +304,7 @@ export function useProductDetail(): ProductDetailModel {
               .join('|')}`
           : product.id,
       productId: product.id,
+      category: String(product.category || ''),
       name: titleOf(product),
       price,
       originalPrice: effectiveNormalPrice || productOriginal || price,
@@ -311,7 +313,21 @@ export function useProductDetail(): ProductDetailModel {
       dealDay: !activeAdminDeal && liveDeal && currentDeal ? currentDeal.day : undefined,
       variant: selection,
     };
-    for (let index = 0; index < Math.min(qty, selectedStock); index += 1) addItem(cartItem);
+    const addedQuantity = Math.min(qty, selectedStock);
+    for (let index = 0; index < addedQuantity; index += 1) addItem(cartItem);
+    trackTikTokEvent('AddToCart', {
+      contents: [
+        makeTikTokContent({
+          id: product.id,
+          name: titleOf(product),
+          category: product.category,
+          price,
+          quantity: addedQuantity,
+        }),
+      ],
+      value: price * addedQuantity,
+      currency: 'PKR',
+    });
     setAdded(true);
     window.setTimeout(() => setAdded(false), 1200);
   };
