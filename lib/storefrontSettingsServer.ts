@@ -48,7 +48,7 @@ function legacyManagerRotation(main: any) {
   return legacy && completeBigDealSlotCount(legacy) >= SLOT_COUNT ? legacy : null;
 }
 
-function withStorefrontBigDeal(result: Awaited<ReturnType<typeof getDualSettings>>, deal: any) {
+function withStorefrontBigDeal(result: Awaited<ReturnType<typeof getDualStorefrontSettings>>, deal: any) {
   const main = result.documents?.main && typeof result.documents.main === 'object'
     ? result.documents.main
     : {};
