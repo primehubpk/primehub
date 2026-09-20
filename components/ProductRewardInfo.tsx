@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
-import { collection, doc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot } from 'firebase/firestore';
 import { Gift, LogIn, Sparkles } from 'lucide-react';
 import { auth, db } from '@/lib/firebase';
 import { loadProductsForNavigation } from '@/lib/productNavigationCache';
@@ -86,20 +86,26 @@ export default function ProductRewardInfo({
 
   useEffect(() => {
     if (!lookupReady) return;
-    const stop = onSnapshot(collection(db, 'reward_gifts'), (snapshot) => {
-      const found = snapshot.docs
-        .map((item) => item.data() as Reward)
-        .find(
-          (reward) =>
-            reward.active !== false &&
-            Number(reward.pointsCost) > 0 &&
-            (reward.productId === productId ||
-              (reward.imageUrl && images.some((image) => same(image, reward.imageUrl)))),
-        );
-      setRequired(found ? Number(found.pointsCost) : null);
-      setStock(Number(found?.stock ?? 1));
-    });
-    return () => stop();
+    let cancelled = false;
+    fetch('/api/storefront/read?type=rewards', { cache: 'no-store' })
+      .then((response) => response.ok ? response.json() : null)
+      .then((data) => {
+        if (cancelled) return;
+        const found = (Array.isArray(data?.gifts) ? data.gifts : [])
+          .find(
+            (reward: Reward) =>
+              reward.active !== false &&
+              Number(reward.pointsCost) > 0 &&
+              (reward.productId === productId ||
+                (reward.imageUrl && images.some((image) => same(image, reward.imageUrl)))),
+          ) as Reward | undefined;
+        setRequired(found ? Number(found.pointsCost) : null);
+        setStock(Number(found?.stock ?? 1));
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
   }, [productId, images, lookupReady]);
 
   useEffect(() => {
