@@ -49,14 +49,24 @@ export function makeTikTokContent(input: {
   };
 }
 
-export function trackTikTokEvent(eventName: string, payload?: TikTokEventPayload) {
+function sendTikTokEvent(eventName: string, payload: TikTokEventPayload | undefined, retriesLeft: number) {
   if (typeof window === 'undefined') return;
   const tracker = window.ttq?.track;
-  if (typeof tracker !== 'function') return;
+
+  if (typeof tracker !== 'function') {
+    if (retriesLeft > 0) {
+      window.setTimeout(() => sendTikTokEvent(eventName, payload, retriesLeft - 1), 250);
+    }
+    return;
+  }
 
   try {
     tracker(eventName, payload);
   } catch (error) {
     console.warn('[tiktok-pixel] event tracking failed', eventName, error);
   }
+}
+
+export function trackTikTokEvent(eventName: string, payload?: TikTokEventPayload) {
+  sendTikTokEvent(eventName, payload, 6);
 }
