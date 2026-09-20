@@ -196,38 +196,46 @@ export default function ProductGridRewards({
   }, [initialProducts, liveUpdates]);
 
   useEffect(() => {
-    let unsubscribeProducts = () => {};
-    if (liveUpdates) {
-      unsubscribeProducts = onSnapshot(
-        collection(db, "products"),
-        (snapshot) => {
-          setProducts(
-            shuffleProducts(
-              snapshot.docs.map((d) => ({ id: d.id, ...d.data() }) as Product),
-            ),
-          );
-          setLoading(false);
-        },
-        () => setLoading(false),
-      );
+    let cancelled = false;
+
+    async function loadPublicData() {
+      try {
+        const requests: Promise<Response>[] = [
+          fetch("/api/storefront/read?type=rewards", { cache: "no-store" }),
+        ];
+        if (liveUpdates) {
+          requests.push(fetch("/api/storefront/read?type=catalog", { cache: "no-store" }));
+        }
+
+        const responses = await Promise.all(requests);
+        const rewardResponse = responses[0];
+        if (rewardResponse.ok) {
+          const data = await rewardResponse.json();
+          if (!cancelled) {
+            setGifts(
+              (Array.isArray(data?.gifts) ? data.gifts : [])
+                .filter((gift: Reward) => gift.active !== false && Number(gift.pointsCost) > 0),
+            );
+          }
+        }
+
+        if (liveUpdates && responses[1]?.ok) {
+          const data = await responses[1].json();
+          const incoming = (Array.isArray(data?.products) ? data.products : []) as Product[];
+          if (!cancelled && incoming.length) {
+            setProducts((current) => reconcileProducts(current, incoming));
+          }
+        }
+      } catch {
+        // Server-provided products stay usable if background reward metadata is unavailable.
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
     }
 
-    const unsubscribeGifts = onSnapshot(
-      collection(db, "reward_gifts"),
-      (snapshot) => {
-        setGifts(
-          snapshot.docs
-            .map((d) => ({ id: d.id, ...d.data() }) as Reward)
-            .filter(
-              (gift) => gift.active !== false && Number(gift.pointsCost) > 0,
-            ),
-        );
-      },
-    );
-
+    void loadPublicData();
     return () => {
-      unsubscribeProducts();
-      unsubscribeGifts();
+      cancelled = true;
     };
   }, [liveUpdates]);
 
