@@ -65,6 +65,7 @@ export async function sendTikTokServerEvent(request: Request, input: {
   pageUrl?: unknown;
   referrer?: unknown;
   forceTestCode?: unknown;
+  forceSend?: boolean;
 }) {
   const event = clean(input.event, 80);
   const eventId = clean(input.eventId, 160);
@@ -72,7 +73,7 @@ export async function sendTikTokServerEvent(request: Request, input: {
   if (!eventId) throw new Error('TikTok event ID is required.');
 
   const settings = await getTikTokEventsSettings();
-  if (!settings.enabled || !settings.accessToken) {
+  if ((!settings.enabled && input.forceSend !== true) || !settings.accessToken) {
     return { sent: false, skipped: true, event, eventId };
   }
 
