@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useSettings } from '@/lib/useSettings';
 import { useCartStore } from '@/lib/cartStore';
@@ -10,6 +10,7 @@ import { isWholesaleProduct } from '@/lib/wholesale';
 import { getEffectivePrice } from '@/lib/dealPricing';
 import { matchesSaleMelaBucket } from '@/lib/priceBucketUtils';
 import { cacheCatalogForNavigation, readCachedCatalog } from '@/lib/productNavigationCache';
+import { makeTikTokContent, trackTikTokEvent } from '@/lib/tiktokPixel';
 import { Product, Category, ShopCatalogModel, imageOf, priceOf, originalOf, productHasVariants, titleOf } from './ShopTypes';
 
 export function useShopCatalog(initialCategory?: string, initialQuery = '', initialProducts: Product[] = [], initialCategories: Category[] = []): ShopCatalogModel {
@@ -32,6 +33,7 @@ export function useShopCatalog(initialCategory?: string, initialQuery = '', init
   const [addedId, setAddedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(!hasServerData);
   const [wholesaleOnly, setWholesaleOnly] = useState(['true', '1'].includes(searchParams.get('wholesale') || ''));
+  const lastTrackedSearch = useRef('');
 
   useEffect(() => {
     setCategory(initialCategory ? slugifyCategory(decodeURIComponent(initialCategory)) || initialCategory : 'all');
@@ -41,6 +43,17 @@ export function useShopCatalog(initialCategory?: string, initialQuery = '', init
     if (!initialQuery) setSearch(urlQuery);
     setMaxPrice(urlMax);
   }, [initialQuery, urlQuery, urlMax]);
+
+  useEffect(() => {
+    const query = search.trim();
+    if (query.length < 2) return;
+    const timer = window.setTimeout(() => {
+      if (lastTrackedSearch.current === query) return;
+      trackTikTokEvent('Search', { search_string: query });
+      lastTrackedSearch.current = query;
+    }, 650);
+    return () => window.clearTimeout(timer);
+  }, [search]);
 
   useEffect(() => {
     let cancelled = false;
@@ -183,13 +196,29 @@ export function useShopCatalog(initialCategory?: string, initialQuery = '', init
 
     const image = imageOf(currentProduct) || imageOf(product);
     if (productHasVariants(currentProduct) && openVariantModal({ ...currentProduct, image, imageUrl: image }, 'cart')) return;
+    const currentPrice = priceOf(currentProduct);
     addItem({
       id: currentProduct.id,
+      productId: currentProduct.id,
+      category: String(currentProduct.category || ''),
       name: titleOf(currentProduct),
-      price: priceOf(currentProduct),
-      originalPrice: originalOf(currentProduct) || priceOf(currentProduct),
+      price: currentPrice,
+      originalPrice: originalOf(currentProduct) || currentPrice,
       image,
       imageUrl: image,
+    });
+    trackTikTokEvent('AddToCart', {
+      contents: [
+        makeTikTokContent({
+          id: currentProduct.id,
+          name: titleOf(currentProduct),
+          category: currentProduct.category,
+          price: currentPrice,
+          quantity: 1,
+        }),
+      ],
+      value: currentPrice,
+      currency: 'PKR',
     });
     setAddedId(currentProduct.id);
     window.setTimeout(() => setAddedId((current) => (current === currentProduct.id ? null : current)), 1400);
