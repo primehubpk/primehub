@@ -1,11 +1,9 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { ArrowLeft, Check, ExternalLink, MessageCircle } from 'lucide-react';
-import { collection, onSnapshot } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
 import { PRIME_SKILLS_SEED } from '@/lib/primeSkillsSeed';
 import { normalizeImageUrl } from '@/lib/imageUrl';
 
@@ -64,18 +62,9 @@ function displayPrice(item: SkillDetailItem) {
 }
 
 export default function SkillDetail({ skillId, initialItems = [] }: { skillId: string; initialItems?: SkillDetailItem[] }) {
-  const [items, setItems] = useState<SkillDetailItem[]>(initialItems);
-  const [loading, setLoading] = useState(initialItems.length === 0);
+  const items = initialItems;
+  const loading = false;
   const [selectedPackageId, setSelectedPackageId] = useState('');
-
-  useEffect(() => onSnapshot(
-    collection(db, 'prime_skills'),
-    (snapshot) => {
-      setItems(snapshot.docs.map((entry) => ({ id: entry.id, ...entry.data() } as SkillDetailItem)));
-      setLoading(false);
-    },
-    () => setLoading(false),
-  ), []);
 
   const source: SkillDetailItem[] = items.length ? items : PRIME_SKILLS_SEED;
   const active = useMemo(() => source.filter((entry) => entry.active !== false).sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0)), [source]);
