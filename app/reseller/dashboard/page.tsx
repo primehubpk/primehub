@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { Outfit } from 'next/font/google';
 import { useEffect, useMemo, useState, type ElementType } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
-import { collection, doc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot } from 'firebase/firestore';
 import {
   ArrowLeft,
   Bell,
@@ -68,7 +68,6 @@ type Voucher = {
   imageUrl?: string;
 };
 
-const settingsRef = doc(db, 'settings', 'main');
 function premiumVoucherImage(title: string, art: string, icon: string) {
   const safeTitle = title.replace(/[<>&]/g, '');
   const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='640' height='360' viewBox='0 0 640 360'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop stop-color='${art}'/><stop offset='1' stop-color='#14140F'/></linearGradient><filter id='b'><feGaussianBlur stdDeviation='22'/></filter></defs><rect width='640' height='360' rx='36' fill='url(#g)'/><circle cx='540' cy='60' r='110' fill='white' opacity='.12'/><circle cx='90' cy='320' r='130' fill='#FFB020' opacity='.18' filter='url(#b)'/><text x='52' y='142' font-size='78' font-family='Arial'>${icon}</text><text x='52' y='230' fill='white' font-size='34' font-weight='800' font-family='Arial'>${safeTitle}</text><text x='52' y='276' fill='white' opacity='.72' font-size='18' font-family='Arial' letter-spacing='4'>PRIMEHUB PREMIUM REWARD</text></svg>`;
@@ -150,34 +149,35 @@ export default function ResellerDashboardPage() {
     };
   }, [router]);
 
-  useEffect(
-    () =>
-      onSnapshot(
-        settingsRef,
-        snapshot => {
-          const data = snapshot.data() as SettingsSnapshot | undefined;
-          if (Array.isArray(data?.resellerTasks)) setTasks(data.resellerTasks);
-          if (data?.resellerMonthlyChallenge) {
-            setChallenge({ ...DEFAULT_MONTHLY_CHALLENGE, ...data.resellerMonthlyChallenge });
-          }
-          if (data?.resellerWheel) setWheel({ ...DEFAULT_RESELLER_WHEEL, ...data.resellerWheel });
-          setVoucherImages(data?.resellerVoucherImages || {});
-          if (Array.isArray(data?.resellerTiers) && data.resellerTiers.length === 4) setResellerTiers(data.resellerTiers);
-        },
-        () => undefined,
-      ),
-    [],
-  );
-
   useEffect(() => {
-    return onSnapshot(
-      collection(db, 'reward_gifts'),
-      snap => setRewardGifts(
-        snap.docs
-          .map(row => ({ id: row.id, ...row.data() }) as RewardGift)
-          .filter(gift => gift.active !== false),
-      ),
-    );
+    let cancelled = false;
+    Promise.all([
+      fetch('/api/storefront/read?type=settings', { cache: 'no-store' }),
+      fetch('/api/storefront/read?type=rewards', { cache: 'no-store' }),
+    ])
+      .then(async ([settingsResponse, rewardsResponse]) => {
+        const settingsData = settingsResponse.ok ? await settingsResponse.json() : null;
+        const rewardsData = rewardsResponse.ok ? await rewardsResponse.json() : null;
+        if (cancelled) return;
+
+        const data = settingsData?.documents?.main as SettingsSnapshot | undefined;
+        if (Array.isArray(data?.resellerTasks)) setTasks(data.resellerTasks);
+        if (data?.resellerMonthlyChallenge) {
+          setChallenge({ ...DEFAULT_MONTHLY_CHALLENGE, ...data.resellerMonthlyChallenge });
+        }
+        if (data?.resellerWheel) setWheel({ ...DEFAULT_RESELLER_WHEEL, ...data.resellerWheel });
+        setVoucherImages(data?.resellerVoucherImages || {});
+        if (Array.isArray(data?.resellerTiers) && data.resellerTiers.length === 4) setResellerTiers(data.resellerTiers);
+
+        const gifts = (Array.isArray(rewardsData?.gifts) ? rewardsData.gifts : [])
+          .filter((gift: RewardGift) => gift.active !== false);
+        setRewardGifts(gifts);
+      })
+      .catch(() => undefined);
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
