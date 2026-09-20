@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import { readFile } from 'node:fs/promises';
 import { stripTypeScriptTypes } from 'node:module';
 const source = await readFile(new URL('../app/api/admin/salar/credentials/route.ts', import.meta.url), 'utf8');
+const adminSessionSource = await readFile(new URL('../lib/adminSession.ts', import.meta.url), 'utf8');
 let code = source.replace(/^import .*;\n/gm, '');
 code = `const NextResponse = {json(value, init) { const r = Response.json(value, init); r.cookies = {set(){}}; return r; }};
 const PRIMEHUB_ADMIN_EMAIL='admin@example.test', PRIMEHUB_ADMIN_UID='admin-uid', PRIMEHUB_ADMIN_SESSION_COOKIE='verified', PRIMEHUB_ADMIN_SESSION_MAX_AGE=86400;
@@ -17,11 +18,17 @@ const route = await import('data:text/javascript;base64,' + Buffer.from(code).to
 function req(body, cookie = '', origin = 'https://store.test') {
   return new Request('https://store.test/api/admin/salar/credentials', {method:'POST',headers:{origin,cookie},body:JSON.stringify(body)});
 }
-test('legacy admin cookie cannot read or change provider secrets', async () => {
+test('production secret route still rejects the legacy admin cookie', async () => {
   globalThis.__writes = 0;
   assert.equal((await route.GET(req({}, 'primehub_admin_auth=true'))).status, 401);
   assert.equal((await route.POST(req({action:'save',provider:'groq',keys:['test-token']}, 'primehub_admin_auth=true'))).status, 401);
   assert.equal(globalThis.__writes, 0);
+});
+test('temporary legacy bridge is constrained to the exact Salar preview branch', () => {
+  assert.match(adminSessionSource, /VERCEL_ENV !== 'preview'/);
+  assert.match(adminSessionSource, /VERCEL_GIT_COMMIT_REF !== SALAR_TEST_BRANCH/);
+  assert.match(adminSessionSource, /fix\/salar-cloudflare-fast-replies/);
+  assert.match(adminSessionSource, /primehub_admin_auth/);
 });
 test('cross-origin key writes are rejected even with a verified session', async () => {
   assert.equal((await route.POST(req({action:'save',provider:'groq'},'verified=test-session','https://other.test'))).status,403);
