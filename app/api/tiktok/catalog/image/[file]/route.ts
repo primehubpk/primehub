@@ -12,13 +12,15 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 const ALLOWED_HOSTS = new Set([
+  'primehubmall.com',
+  'www.primehubmall.com',
   'images.primehubmall.com',
   'i.ibb.co',
 ]);
 
 function trustedImageUrl(value: string) {
   try {
-    const url = new URL(value);
+    const url = new URL(value, 'https://www.primehubmall.com');
     if (url.protocol !== 'https:') return null;
     const host = url.hostname.toLowerCase();
     if (ALLOWED_HOSTS.has(host) || host.endsWith('.r2.dev')) return url;
