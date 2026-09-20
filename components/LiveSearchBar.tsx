@@ -3,10 +3,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Search } from 'lucide-react';
-import { collection, onSnapshot } from 'firebase/firestore';
 import FastProductLink from '@/components/FastProductLink';
-import { db } from '@/lib/firebase';
 import { smartSearchProducts } from '@/lib/smartSearch';
+import { cacheCatalogForNavigation, readCachedCatalog } from '@/lib/productNavigationCache';
 import VoiceSearchButton from '@/components/VoiceSearchButton';
 
 type Product = {
@@ -30,11 +29,33 @@ export default function LiveSearchBar({ value, onChange, className = '', placeho
   const [products, setProducts] = useState<Product[]>([]);
   const [focused, setFocused] = useState(false);
 
-  useEffect(() => onSnapshot(
-    collection(db, 'products'),
-    (snap) => setProducts(snap.docs.map((item) => ({ id: item.id, ...item.data() } as Product)).filter((p) => p.published !== false)),
-    () => setProducts([]),
-  ), []);
+  useEffect(() => {
+    if (!focused || !value.trim() || products.length > 0) return;
+    let cancelled = false;
+
+    const cached = readCachedCatalog<Product, { id?: unknown }>();
+    if (cached?.products?.length) {
+      setProducts(cached.products.filter((product) => product.published !== false));
+      return;
+    }
+
+    fetch('/api/storefront/read?type=catalog', { cache: 'no-store' })
+      .then((response) => response.ok ? response.json() : null)
+      .then((data) => {
+        if (cancelled) return;
+        const nextProducts = (Array.isArray(data?.products) ? data.products : []) as Product[];
+        const nextCategories = Array.isArray(data?.categories) ? data.categories : [];
+        if (nextProducts.length) {
+          setProducts(nextProducts.filter((product) => product.published !== false));
+          cacheCatalogForNavigation(nextProducts, nextCategories);
+        }
+      })
+      .catch(() => undefined);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [focused, value, products.length]);
 
   const results = useMemo(() => {
     const query = value.trim();
