@@ -303,6 +303,25 @@ async function supabaseCatalog(options?: DualReadCacheOptions): Promise<CatalogS
   };
 }
 
+/**
+ * External catalog feeds need the complete product payload: description,
+ * variants, tags, shipping metadata and any future product fields. Keep this
+ * separate from the storefront's compact catalog projection so adding new
+ * product features automatically makes them available to feed builders without
+ * increasing normal storefront egress.
+ */
+async function supabaseFeedCatalog(options?: DualReadCacheOptions): Promise<CatalogSnapshot> {
+  const [products, categories] = await Promise.all([
+    sbRows('products', '*', false, options),
+    sbRows('categories', '*', false, options),
+  ]);
+  return {
+    products: products.map(productFromSupabase),
+    categories: categories.map(categoryFromSupabase),
+    source: 'supabase',
+  };
+}
+
 async function firebaseProduct(id: string): Promise<ProductSnapshot> {
   const snapshot = await getAdminDb().collection('products').doc(id).get();
   if (!snapshot.exists) throw new Error(`Firebase product ${id} was not found.`);
@@ -444,6 +463,14 @@ export function getDualCatalog(options?: DualReadCacheOptions) {
   return withFallback(
     firebaseCatalog,
     () => supabaseCatalog(options),
+    { products: [], categories: [], source: 'empty' as const },
+  );
+}
+
+export function getDualFeedCatalog(options?: DualReadCacheOptions) {
+  return withFallback(
+    firebaseCatalog,
+    () => supabaseFeedCatalog(options),
     { products: [], categories: [], source: 'empty' as const },
   );
 }
