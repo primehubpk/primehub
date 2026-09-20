@@ -1,3 +1,4 @@
+import { testSalarProvider } from '@/lib/salar/modelDrivenEngine';
 import { NextResponse } from 'next/server';
 import { getSalarRuntimeStatus, getSalarState, refreshSalarCatalogue, saveSalarSettings } from '@/lib/salar/server';
 
@@ -14,6 +15,7 @@ function authorized(request: Request) {
 function adminView(state: Awaited<ReturnType<typeof getSalarState>>) {
   return {
     enabled: state.enabled,
+    providerSelection: state.providerSelection,
     instructions: state.instructions,
     orderInstructions: state.orderInstructions,
     updatedAt: state.updatedAt,
@@ -24,7 +26,7 @@ function adminView(state: Awaited<ReturnType<typeof getSalarState>>) {
       categoryCount: state.catalogue.categories.length,
       pageCount: state.catalogue.pages.length,
     } : null,
-    runtime: getSalarRuntimeStatus(),
+    runtime: getSalarRuntimeStatus(state.providerSelection),
   };
 }
 
@@ -51,6 +53,7 @@ export async function PUT(request: Request) {
     const body = await request.json().catch(() => ({}));
     const state = await saveSalarSettings({
       enabled: body?.enabled,
+      providerSelection: body?.providerSelection,
       instructions: body?.instructions,
       orderInstructions: body?.orderInstructions,
     });
@@ -67,6 +70,10 @@ export async function POST(request: Request) {
   }
   try {
     const body = await request.json().catch(() => ({}));
+    if (body?.action === 'test-provider') {
+      const test = await testSalarProvider(body.providerSelection);
+      return NextResponse.json({ success: true, test }, { headers: { 'Cache-Control': 'private, no-store' } });
+    }
     if (body?.action !== 'refresh-catalogue') {
       return NextResponse.json({ success: false, error: 'Unknown action.' }, { status: 400 });
     }
@@ -78,3 +85,4 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: false, error: 'Catalogue update failed. Live store data could not be cached.' }, { status: 503 });
   }
 }
+
