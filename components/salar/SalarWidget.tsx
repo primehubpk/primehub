@@ -522,7 +522,7 @@ export default function SalarWidget() {
     if (isAdminRoute || !hydrated || !chatId) return;
     let stopped = false;
     let polling = false;
-    let timer: ReturnType<typeof window.setTimeout> | undefined;
+    let timer: number | undefined;
     const poll = async () => {
       if (stopped || polling || document.visibilityState !== 'visible') return;
       polling = true;

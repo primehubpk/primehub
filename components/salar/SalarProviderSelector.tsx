@@ -8,7 +8,7 @@ type Selection = { preferredProvider: Provider; models: Partial<Record<Provider,
 type Status = { provider: Provider; configured: boolean; model: string };
 const labels: Record<Provider, string> = { cloudflare: 'Cloudflare', groq: 'Groq', gemini: 'Gemini', openrouter: 'OpenRouter' };
 
-export default function SalarProviderSelector() {
+export default function SalarProviderSelector({ onVerified }: { onVerified?: () => void } = {}) {
   const id = useId();
   const [selection, setSelection] = useState<Selection>({ preferredProvider: 'cloudflare', models: {} });
   const [providers, setProviders] = useState<Status[]>([]);
@@ -46,7 +46,7 @@ export default function SalarProviderSelector() {
 
   const provider = selection.preferredProvider;
   return <section className="rounded-2xl border border-black/10 bg-white p-3 text-[#14140F]">
-    <SalarCredentialManager provider={provider} onVerified={() => setRevision(value => value + 1)} />
+    <SalarCredentialManager provider={provider} onVerified={() => { setRevision(value => value + 1); onVerified?.(); }} />
     <label htmlFor={`${id}-provider`} className="block text-xs font-bold">Salar AI provider</label>
     <select id={`${id}-provider`} value={provider} disabled={busy} onChange={event => setSelection(current => ({ ...current, preferredProvider: event.target.value as Provider }))} className="mt-2 w-full rounded-lg border p-2 text-xs">
       {(Object.keys(labels) as Provider[]).map(value => <option key={value} value={value}>{labels[value]}{providers.find(item => item.provider === value)?.configured ? '' : ' (not configured)'}</option>)}
