@@ -214,18 +214,8 @@ export async function GET(request: Request) {
   let source: typeof settingsResult.source | 'firebase-migration' = settingsResult.source;
   let migratedFromLegacy = false;
 
-  if (!rawDeal) {
-    try {
-      const firebase = await firebaseBigDealCandidate();
-      if (firebase.dedicated) {
-        rawDeal = firebase.dedicated;
-        source = 'firebase-migration';
-      }
-    } catch (error) {
-      console.warn('Big Deal dedicated Firebase lookup skipped', error);
-    }
-  }
-
+  // Supabase is primary. Check both current and legacy Supabase shapes before
+  // touching Firebase, then perform at most one migration-recovery lookup.
   if (!rawDeal && hasRawDeal(main.dailyDeal)) {
     rawDeal = main.dailyDeal;
     migratedFromLegacy = true;
@@ -234,13 +224,16 @@ export async function GET(request: Request) {
   if (!rawDeal) {
     try {
       const firebase = await firebaseBigDealCandidate();
-      if (firebase.legacy) {
+      if (firebase.dedicated) {
+        rawDeal = firebase.dedicated;
+        source = 'firebase-migration';
+      } else if (firebase.legacy) {
         rawDeal = firebase.legacy;
         source = 'firebase-migration';
         migratedFromLegacy = true;
       }
     } catch (error) {
-      console.warn('Big Deal legacy Firebase lookup skipped', error);
+      console.warn('Big Deal Firebase migration lookup skipped', error);
     }
   }
 
