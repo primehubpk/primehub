@@ -19,6 +19,7 @@ import ResellerWhatsAppRequests from '@/components/admin/ResellerWhatsAppRequest
 import WhatsAppCoexistenceSetup from '@/components/admin/WhatsAppCoexistenceSetup';
 import WholesaleVideoManager from '@/components/admin/WholesaleVideoManager';
 import SalarControlPanel from '@/components/admin/SalarControlPanel';
+import TikTokEventsManager from '@/components/admin/TikTokEventsManager';
 
 type SectionDefinition = {
   title: string;
