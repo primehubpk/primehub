@@ -37,6 +37,7 @@ import { isWholesaleProduct } from "@/lib/wholesale";
 import { shuffleProducts } from "@/lib/shuffleProducts";
 import { getEffectivePrice } from "@/lib/dealPricing";
 import { normalizeImageUrl } from "@/lib/imageUrl";
+import { makeTikTokContent, trackTikTokEvent } from "@/lib/tiktokPixel";
 
 type Product = {
   id: string;
@@ -380,14 +381,21 @@ export default function ProductGridRewards({
       if (opened) return;
     }
 
+    const currentPrice = effectivePrice(currentProduct);
     addItem({
       id: currentProduct.id,
+      productId: currentProduct.id,
+      category: String(currentProduct.category || ""),
       name: title(currentProduct),
-      price: effectivePrice(currentProduct),
-      originalPrice:
-        original(currentProduct) || effectivePrice(currentProduct),
+      price: currentPrice,
+      originalPrice: original(currentProduct) || currentPrice,
       image: img,
       imageUrl: img,
+    });
+    trackTikTokEvent("AddToCart", {
+      contents: [makeTikTokContent({ id: currentProduct.id, name: title(currentProduct), category: currentProduct.category, price: currentPrice, quantity: 1 })],
+      value: currentPrice,
+      currency: "PKR",
     });
 
     setAdded(currentProduct.id);
