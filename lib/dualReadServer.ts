@@ -12,6 +12,33 @@ type SettingsSnapshot = { documents: Record<string, any>; source: 'firebase' | '
 type SkillsSnapshot = { skills: any[]; source: 'firebase' | 'supabase' | 'empty' };
 
 const SUPABASE_READ_TIMEOUT_MS = 3500;
+const FIREBASE_FALLBACK_QUOTA_COOLDOWN_MS = 5 * 60 * 1000;
+let firebaseFallbackBlockedUntil = 0;
+
+class FirebaseFallbackCircuitOpenError extends Error {
+  constructor() {
+    super('Firebase fallback temporarily paused after a quota exhaustion error.');
+    this.name = 'FirebaseFallbackCircuitOpenError';
+  }
+}
+
+function errorMessage(error: unknown) {
+  return error instanceof Error ? error.message : String(error || '');
+}
+
+function isSupabaseAuthoritativeMiss(error: unknown) {
+  return /^Supabase product .+ was not found\.$/.test(errorMessage(error));
+}
+
+function isFirebaseQuotaError(error: unknown) {
+  const code = Number((error as any)?.code);
+  const message = errorMessage(error);
+  return code === 8 || /RESOURCE_EXHAUSTED|quota exceeded/i.test(message);
+}
+
+function firebaseFallbackIsBlocked() {
+  return Date.now() < firebaseFallbackBlockedUntil;
+}
 
 // Catalog pages only need card/filter metadata. Fetching the full products row
 // sends descriptions and variant matrices across Supabase on every catalog
@@ -334,28 +361,51 @@ async function supabaseSkills(options?: DualReadCacheOptions): Promise<SkillsSna
 
 async function withFallback<T>(firebaseRead: () => Promise<T>, supabaseRead: () => Promise<T>, empty: T): Promise<T> {
   const readMode = mode();
-  const attempts = readMode === 'supabase-primary'
-    ? [supabaseRead, firebaseRead]
+  const attempts: Array<{ source: 'firebase' | 'supabase'; read: () => Promise<T> }> = readMode === 'supabase-primary'
+    ? [{ source: 'supabase', read: supabaseRead }, { source: 'firebase', read: firebaseRead }]
     : readMode === 'firebase-primary'
-      ? [firebaseRead, supabaseRead]
+      ? [{ source: 'firebase', read: firebaseRead }, { source: 'supabase', read: supabaseRead }]
       : readMode === 'supabase-only'
-        ? [supabaseRead]
-        : [firebaseRead];
+        ? [{ source: 'supabase', read: supabaseRead }]
+        : [{ source: 'firebase', read: firebaseRead }];
 
   let lastError: unknown = null;
   for (let index = 0; index < attempts.length; index += 1) {
     const attempt = attempts[index];
-    try { return await attempt(); }
-    catch (error) {
+
+    if (attempt.source === 'firebase' && firebaseFallbackIsBlocked()) {
+      lastError = new FirebaseFallbackCircuitOpenError();
+      continue;
+    }
+
+    try {
+      return await attempt.read();
+    } catch (error) {
       lastError = error;
-      console.warn('PrimeHub dual-read attempt failed', error);
-      if (readMode === 'supabase-primary' && index === 0 && shouldProtectPreviewFirebase(error)) {
+
+      // Supabase is the verified storefront authority after cutover. A missing
+      // product is a valid not-found result, not a reason to query Firebase again.
+      if (attempt.source === 'supabase' && readMode === 'supabase-primary' && isSupabaseAuthoritativeMiss(error)) {
+        return empty;
+      }
+
+      if (attempt.source === 'firebase' && isFirebaseQuotaError(error)) {
+        firebaseFallbackBlockedUntil = Date.now() + FIREBASE_FALLBACK_QUOTA_COOLDOWN_MS;
+        console.error('PrimeHub Firebase fallback paused for 5 minutes after quota exhaustion.');
+      } else {
+        console.warn('PrimeHub dual-read attempt failed', error);
+      }
+
+      if (readMode === 'supabase-primary' && attempt.source === 'supabase' && shouldProtectPreviewFirebase(error)) {
         console.error('PrimeHub Preview is missing Supabase credentials; Firebase fallback skipped to protect quota.');
         return empty;
       }
     }
   }
-  if (lastError) console.error('PrimeHub dual-read exhausted all configured sources', lastError);
+
+  if (lastError && !(lastError instanceof FirebaseFallbackCircuitOpenError)) {
+    console.error('PrimeHub dual-read exhausted all configured sources', lastError);
+  }
   return empty;
 }
 
