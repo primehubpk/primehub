@@ -66,7 +66,7 @@ export default function CategorySwiper({
 
         <div className="min-w-0 text-center">
           <p className="text-[8px] font-black uppercase tracking-[0.16em] text-[#0F6A5F] sm:text-[9px] sm:tracking-[0.2em]">Browse the collection</p>
-          <h2 className="mt-0.5 font-[family-name:var(--font-display)] text-[22px] font-black leading-none tracking-tight sm:text-2xl">Shop by Category</h2>
+          <h2 className="mt-0.5 whitespace-nowrap font-[family-name:var(--font-display)] text-[18px] font-black leading-none tracking-tight sm:text-2xl">Shop by Category</h2>
           <Link
             href="/category"
             prefetch={false}
