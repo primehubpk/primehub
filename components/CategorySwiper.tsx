@@ -49,7 +49,7 @@ export default function CategorySwiper({
 
   return (
     <section className="home-categories mx-auto mt-7 max-w-6xl px-4">
-      <div className="mb-3 grid grid-cols-[68px_minmax(0,1fr)_68px] items-center gap-1 sm:grid-cols-[76px_minmax(0,1fr)_76px] sm:gap-2">
+      <div className="mb-3 grid grid-cols-[68px_minmax(0,1fr)_68px] items-center gap-1 sm:grid-cols-[76px_minmax(0,1fr)_76px] sm:gap-2" style={{ display: 'grid' }}>
         <div className="flex justify-center">
           <Link
           href="/primehubmall/salemela"
