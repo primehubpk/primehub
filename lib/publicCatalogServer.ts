@@ -159,6 +159,19 @@ export const getStorefrontSettingsResultSnapshot = unstable_cache(
   { revalidate: 60, tags: ['storefront-settings'] },
 );
 
+// The app-wide settings provider refreshes while a customer keeps a tab open.
+// Share one 60-second server snapshot so those refreshes do not repeat Supabase
+// and Firebase recovery reads for every browser tab.
+async function loadPublicStorefrontSettingsDocumentsSnapshot() {
+  return getFreshStorefrontSettingsDocumentsSnapshot();
+}
+
+export const getPublicStorefrontSettingsDocumentsSnapshot = unstable_cache(
+  loadPublicStorefrontSettingsDocumentsSnapshot,
+  ['primehub-public-storefront-settings-documents-v1'],
+  { revalidate: 60, tags: ['storefront-settings', 'wholesale-videos'] },
+);
+
 export async function getStorefrontSettingsSnapshot() {
   const result = await getStorefrontSettingsResultSnapshot();
   const documents = result.documents as Record<string, any>;

@@ -4,7 +4,7 @@ import {
   compactPublicCatalogSnapshot,
   getPublicCatalogSnapshot,
   getFreshPublicProductSnapshot,
-  getFreshStorefrontSettingsDocumentsSnapshot,
+  getPublicStorefrontSettingsDocumentsSnapshot,
   getPrimeSkillsSnapshot,
   getPublicRewardGiftsSnapshot,
   getRewardSettingsSnapshot,
@@ -17,7 +17,7 @@ const FRESH_BROWSER_HEADERS = {
 };
 
 const PUBLIC_SHORT_CACHE_HEADERS = {
-  'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300',
+  'Cache-Control': 'public, max-age=60, s-maxage=60, stale-while-revalidate=300',
 };
 const PUBLIC_LONG_CACHE_HEADERS = {
   'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600',
@@ -44,7 +44,7 @@ export async function GET(request: Request) {
   const type = String(url.searchParams.get('type') || 'catalog');
   try {
     if (type === 'settings') {
-      const documents = await getFreshStorefrontSettingsDocumentsSnapshot();
+      const documents = await getPublicStorefrontSettingsDocumentsSnapshot();
       return NextResponse.json(
         { documents, source: 'cached-public', mode: getConfiguredReadMode() },
         { headers: PUBLIC_SHORT_CACHE_HEADERS },
