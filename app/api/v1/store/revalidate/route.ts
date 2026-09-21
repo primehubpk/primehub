@@ -22,7 +22,10 @@ export async function POST(request: Request) {
   revalidateTag('public-catalog', 'max');
   revalidateTag('public-products', 'max');
   revalidateTag('products', 'max');
+  revalidateTag('storefront-settings', 'max');
+  revalidateTag('wholesale-videos', 'max');
   revalidatePath('/');
   revalidatePath('/shop');
+  revalidatePath('/primehubmall/salemela');
   return NextResponse.json({ success: true, revalidated: true });
 }
