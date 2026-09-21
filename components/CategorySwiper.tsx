@@ -6,13 +6,28 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { collection, onSnapshot } from 'firebase/firestore';
-import { ChevronRight } from 'lucide-react';
+import { BadgePercent, ChevronRight, Package } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { categoryHref } from '@/lib/categoryUtils';
 import { normalizeImageUrl } from '@/lib/imageUrl';
 import { Category } from '@/lib/types';
 
 const ABOVE_THE_FOLD_CATEGORY_IMAGES = 6;
+
+// These are shortcuts only: both destinations already exist and their category cards
+// keep their original links. Keeping them as separate links avoids nested anchors.
+const CATEGORY_SHORTCUTS = {
+  '/category/jewellery-bangles': {
+    href: '/primehubmall/salemela',
+    label: 'Open PrimeHubMall Sale Mela',
+    kind: 'sale',
+  },
+  '/category/metal-bangles': {
+    href: '/primehubmall/salemela#bucket-wholesale',
+    label: 'Open PrimeHubMall Wholesale Deals',
+    kind: 'wholesale',
+  },
+} as const;
 
 export default function CategorySwiper({
   initialCategories = [],
@@ -44,23 +59,6 @@ export default function CategorySwiper({
     [categories],
   );
 
-  useEffect(() => {
-    if (!visible.length) return;
-    const warm = () => visible.slice(0, 10).forEach((category) => router.prefetch(categoryHref(category)));
-    const browser = window as Window & {
-      requestIdleCallback?: (callback: () => void, options?: { timeout?: number }) => number;
-      cancelIdleCallback?: (handle: number) => void;
-    };
-
-    if (browser.requestIdleCallback) {
-      const id = browser.requestIdleCallback(warm, { timeout: 900 });
-      return () => browser.cancelIdleCallback?.(id);
-    }
-
-    const timer = window.setTimeout(warm, 150);
-    return () => window.clearTimeout(timer);
-  }, [router, visible]);
-
   if (!visible.length) return null;
 
   return (
@@ -86,36 +84,55 @@ export default function CategorySwiper({
         {visible.map((category, index) => {
           const aboveTheFold = index < ABOVE_THE_FOLD_CATEGORY_IMAGES;
           const href = categoryHref(category);
+          const shortcut = CATEGORY_SHORTCUTS[href as keyof typeof CATEGORY_SHORTCUTS];
+          const ShortcutIcon = shortcut?.kind === 'sale' ? BadgePercent : Package;
           const image = normalizeImageUrl(category.iconUrl || category.imageUrl || '');
           return (
-            <Link
-              key={category.id}
-              href={href}
-              prefetch
-              onPointerEnter={() => router.prefetch(href)}
-              onPointerDown={() => router.prefetch(href)}
-              onFocus={() => router.prefetch(href)}
-              className="group w-[92px] shrink-0 snap-start text-center lg:w-[78px]"
-            >
-              <span className="relative mx-auto flex h-20 w-20 items-center justify-center overflow-hidden rounded-full bg-[#F4F4F1] ring-1 ring-black/5 lg:h-[68px] lg:w-[68px]">
-                {image ? (
-                  <Image
-                    src={image}
-                    alt={category.title}
-                    fill
-                    unoptimized
-                    priority={aboveTheFold}
-                    loading={aboveTheFold ? 'eager' : 'lazy'}
-                    fetchPriority={aboveTheFold ? 'high' : 'auto'}
-                    sizes="(max-width: 600px) 22vw, 78px"
-                    className="object-cover"
-                  />
-                ) : (
-                  <span className="font-[family-name:var(--font-display)] text-xl font-black text-[#0F6A5F]">{category.title.charAt(0)}</span>
-                )}
-              </span>
-              <span className="mt-2 block truncate text-center text-[10px] font-black text-[#14140F]">{category.title}</span>
-            </Link>
+            <div key={category.id} className="relative w-[92px] shrink-0 snap-start text-center lg:w-[78px]">
+              {shortcut ? (
+                <Link
+                  href={shortcut.href}
+                  prefetch={false}
+                  onPointerDown={() => router.prefetch(shortcut.href)}
+                  onFocus={() => router.prefetch(shortcut.href)}
+                  aria-label={shortcut.label}
+                  className={
+                    shortcut.kind === 'sale'
+                      ? "absolute right-0 top-0 z-10 flex h-7 w-7 -translate-y-1/4 translate-x-1/4 items-center justify-center rounded-full border-2 border-white bg-[#E1352B] text-white shadow-md transition-transform hover:scale-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#E1352B]"
+                      : "absolute right-0 top-0 z-10 flex h-7 w-7 -translate-y-1/4 translate-x-1/4 items-center justify-center rounded-full border-2 border-white bg-[#0F6A5F] text-white shadow-md transition-transform hover:scale-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0F6A5F]"
+                  }
+                >
+                  <ShortcutIcon size={14} strokeWidth={2.6} aria-hidden="true" />
+                  <span className="sr-only">{shortcut.label}</span>
+                </Link>
+              ) : null}
+              <Link
+                href={href}
+                prefetch={false}
+                onPointerDown={() => router.prefetch(href)}
+                onFocus={() => router.prefetch(href)}
+                className="group block text-center"
+              >
+                <span className="relative mx-auto flex h-20 w-20 items-center justify-center overflow-hidden rounded-full bg-[#F4F4F1] ring-1 ring-black/5 lg:h-[68px] lg:w-[68px]">
+                  {image ? (
+                    <Image
+                      src={image}
+                      alt={category.title}
+                      fill
+                      unoptimized
+                      priority={aboveTheFold}
+                      loading={aboveTheFold ? 'eager' : 'lazy'}
+                      fetchPriority={aboveTheFold ? 'high' : 'auto'}
+                      sizes="(max-width: 600px) 22vw, 78px"
+                      className="object-cover"
+                    />
+                  ) : (
+                    <span className="font-[family-name:var(--font-display)] text-xl font-black text-[#0F6A5F]">{category.title.charAt(0)}</span>
+                  )}
+                </span>
+                <span className="mt-2 block truncate text-center text-[10px] font-black text-[#14140F]">{category.title}</span>
+              </Link>
+            </div>
           );
         })}
       </div>
