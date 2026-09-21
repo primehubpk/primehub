@@ -50,7 +50,8 @@ export default function CategorySwiper({
   return (
     <section className="home-categories mx-auto mt-7 max-w-6xl px-4">
       <div className="mb-3 grid grid-cols-[68px_minmax(0,1fr)_68px] items-center gap-1 sm:grid-cols-[76px_minmax(0,1fr)_76px] sm:gap-2">
-        <Link
+        <div className="flex justify-center">
+          <Link
           href="/primehubmall/salemela"
           prefetch={false}
           onPointerDown={() => router.prefetch('/primehubmall/salemela')}
@@ -62,7 +63,8 @@ export default function CategorySwiper({
             <BadgePercent size={27} strokeWidth={2.4} aria-hidden="true" />
           </span>
           <span className="max-w-full text-[8px] font-black leading-tight text-[#E1352B] sm:text-[9px]">Sale Mela</span>
-        </Link>
+          </Link>
+        </div>
 
         <div className="min-w-0 text-center">
           <p className="text-[8px] font-black uppercase tracking-[0.16em] text-[#0F6A5F] sm:text-[9px] sm:tracking-[0.2em]">Browse the collection</p>
@@ -78,7 +80,8 @@ export default function CategorySwiper({
           </Link>
         </div>
 
-        <Link
+        <div className="flex justify-center">
+          <Link
           href="/primehubmall/salemela#bucket-wholesale"
           prefetch={false}
           onPointerDown={() => router.prefetch('/primehubmall/salemela#bucket-wholesale')}
@@ -90,7 +93,8 @@ export default function CategorySwiper({
             <Package size={27} strokeWidth={2.25} aria-hidden="true" />
           </span>
           <span className="max-w-full text-[8px] font-black leading-tight text-[#0F6A5F] sm:text-[9px]">Wholesale</span>
-        </Link>
+          </Link>
+        </div>
       </div>
 
       <div className="flex gap-3 overflow-x-auto overflow-y-visible touch-pan-x touch-pan-y cursor-grab active:cursor-grabbing snap-x snap-mandatory overscroll-x-contain scroll-smooth pb-3 [scrollbar-width:none] lg:[scrollbar-width:thin] lg:[scrollbar-color:#9ca3af_transparent] [&::-webkit-scrollbar]:hidden lg:[&::-webkit-scrollbar]:block lg:[&::-webkit-scrollbar]:h-1.5 lg:[&::-webkit-scrollbar-thumb]:rounded-full lg:[&::-webkit-scrollbar-thumb]:bg-black/25">
