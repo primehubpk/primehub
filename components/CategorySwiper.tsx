@@ -14,20 +14,6 @@ import { Category } from '@/lib/types';
 
 const ABOVE_THE_FOLD_CATEGORY_IMAGES = 6;
 
-// These are shortcuts only: both destinations already exist and their category cards
-// keep their original links. Keeping them as separate links avoids nested anchors.
-const CATEGORY_SHORTCUTS = {
-  '/category/jewellery-bangles': {
-    href: '/primehubmall/salemela',
-    label: 'Open PrimeHubMall Sale Mela',
-    kind: 'sale',
-  },
-  '/category/metal-bangles': {
-    href: '/primehubmall/salemela#bucket-wholesale',
-    label: 'Open PrimeHubMall Wholesale Deals',
-    kind: 'wholesale',
-  },
-} as const;
 
 export default function CategorySwiper({
   initialCategories = [],
@@ -63,20 +49,47 @@ export default function CategorySwiper({
 
   return (
     <section className="home-categories mx-auto mt-7 max-w-6xl px-4">
-      <div className="mb-3 flex items-end justify-between">
-        <div>
-          <p className="text-[9px] font-black uppercase tracking-[0.2em] text-[#0F6A5F]">Browse the collection</p>
-          <h2 className="mt-0.5 font-[family-name:var(--font-display)] text-base font-black tracking-tight">Shop by Category</h2>
-        </div>
+      <div className="mb-3 grid grid-cols-[68px_minmax(0,1fr)_68px] items-center gap-1 sm:grid-cols-[76px_minmax(0,1fr)_76px] sm:gap-2">
         <Link
-          href="/category"
-          prefetch
-          onPointerEnter={() => router.prefetch('/category')}
-          onPointerDown={() => router.prefetch('/category')}
-          onFocus={() => router.prefetch('/category')}
-          className="flex items-center gap-0.5 rounded-full bg-white px-2.5 py-1.5 text-[10px] font-black text-[#0F6A5F] shadow-sm ring-1 ring-black/5"
+          href="/primehubmall/salemela"
+          prefetch={false}
+          onPointerDown={() => router.prefetch('/primehubmall/salemela')}
+          aria-label="Open PrimeHubMall Sale Mela"
+          className="group flex flex-col items-center gap-1 text-center"
         >
-          View all <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
+          <span className="relative flex h-[60px] w-[60px] items-center justify-center overflow-hidden rounded-full border-[3px] border-[#F4C64A] bg-gradient-to-br from-[#FF5A50] via-[#E1352B] to-[#9F1414] text-white shadow-[0_6px_16px_rgba(225,53,43,0.24)] transition-transform group-hover:scale-105 sm:h-[68px] sm:w-[68px]">
+            <span className="absolute inset-[3px] rounded-full border border-white/45" aria-hidden="true" />
+            <BadgePercent size={27} strokeWidth={2.4} aria-hidden="true" />
+          </span>
+          <span className="max-w-full text-[8px] font-black leading-tight text-[#E1352B] sm:text-[9px]">Sale Mela</span>
+        </Link>
+
+        <div className="min-w-0 text-center">
+          <p className="text-[8px] font-black uppercase tracking-[0.16em] text-[#0F6A5F] sm:text-[9px] sm:tracking-[0.2em]">Browse the collection</p>
+          <h2 className="mt-0.5 font-[family-name:var(--font-display)] text-[22px] font-black leading-none tracking-tight sm:text-2xl">Shop by Category</h2>
+          <Link
+            href="/category"
+            prefetch={false}
+            onPointerDown={() => router.prefetch('/category')}
+            onFocus={() => router.prefetch('/category')}
+            className="mt-1 inline-flex items-center gap-0.5 rounded-full bg-white px-2 py-1 text-[9px] font-black text-[#0F6A5F] shadow-sm ring-1 ring-black/5"
+          >
+            View all <ChevronRight className="h-3 w-3" aria-hidden="true" />
+          </Link>
+        </div>
+
+        <Link
+          href="/primehubmall/salemela#bucket-wholesale"
+          prefetch={false}
+          onPointerDown={() => router.prefetch('/primehubmall/salemela#bucket-wholesale')}
+          aria-label="Open PrimeHubMall Wholesale Deals"
+          className="group flex flex-col items-center gap-1 text-center"
+        >
+          <span className="relative flex h-[60px] w-[60px] items-center justify-center overflow-hidden rounded-full border-[3px] border-[#F4C64A] bg-gradient-to-br from-[#1B9A89] via-[#0F6A5F] to-[#07453D] text-white shadow-[0_6px_16px_rgba(15,106,95,0.24)] transition-transform group-hover:scale-105 sm:h-[68px] sm:w-[68px]">
+            <span className="absolute inset-[3px] rounded-full border border-white/45" aria-hidden="true" />
+            <Package size={27} strokeWidth={2.25} aria-hidden="true" />
+          </span>
+          <span className="max-w-full text-[8px] font-black leading-tight text-[#0F6A5F] sm:text-[9px]">Wholesale</span>
         </Link>
       </div>
 
@@ -84,35 +97,16 @@ export default function CategorySwiper({
         {visible.map((category, index) => {
           const aboveTheFold = index < ABOVE_THE_FOLD_CATEGORY_IMAGES;
           const href = categoryHref(category);
-          const shortcut = CATEGORY_SHORTCUTS[href as keyof typeof CATEGORY_SHORTCUTS];
-          const ShortcutIcon = shortcut?.kind === 'sale' ? BadgePercent : Package;
           const image = normalizeImageUrl(category.iconUrl || category.imageUrl || '');
           return (
-            <div key={category.id} className="relative w-[92px] shrink-0 snap-start text-center lg:w-[78px]">
-              {shortcut ? (
-                <Link
-                  href={shortcut.href}
-                  prefetch={false}
-                  onPointerDown={() => router.prefetch(shortcut.href)}
-                  onFocus={() => router.prefetch(shortcut.href)}
-                  aria-label={shortcut.label}
-                  className={
-                    shortcut.kind === 'sale'
-                      ? "absolute right-0 top-0 z-10 flex h-7 w-7 -translate-y-1/4 translate-x-1/4 items-center justify-center rounded-full border-2 border-white bg-[#E1352B] text-white shadow-md transition-transform hover:scale-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#E1352B]"
-                      : "absolute right-0 top-0 z-10 flex h-7 w-7 -translate-y-1/4 translate-x-1/4 items-center justify-center rounded-full border-2 border-white bg-[#0F6A5F] text-white shadow-md transition-transform hover:scale-105 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0F6A5F]"
-                  }
-                >
-                  <ShortcutIcon size={14} strokeWidth={2.6} aria-hidden="true" />
-                  <span className="sr-only">{shortcut.label}</span>
-                </Link>
-              ) : null}
-              <Link
-                href={href}
-                prefetch={false}
-                onPointerDown={() => router.prefetch(href)}
-                onFocus={() => router.prefetch(href)}
-                className="group block text-center"
-              >
+            <Link
+              key={category.id}
+              href={href}
+              prefetch={false}
+              onPointerDown={() => router.prefetch(href)}
+              onFocus={() => router.prefetch(href)}
+              className="group w-[92px] shrink-0 snap-start text-center lg:w-[78px]"
+            >
                 <span className="relative mx-auto flex h-20 w-20 items-center justify-center overflow-hidden rounded-full bg-[#F4F4F1] ring-1 ring-black/5 lg:h-[68px] lg:w-[68px]">
                   {image ? (
                     <Image
@@ -131,8 +125,7 @@ export default function CategorySwiper({
                   )}
                 </span>
                 <span className="mt-2 block truncate text-center text-[10px] font-black text-[#14140F]">{category.title}</span>
-              </Link>
-            </div>
+            </Link>
           );
         })}
       </div>
