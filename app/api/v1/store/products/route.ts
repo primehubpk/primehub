@@ -30,8 +30,8 @@ export async function POST(request: Request) {
     const body = await request.json();
     const input = validateProductInput(body);
     const result = await upsertProduct(input);
-    revalidateTag('public-catalog', 'max');
-    revalidateTag('public-products', 'max');
+    revalidateTag('public-catalog', { expire: 0 });
+    revalidateTag('public-products', { expire: 0 });
     revalidateTag('products', 'max');
     revalidatePath('/');
     revalidatePath('/shop');

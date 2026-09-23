@@ -1,3 +1,5 @@
+import { invalidatePublicStorefront } from './storefrontClient';
+
 export const CATALOG_REFRESH_EVENT = 'primehub:catalog-updated';
 
 export type CatalogRefreshDetail = {
@@ -9,6 +11,8 @@ export type CatalogRefreshDetail = {
 
 export function notifyCatalogUpdated(detail: CatalogRefreshDetail) {
   if (typeof window === 'undefined') return;
+
+  invalidatePublicStorefront();
 
   window.dispatchEvent(new CustomEvent(CATALOG_REFRESH_EVENT, { detail }));
 

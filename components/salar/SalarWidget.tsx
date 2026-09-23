@@ -1,5 +1,6 @@
 'use client';
 
+import { fetchPublicStorefront } from '@/lib/storefrontClient';
 import { FormEvent, PointerEvent as ReactPointerEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { Bot, Check, Forward, ImagePlus, Maximize2, Menu, Minus, Minimize2, Pencil, Plus, RotateCcw, Send, ShoppingCart, X, ZoomIn, ZoomOut } from 'lucide-react';
 import { usePathname } from 'next/navigation';
@@ -322,7 +323,7 @@ function cleanWhatsAppNumber(value: unknown) {
 
 async function adminWhatsAppNumber() {
   try {
-    const response = await fetch('/api/storefront/read?type=settings', { cache: 'no-store' });
+    const response = await fetchPublicStorefront('settings');
     if (!response.ok) return '';
     const payload = await response.json();
     for (const data of [payload?.documents?.main || {}, payload?.documents?.contact || {}]) {

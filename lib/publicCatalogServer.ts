@@ -1,6 +1,6 @@
 import 'server-only';
 import { unstable_cache } from 'next/cache';
-import { getDualCatalog, getDualProduct, getDualStorefrontSettings, getDualSkills } from '@/lib/dualReadServer';
+import { getDualCatalog, getDualCategories, getDualProduct, getDualStorefrontSettings, getDualSkills } from '@/lib/dualReadServer';
 import { getStorefrontSettingsWithBigDealRecovery } from '@/lib/storefrontSettingsServer';
 import { getCachedWholesaleVideosSnapshot } from '@/lib/wholesaleVideosServer';
 
@@ -78,6 +78,15 @@ export const getPublicCatalogSnapshot = unstable_cache(
   { revalidate: 600, tags: ['public-catalog'] },
 );
 
+export const getPublicCategoriesSnapshot = unstable_cache(
+  () => getDualCategories(CATALOG_READ_CACHE).then((result) => {
+    if (result.source === 'empty') throw new Error('Public categories unavailable.');
+    return result;
+  }),
+  ['primehub-public-categories-v1'],
+  { revalidate: 600, tags: ['public-catalog'] },
+);
+
 const CATALOG_SEED_HEAVY_FIELDS = new Set([
   'description',
   'variantMatrix',
@@ -131,7 +140,7 @@ async function loadPublicProduct(productId: string) {
 export const getPublicProductSnapshot = unstable_cache(
   loadPublicProduct,
   ['primehub-public-product-dual-v2'],
-  { revalidate: 60, tags: ['public-products'] },
+  { revalidate: 300, tags: ['public-products'] },
 );
 
 export async function getFreshPublicProductSnapshot(productId: string) {
@@ -156,20 +165,22 @@ async function loadStorefrontSettingsResult() {
 export const getStorefrontSettingsResultSnapshot = unstable_cache(
   loadStorefrontSettingsResult,
   ['primehub-storefront-settings-dual-v5'],
-  { revalidate: 60, tags: ['storefront-settings'] },
+  { revalidate: 300, tags: ['storefront-settings'] },
 );
 
 // The app-wide settings provider refreshes while a customer keeps a tab open.
-// Share one 60-second server snapshot so those refreshes do not repeat Supabase
+// Share one five-minute server snapshot so those refreshes do not repeat Supabase
 // and Firebase recovery reads for every browser tab.
 async function loadPublicStorefrontSettingsDocumentsSnapshot() {
-  return getFreshStorefrontSettingsDocumentsSnapshot();
+  const result = await getStorefrontSettingsResultSnapshot();
+  const main = await mergeFreshStorefrontSettings(result);
+  return { ...result.documents, main };
 }
 
 export const getPublicStorefrontSettingsDocumentsSnapshot = unstable_cache(
   loadPublicStorefrontSettingsDocumentsSnapshot,
   ['primehub-public-storefront-settings-documents-v1'],
-  { revalidate: 60, tags: ['storefront-settings', 'wholesale-videos'] },
+  { revalidate: 300, tags: ['storefront-settings', 'wholesale-videos'] },
 );
 
 export async function getStorefrontSettingsSnapshot() {

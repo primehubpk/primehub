@@ -1,4 +1,5 @@
 'use client';
+import { fetchPublicStorefront } from '@/lib/storefrontClient';
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { BASE_DELIVERY_CHARGE } from '@/lib/deliveryCharges';
 import { auth } from '@/lib/firebase';
@@ -35,7 +36,7 @@ export async function getAuthoritativeQuote(items: any[], selfCollect = false) {
 }
 function cleanWhatsAppNumber(value: any) { return String(value || '').replace(/[^0-9]/g, ''); }
 function variantText(variant: any) { const color = String(variant?.color ?? '').trim(), size = String(variant?.size ?? '').trim(); if (!color && !size) return 'Variant: Standard'; return `Variant: ${[color && `Color: ${color}`, size && `Size: ${size}`].filter(Boolean).join(', ')}`; }
-async function getAdminWhatsAppNumber() { try { const response = await fetch('/api/storefront/read?type=settings', { cache: 'no-store' }); if (!response.ok) throw new Error(`settings read ${response.status}`); const payload = await response.json(); for (const data of [payload?.documents?.main || {}, payload?.documents?.contact || {}]) { const number = data.adminWhatsappNumber ?? data.whatsappNumber ?? data.whatsapp ?? data.whatsappPhone ?? data.phone ?? data.contact?.adminWhatsappNumber ?? data.contact?.whatsappNumber ?? data.contact?.whatsapp ?? data.contact?.phone; const cleaned = cleanWhatsAppNumber(number); if (cleaned) return cleaned; } } catch (error) { console.warn('[whatsapp-checkout] Storefront settings lookup failed', error); } throw new Error('Admin WhatsApp number is not configured.'); }
+async function getAdminWhatsAppNumber() { try { const response = await fetchPublicStorefront('settings'); if (!response.ok) throw new Error(`settings read ${response.status}`); const payload = await response.json(); for (const data of [payload?.documents?.main || {}, payload?.documents?.contact || {}]) { const number = data.adminWhatsappNumber ?? data.whatsappNumber ?? data.whatsapp ?? data.whatsappPhone ?? data.phone ?? data.contact?.adminWhatsappNumber ?? data.contact?.whatsappNumber ?? data.contact?.whatsapp ?? data.contact?.phone; const cleaned = cleanWhatsAppNumber(number); if (cleaned) return cleaned; } } catch (error) { console.warn('[whatsapp-checkout] Storefront settings lookup failed', error); } throw new Error('Admin WhatsApp number is not configured.'); }
 
 const REVIEW_ORDER_KEY = 'primehub_review_orders_v1';
 const ORDER_PROGRESS_KEY = 'primehub_reseller_order_progress_v1';

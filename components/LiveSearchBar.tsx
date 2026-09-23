@@ -1,5 +1,6 @@
 'use client';
 
+import { fetchPublicStorefront } from '@/lib/storefrontClient';
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Search } from 'lucide-react';
@@ -39,7 +40,7 @@ export default function LiveSearchBar({ value, onChange, className = '', placeho
       return;
     }
 
-    fetch('/api/storefront/read?type=catalog', { cache: 'no-store' })
+    fetchPublicStorefront('catalog')
       .then((response) => response.ok ? response.json() : null)
       .then((data) => {
         if (cancelled) return;

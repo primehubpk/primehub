@@ -1,5 +1,6 @@
 'use client';
 
+import { fetchPublicStorefront } from '@/lib/storefrontClient';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -87,7 +88,7 @@ export default function ProductRewardInfo({
   useEffect(() => {
     if (!lookupReady) return;
     let cancelled = false;
-    fetch('/api/storefront/read?type=rewards', { cache: 'no-store' })
+    fetchPublicStorefront('rewards')
       .then((response) => response.ok ? response.json() : null)
       .then((data) => {
         if (cancelled) return;

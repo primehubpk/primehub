@@ -2,7 +2,7 @@ import ProductDetailPageClient from '@/components/product-detail/ProductDetailPa
 import type { Product } from '@/components/product-detail/ProductDetailTypes';
 import { getPublicProductSnapshot } from '@/lib/publicCatalogServer';
 
-export const revalidate = 60;
+export const revalidate = 300;
 
 export default async function ProductDetailPage(
   props: {

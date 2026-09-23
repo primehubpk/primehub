@@ -1,5 +1,6 @@
 'use client';
 
+import { fetchPublicStorefront } from '@/lib/storefrontClient';
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useSettings } from '@/lib/useSettings';
@@ -58,7 +59,7 @@ export function useShopCatalog(initialCategory?: string, initialQuery = '', init
 
     async function load() {
       try {
-        const response = await fetch('/api/storefront/read?type=catalog', { cache: 'no-store' });
+        const response = await fetchPublicStorefront('catalog');
         if (!response.ok) throw new Error(`catalog read ${response.status}`);
         const data = await response.json();
         if (cancelled) return;

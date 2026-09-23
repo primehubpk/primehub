@@ -1,5 +1,6 @@
 "use client";
 
+import { fetchPublicStorefront } from '@/lib/storefrontClient';
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { MessageCircle, Play, PlayCircle, Sparkles } from "lucide-react";
@@ -158,7 +159,7 @@ export function HomePrimeSkills() {
     const loadSkills = () => {
       if (started) return;
       started = true;
-      fetch("/api/storefront/read?type=skills", { cache: "no-store" })
+      fetchPublicStorefront('skills')
         .then((response) => (response.ok ? response.json() : null))
         .then((data) => {
           if (!cancelled && Array.isArray(data?.skills) && data.skills.length) {

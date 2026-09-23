@@ -95,8 +95,8 @@ export function validateProductInput(body: unknown): ProductSyncInput {
 }
 
 function refreshProductCaches() {
-  revalidateTag('public-catalog', 'max');
-  revalidateTag('public-products', 'max');
+  revalidateTag('public-catalog', { expire: 0 });
+  revalidateTag('public-products', { expire: 0 });
   revalidateTag('salaar-catalog', 'max');
   revalidateTag('salaar-store-knowledge', 'max');
 }

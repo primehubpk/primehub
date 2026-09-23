@@ -19,11 +19,11 @@ export async function POST(request: Request) {
     return unauthorized();
   }
 
-  revalidateTag('public-catalog', 'max');
-  revalidateTag('public-products', 'max');
+  revalidateTag('public-catalog', { expire: 0 });
+  revalidateTag('public-products', { expire: 0 });
   revalidateTag('products', 'max');
-  revalidateTag('storefront-settings', 'max');
-  revalidateTag('wholesale-videos', 'max');
+  revalidateTag('storefront-settings', { expire: 0 });
+  revalidateTag('wholesale-videos', { expire: 0 });
   revalidatePath('/');
   revalidatePath('/shop');
   revalidatePath('/primehubmall/salemela');
