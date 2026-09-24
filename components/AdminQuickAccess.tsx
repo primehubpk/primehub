@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { ShieldCheck } from 'lucide-react';
 
+const ADMIN_HINT_KEY = 'primehub-admin-session-hint-v1';
+
 export default function AdminQuickAccess() {
   const pathname = usePathname();
   const router = useRouter();
@@ -11,6 +13,22 @@ export default function AdminQuickAccess() {
   const [checking, setChecking] = useState(true);
 
   const checkSession = useCallback(async () => {
+    if (pathname.startsWith('/admin')) {
+      setChecking(false);
+      return;
+    }
+
+    let hasAdminHint = false;
+    try {
+      hasAdminHint = window.localStorage.getItem(ADMIN_HINT_KEY) === '1';
+    } catch {}
+
+    if (!hasAdminHint) {
+      setAuthenticated(false);
+      setChecking(false);
+      return;
+    }
+
     try {
       const response = await fetch('/api/admin/session', {
         cache: 'no-store',
@@ -19,13 +37,17 @@ export default function AdminQuickAccess() {
       const data = await response.json().catch(() => null);
       const active = response.ok && data?.authenticated === true;
       setAuthenticated(active);
-      if (active) router.prefetch('/admin');
+      if (active) {
+        router.prefetch('/admin');
+      } else {
+        try { window.localStorage.removeItem(ADMIN_HINT_KEY); } catch {}
+      }
     } catch {
       setAuthenticated(false);
     } finally {
       setChecking(false);
     }
-  }, [router]);
+  }, [pathname, router]);
 
   useEffect(() => {
     void checkSession();
