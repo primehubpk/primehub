@@ -496,9 +496,13 @@ export default function SalarWidget() {
     if (!chatId || syncingRef.current || sendingRef.current || document.visibilityState !== 'visible') return;
     syncingRef.current = true;
     try {
-      // Closed widgets only refresh shared settings, never customer history.
-      const url = open ? `/api/salar/chat?chatId=${encodeURIComponent(chatId)}` : '/api/salar/chat';
-      const response = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(10000) });
+      // Closed widgets only refresh a tiny shared status response; full customer
+      // history remains private/fresh and is fetched only while the chat is open.
+      const url = open ? `/api/salar/chat?chatId=${encodeURIComponent(chatId)}` : '/api/salar/status';
+      const response = await fetch(url, {
+        cache: open ? 'no-store' : 'default',
+        signal: AbortSignal.timeout(10000),
+      });
       const result = await response.json().catch(() => null);
       if (!response.ok || !result?.success) return;
       const nextEnabled = result.settings?.enabled !== false;
