@@ -47,6 +47,7 @@ function AdminPanel() {
 
   async function logout() {
     await fetch('/api/admin/session', { method: 'DELETE', cache: 'no-store' }).catch(() => undefined);
+    try { window.localStorage.removeItem('primehub-admin-session-hint-v1'); } catch {}
     await signOut(auth).catch(() => undefined);
     router.replace('/admin');
     router.refresh();
