@@ -178,7 +178,7 @@ function SalarIcon({ iconUrl, size = 19 }: { iconUrl: string; size?: number }) {
   if (!iconUrl || failed) return <Bot size={size}/>;
   return (
     <img
-      src={`/api/salar/image-proxy?url=${encodeURIComponent(iconUrl)}`}
+      src={iconUrl}
       alt=""
       aria-label="Salar"
       className="h-full w-full object-cover object-center"
