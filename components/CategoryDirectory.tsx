@@ -12,13 +12,22 @@ import type { Category } from '@/lib/types';
 
 type CacheProduct = { id?: unknown };
 
-export default function CategoryDirectory() {
+export default function CategoryDirectory({ initialCategories = [] }: { initialCategories?: Category[] }) {
   const router = useRouter();
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [categories, setCategories] = useState<Category[]>(initialCategories);
+  const [loading, setLoading] = useState(initialCategories.length === 0);
 
   useEffect(() => {
     let cancelled = false;
+
+    if (initialCategories.length) {
+      setCategories(initialCategories);
+      setLoading(false);
+      return () => {
+        cancelled = true;
+      };
+    }
+
     const cached = readCachedCatalog<CacheProduct, Category>();
 
     if (cached?.categories.length) {
@@ -48,7 +57,7 @@ export default function CategoryDirectory() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [initialCategories]);
 
   const visible = useMemo(
     () => [...categories]
