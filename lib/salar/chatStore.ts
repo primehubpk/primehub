@@ -81,6 +81,8 @@ export type SalarChatSummary = {
   imageUrl?: string;
 };
 
+type SalarStoredListSummary = Omit<SalarChatSummary, 'active'>;
+
 const ROW_PREFIX = 'salar_chat_';
 const MAX_MESSAGES = 100;
 const MAX_PRODUCTS_PER_MESSAGE = 600;
@@ -273,6 +275,60 @@ function normalizeContext(value: any): SalarStoredContext {
   };
 }
 
+function buildSalarChatListSummary(chat: SalarCustomerChat): SalarStoredListSummary {
+  const last = [...chat.messages].reverse().find((message) => message.content || message.imageUrl || message.products?.length);
+  const firstImage = [...chat.messages].reverse().map((message) => {
+    if (message.imageUrl) return message.imageUrl;
+    return message.products?.find((product) => product.imageUrl)?.imageUrl || '';
+  }).find(Boolean);
+  return {
+    id: chat.id,
+    customerId: chat.customerId,
+    customerName: chat.customerName,
+    customerEmail: chat.customerEmail,
+    createdAt: chat.createdAt,
+    updatedAt: chat.updatedAt,
+    salarPaused: chat.salarPaused,
+    lastPreview: last?.content || (last?.imageUrl ? 'Customer image' : last?.products?.length ? 'Product results' : ''),
+    lastActor: last?.actor || null,
+    messageCount: chat.messages.length,
+    ...(firstImage ? { imageUrl: firstImage } : {}),
+  };
+}
+
+function activeSummary(summary: SalarStoredListSummary, now = Date.now()): SalarChatSummary {
+  const updated = new Date(summary.updatedAt).getTime();
+  return {
+    ...summary,
+    active: Number.isFinite(updated) ? now - updated <= ACTIVE_WINDOW_MS : false,
+  };
+}
+
+function normalizeStoredListSummary(value: unknown, requestedId: string, fallbackUpdatedAt = ''): SalarStoredListSummary | null {
+  if (!value || typeof value !== 'object') return null;
+  const source = value as Record<string, unknown>;
+  const id = cleanChatId(source.id) || requestedId;
+  if (!id) return null;
+  const now = new Date().toISOString();
+  const imageUrl = safeHttpsUrl(source.imageUrl);
+  const actor = source.lastActor === 'customer' || source.lastActor === 'admin' || source.lastActor === 'salar'
+    ? source.lastActor
+    : null;
+  return {
+    id,
+    customerId: cleanText(source.customerId, 200) || undefined,
+    customerName: cleanText(source.customerName, 120) || undefined,
+    customerEmail: cleanText(source.customerEmail, 240) || undefined,
+    createdAt: iso(source.createdAt, now),
+    updatedAt: iso(source.updatedAt || fallbackUpdatedAt, now),
+    salarPaused: source.salarPaused === true,
+    lastPreview: cleanText(source.lastPreview, 500),
+    lastActor: actor,
+    messageCount: Math.max(0, Math.min(MAX_MESSAGES, Number(source.messageCount) || 0)),
+    ...(imageUrl ? { imageUrl } : {}),
+  };
+}
+
 function normalizeChat(payload: Record<string, any> | null, requestedId: string): SalarCustomerChat | null {
   if (!payload) return null;
   const id = cleanChatId(payload.id) || requestedId;
@@ -342,7 +398,12 @@ export async function saveSalarChat(chatInput: SalarCustomerChat) {
     updatedAt: new Date().toISOString(),
     messages: chat.messages.slice(-MAX_MESSAGES),
   };
-  const row = mapDocumentToSupabase('settings', rowId(chatId), next, 'supabase');
+  const row = mapDocumentToSupabase(
+    'settings',
+    rowId(chatId),
+    { ...next, _listSummary: buildSalarChatListSummary(next) },
+    'supabase',
+  );
   if (!row) throw new Error('Could not build Salar chat row.');
   await supabasePrimaryUpsert({ table: 'settings', row });
   rememberHotChat(next);
@@ -424,42 +485,67 @@ function supabaseConfig() {
 export async function listSalarChats(limit = 100): Promise<SalarChatSummary[]> {
   const { url, key, configured } = supabaseConfig();
   if (!configured) throw new Error('Supabase server credentials are not configured.');
+
+  const safeLimit = Math.max(1, Math.min(200, limit));
   const params = new URLSearchParams();
-  params.set('select', 'id,payload,updated_at');
+  // New/updated chat rows keep a compact list summary inside the payload. This
+  // avoids downloading full message histories and image/product arrays every
+  // time the admin chat list refreshes.
+  params.set('select', 'id,updated_at,list_summary:payload->_listSummary');
   params.set('id', `like.${ROW_PREFIX}*`);
   params.set('order', 'updated_at.desc');
-  params.set('limit', String(Math.max(1, Math.min(200, limit))));
+  params.set('limit', String(safeLimit));
+
   const response = await fetch(`${url}/rest/v1/settings?${params.toString()}`, {
     method: 'GET',
     headers: { apikey: key, Authorization: `Bearer ${key}` },
     cache: 'no-store',
   });
   if (!response.ok) throw new Error(`Salar chat list failed ${response.status}: ${await response.text()}`);
-  const rows = await response.json() as Array<{ id?: string; payload?: Record<string, any>; updated_at?: string }>;
+
+  const rows = await response.json() as Array<{
+    id?: string;
+    updated_at?: string;
+    list_summary?: SalarStoredListSummary | null;
+  }>;
   const now = Date.now();
-  return rows.map((row) => {
+  const summaries = new Map<string, SalarChatSummary>();
+  const legacyIds: string[] = [];
+
+  for (const row of rows) {
     const requestedId = String(row.id || '').startsWith(ROW_PREFIX) ? String(row.id).slice(ROW_PREFIX.length) : '';
-    const chat = normalizeChat(row.payload || null, requestedId);
-    if (!chat) return null;
-    const last = [...chat.messages].reverse().find((message) => message.content || message.imageUrl || message.products?.length);
-    const firstImage = [...chat.messages].reverse().map((message) => {
-      if (message.imageUrl) return message.imageUrl;
-      return message.products?.find((product) => product.imageUrl)?.imageUrl || '';
-    }).find(Boolean);
-    const updated = new Date(chat.updatedAt).getTime();
-    return {
-      id: chat.id,
-      customerId: chat.customerId,
-      customerName: chat.customerName,
-      customerEmail: chat.customerEmail,
-      createdAt: chat.createdAt,
-      updatedAt: chat.updatedAt,
-      active: Number.isFinite(updated) ? now - updated <= ACTIVE_WINDOW_MS : false,
-      salarPaused: chat.salarPaused,
-      lastPreview: last?.content || (last?.imageUrl ? 'Customer image' : last?.products?.length ? 'Product results' : ''),
-      lastActor: last?.actor || null,
-      messageCount: chat.messages.length,
-      ...(firstImage ? { imageUrl: firstImage } : {}),
-    } satisfies SalarChatSummary;
-  }).filter(Boolean) as SalarChatSummary[];
+    if (!requestedId) continue;
+    const summary = normalizeStoredListSummary(row.list_summary, requestedId, row.updated_at);
+    if (summary) summaries.set(requestedId, activeSummary(summary, now));
+    else legacyIds.push(String(row.id || ''));
+  }
+
+  // Compatibility path for old rows created before compact summaries existed.
+  // Only those rows fetch the full payload; opening a chat still fetches the
+  // complete history through getSalarChat as before.
+  if (legacyIds.length) {
+    const legacyParams = new URLSearchParams();
+    legacyParams.set('select', 'id,payload,updated_at');
+    legacyParams.set('id', `in.(${legacyIds.map((id) => `"${id.replace(/"/g, '')}"`).join(',')})`);
+    legacyParams.set('order', 'updated_at.desc');
+    const legacyResponse = await fetch(`${url}/rest/v1/settings?${legacyParams.toString()}`, {
+      method: 'GET',
+      headers: { apikey: key, Authorization: `Bearer ${key}` },
+      cache: 'no-store',
+    });
+    if (!legacyResponse.ok) throw new Error(`Salar legacy chat list failed ${legacyResponse.status}: ${await legacyResponse.text()}`);
+    const legacyRows = await legacyResponse.json() as Array<{ id?: string; payload?: Record<string, any> }>;
+    for (const row of legacyRows) {
+      const requestedId = String(row.id || '').startsWith(ROW_PREFIX) ? String(row.id).slice(ROW_PREFIX.length) : '';
+      const chat = normalizeChat(row.payload || null, requestedId);
+      if (chat) summaries.set(chat.id, activeSummary(buildSalarChatListSummary(chat), now));
+    }
+  }
+
+  return rows
+    .map((row) => {
+      const requestedId = String(row.id || '').startsWith(ROW_PREFIX) ? String(row.id).slice(ROW_PREFIX.length) : '';
+      return requestedId ? summaries.get(requestedId) || null : null;
+    })
+    .filter(Boolean) as SalarChatSummary[];
 }
