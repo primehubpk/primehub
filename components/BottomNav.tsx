@@ -93,7 +93,7 @@ export default function BottomNav() {
             <Link
               key={key}
               href={href}
-              prefetch={key === 'home' || key === 'shop'}
+              prefetch={key === 'home' || key === 'shop' || key === 'skills' || key === 'orders'}
               scroll
               aria-current={routeIsActive ? 'page' : undefined}
               aria-busy={isPending || undefined}
