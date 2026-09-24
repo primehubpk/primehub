@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { stripTypeScriptTypes } from 'node:module';
 import { test } from 'node:test';
 
-let code = await readFile(new URL('../app/api/storefront/read/route.ts', import.meta.url), 'utf8');
+let code = (await readFile(new URL('../app/api/storefront/read/route.ts', import.meta.url), 'utf8')).replace(/\r\n/g, '\n');
 code = code.replace(/import[\s\S]*?from ['"][^'"]+['"];\n/g, '');
 const mocks = `
 const NextResponse = { json: (body, init) => Response.json(body, init) };
