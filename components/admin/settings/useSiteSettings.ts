@@ -50,6 +50,13 @@ export default function useSiteSettings() {
         freeDeliveryThreshold: Number.isFinite(deliveryThreshold) ? deliveryThreshold : DEFAULT_SETTINGS.freeDeliveryThreshold,
         storePolicyInfo: typeof rawMain.storePolicyInfo === 'string' ? rawMain.storePolicyInfo : '',
         youtubeGuideUrl: typeof rawMain.youtubeGuideUrl === 'string' ? rawMain.youtubeGuideUrl : '',
+        youtubeGuideTitle: typeof rawMain.youtubeGuideTitle === 'string' && rawMain.youtubeGuideTitle.trim()
+          ? rawMain.youtubeGuideTitle
+          : DEFAULT_SETTINGS.youtubeGuideTitle,
+        youtubeGuidePreviewSeconds: Math.min(
+          30,
+          Math.max(1, Number(rawMain.youtubeGuidePreviewSeconds || DEFAULT_SETTINGS.youtubeGuidePreviewSeconds)),
+        ),
         resellerHomeEnabled: rawMain.resellerHomeEnabled !== false,
         priceBuckets: Array.isArray(rawMain.priceBuckets) && rawMain.priceBuckets.length ? rawMain.priceBuckets : DEFAULT_BUCKETS,
       });
@@ -78,6 +85,11 @@ export default function useSiteSettings() {
           announcementText: settings.announcementText.trim(),
           whatsappNumber,
           youtubeGuideUrl: settings.youtubeGuideUrl.trim(),
+          youtubeGuideTitle: settings.youtubeGuideTitle.trim(),
+          youtubeGuidePreviewSeconds: Math.min(
+            30,
+            Math.max(1, Number(settings.youtubeGuidePreviewSeconds || 5)),
+          ),
           resellerHomeEnabled: settings.resellerHomeEnabled,
           freeShippingCount: Number(settings.freeDeliveryThreshold || 0),
           freeDelivery: { enabled: true, itemThreshold: Number(settings.freeDeliveryThreshold || 0), message: 'Add {remaining} more item{plural} to unlock FREE DELIVERY', unlockedMessage: 'FREE DELIVERY UNLOCKED 🎉' },
@@ -95,7 +107,16 @@ export default function useSiteSettings() {
           physicalAddress: settings.physicalAddress.trim(),
         }),
       ]);
-      setSettings((current) => ({ ...current, whatsappNumber, youtubeGuideUrl: settings.youtubeGuideUrl.trim() }));
+      setSettings((current) => ({
+        ...current,
+        whatsappNumber,
+        youtubeGuideUrl: settings.youtubeGuideUrl.trim(),
+        youtubeGuideTitle: settings.youtubeGuideTitle.trim(),
+        youtubeGuidePreviewSeconds: Math.min(
+          30,
+          Math.max(1, Number(settings.youtubeGuidePreviewSeconds || 5)),
+        ),
+      }));
       setToast('Settings, contact and policies saved.');
     } catch {
       setToast('Unable to save settings.');

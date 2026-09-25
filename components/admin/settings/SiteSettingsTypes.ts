@@ -13,6 +13,8 @@ export type Settings = {
   freeDeliveryThreshold: number;
   storePolicyInfo: string;
   youtubeGuideUrl: string;
+  youtubeGuideTitle: string;
+  youtubeGuidePreviewSeconds: number;
   resellerHomeEnabled: boolean;
   priceBuckets: PriceBucket[];
 };
@@ -52,6 +54,8 @@ export const DEFAULT_SETTINGS: Settings = {
   freeDeliveryThreshold: 5,
   storePolicyInfo: '',
   youtubeGuideUrl: '',
+  youtubeGuideTitle: 'PrimeHubMall Se Order Kaise Karein?',
+  youtubeGuidePreviewSeconds: 5,
   resellerHomeEnabled: true,
   priceBuckets: DEFAULT_BUCKETS,
 };

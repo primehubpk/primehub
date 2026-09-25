@@ -7,6 +7,7 @@ import { signOut } from 'firebase/auth';
 import AdminAuthGuard from '@/components/AdminAuthGuard';
 import AdminHeader, { type AdminTab } from '@/components/admin/AdminHeader';
 import DashboardStats from '@/components/admin/DashboardStats';
+import VisitorStats from '@/components/admin/VisitorStats';
 import { adminCollection, type Order, type Product, type VendorRequest } from '@/components/admin/shared';
 import { auth } from '@/lib/firebase';
 
@@ -71,6 +72,7 @@ function AdminPanel() {
         stats={{ totalProducts: products.length, totalOrders: orders.length }}
       />
       <DashboardStats products={products} orders={orders} vendorRequests={vendorRequests} />
+      <VisitorStats />
     </main>
   );
 }

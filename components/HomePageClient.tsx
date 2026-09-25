@@ -20,6 +20,7 @@ import CategorySwiper from "@/components/CategorySwiper";
 import NewArrivalsRail from "@/components/NewArrivalsRail";
 import ProductGridRewards from "@/components/ProductGridRewards";
 import YouTubeGuide from "@/components/YouTubeGuide";
+import HomeGuideVideo from "@/components/home/HomeGuideVideo";
 import Footer from "@/components/Footer";
 import {
   cacheCatalogForNavigation,
@@ -180,11 +181,12 @@ export default function HomePageClient({
   return (
     <SettingsProvider initialSettings={initialSettings}>
       <div className="home-storefront" onClickCapture={handleStorefrontClickCapture}>
-        <Header />
+        <Header categories={categories} />
         <main className="home-content">
           <h1 className="sr-only">
             PrimeHubMall — Bangles, Jewellery &amp; Wholesale Deals
           </h1>
+          <HomeGuideVideo mode="intro" />
           <CategorySwiper initialCategories={categories} liveUpdates={false} />
           <HeroFlashBanner
             homeLayout

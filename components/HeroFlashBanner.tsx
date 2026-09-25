@@ -295,14 +295,14 @@ export default function HeroFlashBanner({ initialProducts = [], liveUpdates = tr
             <HomeHeading>PrimeHubMall Big Deal of the Day</HomeHeading>
             <div className="home-big-grid">
               <article className="home-big-card">
-                <Link className="home-big-image" href={bigDeal.productId ? `/product/${bigDeal.productId}` : "/deals/big"} prefetch={false}>
+                <Link className="home-big-image" href={bigDeal.productId ? `/product/${bigDeal.productId}?deal=big` : "/deals/big"} prefetch={false}>
                   {src && <Image src={src} alt={bigDeal.title} fill priority loading="eager" fetchPriority="high" unoptimized sizes="(max-width: 600px) 50vw, 600px" className="object-cover" />}
                   <span className="home-live">{live ? "● LIVE" : "SCHEDULED"}</span>
                   {stock > 0 && stock <= 10 ? <span className="home-urgency">Only {stock} left</span> : null}
                   <span className="home-big-seal">BIG<br />DEAL<small>OF THE DAY</small></span>
                 </Link>
                 <div className="home-big-info">
-                  <Link href={bigDeal.productId ? `/product/${bigDeal.productId}` : "/deals/big"} prefetch={false}>{bigDeal.title}</Link>
+                  <Link href={bigDeal.productId ? `/product/${bigDeal.productId}?deal=big` : "/deals/big"} prefetch={false}>{bigDeal.title}</Link>
                   <div className="home-big-prices">
                     <strong>Rs. {price.toLocaleString("en-PK")}</strong>
                     {regularPrice > price ? <s>Rs. {regularPrice.toLocaleString("en-PK")}</s> : null}
@@ -388,7 +388,7 @@ export default function HeroFlashBanner({ initialProducts = [], liveUpdates = tr
         const savedAmount = normalPrice > currentPrice ? normalPrice - currentPrice : 0;
         const stock = Number(productData?.stock ?? productData?.quantity ?? deal.stock ?? 0);
         const productImage = normalizeImageUrl(productData?.imageUrl || deal.imageUrl || "");
-        const productHref = deal.productId ? `/product/${deal.productId}` : "/deals/big";
+        const productHref = deal.productId ? `/product/${deal.productId}?deal=big` : "/deals/big";
         return (
           <section className="mx-4 mt-4 overflow-hidden rounded-[30px] border border-black/8 bg-white shadow-[0_20px_52px_rgba(20,20,15,0.12)]">
             <Link href={productHref} prefetch={false} aria-label={`View ${title}`} className="block">

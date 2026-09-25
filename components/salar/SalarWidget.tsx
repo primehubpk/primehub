@@ -74,6 +74,7 @@ type OrderQuote = {
 const STORAGE_KEY = 'primehub-salar-chat-v5';
 const LEGACY_STORAGE_KEYS = ['primehub-salar-chat-v4', 'primehub-salar-chat-v3'];
 const CHAT_ID_KEY = 'primehub-salar-chat-id-v1';
+const ADMIN_HINT_KEY = 'primehub-admin-session-hint-v1';
 const MAX_SAVED_MESSAGES = 100;
 const MAX_SAVED_PRODUCTS_PER_MESSAGE = 600;
 const PRODUCT_QUERY_STOP_WORDS = new Set([
@@ -435,10 +436,26 @@ export default function SalarWidget() {
 
   const refreshAdminSession = useCallback(async () => {
     if (isAdminRoute) return;
+
+    let hasAdminHint = false;
+    try {
+      hasAdminHint = window.localStorage.getItem(ADMIN_HINT_KEY) === '1';
+    } catch {}
+
+    if (!hasAdminHint) {
+      setAdminAuthenticated(false);
+      return;
+    }
+
     try {
       const response = await fetch('/api/admin/session', { credentials: 'same-origin', cache: 'no-store' });
       const result = await response.json().catch(() => null);
-      setAdminAuthenticated(result?.authenticated === true);
+      const active = result?.authenticated === true;
+      setAdminAuthenticated(active);
+
+      if (!active) {
+        try { window.localStorage.removeItem(ADMIN_HINT_KEY); } catch {}
+      }
     } catch {
       setAdminAuthenticated(false);
     }
@@ -1219,4 +1236,3 @@ export default function SalarWidget() {
     </div>
   );
 }
-
