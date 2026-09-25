@@ -1,5 +1,6 @@
 "use client";
 
+import { fetchPublicStorefront } from '@/lib/storefrontClient';
 import Link from "next/link";
 import Image from "next/image";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
@@ -202,10 +203,10 @@ export default function ProductGridRewards({
     async function loadPublicData() {
       try {
         const requests: Promise<Response>[] = [
-          fetch("/api/storefront/read?type=rewards", { cache: "no-store" }),
+          fetchPublicStorefront('rewards'),
         ];
         if (liveUpdates) {
-          requests.push(fetch("/api/storefront/read?type=catalog", { cache: "no-store" }));
+          requests.push(fetchPublicStorefront('catalog'));
         }
 
         const responses = await Promise.all(requests);

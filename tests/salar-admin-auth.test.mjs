@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import { readFile } from 'node:fs/promises';
 import { stripTypeScriptTypes } from 'node:module';
 
-const source = await readFile(new URL('../app/api/admin/salar/credentials/route.ts', import.meta.url), 'utf8');
+const source = (await readFile(new URL('../app/api/admin/salar/credentials/route.ts', import.meta.url), 'utf8')).replace(/\r\n/g, '\n');
 const adminSessionSource = await readFile(new URL('../lib/adminSession.ts', import.meta.url), 'utf8');
 
 let code = source.replace(/^import .*;\n/gm, '');

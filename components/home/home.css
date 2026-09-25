@@ -127,6 +127,8 @@
   width: min(340px, 90vw);
   height: 100dvh;
   max-height: 100dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 20px;
   border: 0;
   background: #fffcf7;

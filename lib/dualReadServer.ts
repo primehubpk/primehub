@@ -81,6 +81,10 @@ const SUPABASE_CATALOG_PRODUCT_SELECT = [
   'createdAt:payload->>createdAt',
   'updatedAt:payload->>updatedAt',
   'brand:payload->>brand',
+  'normalPrice:payload->normalPrice',
+  'dealPrice:payload->dealPrice',
+  'dealDay:payload->>dealDay',
+  'payloadCategoryId:payload->>categoryId',
 ].join(',');
 
 function envValue(...names: string[]) {
@@ -226,7 +230,7 @@ function catalogProductFromSupabase(row: any) {
     id: row.id,
     title: row.payloadTitle ?? row.title ?? row.payloadName ?? row.name,
     name: row.payloadName ?? row.name ?? row.payloadTitle ?? row.title,
-    categoryId: row.category_id,
+    categoryId: row.payloadCategoryId ?? row.category_id,
     category: row.payloadCategory ?? row.category,
     price: row.payloadPrice ?? row.price,
     originalPrice: row.payloadOriginalPrice ?? row.original_price,
@@ -248,6 +252,9 @@ function catalogProductFromSupabase(row: any) {
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
     brand: row.brand,
+    normalPrice: row.normalPrice,
+    dealPrice: row.dealPrice,
+    dealDay: row.dealDay,
   };
 }
 

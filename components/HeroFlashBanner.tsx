@@ -123,7 +123,7 @@ function bigDealSlotAt(deal: BigDealFields | undefined, index: number) {
 
 export default function HeroFlashBanner({ initialProducts = [], liveUpdates = true, homeLayout = false }: { initialProducts?: Product[]; liveUpdates?: boolean; homeLayout?: boolean }) {
   const { settings } = useSettings();
-  const [nowTick, setNowTick] = useState<number | null>(() => Date.now());
+  const [nowTick, setNowTick] = useState<number | null>(null);
   const [products, setProducts] = useState<Record<string, Product>>(() => productMap(initialProducts));
   const weeklyDeals = settings.weeklyDeals || [];
   const bigDeal = settings.dailyDeal as BigDealFields | undefined;
@@ -131,6 +131,7 @@ export default function HeroFlashBanner({ initialProducts = [], liveUpdates = tr
   const openVariantModal = useCartStore((state) => state.openVariantModal);
 
   useEffect(() => {
+    setNowTick(Date.now());
     const timer = window.setInterval(() => setNowTick(Date.now()), 1000);
     return () => window.clearInterval(timer);
   }, []);
@@ -170,7 +171,7 @@ export default function HeroFlashBanner({ initialProducts = [], liveUpdates = tr
     const normalPrice = Number(deal.normalPrice || deal.originalPrice || product?.normalPrice || product?.price || 0);
     const specialPrice = Number(deal.dealPrice || 0);
     const dealDay = deal.day ? `${deal.day.charAt(0).toUpperCase()}${deal.day.slice(1)}` : undefined;
-    const price = getEffectivePrice({ price: normalPrice, dealPrice: specialPrice, dealDay }, new Date(nowTick || Date.now()));
+    const price = getEffectivePrice({ price: normalPrice, dealPrice: specialPrice, dealDay }, new Date(nowTick ?? 0));
     const isLive = todayKey === deal.day && specialPrice > 0 && price === specialPrice;
     if (!deal.productId || price <= 0 || Number((product as ProductDealFields | undefined)?.stock ?? 1) <= 0) return;
     const image = normalizeImageUrl(product?.imageUrl || deal.imageUrl || "");
@@ -229,7 +230,7 @@ export default function HeroFlashBanner({ initialProducts = [], liveUpdates = tr
     const stock = Number(product?.stock ?? product?.quantity ?? bigDeal?.stock ?? 0);
     const src = normalizeImageUrl(bigDeal?.imageUrl || product?.imageUrl || "");
     const slotCount = bigDealConfiguredSlotCount(bigDeal);
-    const nextDeal = bigDealSlotAt(bigDeal, nextBigDealRotationIndex(bigDeal?.rotationStartedAt, new Date(nowTick || Date.now()), slotCount));
+    const nextDeal = bigDealSlotAt(bigDeal, nextBigDealRotationIndex(bigDeal?.rotationStartedAt, new Date(nowTick ?? 0), slotCount));
     const nextSrc = normalizeImageUrl(nextDeal?.imageUrl || "");
     const nextPrice = Number(nextDeal?.dealPrice || 0);
     const nextRegularPrice = Number(nextDeal?.originalPrice || nextPrice || 0);
@@ -294,14 +295,14 @@ export default function HeroFlashBanner({ initialProducts = [], liveUpdates = tr
             <HomeHeading>PrimeHubMall Big Deal of the Day</HomeHeading>
             <div className="home-big-grid">
               <article className="home-big-card">
-                <Link className="home-big-image" href={bigDeal.productId ? `/product/${bigDeal.productId}` : "/deals/big"} prefetch={false}>
+                <Link className="home-big-image" href={bigDeal.productId ? `/product/${bigDeal.productId}?deal=big` : "/deals/big"} prefetch={false}>
                   {src && <Image src={src} alt={bigDeal.title} fill priority loading="eager" fetchPriority="high" unoptimized sizes="(max-width: 600px) 50vw, 600px" className="object-cover" />}
                   <span className="home-live">{live ? "● LIVE" : "SCHEDULED"}</span>
                   {stock > 0 && stock <= 10 ? <span className="home-urgency">Only {stock} left</span> : null}
                   <span className="home-big-seal">BIG<br />DEAL<small>OF THE DAY</small></span>
                 </Link>
                 <div className="home-big-info">
-                  <Link href={bigDeal.productId ? `/product/${bigDeal.productId}` : "/deals/big"} prefetch={false}>{bigDeal.title}</Link>
+                  <Link href={bigDeal.productId ? `/product/${bigDeal.productId}?deal=big` : "/deals/big"} prefetch={false}>{bigDeal.title}</Link>
                   <div className="home-big-prices">
                     <strong>Rs. {price.toLocaleString("en-PK")}</strong>
                     {regularPrice > price ? <s>Rs. {regularPrice.toLocaleString("en-PK")}</s> : null}
@@ -387,7 +388,7 @@ export default function HeroFlashBanner({ initialProducts = [], liveUpdates = tr
         const savedAmount = normalPrice > currentPrice ? normalPrice - currentPrice : 0;
         const stock = Number(productData?.stock ?? productData?.quantity ?? deal.stock ?? 0);
         const productImage = normalizeImageUrl(productData?.imageUrl || deal.imageUrl || "");
-        const productHref = deal.productId ? `/product/${deal.productId}` : "/deals/big";
+        const productHref = deal.productId ? `/product/${deal.productId}?deal=big` : "/deals/big";
         return (
           <section className="mx-4 mt-4 overflow-hidden rounded-[30px] border border-black/8 bg-white shadow-[0_20px_52px_rgba(20,20,15,0.12)]">
             <Link href={productHref} prefetch={false} aria-label={`View ${title}`} className="block">

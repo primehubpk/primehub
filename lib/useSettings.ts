@@ -2,6 +2,8 @@
 // Shared storefront settings reader backed by one app-wide provider.
 'use client';
 
+import { fetchPublicStorefront, invalidatePublicStorefront } from '@/lib/storefrontClient';
+import { CATALOG_REFRESH_EVENT } from '@/lib/catalogRefreshSignal';
 import {
   createContext,
   createElement,
@@ -145,7 +147,7 @@ export function SettingsProvider({ initialSettings, children }: { initialSetting
 
     const request = (async () => {
       try {
-        const response = await fetch('/api/storefront/read?type=settings', { cache: 'no-store' });
+        const response = await fetchPublicStorefront('settings');
         if (!response.ok) throw new Error(`settings read ${response.status}`);
         const data = await response.json();
         const documents = data?.documents || {};
@@ -197,16 +199,34 @@ export function SettingsProvider({ initialSettings, children }: { initialSetting
       if (Date.now() - lastRefreshRef.current >= SETTINGS_REFRESH_INTERVAL_MS) void refreshSettings();
     };
 
+    const refreshAfterWrite = () => {
+      invalidatePublicStorefront('settings');
+      void refreshSettings();
+    };
+    const refreshFromStorage = (event: StorageEvent) => {
+      if (event.key === CATALOG_REFRESH_EVENT) refreshAfterWrite();
+    };
+    const channel = typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel(CATALOG_REFRESH_EVENT) : null;
+    if (channel) channel.onmessage = refreshAfterWrite;
+
     document.addEventListener('visibilitychange', refreshWhenVisible);
     window.addEventListener('focus', refreshOnFocus);
+    window.addEventListener(CATALOG_REFRESH_EVENT, refreshAfterWrite);
+    window.addEventListener('storage', refreshFromStorage);
     return () => {
       window.clearInterval(timer);
       document.removeEventListener('visibilitychange', refreshWhenVisible);
       window.removeEventListener('focus', refreshOnFocus);
+      window.removeEventListener(CATALOG_REFRESH_EVENT, refreshAfterWrite);
+      window.removeEventListener('storage', refreshFromStorage);
+      channel?.close();
     };
   }, [ownsNetworkRefresh, hasInitialSettings, refreshSettings]);
 
   const contextValue = useMemo<SettingsContextValue>(() => {
+    // Once the shared reader has current data, nested server-seeded providers
+    // must follow it; otherwise the homepage stays stuck on its original seed.
+    if (parent?.hasData) return parent;
     if (hasInitialSettings) return localValue;
     if (parent) return parent;
     return localValue;

@@ -1,5 +1,6 @@
 'use client';
 
+import { fetchPublicStorefront } from '@/lib/storefrontClient';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
@@ -11,13 +12,22 @@ import type { Category } from '@/lib/types';
 
 type CacheProduct = { id?: unknown };
 
-export default function CategoryDirectory() {
+export default function CategoryDirectory({ initialCategories = [] }: { initialCategories?: Category[] }) {
   const router = useRouter();
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [categories, setCategories] = useState<Category[]>(initialCategories);
+  const [loading, setLoading] = useState(initialCategories.length === 0);
 
   useEffect(() => {
     let cancelled = false;
+
+    if (initialCategories.length) {
+      setCategories(initialCategories);
+      setLoading(false);
+      return () => {
+        cancelled = true;
+      };
+    }
+
     const cached = readCachedCatalog<CacheProduct, Category>();
 
     if (cached?.categories.length) {
@@ -27,7 +37,7 @@ export default function CategoryDirectory() {
 
     async function refreshCatalog() {
       try {
-        const response = await fetch('/api/storefront/read?type=catalog', { cache: 'no-store' });
+        const response = await fetchPublicStorefront('categories');
         if (!response.ok) throw new Error(`catalog read ${response.status}`);
         const data = await response.json();
         if (cancelled) return;
@@ -47,7 +57,7 @@ export default function CategoryDirectory() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [initialCategories]);
 
   const visible = useMemo(
     () => [...categories]
@@ -55,23 +65,6 @@ export default function CategoryDirectory() {
       .sort((a, b) => Number(a.sortOrder ?? 999) - Number(b.sortOrder ?? 999) || a.title.localeCompare(b.title)),
     [categories],
   );
-
-  useEffect(() => {
-    if (!visible.length) return;
-    const warm = () => visible.slice(0, 12).forEach((category) => router.prefetch(categoryHref(category)));
-    const browser = window as Window & {
-      requestIdleCallback?: (callback: () => void, options?: { timeout?: number }) => number;
-      cancelIdleCallback?: (handle: number) => void;
-    };
-
-    if (browser.requestIdleCallback) {
-      const id = browser.requestIdleCallback(warm, { timeout: 900 });
-      return () => browser.cancelIdleCallback?.(id);
-    }
-
-    const timer = window.setTimeout(warm, 150);
-    return () => window.clearTimeout(timer);
-  }, [router, visible]);
 
   return (
     <main className="min-h-screen bg-[#F4F4F1] px-4 pb-28 pt-5 md:px-6">
@@ -108,7 +101,7 @@ export default function CategoryDirectory() {
                 <Link
                   key={category.id}
                   href={href}
-                  prefetch
+                  prefetch={false}
                   onPointerEnter={() => router.prefetch(href)}
                   onPointerDown={() => router.prefetch(href)}
                   onFocus={() => router.prefetch(href)}

@@ -1,5 +1,6 @@
 'use client';
 
+import { fetchPublicStorefront } from '@/lib/storefrontClient';
 import { FormEvent, PointerEvent as ReactPointerEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { Bot, Check, Forward, ImagePlus, Maximize2, Menu, Minus, Minimize2, Pencil, Plus, RotateCcw, Send, ShoppingCart, X, ZoomIn, ZoomOut } from 'lucide-react';
 import { usePathname } from 'next/navigation';
@@ -73,6 +74,7 @@ type OrderQuote = {
 const STORAGE_KEY = 'primehub-salar-chat-v5';
 const LEGACY_STORAGE_KEYS = ['primehub-salar-chat-v4', 'primehub-salar-chat-v3'];
 const CHAT_ID_KEY = 'primehub-salar-chat-id-v1';
+const ADMIN_HINT_KEY = 'primehub-admin-session-hint-v1';
 const MAX_SAVED_MESSAGES = 100;
 const MAX_SAVED_PRODUCTS_PER_MESSAGE = 600;
 const PRODUCT_QUERY_STOP_WORDS = new Set([
@@ -177,7 +179,7 @@ function SalarIcon({ iconUrl, size = 19 }: { iconUrl: string; size?: number }) {
   if (!iconUrl || failed) return <Bot size={size}/>;
   return (
     <img
-      src={`/api/salar/image-proxy?url=${encodeURIComponent(iconUrl)}`}
+      src={iconUrl}
       alt=""
       aria-label="Salar"
       className="h-full w-full object-cover object-center"
@@ -322,7 +324,7 @@ function cleanWhatsAppNumber(value: unknown) {
 
 async function adminWhatsAppNumber() {
   try {
-    const response = await fetch('/api/storefront/read?type=settings', { cache: 'no-store' });
+    const response = await fetchPublicStorefront('settings');
     if (!response.ok) return '';
     const payload = await response.json();
     for (const data of [payload?.documents?.main || {}, payload?.documents?.contact || {}]) {
@@ -434,10 +436,26 @@ export default function SalarWidget() {
 
   const refreshAdminSession = useCallback(async () => {
     if (isAdminRoute) return;
+
+    let hasAdminHint = false;
+    try {
+      hasAdminHint = window.localStorage.getItem(ADMIN_HINT_KEY) === '1';
+    } catch {}
+
+    if (!hasAdminHint) {
+      setAdminAuthenticated(false);
+      return;
+    }
+
     try {
       const response = await fetch('/api/admin/session', { credentials: 'same-origin', cache: 'no-store' });
       const result = await response.json().catch(() => null);
-      setAdminAuthenticated(result?.authenticated === true);
+      const active = result?.authenticated === true;
+      setAdminAuthenticated(active);
+
+      if (!active) {
+        try { window.localStorage.removeItem(ADMIN_HINT_KEY); } catch {}
+      }
     } catch {
       setAdminAuthenticated(false);
     }
@@ -495,9 +513,13 @@ export default function SalarWidget() {
     if (!chatId || syncingRef.current || sendingRef.current || document.visibilityState !== 'visible') return;
     syncingRef.current = true;
     try {
-      // Closed widgets only refresh shared settings, never customer history.
-      const url = open ? `/api/salar/chat?chatId=${encodeURIComponent(chatId)}` : '/api/salar/chat';
-      const response = await fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(10000) });
+      // Closed widgets only refresh a tiny shared status response; full customer
+      // history remains private/fresh and is fetched only while the chat is open.
+      const url = open ? `/api/salar/chat?chatId=${encodeURIComponent(chatId)}` : '/api/salar/status';
+      const response = await fetch(url, {
+        cache: open ? 'no-store' : 'default',
+        signal: AbortSignal.timeout(10000),
+      });
       const result = await response.json().catch(() => null);
       if (!response.ok || !result?.success) return;
       const nextEnabled = result.settings?.enabled !== false;
@@ -1214,4 +1236,3 @@ export default function SalarWidget() {
     </div>
   );
 }
-

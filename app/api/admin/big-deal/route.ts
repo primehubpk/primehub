@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { revalidateTag } from 'next/cache';
 import { FieldValue } from 'firebase-admin/firestore';
-import { getDualCatalog, getDualSettings } from '@/lib/dualReadServer';
+import { getDualCatalog, getDualStorefrontSettings } from '@/lib/dualReadServer';
 import { getAdminDb } from '@/lib/firebaseAdmin';
 import type { DailyDeal } from '@/lib/types';
 
@@ -205,7 +205,7 @@ async function firebaseBigDealCandidate() {
 export async function GET(request: Request) {
   if (!isAuthorized(request)) return NextResponse.json({ error: 'Authentication required.' }, { status: 401 });
 
-  const [settingsResult, catalogResult] = await Promise.all([getDualSettings(), getDualCatalog()]);
+  const [settingsResult, catalogResult] = await Promise.all([getDualStorefrontSettings(), getDualCatalog()]);
   const main = settingsResult.documents?.main && typeof settingsResult.documents.main === 'object'
     ? settingsResult.documents.main
     : {};
@@ -259,7 +259,7 @@ export async function POST(request: Request) {
     const validationError = validateDeal(dailyDeal);
     if (validationError) return NextResponse.json({ error: validationError }, { status: 400 });
 
-    const current = await getDualSettings();
+    const current = await getDualStorefrontSettings();
     const main = current.documents?.main && typeof current.documents.main === 'object' ? current.documents.main : {};
     const existing = normalizeDeal(main.bigDeal || main.dailyDeal || {});
     if (dailyDeal.active && !dailyDeal.rotationStartedAt) {
@@ -284,7 +284,7 @@ export async function POST(request: Request) {
         console.warn('Big Deal Firebase fallback mirror skipped', mirrorError);
         warning = 'Big Deal saved to Supabase primary. Firebase fallback mirror could not be refreshed.';
       }
-      revalidateTag('storefront-settings', 'max');
+      revalidateTag('storefront-settings', { expire: 0 });
       revalidateTag('salaar-store-knowledge', 'max');
       return NextResponse.json({ success: true, source: 'supabase', dailyDeal, warning });
     }
@@ -299,7 +299,7 @@ export async function POST(request: Request) {
         { bigDeal: dailyDeal, dailyDeal: FieldValue.delete() },
         { merge: true },
       );
-      revalidateTag('storefront-settings', 'max');
+      revalidateTag('storefront-settings', { expire: 0 });
       return NextResponse.json({
         success: true,
         source: 'firebase-fallback',

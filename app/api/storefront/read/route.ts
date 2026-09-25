@@ -3,6 +3,8 @@ import { getConfiguredReadMode } from '@/lib/dualReadServer';
 import {
   compactPublicCatalogSnapshot,
   getPublicCatalogSnapshot,
+  getPublicCategoriesSnapshot,
+  getPublicProductSnapshot,
   getFreshPublicProductSnapshot,
   getPublicStorefrontSettingsDocumentsSnapshot,
   getPrimeSkillsSnapshot,
@@ -42,19 +44,25 @@ function requestedProductIds(url: URL) {
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const type = String(url.searchParams.get('type') || 'catalog');
+  const publicHeaders = url.searchParams.get('refresh') === '1' ? FRESH_BROWSER_HEADERS : PUBLIC_SHORT_CACHE_HEADERS;
+  const longPublicHeaders = url.searchParams.get('refresh') === '1' ? FRESH_BROWSER_HEADERS : PUBLIC_LONG_CACHE_HEADERS;
   try {
+    if (type === 'categories') {
+      const result = await getPublicCategoriesSnapshot();
+      return NextResponse.json(result, { headers: publicHeaders });
+    }
     if (type === 'settings') {
       const documents = await getPublicStorefrontSettingsDocumentsSnapshot();
       return NextResponse.json(
         { documents, source: 'cached-public', mode: getConfiguredReadMode() },
-        { headers: PUBLIC_SHORT_CACHE_HEADERS },
+        { headers: publicHeaders },
       );
     }
     if (type === 'skills') {
       const result = await getPrimeSkillsSnapshot();
       return NextResponse.json(
         { skills: result.skills, source: result.source, mode: getConfiguredReadMode() },
-        { headers: PUBLIC_LONG_CACHE_HEADERS },
+        { headers: longPublicHeaders },
       );
     }
     if (type === 'rewards') {
@@ -64,7 +72,7 @@ export async function GET(request: Request) {
       ]);
       return NextResponse.json(
         { gifts, settings, source: 'supabase-cache', mode: getConfiguredReadMode() },
-        { headers: PUBLIC_LONG_CACHE_HEADERS },
+        { headers: longPublicHeaders },
       );
     }
     if (type === 'products') {
@@ -72,13 +80,13 @@ export async function GET(request: Request) {
       if (ids.length === 0) {
         return NextResponse.json({ error: 'At least one product id is required.' }, { status: 400 });
       }
-      const results = await Promise.all(ids.map((id) => getFreshPublicProductSnapshot(id)));
+      const results = await Promise.all(ids.map((id) => getPublicProductSnapshot(id)));
       const products = results
         .map((result) => result.product)
         .filter((product) => Boolean(product));
       return NextResponse.json(
-        { products, source: 'fresh', mode: getConfiguredReadMode() },
-        { headers: FRESH_BROWSER_HEADERS },
+        { products, source: 'cached-public', mode: getConfiguredReadMode() },
+        { headers: publicHeaders },
       );
     }
     if (type === 'product') {
@@ -98,6 +106,9 @@ export async function GET(request: Request) {
         { headers: FRESH_BROWSER_HEADERS },
       );
     }
+    if (type !== 'catalog') {
+      return NextResponse.json({ error: 'Unknown storefront read type.' }, { status: 400, headers: FRESH_BROWSER_HEADERS });
+    }
     // Browser requests stay no-store, but the server-side catalog read is shared
     // through the tagged cache. Admin/product writes invalidate that tag, so open
     // storefronts still see updates on their existing refresh cycle without every
@@ -105,7 +116,7 @@ export async function GET(request: Request) {
     const result = compactPublicCatalogSnapshot(await getPublicCatalogSnapshot());
     return NextResponse.json(
       { ...result, mode: getConfiguredReadMode() },
-      { headers: PUBLIC_SHORT_CACHE_HEADERS },
+      { headers: publicHeaders },
     );
   } catch (error) {
     console.error('storefront dual read failed', error);

@@ -1,7 +1,7 @@
 'use client';
 
 import SalarProviderSelector from '@/components/salar/SalarProviderSelector';
-import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, Ban, Bot, PauseCircle, PlayCircle, RefreshCw, Send, Trash2, Unlock, X } from 'lucide-react';
 
 type ChatSummary = {
@@ -64,8 +64,12 @@ export default function SalarAdminDrawer({ open, onClose }: Props) {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [bulkDeleting, setBulkDeleting] = useState(false);
   const [error, setError] = useState('');
+  const listPending = useRef(false);
+  const detailPending = useRef(new Set<string>());
 
   const loadList = useCallback(async (quiet = false) => {
+    if (listPending.current) return;
+    listPending.current = true;
     if (!quiet) setLoading(true);
     setError('');
     try {
@@ -76,12 +80,14 @@ export default function SalarAdminDrawer({ open, onClose }: Props) {
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Chats could not load.');
     } finally {
+      listPending.current = false;
       if (!quiet) setLoading(false);
     }
   }, []);
 
   const loadDetail = useCallback(async (chatId: string, quiet = false) => {
-    if (!chatId) return;
+    if (!chatId || detailPending.current.has(chatId)) return;
+    detailPending.current.add(chatId);
     if (!quiet) setLoading(true);
     setError('');
     try {
@@ -92,6 +98,7 @@ export default function SalarAdminDrawer({ open, onClose }: Props) {
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Chat could not load.');
     } finally {
+      detailPending.current.delete(chatId);
       if (!quiet) setLoading(false);
     }
   }, []);
@@ -100,15 +107,18 @@ export default function SalarAdminDrawer({ open, onClose }: Props) {
     if (!open) return;
     void loadList();
     const timer = window.setInterval(() => {
-      void loadList(true);
-      if (selectedId) void loadDetail(selectedId, true);
-    }, 5000);
+      if (document.visibilityState === 'visible') void loadList(true);
+    }, 30_000);
     return () => window.clearInterval(timer);
-  }, [open, selectedId, loadList, loadDetail]);
+  }, [open, loadList]);
 
   useEffect(() => {
     if (!open || !selectedId) return;
     void loadDetail(selectedId);
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === 'visible') void loadDetail(selectedId, true);
+    }, 5000);
+    return () => window.clearInterval(timer);
   }, [open, selectedId, loadDetail]);
 
   const visibleChats = useMemo(() => chats.filter((chat) => {
@@ -395,4 +405,3 @@ export default function SalarAdminDrawer({ open, onClose }: Props) {
     </div>
   );
 }
-

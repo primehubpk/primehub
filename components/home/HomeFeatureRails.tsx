@@ -1,5 +1,6 @@
 "use client";
 
+import { fetchPublicStorefront } from '@/lib/storefrontClient';
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -656,7 +657,7 @@ export function HomeWholesaleVideos() {
 export function HomePrimeSkills() {
   const [items, setItems] = useState(PRIME_SKILLS_SEED);
   useEffect(() => {
-    fetch("/api/storefront/read?type=skills", { cache: "no-store" })
+    fetchPublicStorefront('skills')
       .then((response) => (response.ok ? response.json() : null))
       .then((data) => {
         if (Array.isArray(data?.skills) && data.skills.length)

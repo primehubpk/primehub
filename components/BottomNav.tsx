@@ -57,36 +57,10 @@ export default function BottomNav() {
   const [resellerUser, setResellerUser] = useState<User | null>(() => auth.currentUser);
   const [authResolved, setAuthResolved] = useState(() => Boolean(auth.currentUser));
 
-  useEffect(() => {
-    router.prefetch(RESELLER_JOIN);
-    router.prefetch(RESELLER_DASHBOARD);
-    return onAuthStateChanged(auth, user => {
-      setResellerUser(user);
-      setAuthResolved(true);
-      router.prefetch(user ? RESELLER_DASHBOARD : RESELLER_JOIN);
-    });
-  }, [router]);
-
-  useEffect(() => {
-    const hrefs = [
-      ...NAV_ITEMS.map(({ href }) => href),
-      RESELLER_JOIN,
-      RESELLER_DASHBOARD,
-    ].filter((href, index, list) => href !== pathname && list.indexOf(href) === index);
-    const warmRoutes = () => hrefs.forEach((href) => router.prefetch(href));
-    const browser = window as Window & {
-      requestIdleCallback?: (callback: () => void, options?: { timeout?: number }) => number;
-      cancelIdleCallback?: (handle: number) => void;
-    };
-
-    if (browser.requestIdleCallback) {
-      const idleId = browser.requestIdleCallback(warmRoutes, { timeout: 1200 });
-      return () => browser.cancelIdleCallback?.(idleId);
-    }
-
-    const timer = window.setTimeout(warmRoutes, 250);
-    return () => window.clearTimeout(timer);
-  }, [pathname, router]);
+  useEffect(() => onAuthStateChanged(auth, user => {
+    setResellerUser(user);
+    setAuthResolved(true);
+  }), []);
 
   useEffect(() => {
     setPendingHref(null);
@@ -119,7 +93,7 @@ export default function BottomNav() {
             <Link
               key={key}
               href={href}
-              prefetch
+              prefetch={key === 'home' || key === 'shop' || key === 'skills' || key === 'orders'}
               scroll
               aria-current={routeIsActive ? 'page' : undefined}
               aria-busy={isPending || undefined}

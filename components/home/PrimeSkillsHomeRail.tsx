@@ -1,5 +1,6 @@
 'use client';
 
+import { fetchPublicStorefront } from '@/lib/storefrontClient';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -25,7 +26,7 @@ export default function PrimeSkillsHomeRail() {
     const load = () => {
       if (started) return;
       started = true;
-      fetch('/api/storefront/read?type=skills', { cache: 'no-store' })
+      fetchPublicStorefront('skills')
         .then((response) => response.ok ? response.json() : null)
         .then((data) => {
           if (!cancelled && Array.isArray(data?.skills) && data.skills.length) {

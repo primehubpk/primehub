@@ -37,16 +37,16 @@ function hasProductIdentity(value: Record<string, any>) {
 
 function refreshCachesForCollection(name: string) {
   if (name === 'products' || name === 'categories') {
-    revalidateTag('public-catalog', 'max');
+    revalidateTag('public-catalog', { expire: 0 });
     revalidateTag('salaar-catalog', 'max');
   }
-  if (name === 'products') revalidateTag('public-products', 'max');
+  if (name === 'products') revalidateTag('public-products', { expire: 0 });
   if (name === 'settings') {
-    revalidateTag('storefront-settings', 'max');
-    revalidateTag('prime-skills', 'max');
+    revalidateTag('storefront-settings', { expire: 0 });
+    revalidateTag('prime-skills', { expire: 0 });
   }
-  if (name === 'prime_skills') revalidateTag('prime-skills', 'max');
-  if (name === 'reward_gifts') revalidateTag('rewards', 'max');
+  if (name === 'prime_skills') revalidateTag('prime-skills', { expire: 0 });
+  if (name === 'reward_gifts') revalidateTag('rewards', { expire: 0 });
   if (name === 'settings' || name === 'categories' || name === 'prime_skills' || name === 'products') {
     revalidateTag('salaar-store-knowledge', 'max');
   }

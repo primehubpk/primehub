@@ -14,15 +14,18 @@ import {
   X,
 } from "lucide-react";
 import LiveSearchBar from "@/components/LiveSearchBar";
+import HomeGuideVideo from "@/components/home/HomeGuideVideo";
 import { useCartStore } from "@/lib/cartStore";
 import { useSettings } from "@/lib/useSettings";
 import { trackTikTokEvent } from "@/lib/tiktokPixel";
+import { categoryHref } from "@/lib/categoryUtils";
+import type { Category } from "@/lib/types";
 import {
   buildSmartSearchHref,
   interpretSearchQuery,
 } from "@/lib/aiSearchClient";
 
-export default function HomeHeader() {
+export default function HomeHeader({ categories = [] }: { categories?: Category[] }) {
   const { settings } = useSettings();
   const router = useRouter();
   const [query, setQuery] = useState("");
@@ -32,6 +35,13 @@ export default function HomeHeader() {
   const [count, setCount] = useState(0);
   const items = useCartStore((s) => s.items);
   const openDrawer = useCartStore((s) => s.openDrawer);
+  const menuCategories = [...categories]
+    .filter((category) => category.active !== false && String(category.title || "").trim())
+    .sort(
+      (a, b) =>
+        Number(a.sortOrder ?? 999) - Number(b.sortOrder ?? 999) ||
+        String(a.title || "").localeCompare(String(b.title || "")),
+    );
   useEffect(
     () => setCount(items.reduce((sum, item) => sum + item.qty, 0)),
     [items],
@@ -65,7 +75,7 @@ export default function HomeHeader() {
       <header className="home-header">
         <div className="home-header-row">
           <button
-            ref={menuButton}
+            ref={menuButton} id="primehub-menu-button"
             className="home-icon"
             aria-label="Open menu"
             onClick={() => menu.current?.showModal()}
@@ -121,8 +131,10 @@ export default function HomeHeader() {
           if (event.target === menu.current) menu.current.close();
         }}
       >
+        <HomeGuideVideo mode="menu" />
+
         <div className="home-menu-top">
-          <b>Explore PrimeHubMall</b>
+          <b>Shop by Category</b>
           <button
             className="home-icon"
             aria-label="Close menu"
@@ -131,18 +143,49 @@ export default function HomeHeader() {
             <X />
           </button>
         </div>
+
         <nav aria-label="Main menu">
+          {menuCategories.map((category) => {
+            const href = categoryHref(category);
+            return (
+              <Link
+                key={category.id || category.title}
+                href={href}
+                prefetch={false}
+                onClick={() => menu.current?.close()}
+              >
+                {category.title}
+              </Link>
+            );
+          })}
+
+          <Link
+            href="/category"
+            prefetch={false}
+            onClick={() => menu.current?.close()}
+          >
+            All Categories
+          </Link>
+
+          <p className="px-2 pb-2 pt-5 text-[10px] font-black uppercase tracking-[0.18em] text-black/45">
+            Explore PrimeHubMall
+          </p>
+
           {[
-            ["Shop all products", "/shop"],
             ["Weekly Deals", "/weekly-deals"],
+            ["Big Deal", "/deals/big"],
             ["New Arrivals", "/new-arrivals"],
+            ["Sale Mela", "/primehubmall/salemela"],
             ["Reseller Club", "/reseller"],
             ["Prime Skills", "/skills"],
-            ["My Orders", "/orders"],
-            ["Rewards", "/rewards"],
-            ["Contact us", "/contact"],
+            ["Shop", "/shop"],
           ].map(([label, href]) => (
-            <Link key={href} href={href} prefetch={false} onClick={() => menu.current?.close()}>
+            <Link
+              key={href}
+              href={href}
+              prefetch={false}
+              onClick={() => menu.current?.close()}
+            >
               {label}
             </Link>
           ))}

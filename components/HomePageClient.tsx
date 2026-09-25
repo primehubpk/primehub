@@ -20,6 +20,7 @@ import CategorySwiper from "@/components/CategorySwiper";
 import NewArrivalsRail from "@/components/NewArrivalsRail";
 import ProductGridRewards from "@/components/ProductGridRewards";
 import YouTubeGuide from "@/components/YouTubeGuide";
+import HomeGuideVideo from "@/components/home/HomeGuideVideo";
 import Footer from "@/components/Footer";
 import {
   cacheCatalogForNavigation,
@@ -33,6 +34,7 @@ import type {
 } from "@/lib/types";
 import type { Product } from "@/components/shop/ShopTypes";
 import { CATALOG_REFRESH_EVENT } from "@/lib/catalogRefreshSignal";
+import { fetchPublicStorefront, invalidatePublicStorefront } from "@/lib/storefrontClient";
 
 type Props = {
   initialProducts: Product[];
@@ -40,7 +42,7 @@ type Props = {
   initialSettings: Partial<SiteSettings>;
 };
 
-const RECOVERY_DELAYS_MS = [0, 350, 900];
+const RECOVERY_DELAYS_MS = [0];
 const BACKGROUND_REFRESH_INTERVAL_MS = 5 * 60_000;
 
 export default function HomePageClient({
@@ -74,10 +76,7 @@ export default function HomePageClient({
           if (cancelled) return;
 
           try {
-            const response = await fetch("/api/storefront/read?type=catalog", {
-              cache: "no-store",
-              headers: { "x-primehub-catalog-refresh": "1" },
-            });
+            const response = await fetchPublicStorefront('catalog');
             if (!response.ok) continue;
             const data = await response.json();
             const nextProducts = Array.isArray(data?.products)
@@ -115,9 +114,12 @@ export default function HomePageClient({
     const refreshWhenVisible = () => {
       if (document.visibilityState === "visible") void refreshCatalog();
     };
-    const refreshAfterAdminWrite = () => void refreshCatalog(true);
+    const refreshAfterAdminWrite = () => {
+      invalidatePublicStorefront('catalog');
+      void refreshCatalog(true);
+    };
     const refreshFromStorage = (event: StorageEvent) => {
-      if (event.key === CATALOG_REFRESH_EVENT) void refreshCatalog();
+      if (event.key === CATALOG_REFRESH_EVENT) refreshAfterAdminWrite();
     };
     const catalogChannel = typeof BroadcastChannel !== "undefined"
       ? new BroadcastChannel(CATALOG_REFRESH_EVENT)
@@ -179,11 +181,12 @@ export default function HomePageClient({
   return (
     <SettingsProvider initialSettings={initialSettings}>
       <div className="home-storefront" onClickCapture={handleStorefrontClickCapture}>
-        <Header />
+        <Header categories={categories} />
         <main className="home-content">
           <h1 className="sr-only">
             PrimeHubMall — Bangles, Jewellery &amp; Wholesale Deals
           </h1>
+          <HomeGuideVideo mode="intro" />
           <CategorySwiper initialCategories={categories} liveUpdates={false} />
           <HeroFlashBanner
             homeLayout

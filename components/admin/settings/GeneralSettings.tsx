@@ -5,7 +5,26 @@ export default function GeneralSettings({ settings, update }: { settings: Settin
   return <>
     <label className="block"><span className="text-xs font-bold">Top Announcement</span><textarea value={settings.announcementText} onChange={e=>update('announcementText',e.target.value)} rows={2} className="mt-1.5 w-full rounded-xl border border-black/15 px-3 py-2.5 text-sm"/></label>
     <label className="block"><span className="text-xs font-bold">WhatsApp Number</span><input value={settings.whatsappNumber} onChange={e=>update('whatsappNumber',e.target.value)} className="mt-1.5 w-full rounded-xl border border-black/15 px-3 py-2.5 text-sm"/></label>
-    <label className="block"><span className="text-xs font-bold">YouTube Guide URL</span><input type="url" placeholder="https://www.youtube.com/watch?v=..." value={settings.youtubeGuideUrl} onChange={e=>update('youtubeGuideUrl',e.target.value)} className="mt-1.5 w-full rounded-xl border border-black/15 px-3 py-2.5 text-sm" /></label>
+    <div className="rounded-2xl border border-black/10 bg-[#F8F7F3] p-4">
+      <p className="text-xs font-black">Homepage Opening Guide Video</p>
+      <p className="mt-1 text-[11px] text-black/50">The same guide stays at the bottom and also appears inside the 3-line menu.</p>
+
+      <label className="mt-3 block">
+        <span className="text-xs font-bold">YouTube Guide URL</span>
+        <input type="url" placeholder="https://www.youtube.com/watch?v=..." value={settings.youtubeGuideUrl} onChange={e=>update('youtubeGuideUrl',e.target.value)} className="mt-1.5 w-full rounded-xl border border-black/15 px-3 py-2.5 text-sm" />
+      </label>
+
+      <label className="mt-3 block">
+        <span className="text-xs font-bold">Opening Video Title</span>
+        <input value={settings.youtubeGuideTitle} onChange={e=>update('youtubeGuideTitle',e.target.value)} placeholder="PrimeHubMall Se Order Kaise Karein?" className="mt-1.5 w-full rounded-xl border border-black/15 px-3 py-2.5 text-sm" />
+      </label>
+
+      <label className="mt-3 block">
+        <span className="text-xs font-bold">Opening Preview Seconds</span>
+        <input type="number" min="1" max="30" value={settings.youtubeGuidePreviewSeconds} onChange={e=>update('youtubeGuidePreviewSeconds',Math.min(30,Math.max(1,Number(e.target.value)||5)))} className="mt-1.5 w-full rounded-xl border border-black/15 px-3 py-2.5 text-sm" />
+        <span className="mt-1 block text-[10px] text-black/45">Default 5 seconds. Allowed range: 1–30 seconds.</span>
+      </label>
+    </div>
     <label className="block"><span className="text-xs font-bold">Free Delivery Items</span><input type="number" min="0" value={settings.freeDeliveryThreshold} onChange={e=>update('freeDeliveryThreshold',Number(e.target.value))} className="mt-1.5 w-full rounded-xl border border-black/15 px-3 py-2.5 text-sm"/></label>
     <label className="flex items-center justify-between gap-4 rounded-xl border border-black/10 bg-white px-3 py-3">
       <span><span className="block text-xs font-bold">Show Reseller Club on Home</span><span className="mt-0.5 block text-[11px] text-black/55">One master switch. Home uses the same Reseller Club rewards, tiers, tasks, vouchers, wallet and gifts data.</span></span>

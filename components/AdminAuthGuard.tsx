@@ -6,6 +6,8 @@ import { Eye, EyeOff, LockKeyhole, LogOut, ShieldCheck } from 'lucide-react';
 
 type Props = { children: React.ReactNode };
 
+const ADMIN_HINT_KEY = 'primehub-admin-session-hint-v1';
+
 export default function AdminAuthGuard({ children }: Props) {
   const router = useRouter();
   const [checking, setChecking] = useState(true);
@@ -21,7 +23,12 @@ export default function AdminAuthGuard({ children }: Props) {
       .then((response) => response.json().catch(() => null))
       .then((data) => {
         if (!active) return;
-        setAuthenticated(data?.authenticated === true);
+        const activeSession = data?.authenticated === true;
+        setAuthenticated(activeSession);
+        try {
+          if (activeSession) window.localStorage.setItem(ADMIN_HINT_KEY, '1');
+          else window.localStorage.removeItem(ADMIN_HINT_KEY);
+        } catch {}
       })
       .catch(() => {
         if (active) setAuthenticated(false);
@@ -52,6 +59,7 @@ export default function AdminAuthGuard({ children }: Props) {
       }
 
       setAuthenticated(true);
+      try { window.localStorage.setItem(ADMIN_HINT_KEY, '1'); } catch {}
       setPassword('');
       router.replace('/admin');
       router.refresh();
@@ -69,6 +77,7 @@ export default function AdminAuthGuard({ children }: Props) {
       await fetch('/api/admin/session', { method: 'DELETE', cache: 'no-store', credentials: 'same-origin' }).catch(() => undefined);
     } finally {
       setAuthenticated(false);
+      try { window.localStorage.removeItem(ADMIN_HINT_KEY); } catch {}
       setPassword('');
       setBusy(false);
       router.replace('/admin');

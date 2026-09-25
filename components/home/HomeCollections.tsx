@@ -304,7 +304,7 @@ export default function HomeCollections({
                   )}
                 </span>
                 <span className="home-budget-label">
-                  {standalone && !wholesale ? saleMelaBucketLabel(amount) : bucket.title}
+                  {standalone && !wholesale ? saleMelaBucketLabel(amount) : !wholesale && amount === 99 ? "Rs. 99–298" : !wholesale && amount === 299 ? "Rs. 299–998" : !wholesale && amount === 999 ? "Rs. 999+" : bucket.title}
                 </span>
               </Link>
             );
@@ -360,7 +360,7 @@ export default function HomeCollections({
                   aria-label={`${bucket.title} products`}
                 >
                   {matches.length ? (
-                    (standalone ? matches : matches.slice(0, 12)).map((product) => (
+                    matches.map((product) => (
                       <div
                         key={product.id}
                         style={standalone ? {

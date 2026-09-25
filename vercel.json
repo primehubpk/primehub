@@ -5,6 +5,7 @@
   },
   "git": {
     "deploymentEnabled": {
+      "fix/primehubmall-egress-performance": false,
       "fix/weekly-deal-original-price": true,
       "feature/home-nav-instant-active-fix": false,
       "fix/mobile-nav-performance-audit": true,
