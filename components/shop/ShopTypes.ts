@@ -40,27 +40,32 @@ export function variantRowsOf(p: Product) {
 }
 
 export function productHasVariants(p: Product) {
-  return Boolean(
-    p.hasVariants === true ||
-    variantRowsOf(p).length > 0 ||
-    (Array.isArray(p.variantColors) && p.variantColors.length > 0) ||
-    (Array.isArray(p.variantSizes) && p.variantSizes.length > 0) ||
-    (Array.isArray(p.variantOptions) && p.variantOptions.length > 0) ||
-    (Array.isArray(p.colors) && p.colors.length > 0) ||
-    (Array.isArray(p.sizes) && p.sizes.length > 0),
-  );
+  return variantRowsOf(p).some((row) => {
+    if (!row || typeof row !== 'object') return false;
+    return row.active !== false && row.hidden !== true;
+  });
 }
 
 export function availableStockOf(p: Product) {
-  const rows = variantRowsOf(p);
-  const parentStock = Number(p.stock ?? p.quantity ?? 0);
+  const rawParentStock = p.stock ?? p.quantity;
+  const parentStock =
+    rawParentStock == null || rawParentStock === ''
+      ? 30
+      : Math.max(0, Number(rawParentStock) || 0);
+  const rows = variantRowsOf(p).filter(
+    (row) => row && row.active !== false && row.hidden !== true,
+  );
+
   if (rows.length) {
-    const explicit = rows.filter((row) => row?.stock != null && row.stock !== '');
-    if (explicit.length) {
-      return explicit.reduce((sum, row) => sum + Math.max(0, Number(row.stock || 0)), 0);
-    }
-    return parentStock > 0 ? parentStock : 1;
+    return rows.reduce((sum, row) => {
+      const raw = row.stock;
+      const resolved =
+        raw == null || raw === ''
+          ? parentStock
+          : Math.max(0, Number(raw) || 0);
+      return sum + resolved;
+    }, 0);
   }
-  if (productHasVariants(p) && parentStock <= 0) return 1;
+
   return parentStock;
 }
