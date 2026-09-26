@@ -539,6 +539,7 @@ function EditableProductRow({ product, draft, categories, priceBuckets, disabled
   const [replacingIndex, setReplacingIndex] = useState<number | null>(null);
   const [editingVariantIndex, setEditingVariantIndex] = useState<number | null>(null);
   const [showSizeAdder, setShowSizeAdder] = useState(false);
+  const [customSizeValue, setCustomSizeValue] = useState('');
   const [rowMessage, setRowMessage] = useState('');
   const hasLegacyCategory = Boolean(draft.category && !categories.some(category => category.id === draft.category));
   const inputClass = 'min-w-0 w-full rounded-xl bg-[#F4F4F1] px-2 py-2.5 text-[10px] outline-none focus:ring-2 focus:ring-[#0F6A5F]/20 disabled:opacity-50 sm:px-3 sm:text-xs';
@@ -683,6 +684,20 @@ function EditableProductRow({ product, draft, categories, priceBuckets, disabled
     setRowMessage(`${preset.label} added to ${additions.length} variant${additions.length === 1 ? '' : 's'}. Press Save to keep the change.`);
   }
 
+  function addCustomSize() {
+    const label = customSizeValue.trim();
+    if (!label) {
+      setRowMessage('Type a custom size / fit / pack first.');
+      return;
+    }
+
+    addSizePreset({
+      key: sizeKey(label),
+      label,
+    });
+    setCustomSizeValue('');
+  }
+
   return <article className="rounded-3xl border border-black/[.04] bg-white p-3 shadow-sm sm:p-4">
     <div className="flex items-start gap-3">
       <label className="min-w-0 flex-1">
@@ -751,6 +766,28 @@ function EditableProductRow({ product, draft, categories, priceBuckets, disabled
       {showSizeAdder && <div className="mt-3 rounded-xl border border-[#0F6A5F]/15 bg-white p-3">
         <p className="text-[9px] font-black text-[#0F6A5F]">Add size / fit / pack variants</p>
         <p className="mt-0.5 text-[8px] leading-4 text-black/45">Tap a size, adjustable fit or pack to add only missing rows for every current design/color. Existing variants are never removed here.</p>
+        <div className="mt-2 flex gap-2">
+          <input
+            value={customSizeValue}
+            disabled={disabled}
+            onChange={event => setCustomSizeValue(event.target.value)}
+            onKeyDown={event => {
+              if (event.key !== 'Enter') return;
+              event.preventDefault();
+              addCustomSize();
+            }}
+            placeholder="Custom size / fit / pack"
+            className="min-w-0 flex-1 rounded-xl bg-[#F4F4F1] px-3 py-2.5 text-[9px] font-bold outline-none focus:ring-2 focus:ring-[#0F6A5F]/20 disabled:opacity-50"
+          />
+          <button
+            type="button"
+            disabled={disabled || !customSizeValue.trim()}
+            onClick={addCustomSize}
+            className="shrink-0 rounded-xl bg-[#0F6A5F] px-3 py-2.5 text-[9px] font-black text-white disabled:opacity-40"
+          >
+            + Add custom
+          </button>
+        </div>
         <div className="mt-2 grid gap-2 sm:grid-cols-2">
           {SIZE_PRESETS.map(preset => {
             const added = sizePresetComplete(preset);
