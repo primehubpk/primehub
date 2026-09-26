@@ -68,6 +68,18 @@ export function validateProductInput(body: unknown): ProductSyncInput {
     ? input.images.map((item) => String(item || '').trim()).filter(Boolean).slice(0, 6)
     : [];
   const imageUrl = String(input.imageUrl || images[0] || '');
+  const variantMatrix = Array.isArray(input.variantMatrix)
+    ? (input.variantMatrix as Array<Record<string, unknown>>).map((row) => {
+        const rawStock = row?.stock;
+        return {
+          ...row,
+          stock:
+            rawStock == null || rawStock === ''
+              ? 30
+              : Math.max(0, asNumber(rawStock, 30)),
+        };
+      })
+    : [];
   return {
     title,
     slug: String(input.slug || slugify(title)),
@@ -82,7 +94,7 @@ export function validateProductInput(body: unknown): ProductSyncInput {
     colorImages: (input.colorImages as Record<string, string>) || {},
     variantColors: Array.isArray(input.variantColors) ? (input.variantColors as ProductSyncInput['variantColors']) : [],
     variantOptions: Array.isArray(input.variantOptions) ? (input.variantOptions as ProductSyncInput['variantOptions']) : [],
-    variantMatrix: Array.isArray(input.variantMatrix) ? (input.variantMatrix as ProductSyncInput['variantMatrix']) : [],
+    variantMatrix,
     featured: Boolean(input.featured),
     published: input.published !== false,
     priceBucketIds: Array.isArray(input.priceBucketIds)
