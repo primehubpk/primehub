@@ -213,7 +213,7 @@ export default function HomeGuideVideo({
 
   const introEmbedUrl =
     `https://www.youtube-nocookie.com/embed/${encodeURIComponent(videoId)}` +
-    "?autoplay=1&mute=1&playsinline=1&rel=0&modestbranding=1&controls=0&enablejsapi=1";
+    `?autoplay=1&mute=${introSoundOn ? 0 : 1}&playsinline=1&rel=0&modestbranding=1&controls=0&enablejsapi=1`;
 
   const menuEmbedUrl =
     `https://www.youtube-nocookie.com/embed/${encodeURIComponent(videoId)}` +
@@ -352,6 +352,9 @@ export default function HomeGuideVideo({
             className="h-full w-full"
             src={introEmbedUrl}
             title={title}
+            onLoad={() => {
+              if (introSoundOn) enableIntroSound();
+            }}
             allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture"
             allowFullScreen
           />
