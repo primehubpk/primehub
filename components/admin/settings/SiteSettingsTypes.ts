@@ -15,6 +15,7 @@ export type Settings = {
   youtubeGuideUrl: string;
   youtubeGuideTitle: string;
   youtubeGuidePreviewSeconds: number;
+  youtubeGuideHomeEnabled: boolean;
   resellerHomeEnabled: boolean;
   priceBuckets: PriceBucket[];
 };
@@ -56,6 +57,7 @@ export const DEFAULT_SETTINGS: Settings = {
   youtubeGuideUrl: '',
   youtubeGuideTitle: 'PrimeHubMall Se Order Kaise Karein?',
   youtubeGuidePreviewSeconds: 5,
+  youtubeGuideHomeEnabled: true,
   resellerHomeEnabled: true,
   priceBuckets: DEFAULT_BUCKETS,
 };
