@@ -150,10 +150,16 @@ export function normalizeProductVariants(product: VariantModalProduct): Normaliz
   asStrings(product.sizes).forEach(addSize);
   const optionSizes = product.variantOptions?.find((option) => /size/i.test(String(option.id)))?.values;
   asStrings(optionSizes).forEach(addSize);
-  const hasVariantMetadata = Boolean(product.hasVariants === true || colorItems.length > 0 || sizes.length > 0 || allSourceRows.length > 0);
-  if (!hasVariantMetadata) return { hasVariants: false, colors: [], sizes: [], rows: [] };
+  const hasVariantRows = sourceRows.length > 0;
+  if (!hasVariantRows) return { hasVariants: false, colors: [], sizes: [], rows: [] };
   if (!colorItems.length) addColor('Standard', product.imageUrl || product.image);
   if (!sizes.length) addSize('Standard');
+
+  const rawParentStock = product.stock ?? product.quantity;
+  const parentStock =
+    rawParentStock == null || rawParentStock === ''
+      ? 30
+      : Math.max(0, Number(rawParentStock) || 0);
 
   const rawRows = sourceRows.map((row, index) => {
     const color = rowValue(row, 'color') || colorItems[0]?.name || 'Standard';
@@ -163,23 +169,14 @@ export function normalizeProductVariants(product: VariantModalProduct): Normaliz
       id: row.id || `variant-${index}`,
       color,
       size,
-      stock: Math.max(0, Number(row.stock ?? 0)),
+      stock:
+        row.stock == null || row.stock === ''
+          ? parentStock
+          : Math.max(0, Number(row.stock) || 0),
       price: row.price == null ? Number(product.price ?? 0) : Number(row.price),
       imageUrl: rowImage(row, color, product.colorImages || {}, colorItems),
     };
   });
-
-  if (!allSourceRows.length) {
-    const rows = colorItems.flatMap((color) => sizes.map((size) => ({
-      id: `variant-${encodeURIComponent(color.name)}-${encodeURIComponent(size)}`,
-      color: color.name,
-      size,
-      stock: 0,
-      price: Number(product.price ?? 0),
-      imageUrl: color.imageUrl,
-    })));
-    return { hasVariants: true, colors: colorItems, sizes, rows };
-  }
 
   const rowMap = new Map<string, ProductVariantRow>();
   rawRows.forEach((row) => {
