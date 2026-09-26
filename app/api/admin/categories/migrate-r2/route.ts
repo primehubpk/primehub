@@ -9,6 +9,8 @@ export const runtime = 'nodejs';
 
 const BATCH_SIZE = 3;
 const MAX_SOURCE_BYTES = 10 * 1024 * 1024;
+const DOWNLOAD_ATTEMPTS = 3;
+const DOWNLOAD_TIMEOUT_MS = 25_000;
 const LEGACY_IMAGE_URL = /^https:\/\/i\.ibb\.co\//i;
 
 function isAuthorized(request: Request) {
@@ -29,19 +31,39 @@ function existingR2Url(data: Record<string, any>) {
 }
 
 async function downloadLegacyImage(url: string) {
-  const response = await fetch(url, {
-    redirect: 'follow',
-    cache: 'no-store',
-    signal: AbortSignal.timeout(15_000),
-  });
-  if (!response.ok) throw new Error(`Legacy image returned HTTP ${response.status}.`);
-  const contentType = String(response.headers.get('content-type') || '').toLowerCase();
-  if (!contentType.startsWith('image/')) throw new Error('Legacy URL did not return an image.');
-  const declaredSize = Number(response.headers.get('content-length') || 0);
-  if (declaredSize > MAX_SOURCE_BYTES) throw new Error('Legacy image is larger than 10MB.');
-  const body = Buffer.from(await response.arrayBuffer());
-  if (body.length > MAX_SOURCE_BYTES) throw new Error('Legacy image is larger than 10MB.');
-  return body;
+  let lastError: unknown = null;
+
+  for (let attempt = 1; attempt <= DOWNLOAD_ATTEMPTS; attempt += 1) {
+    try {
+      const response = await fetch(url, {
+        redirect: 'follow',
+        cache: 'no-store',
+        headers: {
+          Accept: 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
+          'Cache-Control': 'no-cache',
+          'User-Agent': 'PrimeHubMall-R2-Migration/1.0',
+        },
+        signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS),
+      });
+      if (!response.ok) throw new Error(`Legacy image returned HTTP ${response.status}.`);
+      const contentType = String(response.headers.get('content-type') || '').toLowerCase();
+      if (!contentType.startsWith('image/')) throw new Error('Legacy URL did not return an image.');
+      const declaredSize = Number(response.headers.get('content-length') || 0);
+      if (declaredSize > MAX_SOURCE_BYTES) throw new Error('Legacy image is larger than 10MB.');
+      const body = Buffer.from(await response.arrayBuffer());
+      if (body.length > MAX_SOURCE_BYTES) throw new Error('Legacy image is larger than 10MB.');
+      if (body.length === 0) throw new Error('Legacy image download returned an empty file.');
+      return body;
+    } catch (error) {
+      lastError = error;
+      if (attempt < DOWNLOAD_ATTEMPTS) {
+        await new Promise((resolve) => setTimeout(resolve, attempt * 750));
+      }
+    }
+  }
+
+  const reason = lastError instanceof Error ? lastError.message : String(lastError || 'Unknown download error');
+  throw new Error(`Legacy image download failed after ${DOWNLOAD_ATTEMPTS} attempts: ${reason}`);
 }
 
 function migrationObjectKey(sourceUrl: string) {
