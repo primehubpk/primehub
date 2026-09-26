@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { ArrowRight, Boxes, Flame, Grid2X2, SlidersHorizontal, Star, Tag, Zap } from 'lucide-react';
 import HomeHeader from '@/components/home/HomeHeader';
@@ -61,6 +61,67 @@ function relatedScore(selectedLabel: string, candidateLabel: string) {
   if (selected.has('jewelry') && candidate.includes('jewelry')) scoreValue += 6;
 
   return scoreValue;
+}
+
+function DeferredCategoryProducts({
+  products,
+  addedId,
+  addProduct,
+  loading,
+}: {
+  products: Product[];
+  addedId: string | null;
+  addProduct: (product: Product) => void;
+  loading: boolean;
+}) {
+  const hostRef = useRef<HTMLDivElement | null>(null);
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    if (ready) return;
+    const node = hostRef.current;
+    if (!node) return;
+
+    if (typeof IntersectionObserver === 'undefined') {
+      setReady(true);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries.some((entry) => entry.isIntersecting)) return;
+        setReady(true);
+        observer.disconnect();
+      },
+      { rootMargin: '700px 0px', threshold: 0.01 },
+    );
+
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [ready]);
+
+  return (
+    <div ref={hostRef}>
+      {ready ? (
+        <CatalogProductGrid
+          products={products}
+          addedId={addedId}
+          addProduct={addProduct}
+          loading={loading}
+          premium
+        />
+      ) : (
+        <div className="grid grid-cols-2 gap-2.5 sm:gap-3" aria-hidden="true">
+          {Array.from({ length: 4 }, (_, index) => (
+            <div
+              key={index}
+              className="aspect-[0.78/1] animate-pulse rounded-[18px] border border-[#E9E2D8] bg-white"
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 type Props = {
@@ -162,10 +223,41 @@ export default function ShopCatalog({
     [categorySections],
   );
 
-  // A category route should render only the requested category. Rendering every
-  // other category below it multiplies HTML size and starts hundreds of image
-  // requests; customers can switch categories with the directory immediately below.
-  const followingSections: typeof categorySections = [];
+  const followingSections = useMemo(() => {
+    if (!categoryView) return [];
+
+    const selectedLabel = currentSection
+      ? categoryLabel(currentSection.category)
+      : shop.categoryLabel;
+    const selectedValue = slugifyCategory(shop.category);
+
+    return categorySections
+      .filter(
+        (section) =>
+          !section.selected &&
+          section.value !== selectedValue,
+      )
+      .map((section, index) => ({
+        section,
+        index,
+        similarity: relatedScore(
+          selectedLabel,
+          categoryLabel(section.category),
+        ),
+      }))
+      .sort(
+        (a, b) =>
+          b.similarity - a.similarity ||
+          a.index - b.index,
+      )
+      .map(({ section }) => section);
+  }, [
+    categorySections,
+    categoryView,
+    currentSection,
+    shop.category,
+    shop.categoryLabel,
+  ]);
 
 
   const recommendations = useMemo(() => {
@@ -307,7 +399,13 @@ export default function ShopCatalog({
                   >
                     <span className="flex h-[76px] w-[76px] items-center justify-center overflow-hidden rounded-[24px] border border-[#C58A2A] bg-[#FFF9F0] p-1.5 shadow-[0_8px_24px_rgba(83,58,22,0.09)] ring-2 ring-[#C58A2A]/10 transition group-active:scale-95">
                       {icon ? (
-                        <img src={icon} alt="" className="h-full w-full rounded-[19px] object-cover" />
+                        <img
+                          src={icon}
+                          alt=""
+                          loading="lazy"
+                          decoding="async"
+                          className="h-full w-full rounded-[19px] object-cover"
+                        />
                       ) : (
                         <span className="text-2xl font-black text-[#A66B17]">{label.charAt(0)}</span>
                       )}
@@ -324,12 +422,11 @@ export default function ShopCatalog({
                   </div>
                 </div>
 
-                <CatalogProductGrid
+                <DeferredCategoryProducts
                   products={section.products}
                   addedId={shop.addedId}
                   addProduct={shop.addProduct}
                   loading={shop.loading}
-                  premium
                 />
               </section>
             );
