@@ -15,6 +15,16 @@ const SOURCES = [
   "other",
 ] as const;
 
+type VisitorDetail = {
+  visitorId: string;
+  source: string;
+  country: string;
+  firstSeenAt: string;
+  memberUid: string;
+  memberEmail: string;
+  memberName: string;
+};
+
 type StatsPayload = {
   success: true;
   today: string;
@@ -76,6 +86,60 @@ function pakistanDay(offsetDays = 0) {
   ].join("-");
 }
 
+
+async function loadVisitorDetails(day: string): Promise<VisitorDetail[]> {
+  const { url, key } = config();
+  const baseParams = new URLSearchParams();
+  baseParams.set("visit_day", `eq.${day}`);
+  baseParams.set("order", "first_seen_at.desc");
+  baseParams.set("limit", "500");
+
+  const read = async (select: string) => {
+    const params = new URLSearchParams(baseParams);
+    params.set("select", select);
+
+    return fetch(
+      `${url}/rest/v1/daily_unique_visitors?${params.toString()}`,
+      {
+        headers: {
+          apikey: key,
+          Authorization: `Bearer ${key}`,
+        },
+        cache: "no-store",
+        signal: AbortSignal.timeout(5000),
+      },
+    );
+  };
+
+  let response = await read(
+    "device_hash,source,country,first_seen_at,member_uid,member_email,member_name",
+  );
+
+  if (!response.ok && response.status === 400) {
+    response = await read(
+      "device_hash,source,country,first_seen_at",
+    );
+  }
+
+  if (!response.ok) {
+    throw new Error(
+      `Visitor detail read failed ${response.status}`,
+    );
+  }
+
+  const rows = (await response.json()) as Array<Record<string, unknown>>;
+
+  return rows.map((row) => ({
+    visitorId: String(row.device_hash || ""),
+    source: String(row.source || "other"),
+    country: String(row.country || "unknown"),
+    firstSeenAt: String(row.first_seen_at || ""),
+    memberUid: String(row.member_uid || ""),
+    memberEmail: String(row.member_email || ""),
+    memberName: String(row.member_name || ""),
+  }));
+}
+
 async function loadStats(today: string, yesterday: string) {
   const { url, key } = config();
 
@@ -127,6 +191,33 @@ export async function GET(request: Request) {
   }
 
   try {
+    const requestUrl = new URL(request.url);
+    const detailKey = String(
+      requestUrl.searchParams.get("details") || "",
+    ).toLowerCase();
+
+    if (detailKey === "today" || detailKey === "yesterday") {
+      const day =
+        detailKey === "today"
+          ? pakistanDay(0)
+          : pakistanDay(-1);
+      const visitors = await loadVisitorDetails(day);
+
+      return NextResponse.json(
+        {
+          success: true,
+          day,
+          visitors,
+          countingRule:
+            "one-browser-device-per-pakistan-day",
+        },
+        {
+          headers: {
+            "Cache-Control": "private, no-store, max-age=0",
+          },
+        },
+      );
+    }
     if (
       memoryCache &&
       Date.now() - memoryCache.at < CACHE_MS

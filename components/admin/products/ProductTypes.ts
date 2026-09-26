@@ -16,7 +16,7 @@ export type ProductListProps={products:Product[];query:string;onQueryChange:(val
 export type ProductRowProps={product:Product;onEdit:(product:Product)=>void;onDelete:(product:Product)=>void};
 export const DAYS:Array<{key:Weekday;label:string}>=[{key:'monday',label:'Monday Deal'},{key:'tuesday',label:'Tuesday Deal'},{key:'wednesday',label:'Wednesday Deal'},{key:'thursday',label:'Thursday Deal'},{key:'friday',label:'Friday Deal'},{key:'saturday',label:'Saturday Deal'},{key:'sunday',label:'Sunday Deal'}];
 export const QUICK_SIZES=['2.4','2.6','2.8','2.10','Free Size'];
-export const EMPTY_FORM:ProductFormState={title:'',originalPrice:'',discountPrice:'',description:'',category:'',stock:'0',shippingWeight:'',videoUrl:'',images:[],featured:false,published:true,isWholesale:false};
+export const EMPTY_FORM:ProductFormState={title:'',originalPrice:'',discountPrice:'',description:'',category:'',stock:'30',shippingWeight:'',videoUrl:'',images:[],featured:false,published:true,isWholesale:false};
 export function makeId(){return Math.random().toString(36).slice(2,10)}
 export function slugify(value:string){return value.toLowerCase().trim().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'')}
 export function imageOf(product:Product):string{if(!product)return '';const img=product.images?.[0];if(typeof img==='string')return img;if(img&&typeof img==='object'&&typeof (img as {url?:string}).url==='string')return (img as {url:string}).url;if(typeof product.imageUrl==='string')return product.imageUrl;const legacyImage=(product as unknown as {image?:unknown})?.image;if(typeof legacyImage==='string')return legacyImage;return ''}

@@ -1,7 +1,7 @@
 // PrimeHubMall PWA service worker.
 // Only static/app-shell assets are cached. Live HTML, APIs, cart, checkout,
 // orders, account data and price-bearing responses always stay network-driven.
-const VERSION = 'primehub-pwa-v2';
+const VERSION = 'primehub-pwa-v3';
 const SHELL_CACHE = `${VERSION}-shell`;
 const STATIC_CACHE = `${VERSION}-static`;
 const IMAGE_CACHE = `${VERSION}-images`;

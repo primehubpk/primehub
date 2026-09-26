@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Play, X } from "lucide-react";
+import { Play, Volume2, X } from "lucide-react";
 import { useSettings } from "@/lib/useSettings";
 
 const SESSION_KEY = "primehub-guide-intro-seen-v1";
@@ -55,8 +55,10 @@ export default function HomeGuideVideo({
     "translate3d(0, 0, 0) scale(1)",
   );
   const [menuPlaying, setMenuPlaying] = useState(false);
+  const [introSoundOn, setIntroSoundOn] = useState(false);
 
   const introCardRef = useRef<HTMLElement>(null);
+  const introIframeRef = useRef<HTMLIFrameElement>(null);
   const menuRootRef = useRef<HTMLElement>(null);
   const flightTimerRef = useRef<number | null>(null);
 
@@ -168,6 +170,30 @@ export default function HomeGuideVideo({
     };
   }, []);
 
+  const enableIntroSound = useCallback(() => {
+    if (mode !== "intro" || introState !== "visible") return;
+
+    setIntroSoundOn(true);
+
+    const frame = introIframeRef.current?.contentWindow;
+    if (!frame) return;
+
+    const command = (func: string, args: unknown[] = []) => {
+      frame.postMessage(
+        JSON.stringify({
+          event: "command",
+          func,
+          args,
+        }),
+        "*",
+      );
+    };
+
+    command("unMute");
+    command("setVolume", [100]);
+    command("playVideo");
+  }, [introState, mode]);
+
   useEffect(() => {
     if (mode !== "menu") return;
 
@@ -187,7 +213,7 @@ export default function HomeGuideVideo({
 
   const introEmbedUrl =
     `https://www.youtube-nocookie.com/embed/${encodeURIComponent(videoId)}` +
-    "?autoplay=1&mute=1&playsinline=1&rel=0&modestbranding=1&controls=0";
+    `?autoplay=1&mute=${introSoundOn ? 0 : 1}&playsinline=1&rel=0&modestbranding=1&controls=0&enablejsapi=1`;
 
   const menuEmbedUrl =
     `https://www.youtube-nocookie.com/embed/${encodeURIComponent(videoId)}` +
@@ -320,14 +346,32 @@ export default function HomeGuideVideo({
           </button>
         </div>
 
-        <div className="aspect-video w-full overflow-hidden bg-black">
+        <div className="relative aspect-video w-full overflow-hidden bg-black">
           <iframe
+            ref={introIframeRef}
             className="h-full w-full"
             src={introEmbedUrl}
             title={title}
+            onLoad={() => {
+              if (introSoundOn) enableIntroSound();
+            }}
             allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture"
             allowFullScreen
           />
+
+          {!introSoundOn ? (
+            <button
+              type="button"
+              onClick={enableIntroSound}
+              className="absolute inset-0 flex items-end justify-end bg-transparent p-2"
+              aria-label="Turn on guide video sound"
+            >
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-black/75 px-2.5 py-1.5 text-[9px] font-black text-white shadow-lg">
+                <Volume2 size={12} />
+                Tap for sound
+              </span>
+            </button>
+          ) : null}
         </div>
 
         <div className="px-3 py-2 text-center text-[9px] font-semibold text-black/45">
