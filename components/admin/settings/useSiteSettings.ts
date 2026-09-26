@@ -57,6 +57,7 @@ export default function useSiteSettings() {
           30,
           Math.max(1, Number(rawMain.youtubeGuidePreviewSeconds || DEFAULT_SETTINGS.youtubeGuidePreviewSeconds)),
         ),
+        youtubeGuideHomeEnabled: rawMain.youtubeGuideHomeEnabled !== false,
         resellerHomeEnabled: rawMain.resellerHomeEnabled !== false,
         priceBuckets: Array.isArray(rawMain.priceBuckets) && rawMain.priceBuckets.length ? rawMain.priceBuckets : DEFAULT_BUCKETS,
       });
@@ -90,6 +91,7 @@ export default function useSiteSettings() {
             30,
             Math.max(1, Number(settings.youtubeGuidePreviewSeconds || 5)),
           ),
+          youtubeGuideHomeEnabled: settings.youtubeGuideHomeEnabled,
           resellerHomeEnabled: settings.resellerHomeEnabled,
           freeShippingCount: Number(settings.freeDeliveryThreshold || 0),
           freeDelivery: { enabled: true, itemThreshold: Number(settings.freeDeliveryThreshold || 0), message: 'Add {remaining} more item{plural} to unlock FREE DELIVERY', unlockedMessage: 'FREE DELIVERY UNLOCKED 🎉' },
@@ -116,6 +118,7 @@ export default function useSiteSettings() {
           30,
           Math.max(1, Number(settings.youtubeGuidePreviewSeconds || 5)),
         ),
+        youtubeGuideHomeEnabled: settings.youtubeGuideHomeEnabled,
       }));
       setToast('Settings, contact and policies saved.');
     } catch {
