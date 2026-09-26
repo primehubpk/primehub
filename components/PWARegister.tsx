@@ -11,6 +11,31 @@ export default function PWARegister() {
   useEffect(() => {
     if (!('serviceWorker' in navigator)) return;
 
+    const isLocalDev =
+      process.env.NODE_ENV !== 'production' ||
+      window.location.hostname === 'localhost' ||
+      window.location.hostname === '127.0.0.1';
+
+    if (isLocalDev) {
+      void navigator.serviceWorker.getRegistrations()
+        .then((registrations) => Promise.all(
+          registrations.map((registration) => registration.unregister()),
+        ))
+        .catch(() => undefined);
+
+      if ('caches' in window) {
+        void caches.keys()
+          .then((names) => Promise.all(
+            names
+              .filter((name) => name.startsWith('primehub-pwa-'))
+              .map((name) => caches.delete(name)),
+          ))
+          .catch(() => undefined);
+      }
+
+      return;
+    }
+
     const browser = window as IdleWindow;
     let idleId: number | null = null;
     let fallbackTimer: number | null = null;
