@@ -156,7 +156,7 @@ export default function VisitorTracker() {
           name: user.displayName,
         })
           .then((result) => {
-            if (result?.memberLinked) {
+            if (result?.success) {
               window.localStorage.setItem(
                 MEMBER_LINK_KEY,
                 memberKey,
