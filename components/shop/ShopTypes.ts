@@ -47,7 +47,7 @@ export function productHasVariants(p: Product) {
 }
 
 export function availableStockOf(p: Product) {
-  const rawParentStock = p.stock ?? p.quantity;
+  const rawParentStock: unknown = p.stock ?? p.quantity;
   const parentStock =
     rawParentStock == null || rawParentStock === ''
       ? 30
