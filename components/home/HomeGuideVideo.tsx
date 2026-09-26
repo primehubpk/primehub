@@ -39,6 +39,7 @@ export default function HomeGuideVideo({
   const { settings } = useSettings();
 
   const guideUrl = String(settings.youtubeGuideUrl || "").trim();
+  const homeEnabled = settings.youtubeGuideHomeEnabled !== false;
   const title =
     String(settings.youtubeGuideTitle || "").trim() ||
     "PrimeHubMall Se Order Kaise Karein?";
@@ -56,6 +57,7 @@ export default function HomeGuideVideo({
   );
   const [menuPlaying, setMenuPlaying] = useState(false);
   const [introSoundOn, setIntroSoundOn] = useState(false);
+  const [introPlaybackStarted, setIntroPlaybackStarted] = useState(false);
 
   const introCardRef = useRef<HTMLElement>(null);
   const introIframeRef = useRef<HTMLIFrameElement>(null);
@@ -135,7 +137,13 @@ export default function HomeGuideVideo({
   }, [introState, mode, pulseMenuButton]);
 
   useEffect(() => {
-    if (mode !== "intro" || !videoId) return;
+    if (mode !== "intro") return;
+
+    if (!homeEnabled || !videoId) {
+      setIntroState("hidden");
+      setIntroPlaybackStarted(false);
+      return;
+    }
 
     let alreadySeen = false;
 
@@ -148,19 +156,54 @@ export default function HomeGuideVideo({
     } catch {}
 
     if (!alreadySeen) {
+      setIntroPlaybackStarted(false);
       setIntroState("visible");
     }
-  }, [mode, videoId]);
+  }, [homeEnabled, mode, videoId]);
 
   useEffect(() => {
-    if (mode !== "intro" || introState !== "visible") return;
+    if (mode !== "intro" || !homeEnabled || introState !== "visible") return;
 
     const timer = window.setTimeout(() => {
       flyToMenu();
     }, seconds * 1000);
 
     return () => window.clearTimeout(timer);
-  }, [flyToMenu, introState, mode, seconds]);
+  }, [flyToMenu, homeEnabled, introState, mode, seconds]);
+
+  useEffect(() => {
+    if (mode !== "intro") return;
+
+    const onPlayerMessage = (event: MessageEvent) => {
+      if (
+        event.origin !== "https://www.youtube.com" &&
+        event.origin !== "https://www.youtube-nocookie.com"
+      ) {
+        return;
+      }
+
+      let payload: any = event.data;
+      if (typeof payload === "string") {
+        try {
+          payload = JSON.parse(payload);
+        } catch {
+          return;
+        }
+      }
+
+      const state =
+        payload?.event === "onStateChange"
+          ? Number(payload?.info)
+          : Number(payload?.info?.playerState);
+
+      if (state === 1) {
+        setIntroPlaybackStarted(true);
+      }
+    };
+
+    window.addEventListener("message", onPlayerMessage);
+    return () => window.removeEventListener("message", onPlayerMessage);
+  }, [mode]);
 
   useEffect(() => {
     return () => {
@@ -210,6 +253,7 @@ export default function HomeGuideVideo({
   }, [mode]);
 
   if (!videoId) return null;
+  if (mode === "intro" && !homeEnabled) return null;
 
   const introEmbedUrl =
     `https://www.youtube-nocookie.com/embed/${encodeURIComponent(videoId)}` +
@@ -346,13 +390,37 @@ export default function HomeGuideVideo({
           </button>
         </div>
 
-        <div className="relative aspect-video w-full overflow-hidden bg-black">
+        <div className="relative aspect-video w-full overflow-hidden bg-[#F6F1E8]">
+          <img
+            src={`https://i.ytimg.com/vi/${encodeURIComponent(videoId)}/hqdefault.jpg`}
+            alt={title}
+            loading="eager"
+            decoding="async"
+            referrerPolicy="no-referrer"
+            className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-300 ${introPlaybackStarted ? "pointer-events-none opacity-0" : "opacity-100"}`}
+          />
+
           <iframe
             ref={introIframeRef}
-            className="h-full w-full"
+            className={`absolute inset-0 h-full w-full transition-opacity duration-300 ${introPlaybackStarted ? "opacity-100" : "opacity-0"}`}
             src={introEmbedUrl}
             title={title}
             onLoad={() => {
+              const frame = introIframeRef.current?.contentWindow;
+              if (frame) {
+                frame.postMessage(
+                  JSON.stringify({ event: "listening", id: "primehub-home-guide" }),
+                  "*",
+                );
+                frame.postMessage(
+                  JSON.stringify({ event: "command", func: "mute", args: [] }),
+                  "*",
+                );
+                frame.postMessage(
+                  JSON.stringify({ event: "command", func: "playVideo", args: [] }),
+                  "*",
+                );
+              }
               if (introSoundOn) enableIntroSound();
             }}
             allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture"
@@ -375,7 +443,7 @@ export default function HomeGuideVideo({
         </div>
 
         <div className="px-3 py-2 text-center text-[9px] font-semibold text-black/45">
-          Guide preview ke baad â˜° menu mein mil jayegi.
+          Guide preview ke baad ☰ menu mein mil jayegi.
         </div>
       </div>
     </section>
