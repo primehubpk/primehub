@@ -98,27 +98,69 @@ export function HomeProductCard({
   const addItem = useCartStore((s) => s.addItem);
   const openVariantModal = useCartStore((s) => s.openVariantModal);
   const [added, setAdded] = useState(false);
+  const [unavailable, setUnavailable] = useState(false);
   const price = homePrice(product);
   const src = imageOf(product);
-  const available = availableStockOf(product) > 0 && price > 0;
+  const cardHasPrice = price > 0;
 
-  function add() {
-    if (!available) return;
+  async function add() {
+    if (!cardHasPrice) return;
+
+    let currentProduct = product;
+    try {
+      const response = await fetch(
+        `/api/storefront/read?type=product&id=${encodeURIComponent(product.id)}`,
+        { cache: "no-store" },
+      );
+      if (response.ok) {
+        const data = await response.json();
+        if (data?.product && String(data.product.id || "") === String(product.id)) {
+          currentProduct = data.product as Product;
+        }
+      }
+    } catch (error) {
+      console.warn(
+        "Fresh Sale Mela product read unavailable; using current card data",
+        error,
+      );
+    }
+
+    const currentPrice = homePrice(currentProduct);
+    const currentSrc = imageOf(currentProduct) || src;
+
     if (
-      productHasVariants(product) &&
-      openVariantModal({ ...product, price, image: src, imageUrl: src }, "cart")
-    )
+      productHasVariants(currentProduct) &&
+      openVariantModal(
+        {
+          ...currentProduct,
+          price: currentPrice,
+          image: currentSrc,
+          imageUrl: currentSrc,
+        },
+        "cart",
+      )
+    ) {
+      setUnavailable(false);
       return;
+    }
+
+    if (availableStockOf(currentProduct) <= 0 || currentPrice <= 0) {
+      setUnavailable(true);
+      return;
+    }
 
     addItem({
-      id: product.id,
-      name: titleOf(product),
-      price,
-      originalPrice: originalOf(product) || price,
-      image: src,
-      imageUrl: src,
-      dealDay: product.dealDay,
+      id: currentProduct.id,
+      productId: currentProduct.id,
+      category: String(currentProduct.category || ""),
+      name: titleOf(currentProduct),
+      price: currentPrice,
+      originalPrice: originalOf(currentProduct) || currentPrice,
+      image: currentSrc,
+      imageUrl: currentSrc,
+      dealDay: currentProduct.dealDay,
     });
+    setUnavailable(false);
     setAdded(true);
   }
 
@@ -171,11 +213,11 @@ export function HomeProductCard({
           <button
             className="home-add"
             onClick={add}
-            disabled={!available}
-            aria-label={`${available ? "Add to cart:" : "Sold out:"} ${titleOf(product)}`}
+            disabled={!cardHasPrice}
+            aria-label={`${unavailable ? "Out of stock:" : "Add to cart:"} ${titleOf(product)}`}
           >
             <span aria-live="polite">
-              {!available ? "Sold out" : added ? "Add another" : "Add to cart"}
+              {unavailable ? "Out of stock" : added ? "Add another" : "Add to cart"}
             </span>
             <ShoppingCart size={15} />
           </button>
@@ -199,6 +241,64 @@ function sortBySalePrice(products: Product[]) {
   );
 }
 
+function stableSaleMelaSeed(products: Product[]) {
+  let hash = 2166136261;
+  const keys = products
+    .map((product) => `${product.id}|${homePrice(product)}|${productTime(product)}`)
+    .sort();
+
+  for (const key of keys) {
+    for (let index = 0; index < key.length; index += 1) {
+      hash ^= key.charCodeAt(index);
+      hash = Math.imul(hash, 16777619) >>> 0;
+    }
+  }
+
+  return hash || 1;
+}
+
+function orderHomeSaleMelaProducts(
+  products: Product[],
+  amount: number,
+  seed: number,
+) {
+  const exactPrice = products
+    .filter((product) => homePrice(product) === amount)
+    .sort(
+      (a, b) =>
+        productTime(b) - productTime(a) ||
+        b.id.localeCompare(a.id),
+    );
+
+  const featured = exactPrice.slice(0, 2);
+  const randomPool = exactPrice.slice(2);
+  if (randomPool.length > 0) {
+    const unit = seededUnit(seed ^ amount, `sale-third-${amount}`);
+    const randomIndex = Math.min(
+      randomPool.length - 1,
+      Math.floor(unit * randomPool.length),
+    );
+    featured.push(randomPool[randomIndex]);
+  }
+
+  const featuredIds = new Set(featured.map((product) => product.id));
+  const remainingExact = exactPrice.filter(
+    (product) => !featuredIds.has(product.id),
+  );
+
+  const higherPrices = products
+    .filter((product) => homePrice(product) > amount)
+    .sort((a, b) => {
+      const priceDifference = homePrice(a) - homePrice(b);
+      if (priceDifference !== 0) return priceDifference;
+      const freshnessDifference = productTime(b) - productTime(a);
+      if (freshnessDifference !== 0) return freshnessDifference;
+      return a.id.localeCompare(b.id);
+    });
+
+  return [...featured, ...remainingExact, ...higherPrices];
+}
+
 const standaloneGridStyle = {
   display: "grid",
   gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
@@ -218,24 +318,44 @@ export default function HomeCollections({
   onWholesaleSelect?: () => void;
 }) {
   const { settings } = useSettings();
-  const [shuffleSeed, setShuffleSeed] = useState(0);
-  const catalog = products.filter((p) => p.published !== false);
+  const liveCatalog = products.filter((p) => p.published !== false);
+  const [homeSaleCatalog, setHomeSaleCatalog] = useState<Product[]>(
+    () => (standalone ? [] : liveCatalog),
+  );
+  const [standaloneShuffleSeed, setStandaloneShuffleSeed] = useState(0);
+
+  useEffect(() => {
+    if (standalone || homeSaleCatalog.length > 0 || liveCatalog.length === 0) return;
+    setHomeSaleCatalog(liveCatalog);
+  }, [standalone, homeSaleCatalog.length, products]);
+
+  useEffect(() => {
+    if (!standalone) return;
+    const values = new Uint32Array(1);
+    if (typeof window !== "undefined" && window.crypto?.getRandomValues) {
+      window.crypto.getRandomValues(values);
+      setStandaloneShuffleSeed(values[0] || Date.now());
+      return;
+    }
+    setStandaloneShuffleSeed(
+      (Date.now() ^ Math.floor(Math.random() * 0xffffffff)) >>> 0,
+    );
+  }, [standalone]);
+
+  const catalog = standalone
+    ? liveCatalog
+    : homeSaleCatalog.length > 0
+      ? homeSaleCatalog
+      : liveCatalog;
+  const shuffleSeed = standalone
+    ? standaloneShuffleSeed
+    : stableSaleMelaSeed(catalog);
   const buckets = sortPriceBuckets(
     (settings.priceBuckets || []).filter((b) => b.active),
   );
   const packs = catalog.filter(isWholesaleProduct);
   const kidsPacks = packs.filter(isKidsWholesaleProduct);
   const regularPacks = packs.filter((product) => !isKidsWholesaleProduct(product));
-
-  useEffect(() => {
-    const values = new Uint32Array(1);
-    if (typeof window !== "undefined" && window.crypto?.getRandomValues) {
-      window.crypto.getRandomValues(values);
-      setShuffleSeed(values[0] || Date.now());
-      return;
-    }
-    setShuffleSeed((Date.now() ^ Math.floor(Math.random() * 0xffffffff)) >>> 0);
-  }, []);
 
   return (
     <>
@@ -273,7 +393,9 @@ export default function HomeCollections({
                 );
             const matches = standalone && !wholesale
               ? baseMatches
-              : shuffleWithNewArrivalPriority(baseMatches, shuffleSeed);
+              : wholesale
+                ? shuffleWithNewArrivalPriority(baseMatches, shuffleSeed)
+                : orderHomeSaleMelaProducts(baseMatches, amount, shuffleSeed);
             const kidsMatches = standalone && wholesale
               ? shuffleWithNewArrivalPriority(
                   sortBySalePrice(kidsPacks),
