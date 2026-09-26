@@ -56,3 +56,16 @@ test('active local-test branch remains disabled for Vercel auto deploy', () => {
     false,
   );
 });
+
+
+test('local development unregisters the PWA worker and clears PrimeHub caches', () => {
+  const register = read('components/PWARegister.tsx');
+  const sw = read('public/sw.js');
+
+  assert.match(register, /process\.env\.NODE_ENV !== 'production'/);
+  assert.match(register, /window\.location\.hostname === 'localhost'/);
+  assert.match(register, /navigator\.serviceWorker\.getRegistrations\(\)/);
+  assert.match(register, /registration\.unregister\(\)/);
+  assert.match(register, /name\.startsWith\('primehub-pwa-'\)/);
+  assert.match(sw, /const VERSION = 'primehub-pwa-v3'/);
+});
