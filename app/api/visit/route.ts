@@ -49,6 +49,9 @@ export async function POST(request: Request) {
     const rawSource = String(body?.source || "")
       .trim()
       .toLowerCase();
+    const memberUid = String(body?.memberUid || "").trim().slice(0, 160);
+    const memberEmail = String(body?.memberEmail || "").trim().slice(0, 240);
+    const memberName = String(body?.memberName || "").trim().slice(0, 160);
 
     if (
       rawDeviceId.length < 8 ||
@@ -111,7 +114,43 @@ export async function POST(request: Request) {
       );
     }
 
-    return new NextResponse(null, { status: 204 });
+    let memberLinked = false;
+
+    if (memberUid) {
+      const memberUpdate = await fetch(
+        `${url}/rest/v1/daily_unique_visitors?visit_day=eq.${encodeURIComponent(day)}&device_hash=eq.${encodeURIComponent(deviceHash)}`,
+        {
+          method: "PATCH",
+          headers: {
+            apikey: key,
+            Authorization: `Bearer ${key}`,
+            "Content-Type": "application/json",
+            Prefer: "return=minimal",
+          },
+          body: JSON.stringify({
+            member_uid: memberUid,
+            member_email: memberEmail || null,
+            member_name: memberName || null,
+          }),
+          cache: "no-store",
+          signal: AbortSignal.timeout(5000),
+        },
+      );
+
+      if (memberUpdate.ok) {
+        memberLinked = true;
+      } else if (memberUpdate.status !== 400) {
+        console.warn(
+          "Visitor member identity update failed",
+          memberUpdate.status,
+        );
+      }
+    }
+
+    return NextResponse.json({
+      success: true,
+      memberLinked,
+    });
   } catch (error) {
     console.error("Visitor tracking failed", error);
 
