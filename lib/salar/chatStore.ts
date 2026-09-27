@@ -42,6 +42,7 @@ export type SalarStoredMessage = {
   products?: SalarStoredProduct[];
   categories?: SalarStoredCategory[];
   displayMode?: SalarStoredDisplayMode;
+  showAllMatches?: boolean;
 };
 
 export type SalarStoredContext = {
@@ -85,7 +86,7 @@ type SalarStoredListSummary = Omit<SalarChatSummary, 'active'>;
 
 const ROW_PREFIX = 'salar_chat_';
 const MAX_MESSAGES = 100;
-const MAX_PRODUCTS_PER_MESSAGE = 600;
+const MAX_PRODUCTS_PER_MESSAGE = 1000;
 const ACTIVE_WINDOW_MS = 24 * 60 * 60 * 1000;
 const CHAT_HOT_CACHE_TTL_MS = 15 * 1000;
 
@@ -182,7 +183,7 @@ function normalizeProducts(value: unknown): SalarStoredProduct[] {
   return value.slice(0, MAX_PRODUCTS_PER_MESSAGE).map((item: any) => {
     const imageUrl = safeHttpsUrl(item?.imageUrl);
     const imageUrls = Array.isArray(item?.imageUrls)
-      ? [...new Set(item.imageUrls.map((url: unknown) => safeHttpsUrl(url)).filter(Boolean))].slice(0, 8)
+      ? [...new Set(item.imageUrls.map((url: unknown) => safeHttpsUrl(url)).filter(Boolean))]
       : [];
     const variantColors = Array.isArray(item?.variantColors)
       ? item.variantColors.slice(0, 30).map((variant: any) => {
@@ -248,6 +249,7 @@ function normalizeMessage(value: any): SalarStoredMessage | null {
     ...(products.length ? { products } : {}),
     ...(categories.length ? { categories } : {}),
     ...(displayMode !== 'none' ? { displayMode } : {}),
+    ...(value.showAllMatches === true ? { showAllMatches: true } : {}),
   };
 }
 

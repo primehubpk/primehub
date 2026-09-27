@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type MouseEvent } from "react";
 import Header from "@/components/home/HomeHeader";
 import HomeCollections from "@/components/home/HomeCollections";
+import HomeCategoryDeals from "@/components/home/HomeCategoryDeals";
 import BigDealNextPreviewSync from "@/components/home/BigDealNextPreviewSync";
 import HomeResellerClubFull from "@/components/home/HomeResellerClubFull";
 import {
@@ -207,6 +208,7 @@ export default function HomePageClient({
           <HomeResellerClubFull initialProducts={products} />
           <HomeWholesaleVideos />
           <HomePrimeSkills />
+          <HomeCategoryDeals products={products} categories={categories} />
           <div id="discover-deals-section">
             {(selectedMaxPrice !== null || wholesaleSelected) && (
               <div className="home-filter-status">

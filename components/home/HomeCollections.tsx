@@ -205,13 +205,9 @@ export function HomeProductCard({
         <strong className="home-price">
           Rs. {price.toLocaleString("en-PK")}
         </strong>
-        {pack ? (
-          <FastProductLink product={product} className="home-add">
-            View Pack
-          </FastProductLink>
-        ) : (
-          <button
+        <button
             className="home-add"
+            type="button"
             onClick={add}
             disabled={!cardHasPrice}
             aria-label={`${unavailable ? "Out of stock:" : "Add to cart:"} ${titleOf(product)}`}
@@ -220,8 +216,7 @@ export function HomeProductCard({
               {unavailable ? "Out of stock" : added ? "Add another" : "Add to cart"}
             </span>
             <ShoppingCart size={15} />
-          </button>
-        )}
+        </button>
       </div>
     </article>
   );
@@ -264,27 +259,7 @@ function orderHomeSaleMelaProducts(
 ) {
   const exactPrice = products
     .filter((product) => homePrice(product) === amount)
-    .sort(
-      (a, b) =>
-        productTime(b) - productTime(a) ||
-        b.id.localeCompare(a.id),
-    );
-
-  const featured = exactPrice.slice(0, 2);
-  const randomPool = exactPrice.slice(2);
-  if (randomPool.length > 0) {
-    const unit = seededUnit(seed ^ amount, `sale-third-${amount}`);
-    const randomIndex = Math.min(
-      randomPool.length - 1,
-      Math.floor(unit * randomPool.length),
-    );
-    featured.push(randomPool[randomIndex]);
-  }
-
-  const featuredIds = new Set(featured.map((product) => product.id));
-  const remainingExact = exactPrice.filter(
-    (product) => !featuredIds.has(product.id),
-  );
+    .sort((a, b) => seededUnit(seed ^ amount, a.id) - seededUnit(seed ^ amount, b.id));
 
   const higherPrices = products
     .filter((product) => homePrice(product) > amount)
@@ -296,7 +271,9 @@ function orderHomeSaleMelaProducts(
       return a.id.localeCompare(b.id);
     });
 
-  return [...featured, ...remainingExact, ...higherPrices];
+  // Only the price printed on the medallion rotates. Higher priced items
+  // retain their order in the same rail and never move to another rail.
+  return [...exactPrice, ...higherPrices];
 }
 
 const standaloneGridStyle = {
@@ -322,7 +299,7 @@ export default function HomeCollections({
   const [homeSaleCatalog, setHomeSaleCatalog] = useState<Product[]>(
     () => (standalone ? [] : liveCatalog),
   );
-  const [standaloneShuffleSeed, setStandaloneShuffleSeed] = useState(0);
+  const [shuffleSeed, setShuffleSeed] = useState(0);
 
   useEffect(() => {
     if (standalone || homeSaleCatalog.length > 0 || liveCatalog.length === 0) return;
@@ -330,26 +307,23 @@ export default function HomeCollections({
   }, [standalone, homeSaleCatalog.length, products]);
 
   useEffect(() => {
-    if (!standalone) return;
     const values = new Uint32Array(1);
     if (typeof window !== "undefined" && window.crypto?.getRandomValues) {
       window.crypto.getRandomValues(values);
-      setStandaloneShuffleSeed(values[0] || Date.now());
+      setShuffleSeed(values[0] || Date.now());
       return;
     }
-    setStandaloneShuffleSeed(
+    setShuffleSeed(
       (Date.now() ^ Math.floor(Math.random() * 0xffffffff)) >>> 0,
     );
-  }, [standalone]);
+  }, []);
 
   const catalog = standalone
     ? liveCatalog
     : homeSaleCatalog.length > 0
       ? homeSaleCatalog
       : liveCatalog;
-  const shuffleSeed = standalone
-    ? standaloneShuffleSeed
-    : stableSaleMelaSeed(catalog);
+  const saleShuffleSeed = shuffleSeed || stableSaleMelaSeed(catalog);
   const buckets = sortPriceBuckets(
     (settings.priceBuckets || []).filter((b) => b.active),
   );
@@ -394,12 +368,12 @@ export default function HomeCollections({
             const matches = standalone && !wholesale
               ? baseMatches
               : wholesale
-                ? shuffleWithNewArrivalPriority(baseMatches, shuffleSeed)
-                : orderHomeSaleMelaProducts(baseMatches, amount, shuffleSeed);
+                ? shuffleWithNewArrivalPriority(baseMatches, saleShuffleSeed)
+                : orderHomeSaleMelaProducts(baseMatches, amount, saleShuffleSeed);
             const kidsMatches = standalone && wholesale
               ? shuffleWithNewArrivalPriority(
                   sortBySalePrice(kidsPacks),
-                  (shuffleSeed ^ 0x9e3779b9) >>> 0,
+                  (saleShuffleSeed ^ 0x9e3779b9) >>> 0,
                 )
               : [];
 

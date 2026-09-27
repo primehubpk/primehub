@@ -55,6 +55,7 @@ type ChatMessage = {
   products?: ProductCard[];
   categories?: CategoryCard[];
   displayMode?: DisplayMode;
+  showAllMatches?: boolean;
   mention?: ProductMention;
 };
 
@@ -76,7 +77,7 @@ const LEGACY_STORAGE_KEYS = ['primehub-salar-chat-v4', 'primehub-salar-chat-v3']
 const CHAT_ID_KEY = 'primehub-salar-chat-id-v1';
 const ADMIN_HINT_KEY = 'primehub-admin-session-hint-v1';
 const MAX_SAVED_MESSAGES = 100;
-const MAX_SAVED_PRODUCTS_PER_MESSAGE = 600;
+const MAX_SAVED_PRODUCTS_PER_MESSAGE = 1000;
 const PRODUCT_QUERY_STOP_WORDS = new Set([
   'bhai', 'please', 'mujhe', 'muje', 'mera', 'meri', 'mery', 'hamara', 'hamari',
   'show', 'see', 'view', 'find', 'search', 'browse', 'option', 'options', 'product', 'products', 'item', 'items',
@@ -127,6 +128,7 @@ function savedMessages(value: unknown): ChatMessage[] {
       products: Array.isArray(item.products) ? item.products.slice(0, MAX_SAVED_PRODUCTS_PER_MESSAGE) : [],
       categories: Array.isArray(item.categories) ? item.categories.slice(0, 30) : [],
       displayMode: safeDisplayMode(item.displayMode),
+      showAllMatches: item.showAllMatches === true,
       mention: item.mention && typeof item.mention === 'object'
         ? {
             id: String(item.mention.id || '').slice(0, 200),
@@ -986,7 +988,7 @@ export default function SalarWidget() {
       setOrderCustomer(finalCustomer);
 
       if (Array.isArray(result?.products) && result.products.length) {
-        const shown = result.products.filter((product: any) => product?.id && product?.title).slice(0, 30);
+        const shown = result.products.filter((product: any) => product?.id && product?.title);
         setLastSharedProducts((current) => {
           const merged = new Map(current.map((product) => [product.id, product]));
           for (const product of shown) merged.set(product.id, { ...merged.get(product.id), ...product });
@@ -1072,7 +1074,7 @@ export default function SalarWidget() {
 
             {messages.map((message, index) => {
               const exactFocusProduct = message.role === 'assistant' ? referencedProductBefore(messages, index) : null;
-              const focusedMessageProducts = message.role === 'assistant'
+              const focusedMessageProducts = message.role === 'assistant' && !message.showAllMatches
                 ? focusedProducts(message.products || [], context.lastProductQuery || '', exactFocusProduct)
                 : (message.products || []);
               const topSuggestionImages = message.role === 'assistant' && message.displayMode !== 'product_images'
@@ -1080,7 +1082,7 @@ export default function SalarWidget() {
                 : [];
               const imageOnlyProducts = message.displayMode === 'product_images'
                 ? focusedMessageProducts.flatMap((product) => {
-                    const urls = [...new Set([...(product.imageUrls || []), product.imageUrl].filter(Boolean) as string[])].slice(0, 8);
+                    const urls = [...new Set([...(product.imageUrls || []), product.imageUrl].filter(Boolean) as string[])];
                     return urls.map((url) => ({ ...product, imageUrl: url }));
                   })
                 : [];
