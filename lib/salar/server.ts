@@ -110,14 +110,14 @@ function safePublicImageUrl(value: unknown) {
 
 function productImageUrls(product: any) {
   const values: unknown[] = [
-    ...safeArray(product?.images, 8),
+    ...safeArray(product?.images, 60),
     product?.imageUrl,
     product?.image,
   ];
   const urls = values
     .map((item: any) => safePublicImageUrl(typeof item === 'string' ? item : item?.url || item?.imageUrl))
     .filter(Boolean);
-  return [...new Set(urls)].slice(0, 8);
+  return [...new Set(urls)];
 }
 
 function compactProduct(product: any): Record<string, any> {

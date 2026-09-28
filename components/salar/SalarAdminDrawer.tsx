@@ -58,6 +58,7 @@ export default function SalarAdminDrawer({ open, onClose }: Props) {
   const [selectedId, setSelectedId] = useState('');
   const [detail, setDetail] = useState<ChatDetail | null>(null);
   const [reply, setReply] = useState('');
+  const [selectedProducts, setSelectedProducts] = useState<NonNullable<ChatMessage['products']>>([]);
   const [loading, setLoading] = useState(false);
   const [acting, setActing] = useState(false);
   const [selectionMode, setSelectionMode] = useState(false);
@@ -120,6 +121,14 @@ export default function SalarAdminDrawer({ open, onClose }: Props) {
     }, 5000);
     return () => window.clearInterval(timer);
   }, [open, selectedId, loadDetail]);
+
+  useEffect(() => { setSelectedProducts([]); }, [selectedId]);
+
+  function toggleProduct(product: NonNullable<ChatMessage['products']>[number]) {
+    setSelectedProducts((current) => current.some((item) => item.id === product.id)
+      ? current.filter((item) => item.id !== product.id)
+      : [...current, product].slice(0, 30));
+  }
 
   const visibleChats = useMemo(() => chats.filter((chat) => {
     if (filter === 'active') return chat.active;
@@ -195,7 +204,8 @@ export default function SalarAdminDrawer({ open, onClose }: Props) {
         headers: { 'Content-Type': 'application/json' },
         credentials: 'same-origin',
         cache: 'no-store',
-        body: JSON.stringify({ action: actionName, chatId: targetChatId, message, pauseSalar }),
+        body: JSON.stringify({ action: actionName, chatId: targetChatId, message, pauseSalar,
+          productIds: actionName === 'reply' ? selectedProducts.map((product) => product.id) : [] }),
       });
       const result = await response.json().catch(() => null);
       if (!response.ok || !result?.success) throw new Error(result?.error || 'Action failed.');
@@ -208,7 +218,7 @@ export default function SalarAdminDrawer({ open, onClose }: Props) {
       } else if (selectedId === targetChatId && result.chat) {
         setDetail(result.chat as ChatDetail);
       }
-      if (actionName === 'reply') setReply('');
+      if (actionName === 'reply') { setReply(''); setSelectedProducts([]); }
       await loadList(true);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Action failed.');
@@ -237,7 +247,7 @@ export default function SalarAdminDrawer({ open, onClose }: Props) {
   async function submitReply(event: FormEvent<HTMLFormElement>, pauseAfter = false) {
     event.preventDefault();
     const message = reply.trim();
-    if (!message) return;
+    if (!message && !selectedProducts.length) return;
     await action('reply', message, pauseAfter);
   }
 
@@ -378,7 +388,7 @@ export default function SalarAdminDrawer({ open, onClose }: Props) {
                     {message.content ? <p className="whitespace-pre-wrap">{message.content}</p> : null}
                     {message.products?.length ? (
                       <div className="mt-2 grid grid-cols-3 gap-1.5">
-                        {message.products.filter((product) => product.imageUrl).slice(0, 9).map((product) => <img key={product.id} src={product.imageUrl} alt={product.title} className="aspect-square w-full rounded-lg object-cover"/>)}
+                        {message.products.filter((product) => product.imageUrl).map((product) => <button key={product.id} type="button" onClick={() => toggleProduct(product)} className={`relative overflow-hidden rounded-lg border-2 ${selectedProducts.some((item) => item.id === product.id) ? 'border-[#0F6A5F]' : 'border-transparent'}`} aria-label={`Select ${product.title}`} aria-pressed={selectedProducts.some((item) => item.id === product.id)}><img src={product.imageUrl} alt={product.title} className="aspect-square w-full object-cover"/>{selectedProducts.some((item) => item.id === product.id) ? <span className="absolute right-1 top-1 rounded-full bg-[#0F6A5F] px-1 text-white">✓</span> : null}</button>)}
                       </div>
                     ) : null}
                     <p className={`mt-1.5 text-[7px] ${customer ? 'text-white/55' : 'text-black/30'}`}>{timeLabel(message.createdAt)}</p>
@@ -389,12 +399,13 @@ export default function SalarAdminDrawer({ open, onClose }: Props) {
           </div>
 
           <div className="shrink-0 border-t border-black/8 bg-white p-3">
+            {selectedProducts.length ? <div className="mb-2 flex items-center gap-2 rounded-xl bg-[#F1F7F3] px-3 py-2 text-[9px] font-bold text-[#0F6A5F]"><span className="flex-1">{selectedProducts.length} products selected to send</span><button type="button" onClick={() => setSelectedProducts([])} aria-label="Clear selected products"><X size={14}/></button></div> : null}
             {detail?.blocked ? <p className="mb-2 rounded-xl bg-[#FFE8E5] px-3 py-2 text-[8px] font-bold text-[#A32720]">This customer is blocked. Tap Unblock above to restore Salar access.</p> : detail?.salarPaused ? <p className="mb-2 rounded-xl bg-[#FFF1D6] px-3 py-2 text-[8px] font-bold text-[#8A5A00]">Salar is stopped only for this customer chat. Other customers continue normally.</p> : null}
             <form onSubmit={(event) => void submitReply(event, false)}>
               <textarea value={reply} onChange={(event) => setReply(event.target.value.slice(0, 6000))} rows={2} placeholder="Reply as PrimeHub Admin…" className="w-full resize-none rounded-xl bg-[#F1F1ED] px-3 py-2.5 text-[10px] outline-none"/>
               <div className="mt-2 flex gap-2">
-                <button type="submit" disabled={acting || !reply.trim()} className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-full bg-[#14140F] px-3 py-2.5 text-[9px] font-black text-white disabled:opacity-40"><Send size={13}/>Send reply</button>
-                <button type="button" disabled={acting || !reply.trim()} onClick={(event) => void submitReply(event as unknown as FormEvent<HTMLFormElement>, true)} className="flex-1 rounded-full bg-[#E1352B] px-3 py-2.5 text-[9px] font-black text-white disabled:opacity-40">Send + Stop Salar</button>
+                <button type="submit" disabled={acting || (!reply.trim() && !selectedProducts.length)} className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-full bg-[#14140F] px-3 py-2.5 text-[9px] font-black text-white disabled:opacity-40"><Send size={13}/>Send {selectedProducts.length ? 'selected' : 'reply'}</button>
+                <button type="button" disabled={acting || (!reply.trim() && !selectedProducts.length)} onClick={(event) => void submitReply(event as unknown as FormEvent<HTMLFormElement>, true)} className="flex-1 rounded-full bg-[#E1352B] px-3 py-2.5 text-[9px] font-black text-white disabled:opacity-40">Send + Stop Salar</button>
               </div>
             </form>
           </div>

@@ -27,9 +27,9 @@ function GoldPointer({ pinId }: { pinId: string }) {
     <svg className="psw-pointer-svg" viewBox="0 0 72 96" aria-hidden="true">
       <defs>
         <linearGradient id={pinId} x1="36" y1="4" x2="36" y2="92" gradientUnits="userSpaceOnUse">
-          <stop stop-color="#FFF4C2" />
-          <stop offset=".42" stop-color="#E8B83A" />
-          <stop offset="1" stop-color="#A66B10" />
+          <stop stopColor="#FFF4C2" />
+          <stop offset=".42" stopColor="#E8B83A" />
+          <stop offset="1" stopColor="#A66B10" />
         </linearGradient>
       </defs>
       <path
@@ -103,7 +103,7 @@ export default function PremiumSpinWheel({
               <div
                 key={prize.id || `${prize.name}-${index}`}
                 className="psw-slice"
-                style={{ left: `${x}%`, top: `${y}%` }}
+                style={{ left: `${x.toFixed(4)}%`, top: `${y.toFixed(4)}%` }}
               >
                 <RewardWheelArtwork prize={prize} compact={compact} />
               </div>

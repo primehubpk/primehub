@@ -13,7 +13,8 @@
       "fix/instant-home-shop-navigation-phase1": true,
       "fix/bottom-nav-instant-phase-1": true,
       "fix/homepage-refresh-phase-1": false,
-      "fix/category-continuous-sections": false
+      "fix/category-continuous-sections": false,
+      "fix/salar-home-catalog-sep27": true
     }
   }
 }

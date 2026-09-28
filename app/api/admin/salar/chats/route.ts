@@ -94,11 +94,15 @@ export async function POST(request: Request) {
       chat = { ...chat, salarPaused: false };
     } else if (action === 'reply') {
       const message = cleanText(body?.message, 6000);
-      if (!message) return NextResponse.json({ success: false, error: 'Reply cannot be empty.' }, { status: 400 });
+      const available = new Map(chat.messages.flatMap((entry) => entry.products || []).map((product) => [product.id, product]));
+      const selectedIds: string[] = Array.isArray(body?.productIds) ? body.productIds.slice(0, 30).map((id: unknown) => String(id)) : [];
+      const products = [...new Set(selectedIds)].map((id) => available.get(id)).filter((product): product is NonNullable<typeof product> => Boolean(product));
+      if (!message && !products.length) return NextResponse.json({ success: false, error: 'Reply cannot be empty.' }, { status: 400 });
       chat = appendSalarMessage(chat, {
         role: 'assistant',
         actor: 'admin',
-        content: message,
+        content: message || 'Ye selected products dekhein.',
+        products,
       });
       if (body?.pauseSalar === true) chat = { ...chat, salarPaused: true };
     } else if (action === 'pause') {

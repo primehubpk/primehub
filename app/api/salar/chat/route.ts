@@ -307,6 +307,7 @@ export async function POST(request: Request) {
       products: Array.isArray(result.products) ? result.products : [],
       categories: Array.isArray(result.categories) ? result.categories : [],
       displayMode: result.displayMode || 'none',
+      showAllMatches: result.showAllMatches === true,
     });
     chat = await saveSalarChat(chat);
 
@@ -350,4 +351,3 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: false, error: 'Salar could not respond right now. Please try again.' }, { status: 503 });
   }
 }
-

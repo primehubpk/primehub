@@ -37,6 +37,7 @@ export default function NewArrivalsRail({
   homeLayout?: boolean;
 }) {
   const [products, setProducts] = useState<Product[]>(initialProducts);
+  const [refreshSeed, setRefreshSeed] = useState(0);
   const [addedId, setAddedId] = useState<string | null>(null);
   const addItem = useCartStore((s) => s.addItem);
   const openVariantModal = useCartStore((s) => s.openVariantModal);
@@ -44,6 +45,12 @@ export default function NewArrivalsRail({
   useEffect(() => {
     setProducts(initialProducts);
   }, [initialProducts]);
+
+  useEffect(() => {
+    const value = new Uint32Array(1);
+    window.crypto.getRandomValues(value);
+    setRefreshSeed(value[0] || Date.now());
+  }, []);
 
   useEffect(() => {
     if (!liveUpdates) return;
@@ -54,10 +61,19 @@ export default function NewArrivalsRail({
     return () => stop();
   }, [liveUpdates]);
 
-  const newest = useMemo(
-    () => newestFirst(products, homeLayout).slice(0, homeLayout ? 100 : products.length),
-    [products, homeLayout],
-  );
+  const newest = useMemo(() => {
+    const arrivals = newestFirst(products, homeLayout).slice(0, homeLayout ? 100 : products.length);
+    if (!homeLayout || !refreshSeed) return arrivals;
+    let state = refreshSeed;
+    for (let index = arrivals.length - 1; index > 0; index -= 1) {
+      state ^= state << 13;
+      state ^= state >>> 17;
+      state ^= state << 5;
+      const swap = (state >>> 0) % (index + 1);
+      [arrivals[index], arrivals[swap]] = [arrivals[swap], arrivals[index]];
+    }
+    return arrivals;
+  }, [products, homeLayout, refreshSeed]);
 
   const addProduct = (product: Product) => {
     const image = imageOf(product);

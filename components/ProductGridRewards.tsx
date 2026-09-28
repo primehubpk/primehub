@@ -171,9 +171,9 @@ export default function ProductGridRewards({
   wholesaleSelected?: boolean;
   homeLayout?: boolean;
 }) {
-  const [products, setProducts] = useState<Product[]>(() =>
-    shuffleProducts(initialProducts),
-  );
+  // The server and the first browser render must use the same order. Shuffle
+  // after hydration so a reload still rotates the product selection.
+  const [products, setProducts] = useState<Product[]>(initialProducts);
   const [gifts, setGifts] = useState<Reward[]>([]);
   const [points, setPoints] = useState(0);
   const [uid, setUid] = useState<string | null>(null);
@@ -189,6 +189,10 @@ export default function ProductGridRewards({
 
   const addItem = useCartStore((s) => s.addItem);
   const openVariantModal = useCartStore((s) => s.openVariantModal);
+
+  useEffect(() => {
+    setProducts((current) => shuffleProducts(current));
+  }, []);
 
   useEffect(() => {
     if (!liveUpdates) {
@@ -572,7 +576,7 @@ export default function ProductGridRewards({
                     {img ? (
                       <FastProductLink
                         product={p}
-                        className="block h-full w-full"
+                        className="relative block h-full w-full"
                       >
                         <Image
                           src={img}
