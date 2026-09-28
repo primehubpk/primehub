@@ -605,18 +605,25 @@ function matchesShoppingMode(product: any, mode: ShoppingMode) {
 function searchProducts(catalogue: SalarCatalogue, query: string, shoppingMode: ShoppingMode) {
   const normalized = normalizeSearchText(query);
   if (!normalized) return [] as ProductCard[];
-  const category = catalogue.categories
+  const categoryMatches = catalogue.categories
     .filter((item: any) => [item?.title, item?.name, item?.slug].some((value) => {
       const label = normalizeSearchText(String(value || ''));
       return label.length >= 4 && (normalized === label || normalized.includes(label));
-    }))
-    .sort((a: any, b: any) => String(b.title || '').length - String(a.title || '').length)[0];
+    }));
+  // A short category request such as "jewellery" can match multiple actual
+  // categories; retain all of them instead of drifting into unrelated items.
+  const categories = categoryMatches.length ? categoryMatches : normalized.length >= 5
+    ? catalogue.categories.filter((item: any) => [item?.title, item?.name, item?.slug].some((value) =>
+      normalizeSearchText(String(value || '')).startsWith(normalized)))
+    : [];
   return catalogue.products
     .filter((product: any) => matchesShoppingMode(product, shoppingMode) &&
-      (!category || [product?.category, product?.categoryId].some((value) =>
-        [category?.title, category?.name, category?.id].some((label) => normalizeSearchText(String(value || '')) === normalizeSearchText(String(label || ''))))))
+      (!categories.length || categories.some((category: any) => [product?.category, product?.categoryId].some((value) =>
+        [category?.title, category?.name, category?.id].some((label) => normalizeSearchText(String(value || '')) === normalizeSearchText(String(label || '')))))))
     .map((product: any, index) => ({ product, index, score: productSearchScore(product, normalized) }))
-    .filter((item) => item.score > 0)
+    // For a named category the catalogue membership is stronger evidence than
+    // a partial token score. Include every item when the customer asks for all.
+    .filter((item) => categories.length > 0 || item.score > 0)
     .sort((a, b) => b.score - a.score || a.index - b.index)
     .map((item) => productCard(item.product))
     .filter((product) => product.id && product.title);
@@ -631,7 +638,8 @@ function explicitProductShowRequest(message: string) {
 function applyRenderingSafety(decision: ModelDecision, catalogue: SalarCatalogue, message: string, exactProductIds: string[]) {
   const next = { ...decision };
 
-  const asksForAlternatives = /\b(another|other|different|more|alternatives?|aur|mazeed|dusra|doosra|alag|variet(?:y|ies))\b/i.test(message);
+  const asksForAlternatives = /\b(another|other|different|more|alternatives?|aur|mazeed|dusra|doosra|alag|variet(?:y|ies)|same|wohi|wahi)\b/i.test(message);
+  if (asksForAlternatives && !exactProductIds.length) next.excludeShown = true;
   if (exactProductIds.length && !asksForAlternatives && next.orderAction === 'none') {
     // An exact product link is stronger evidence than a model's generic search.
     next.productIds = exactProductIds;
