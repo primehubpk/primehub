@@ -572,7 +572,7 @@ export default function ProductGridRewards({
                     {img ? (
                       <FastProductLink
                         product={p}
-                        className="block h-full w-full"
+                        className="relative block h-full w-full"
                       >
                         <Image
                           src={img}
