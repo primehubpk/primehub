@@ -4,20 +4,20 @@ import fs from 'node:fs';
 
 const read = (path) => fs.readFileSync(path, 'utf8').replace(/\r\n/g, '\n');
 
-test('home Sale Mela keeps exact bucket-price cards first and freezes the first populated catalog', () => {
+test('home Sale Mela shuffles only exact bucket-price cards and freezes the first populated catalog', () => {
   const source = read('components/home/HomeCollections.tsx');
 
   assert.match(source, /function orderHomeSaleMelaProducts\(/);
   assert.match(source, /homePrice\(product\) === amount/);
-  assert.match(source, /const featured = exactPrice\.slice\(0, 2\)/);
-  assert.match(source, /const randomPool = exactPrice\.slice\(2\)/);
+  assert.match(source, /seededUnit\(seed \^ amount, a\.id\) - seededUnit\(seed \^ amount, b\.id\)/);
+  assert.match(source, /return \[\.\.\.exactPrice, \.\.\.higherPrices\]/);
   assert.match(source, /homePrice\(product\) > amount/);
   assert.match(source, /priceDifference = homePrice\(a\) - homePrice\(b\)/);
 
   assert.match(source, /const \[homeSaleCatalog, setHomeSaleCatalog\] = useState<Product\[\]>/);
   assert.match(source, /homeSaleCatalog\.length > 0/);
   assert.match(source, /setHomeSaleCatalog\(liveCatalog\)/);
-  assert.match(source, /: orderHomeSaleMelaProducts\(baseMatches, amount, shuffleSeed\)/);
+  assert.match(source, /: orderHomeSaleMelaProducts\(baseMatches, amount, saleShuffleSeed\)/);
 });
 
 test('home Add to Cart checks the fresh product before deciding variants or stock', () => {
@@ -56,7 +56,7 @@ test('bot/admin stock defaults stay at 30 and the active test branch is Vercel-d
   assert.match(manager, /form\.stock \|\| '30'/);
   assert.match(manager, /row\.stock \?\? legacyStock \?\? 30/);
   assert.equal(
-    vercel.git?.deploymentEnabled?.['fix/category-continuous-sections'],
+    vercel.git?.deploymentEnabled?.['fix/salar-home-catalog-sep27'],
     false,
   );
 });
