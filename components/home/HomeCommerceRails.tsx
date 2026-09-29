@@ -6,7 +6,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { MessageCircle, Package, Play, PlayCircle, Sparkles } from "lucide-react";
 import HomeHeading from "./HomeHeading";
 import HomeRailFrame from './HomeRailFrame';
-import { orderHomeCards, railSeed } from '@/lib/homeRailOrder';
 import { useSettings } from "@/lib/useSettings";
 import { PRIME_SKILLS_SEED } from "@/lib/primeSkillsSeed";
 import { normalizeImageUrl } from "@/lib/imageUrl";
@@ -60,13 +59,9 @@ function skillDisplayPrice(item: PrimeSkillHomeItem) {
 }
 
 export function HomeWholesaleVideos() {
-  const [seed, setSeed] = useState(0);
-  useEffect(() => setSeed(railSeed()), []);
   const { settings, contact } = useSettings();
-  const videos = orderHomeCards((
-    (settings as typeof settings & { wholesaleVideos?: WholesaleVideo[] })
-      .wholesaleVideos || []
-  ).filter((video) => video.active !== false), seed);
+  const videos = ((settings as typeof settings & { wholesaleVideos?: WholesaleVideo[] })
+    .wholesaleVideos || []).filter((video) => video.active !== false);
 
   const storeWhatsApp =
     cleanWhatsApp(contact?.whatsappNumber) ||
@@ -152,8 +147,6 @@ export function HomeWholesaleVideos() {
 }
 
 export function HomePrimeSkills() {
-  const [seed, setSeed] = useState(0);
-  useEffect(() => setSeed(railSeed()), []);
   const { settings, contact } = useSettings();
   const sectionRef = useRef<HTMLElement | null>(null);
   const [items, setItems] = useState<PrimeSkillHomeItem[]>(
@@ -204,10 +197,10 @@ export function HomePrimeSkills() {
 
   const skills = useMemo(
     () =>
-      orderHomeCards(items
+      items
         .filter((item) => item.active !== false)
-        .sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0)), seed),
-    [items, seed],
+        .sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0)),
+    [items],
   );
 
   const storeWhatsApp =

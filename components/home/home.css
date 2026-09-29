@@ -16,6 +16,9 @@
 .home-content .ph-live-tabs,
 .home-content .snap-x {
   overflow-anchor: none;
+  direction: ltr;
+  scroll-padding-inline: 0;
+  overscroll-behavior-inline: contain;
 }
 .home-content {
   max-width: 1200px;

@@ -20,7 +20,7 @@ import { isDirectStorefrontImage } from "@/lib/imageUrl";
 import { getEffectivePrice } from "@/lib/dealPricing";
 import { isWholesaleProduct } from "@/lib/wholesale";
 import HomeRailFrame from './HomeRailFrame';
-import { orderHomeProducts, railSeed } from '@/lib/homeRailOrder';
+import { orderHomeProducts } from '@/lib/homeRailOrder';
 import {
   isWholesalePriceBucket,
   matchesPriceBucket,
@@ -301,23 +301,18 @@ export default function HomeCollections({
   const [homeSaleCatalog, setHomeSaleCatalog] = useState<Product[]>(
     () => (standalone ? [] : liveCatalog),
   );
-  const [shuffleSeed, setShuffleSeed] = useState(0);
 
   useEffect(() => {
     if (standalone || homeSaleCatalog.length > 0 || liveCatalog.length === 0) return;
     setHomeSaleCatalog(liveCatalog);
   }, [standalone, homeSaleCatalog.length, products]);
 
-  useEffect(() => {
-    setShuffleSeed(railSeed());
-  }, []);
-
   const catalog = standalone
     ? liveCatalog
     : homeSaleCatalog.length > 0
       ? homeSaleCatalog
       : liveCatalog;
-  const saleShuffleSeed = shuffleSeed || stableSaleMelaSeed(catalog);
+  const saleShuffleSeed = stableSaleMelaSeed(catalog);
   const buckets = sortPriceBuckets(
     (settings.priceBuckets || []).filter((b) => b.active),
   );
