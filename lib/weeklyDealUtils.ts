@@ -45,7 +45,7 @@ export function weeklyDealSavings(deal: {
   originalPrice?: unknown;
   dealPrice?: unknown;
 }) {
-  const normal = Number(deal.normalPrice) || Number(deal.originalPrice) || 0;
+  const normal = Math.max(Number(deal.normalPrice) || 0, Number(deal.originalPrice) || 0);
   const dealP = Number(deal.dealPrice) || 0;
   return Math.max(0, normal - dealP);
 }

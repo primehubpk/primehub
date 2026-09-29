@@ -14,10 +14,7 @@ export default function DealCard({ deal, label, status, product, adding }: DealC
 
   const regularPrice = regularPriceOf(product, deal);
   const dealPrice = Number(deal.dealPrice || 0);
-  const { price: livePrice, comparison, live } = weeklyCartPrice(deal, product);
-  const discount = comparison > dealPrice && dealPrice > 0
-    ? Math.round(((comparison - dealPrice) / comparison) * 100)
-    : 0;
+  const { price: livePrice, comparison, savings, discount, live } = weeklyCartPrice(deal, product);
   const image = imageOf(product, deal);
   const title = product?.title || deal.title || `${label} Deal`;
   const stock = Number(product?.stock ?? 0);
@@ -78,7 +75,7 @@ export default function DealCard({ deal, label, status, product, adding }: DealC
             </span>
             {discount > 0 && (
               <span className="rounded-full bg-[#E1352B] px-2.5 py-1.5 text-[9px] font-black text-white">
-                -{discount}% OFF
+                -{discount}% · Save Rs. {savings.toLocaleString()}
               </span>
             )}
           </div>

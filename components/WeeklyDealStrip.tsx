@@ -6,7 +6,6 @@ import { db } from '@/lib/firebase';
 import Link from 'next/link';
 import { ArrowRight, Clock3, ShoppingBag } from 'lucide-react';
 import type { WeeklyDeal } from '@/lib/types';
-import { weeklyDealSavings } from '@/lib/weeklyDealUtils';
 import { useCartStore, type VariantModalProduct } from '@/lib/cartStore';
 import { getPakistanDay } from '@/lib/dealPricing';
 import { weeklyCartPrice } from '@/lib/weeklyCartPrice';
@@ -126,7 +125,7 @@ export default function WeeklyDealStrip() {
             const dayLabel = DAY_LABELS[deal.day];
             const href = deal.productId ? `/deals/${deal.day}` : (deal.buttonLink || '/weekly-deals');
             const isLoading = loadingDealId === (deal.id || deal.productId);
-            const savings = weeklyDealSavings(deal);
+            const { savings, discount } = weeklyCartPrice(deal, null);
             return (
               <article key={deal.id || deal.day} className={`min-w-[180px] shrink-0 snap-start overflow-hidden rounded-[24px] bg-white shadow-sm ${deal.day === today ? 'ring-2 ring-[#E1352B]' : ''}`}>
                 <Link href={href} className="block">
@@ -137,7 +136,7 @@ export default function WeeklyDealStrip() {
                     {deal.day === today && <span className="pointer-events-none absolute bottom-3 left-3 rounded-full bg-[#E1352B] px-2 py-1 text-[7px] font-black text-white">TODAY</span>}
                     {savings > 0 && (
                       <span className="pointer-events-none absolute right-2 top-2 z-10 rounded-md bg-[#0F6A5F] px-2 py-0.5 text-[10px] font-semibold text-white shadow-sm">
-                        Save Rs. {savings.toLocaleString()}
+                        Save Rs. {savings.toLocaleString()} · {discount}%
                       </span>
                     )}
                   </div>

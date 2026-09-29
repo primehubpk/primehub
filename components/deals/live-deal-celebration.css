@@ -4,6 +4,78 @@
     linear-gradient(125deg, #6b1724, #a82937 48%, #7f3322);
 }
 
+.deal-festival-page {
+  position: relative;
+  background: radial-gradient(circle at 6% 12%, #ffe8b9 0, transparent 27%),
+    radial-gradient(circle at 95% 42%, #ffdfd8 0, transparent 28%),
+    radial-gradient(circle at 8% 77%, #fff1c8 0, transparent 28%),
+    linear-gradient(180deg, #fff9eb, #fffaf6 48%, #fff3df);
+}
+.deal-festival-page header, .deal-festival-page section {
+  border-color: #e2c69b;
+  box-shadow: 0 12px 36px #9f694a13;
+}
+.deal-festival-page header {
+  background: linear-gradient(120deg, #fffaf1, #fff, #fff4e1);
+  border: 1px solid #e2c69b;
+}
+.deal-festival-overlay {
+  position: fixed;
+  z-index: 40;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  contain: layout style;
+}
+.deal-festival-garland {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 24px;
+  border-top: 5px solid #c5923b;
+  background: repeating-linear-gradient(110deg, transparent 0 23px, #c99446 24px 27px, transparent 28px 47px),
+    repeating-linear-gradient(70deg, transparent 0 23px, #b63840 24px 27px, transparent 28px 47px);
+  opacity: .78;
+}
+.deal-festival-firework {
+  position: absolute;
+  width: 155px;
+  height: 155px;
+  border-radius: 50%;
+  background: repeating-conic-gradient(from 7deg, #ffc54d 0 5deg, transparent 5deg 19deg, #d45951 19deg 22deg, transparent 22deg 30deg);
+  -webkit-mask: radial-gradient(circle, transparent 0 25%, #000 29% 47%, transparent 50%);
+  mask: radial-gradient(circle, transparent 0 25%, #000 29% 47%, transparent 50%);
+  opacity: 0;
+  animation: deal-firework 5s ease-out infinite;
+}
+.firework-one { top: 9%; left: 1%; }
+.firework-two { top: 34%; right: 1%; animation-delay: 1.3s; }
+.firework-three { bottom: 17%; left: 4%; animation-delay: 2.6s; }
+.firework-four { bottom: 4%; right: 5%; animation-delay: 3.8s; }
+.deal-festival-pieces i {
+  position: absolute;
+  top: -14px;
+  width: 7px;
+  height: 11px;
+  border-radius: 2px;
+  background: #dca642;
+  opacity: 0;
+  animation: deal-page-confetti 8s linear infinite;
+  will-change: transform;
+}
+.deal-festival-pieces i:nth-child(3n) { background: #ce6370; }
+.deal-festival-pieces i:nth-child(4n) { background: #84a68d; border-radius: 50%; width: 6px; height: 6px; }
+@keyframes deal-firework {
+  0%, 50%, 100% { transform: scale(.2) rotate(0); opacity: 0; }
+  12%, 27% { transform: scale(1) rotate(16deg); opacity: .72; }
+}
+@keyframes deal-page-confetti {
+  0% { transform: translate3d(0, -10px, 0) rotate(0); opacity: 0; }
+  7%, 72% { opacity: .82; }
+  100% { transform: translate3d(40px, 105vh, 0) rotate(650deg); opacity: 0; }
+}
+
 .deal-celebration-glow {
   position: absolute;
   inset: -60%;
@@ -43,10 +115,12 @@
 @keyframes deal-confetti { to { translate: 0 340px; rotate: 540deg; } }
 
 @media (max-width: 600px) {
+  .deal-festival-firework { width: 100px; height: 100px; }
   .deal-celebration-burst { top: 7%; font-size: 2.5rem; opacity: .5; }
   .deal-celebration-burst-left { left: 3%; }
   .deal-celebration-burst-right { right: 3%; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .deal-celebration-glow, .deal-celebration-burst, .deal-celebration-confetti i { animation: none; }
+  .deal-celebration-glow, .deal-celebration-burst, .deal-celebration-confetti i,
+  .deal-festival-firework, .deal-festival-pieces i { animation: none; }
 }

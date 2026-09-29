@@ -28,7 +28,6 @@ import {
   dealTiming,
   pakistanNowWeekday,
   countdownParts,
-  weeklyDealSavings,
 } from "@/lib/weeklyDealUtils";
 import {
   bigDealConfiguredSlotCount,
@@ -249,8 +248,9 @@ export default function HeroFlashBanner({ initialProducts = [], liveUpdates = tr
               const deal = weeklyDeals.find((d) => d.day === key && d.active !== false && Number(d.dealPrice) > 0);
               const dealProduct = deal ? (products[deal.productId] as ProductDealFields | undefined) : undefined;
               const dealPrice = Number(deal?.dealPrice || 0);
-              const weeklyRegular = deal ? weeklyCartPrice(deal, dealProduct).regular : 0;
-              const saving = Math.max(0, weeklyRegular - dealPrice);
+              const weeklyOffer = deal ? weeklyCartPrice(deal, dealProduct) : null;
+              const weeklyRegular = weeklyOffer?.regular || 0;
+              const saving = weeklyOffer?.savings || 0;
               const dealImage = normalizeImageUrl(deal?.imageUrl || (deal ? products[deal.productId]?.imageUrl : "") || "");
               const isLive = Boolean(deal && todayKey === key);
               const weeklyTiming = deal && nowTick !== null ? dealTiming(deal.day, new Date(nowTick)) : null;
@@ -260,7 +260,7 @@ export default function HeroFlashBanner({ initialProducts = [], liveUpdates = tr
                   <Link className="home-week-link" href={deal ? `/deals/${key}` : "/weekly-deals"} prefetch={false}>
                     <strong>{key.slice(0, 3).toUpperCase()}</strong>
                     {saving > 0 ? (
-                      <em className="home-week-saving">Save Rs. {saving.toLocaleString("en-PK")}</em>
+                      <em className="home-week-saving">Save Rs. {saving.toLocaleString("en-PK")} · {weeklyOffer?.discount}%</em>
                     ) : null}
                     <span className={`home-week-status ${isLive ? "is-live" : ""}`}>
                       <span className={isLive ? "home-live" : "home-unlocks"}>
@@ -278,13 +278,14 @@ export default function HeroFlashBanner({ initialProducts = [], liveUpdates = tr
                     {deal ? (
                       <span className="home-week-pricing">
                         <small>Deal <b>Rs. {dealPrice.toLocaleString("en-PK")}</b></small>
-                        <small>Regular <s>Rs. {weeklyRegular.toLocaleString("en-PK")}</s></small>
+                        <small>Regular Rs. {weeklyRegular.toLocaleString("en-PK")}</small>
+                        {weeklyOffer && weeklyOffer.comparison > weeklyRegular && <small>Was <s>Rs. {weeklyOffer.comparison.toLocaleString("en-PK")}</s></small>}
                       </span>
                     ) : <b className="home-price">Coming soon</b>}
                   </Link>
                   {deal ? (
                     <button type="button" className="home-week-add" onClick={() => addDealToCart(deal)} disabled={!dealProduct || Number(dealProduct.stock ?? dealProduct.quantity ?? 1) <= 0}>
-                      <ShoppingCart size={11} /> Add · Rs. {dealPrice.toLocaleString("en-PK")}
+                      <ShoppingCart size={11} /> Add · Rs. {(weeklyOffer?.price || dealPrice).toLocaleString("en-PK")}
                     </button>
                   ) : null}
                 </article>
@@ -340,8 +341,8 @@ export default function HeroFlashBanner({ initialProducts = [], liveUpdates = tr
               const deal = weeklyDeals.find((item) => item.day === key && Number(item.dealPrice) > 0);
               const product = deal ? products[deal.productId] : undefined;
               const dealPrice = Number(deal?.dealPrice || 0);
-              const savings = deal ? weeklyDealSavings(deal) : 0;
               const prices = deal ? weeklyCartPrice(deal, product) : null;
+              const savings = prices?.savings || 0;
               const normalPrice = prices?.regular || 0;
               const comparisonPrice = prices?.comparison || 0;
               const isLive = Boolean(deal && todayKey === key && dealPrice > 0);
@@ -356,11 +357,11 @@ export default function HeroFlashBanner({ initialProducts = [], liveUpdates = tr
                         <Image src={dealImage} alt={label} fill priority={isLive} loading={isLive ? "eager" : "lazy"} sizes="(max-width: 640px) 145px, (max-width: 1024px) 20vw, 180px" quality={72} className="object-cover transition duration-200 group-hover:scale-105" />
                         <span className="absolute left-1.5 top-1.5 rounded-full bg-[#E1352B] px-1.5 py-0.5 text-[6px] font-black uppercase tracking-[0.08em] text-white shadow-sm">{isLive ? "Sale" : label}</span>
                         {isLive && <span className="absolute bottom-1.5 left-1.5 rounded-full bg-emerald-500 px-1.5 py-0.5 text-[6px] font-black uppercase tracking-[0.08em] text-white shadow-sm">LIVE</span>}
-                        {savings > 0 && <span className="absolute right-1.5 top-1.5 z-20 rounded-md bg-[#0F6A5F] px-1.5 py-0.5 text-[7px] font-medium leading-none text-white shadow-sm">Save Rs. {savings.toLocaleString()}</span>}
+                        {savings > 0 && <span className="absolute right-1.5 top-1.5 z-20 rounded-md bg-[#0F6A5F] px-1.5 py-0.5 text-[7px] font-medium leading-none text-white shadow-sm">Save Rs. {savings.toLocaleString()} · {prices?.discount}%</span>}
                       </span>
                     </Link>
                   ) : (
-                    <span className="relative flex aspect-[4/3] w-full items-center justify-center overflow-hidden bg-[#F4F4F1] text-[#0F6A5F]"><Icon size={18} strokeWidth={2.3} />{savings > 0 && <span className="absolute right-1.5 top-1.5 z-20 rounded-md bg-[#0F6A5F] px-1.5 py-0.5 text-[7px] font-medium leading-none text-white shadow-sm">Save Rs. {savings.toLocaleString()}</span>}</span>
+                    <span className="relative flex aspect-[4/3] w-full items-center justify-center overflow-hidden bg-[#F4F4F1] text-[#0F6A5F]"><Icon size={18} strokeWidth={2.3} />{savings > 0 && <span className="absolute right-1.5 top-1.5 z-20 rounded-md bg-[#0F6A5F] px-1.5 py-0.5 text-[7px] font-medium leading-none text-white shadow-sm">Save Rs. {savings.toLocaleString()} · {prices?.discount}%</span>}</span>
                   )}
                   <span className="relative z-10 block px-2.5 pb-3 pt-2">
                     {deal?.productId ? (

@@ -134,10 +134,9 @@ export default function WeeklyDealsPage() {
               const product = products[deal.productId];
               const title = product?.title || deal.title || `${LABELS[deal.day]} Deal`;
               const image = imageOf(product, deal);
-              const { regular: regularPrice, comparison, live: isLiveToday } = weeklyCartPrice(deal, product);
+              const { regular: regularPrice, comparison, savings, discount, live: isLiveToday } = weeklyCartPrice(deal, product);
               const dealPrice = Number(deal.dealPrice || 0);
               const price = isLiveToday ? dealPrice : regularPrice;
-              const discount = isLiveToday && comparison > price && price > 0 ? Math.round(((comparison - price) / comparison) * 100) : 0;
               const inStock = Boolean(product && Number(product.stock ?? 0) > 0 && price > 0);
               const unlockCountdown = countdownParts(countdownToNextUnlock(deal.day, new Date(nowTick)));
               return (
@@ -145,7 +144,7 @@ export default function WeeklyDealsPage() {
                   <Link href={`/deals/${deal.day}`} prefetch={false} aria-label={`View ${title}`} className="group block">
                     <div className="relative aspect-square overflow-hidden bg-[#F4F4F1]">
                       {image ? <img src={image} alt={title} className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]" /> : <div className="flex h-full items-center justify-center text-xs font-bold text-black/25">No product image</div>}
-                      <div className="absolute left-3 right-3 top-3 flex items-center justify-between gap-2"><span className={`rounded-full px-2.5 py-1.5 text-[8px] font-black uppercase tracking-wide ${isLiveToday ? 'bg-emerald-500 text-white' : 'bg-white/95 text-black/70'}`}>{isLiveToday ? "LIVE TODAY" : `${LABELS[deal.day]} DEAL`}</span>{discount > 0 && <span className="rounded-full bg-[#E1352B] px-2.5 py-1.5 text-[9px] font-black text-white">-{discount}% OFF</span>}</div>
+                      <div className="absolute left-3 right-3 top-3 flex items-center justify-between gap-2"><span className={`rounded-full px-2.5 py-1.5 text-[8px] font-black uppercase tracking-wide ${isLiveToday ? 'bg-emerald-500 text-white' : 'bg-white/95 text-black/70'}`}>{isLiveToday ? "LIVE TODAY" : `${LABELS[deal.day]} DEAL`}</span>{discount > 0 && <span className="rounded-full bg-[#E1352B] px-2.5 py-1.5 text-[9px] font-black text-white">-{discount}% OFF · Rs. {savings.toLocaleString()}</span>}</div>
                     </div>
                   </Link>
                   <div className="p-4">

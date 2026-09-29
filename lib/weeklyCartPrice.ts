@@ -10,8 +10,10 @@ export function weeklyCartPrice(deal: WeeklyCartDeal, product: WeeklyCartProduct
   const comparison = Math.max(regular, Number(product?.originalPrice) || 0,
     Number(product?.compareAtPrice) || 0, Number(deal.originalPrice) || 0);
   const special = Number(deal.dealPrice) || 0;
+  const savings = special > 0 ? Math.max(0, comparison - special) : 0;
+  const discount = comparison > 0 ? Math.round(savings / comparison * 100) : 0;
   const live = deal.active !== false &&
     String(deal.day || '').toLowerCase() === getPakistanDay(now).toLowerCase() &&
     special > 0 && special < regular;
-  return { price: live ? special : regular, regular, comparison, live };
+  return { price: live ? special : regular, regular, comparison, savings, discount, live };
 }

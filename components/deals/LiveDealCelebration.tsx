@@ -3,10 +3,17 @@
 import { PartyPopper, Sparkles } from 'lucide-react';
 import './live-deal-celebration.css';
 
-const confetti = Array.from({ length: 18 }, (_, index) => index);
+const confetti = Array.from({ length: 32 }, (_, index) => index);
 
 export default function LiveDealCelebration({ day }: { day: string }) {
-  return <div className="deal-celebration relative mt-5 overflow-hidden rounded-[28px] px-5 py-8 text-center text-white shadow-[0_22px_50px_rgba(144,65,24,.2)] md:py-10" aria-label={`${day} live deal celebration`}>
+  return <>
+    <div className="deal-festival-overlay" aria-hidden="true">
+      <div className="deal-festival-garland" />
+      <span className="deal-festival-firework firework-one" /><span className="deal-festival-firework firework-two" />
+      <span className="deal-festival-firework firework-three" /><span className="deal-festival-firework firework-four" />
+      <div className="deal-festival-pieces">{confetti.map((index) => <i key={index} style={{ left: `${(index * 47) % 99}%`, animationDuration: `${6 + index % 5}s`, animationDelay: `${index * -.65}s` }} />)}</div>
+    </div>
+    <div className="deal-celebration relative mt-5 overflow-hidden rounded-[28px] px-5 py-8 text-center text-white shadow-[0_22px_50px_rgba(144,65,24,.2)] md:py-10" aria-label={`${day} live deal celebration`}>
     <div className="deal-celebration-glow" aria-hidden="true" />
     <div className="deal-celebration-burst deal-celebration-burst-left" aria-hidden="true">✦</div>
     <div className="deal-celebration-burst deal-celebration-burst-right" aria-hidden="true">✦</div>
@@ -16,5 +23,6 @@ export default function LiveDealCelebration({ day }: { day: string }) {
       <h2 className="mt-4 flex items-center justify-center gap-2 text-2xl font-black tracking-tight sm:text-4xl"><PartyPopper size={24} className="shrink-0 text-[#FFE193]" /> {day} Deal Is Live! <PartyPopper size={24} className="shrink-0 text-[#FFE193]" /></h2>
       <p className="mt-2 text-sm font-semibold text-white/90">Special price is unlocked today. Celebrate and shop before midnight!</p>
     </div>
-  </div>;
+    </div>
+  </>;
 }

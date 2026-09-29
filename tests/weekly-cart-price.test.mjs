@@ -25,7 +25,20 @@ test('original comparison price never replaces the current store price', () => {
   assert.equal(locked.price, 3500);
   assert.equal(locked.regular, 3500);
   assert.equal(locked.comparison, 5000);
+  assert.equal(locked.savings, 2501);
+  assert.equal(locked.discount, 50);
   const live = weeklyCartPrice({ ...deal, day: 'monday' }, product);
   assert.equal(live.price, 2499);
   assert.equal(live.comparison, 5000);
+});
+
+test('percentage and savings use the crossed original, not regular price', () => {
+  const offer = weeklyCartPrice(
+    { day: 'monday', originalPrice: 3000, dealPrice: 1999 },
+    { price: 2500, originalPrice: 3000 },
+  );
+  assert.equal(offer.regular, 2500);
+  assert.equal(offer.price, 1999);
+  assert.equal(offer.savings, 1001);
+  assert.equal(offer.discount, 33);
 });
