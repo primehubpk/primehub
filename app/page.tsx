@@ -94,6 +94,7 @@ export default async function HomePage() {
         initialProducts={snapshot.products as Product[]}
         initialCategories={snapshot.categories as Category[]}
         initialSettings={initialSettings as Partial<SiteSettings>}
+        initialWeekday={today}
       />
     </>
   );

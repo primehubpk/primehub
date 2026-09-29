@@ -59,7 +59,11 @@ export default function WeeklyDealStrip() {
     setDeals(Array.isArray(raw) ? (raw as WeeklyDeal[]) : []);
   }), []);
 
-  const orderedDeals = DAYS
+  const todayIndex = DAYS.indexOf(today);
+  const orderedDays = todayIndex >= 0
+    ? [...DAYS.slice(todayIndex), ...DAYS.slice(0, todayIndex)]
+    : DAYS;
+  const orderedDeals = orderedDays
     .map((day) => deals.find((deal) => deal.day === day))
     .filter((deal): deal is WeeklyDeal => Boolean(deal));
 

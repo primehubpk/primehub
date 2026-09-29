@@ -32,6 +32,7 @@ import type {
   Category,
   Product as SharedProduct,
   SiteSettings,
+  Weekday,
 } from "@/lib/types";
 import type { Product } from "@/components/shop/ShopTypes";
 import { CATALOG_REFRESH_EVENT } from "@/lib/catalogRefreshSignal";
@@ -41,6 +42,7 @@ type Props = {
   initialProducts: Product[];
   initialCategories: Category[];
   initialSettings: Partial<SiteSettings>;
+  initialWeekday: Weekday;
 };
 
 const RECOVERY_DELAYS_MS = [0];
@@ -50,6 +52,7 @@ export default function HomePageClient({
   initialProducts,
   initialCategories,
   initialSettings,
+  initialWeekday,
 }: Props) {
   const router = useRouter();
   const [selectedMaxPrice, setSelectedMaxPrice] = useState<number | null>(null);
@@ -231,6 +234,7 @@ export default function HomePageClient({
             homeLayout
             initialProducts={products as SharedProduct[]}
             liveUpdates={false}
+            initialWeekday={initialWeekday}
           />
           <BigDealNextPreviewSync />
           <NewArrivalsRail

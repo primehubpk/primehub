@@ -121,7 +121,7 @@ function bigDealSlotAt(deal: BigDealFields | undefined, index: number) {
   };
 }
 
-export default function HeroFlashBanner({ initialProducts = [], liveUpdates = true, homeLayout = false }: { initialProducts?: Product[]; liveUpdates?: boolean; homeLayout?: boolean }) {
+export default function HeroFlashBanner({ initialProducts = [], liveUpdates = true, homeLayout = false, initialWeekday }: { initialProducts?: Product[]; liveUpdates?: boolean; homeLayout?: boolean; initialWeekday?: Weekday }) {
   const { settings } = useSettings();
   const [nowTick, setNowTick] = useState<number | null>(null);
   const [products, setProducts] = useState<Record<string, Product>>(() => productMap(initialProducts));
@@ -151,7 +151,9 @@ export default function HeroFlashBanner({ initialProducts = [], liveUpdates = tr
     }, () => undefined);
   }, [liveUpdates]);
 
-  const todayKey = nowTick === null ? null : pakistanNowWeekday(new Date(nowTick));
+  const todayKey = nowTick === null
+    ? (initialWeekday || pakistanNowWeekday(new Date()))
+    : pakistanNowWeekday(new Date(nowTick));
   const activeBigSlot = bigDealSlotAt(bigDeal, bigDealRotationIndex(bigDeal?.rotationStartedAt, new Date(nowTick ?? 0), bigDealConfiguredSlotCount(bigDeal)));
   const countdown = useMemo(() => {
     if (nowTick === null) return { days: 0, hours: 0, minutes: 0, seconds: 0 };

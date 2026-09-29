@@ -84,11 +84,11 @@ export default function WeeklyDealsPage() {
 
   const deals = useMemo(() => {
     const source = (settings.weeklyDeals || []).filter((deal) => deal.productId);
+    const todayIndex = DAYS.indexOf(today);
     return [...source].sort((a, b) => {
-      const aToday = a.day === today ? 0 : 1;
-      const bToday = b.day === today ? 0 : 1;
-      if (aToday !== bToday) return aToday - bToday;
-      return DAYS.indexOf(a.day) - DAYS.indexOf(b.day);
+      const aDistance = (DAYS.indexOf(a.day) - todayIndex + 7) % 7;
+      const bDistance = (DAYS.indexOf(b.day) - todayIndex + 7) % 7;
+      return aDistance - bDistance;
     });
   }, [settings.weeklyDeals, today]);
 
