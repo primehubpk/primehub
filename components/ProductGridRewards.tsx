@@ -2,7 +2,7 @@
 
 import { fetchPublicStorefront } from '@/lib/storefrontClient';
 import Link from "next/link";
-import Image from "next/image";
+import RetryableStorefrontImage from '@/components/RetryableStorefrontImage';
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { onAuthStateChanged } from "firebase/auth";
 import {
@@ -578,7 +578,7 @@ export default function ProductGridRewards({
                         product={p}
                         className="relative block h-full w-full"
                       >
-                        <Image
+                        <RetryableStorefrontImage
                           src={img}
                           alt={title(p)}
                           fill

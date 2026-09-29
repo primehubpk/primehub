@@ -1,6 +1,6 @@
 "use client";
 
-import Image from "next/image";
+import RetryableStorefrontImage from '@/components/RetryableStorefrontImage';
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ChevronRight, Package, ShoppingCart } from "lucide-react";
@@ -176,7 +176,7 @@ export function HomeProductCard({
         aria-label={`View ${titleOf(product)}`}
       >
         {src ? (
-          <Image
+          <RetryableStorefrontImage
             src={src}
             alt={titleOf(product)}
             fill

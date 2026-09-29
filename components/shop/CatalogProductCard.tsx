@@ -1,6 +1,6 @@
 'use client';
 
-import Image from 'next/image';
+import RetryableStorefrontImage from '@/components/RetryableStorefrontImage';
 import { Check, Eye, ShoppingBag, Star } from 'lucide-react';
 import FastProductLink from '@/components/FastProductLink';
 import WholesaleBadge from '@/components/WholesaleBadge';
@@ -43,7 +43,7 @@ export default function CatalogProductCard({ product, addedId, addProduct, compa
         <FastProductLink product={product} className="block">
           <div className="relative aspect-[1.5/1] overflow-hidden bg-[#F7F2EA] sm:aspect-[1.58/1]">
             {image ? (
-              <Image
+              <RetryableStorefrontImage
                 src={image}
                 alt={titleOf(product)}
                 fill
@@ -106,7 +106,7 @@ export default function CatalogProductCard({ product, addedId, addProduct, compa
       <FastProductLink product={product} className="block">
         <div className={`relative overflow-hidden bg-[#f3eee7] ${dense ? 'aspect-[1.38/1] sm:aspect-[1.22/1]' : 'aspect-square'}`}>
           {image ? (
-            <Image
+            <RetryableStorefrontImage
               src={image}
               alt={titleOf(product)}
               fill
