@@ -19,6 +19,8 @@ import {
 import { isDirectStorefrontImage } from "@/lib/imageUrl";
 import { getEffectivePrice } from "@/lib/dealPricing";
 import { isWholesaleProduct } from "@/lib/wholesale";
+import HomeRailFrame from './HomeRailFrame';
+import { orderHomeProducts, railSeed } from '@/lib/homeRailOrder';
 import {
   isWholesalePriceBucket,
   matchesPriceBucket,
@@ -257,9 +259,9 @@ function orderHomeSaleMelaProducts(
   amount: number,
   seed: number,
 ) {
-  const exactPrice = products
-    .filter((product) => homePrice(product) === amount)
-    .sort((a, b) => seededUnit(seed ^ amount, a.id) - seededUnit(seed ^ amount, b.id));
+  const exactPrice = orderHomeProducts(
+    products.filter((product) => homePrice(product) === amount), seed ^ amount,
+  );
 
   const higherPrices = products
     .filter((product) => homePrice(product) > amount)
@@ -307,15 +309,7 @@ export default function HomeCollections({
   }, [standalone, homeSaleCatalog.length, products]);
 
   useEffect(() => {
-    const values = new Uint32Array(1);
-    if (typeof window !== "undefined" && window.crypto?.getRandomValues) {
-      window.crypto.getRandomValues(values);
-      setShuffleSeed(values[0] || Date.now());
-      return;
-    }
-    setShuffleSeed(
-      (Date.now() ^ Math.floor(Math.random() * 0xffffffff)) >>> 0,
-    );
+    setShuffleSeed(railSeed());
   }, []);
 
   const catalog = standalone
@@ -406,11 +400,11 @@ export default function HomeCollections({
             );
 
             return (
+              <HomeRailFrame key={bucket.id} title={wholesale ? 'Wholesale' : `Sale Mela · ${saleMelaBucketLabel(amount)}`} href={href} icon={wholesale ? <Package size={27} /> : <b className="text-lg">{amount}</b>} className={standalone ? 'home-sale-standalone-frame' : 'home-sale-home-frame'}>
               <div
                 id={anchor}
                 className={`home-sale-row scroll-mt-24 ${wholesale ? "home-sale-wholesale" : ""}`}
                 style={standalone ? { display: "block", marginBottom: "28px" } : undefined}
-                key={bucket.id}
               >
                 {standalone && wholesale && kidsPacks.length > 0 ? (
                   <div
@@ -440,14 +434,14 @@ export default function HomeCollections({
                       <span className="home-budget-label">Kids Metal Wholesale</span>
                     </Link>
                   </div>
-                ) : budgetLink}
+                ) : standalone ? budgetLink : null}
 
                 <div
                   className="home-sale-products [scrollbar-width:none]"
                   style={standalone ? standaloneGridStyle : {
                     display: "flex",
                     gridTemplateColumns: "none",
-                    gap: "6px",
+                    gap: "10px",
                     overflowX: "auto",
                     overscrollBehaviorX: "contain",
                     paddingBottom: "3px",
@@ -462,7 +456,7 @@ export default function HomeCollections({
                         style={standalone ? {
                           minWidth: 0,
                         } : {
-                          flex: "0 0 calc((100% - 12px) / 3)",
+                          flex: "0 0 clamp(156px, 44%, 196px)",
                           minWidth: 0,
                           scrollSnapAlign: "start",
                         }}
@@ -535,6 +529,7 @@ export default function HomeCollections({
                   </section>
                 ) : null}
               </div>
+              </HomeRailFrame>
             );
           })}
         </section>

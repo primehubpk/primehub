@@ -10,8 +10,8 @@ const PUBLIC_PRIMARY_TIMEOUT_MS = 8000;
 // Admin/product writes explicitly invalidate the public-catalog tag, so a longer
 // fallback TTL cuts repeated Supabase egress without delaying normal updates.
 const CATALOG_READ_CACHE = { revalidate: 600, tags: ['public-catalog'], timeoutMs: PUBLIC_PRIMARY_TIMEOUT_MS };
-const PRODUCT_READ_CACHE = { revalidate: 300, tags: ['public-products'], timeoutMs: PUBLIC_PRIMARY_TIMEOUT_MS };
-const SETTINGS_READ_CACHE = { revalidate: 300, tags: ['storefront-settings'], timeoutMs: PUBLIC_PRIMARY_TIMEOUT_MS };
+const PRODUCT_READ_CACHE = { revalidate: 600, tags: ['public-products'], timeoutMs: PUBLIC_PRIMARY_TIMEOUT_MS };
+const SETTINGS_READ_CACHE = { revalidate: 600, tags: ['storefront-settings'], timeoutMs: PUBLIC_PRIMARY_TIMEOUT_MS };
 const SKILLS_READ_CACHE = { revalidate: 600, tags: ['prime-skills', 'storefront-settings'], timeoutMs: PUBLIC_PRIMARY_TIMEOUT_MS };
 
 function supabaseServiceConfig() {
@@ -140,7 +140,7 @@ async function loadPublicProduct(productId: string) {
 export const getPublicProductSnapshot = unstable_cache(
   loadPublicProduct,
   ['primehub-public-product-dual-v2'],
-  { revalidate: 300, tags: ['public-products'] },
+  { revalidate: 600, tags: ['public-products'] },
 );
 
 export async function getFreshPublicProductSnapshot(productId: string) {
@@ -165,11 +165,11 @@ async function loadStorefrontSettingsResult() {
 export const getStorefrontSettingsResultSnapshot = unstable_cache(
   loadStorefrontSettingsResult,
   ['primehub-storefront-settings-dual-v5'],
-  { revalidate: 300, tags: ['storefront-settings'] },
+  { revalidate: 600, tags: ['storefront-settings'] },
 );
 
 // The app-wide settings provider refreshes while a customer keeps a tab open.
-// Share one five-minute server snapshot so those refreshes do not repeat Supabase
+// Share one ten-minute server snapshot so those refreshes do not repeat Supabase
 // and Firebase recovery reads for every browser tab.
 async function loadPublicStorefrontSettingsDocumentsSnapshot() {
   const result = await getStorefrontSettingsResultSnapshot();
@@ -180,7 +180,7 @@ async function loadPublicStorefrontSettingsDocumentsSnapshot() {
 export const getPublicStorefrontSettingsDocumentsSnapshot = unstable_cache(
   loadPublicStorefrontSettingsDocumentsSnapshot,
   ['primehub-public-storefront-settings-documents-v1'],
-  { revalidate: 300, tags: ['storefront-settings', 'wholesale-videos'] },
+  { revalidate: 600, tags: ['storefront-settings', 'wholesale-videos'] },
 );
 
 export async function getStorefrontSettingsSnapshot() {

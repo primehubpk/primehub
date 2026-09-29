@@ -1,6 +1,19 @@
 .home-commerce-section {
   position: relative;
 }
+.home-commerce-section .home-commerce-rail-wrap {
+  padding: 0 16px;
+}
+.home-commerce-section .home-commerce-rail {
+  display: flex;
+  grid-template-rows: none;
+  grid-auto-flow: row;
+  gap: 10px;
+  scroll-snap-type: x mandatory;
+}
+.home-commerce-section .home-commerce-card {
+  flex: 0 0 clamp(156px, 44%, 196px);
+}
 
 .home-commerce-rail-wrap {
   position: relative;

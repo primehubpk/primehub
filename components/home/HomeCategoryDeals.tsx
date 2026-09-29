@@ -2,6 +2,8 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
+import { useEffect, useState } from 'react';
+import { orderHomeProducts, railSeed } from '@/lib/homeRailOrder';
 import { categoryHref, productMatchesCategory } from '@/lib/categoryUtils';
 import { normalizeImageUrl } from '@/lib/imageUrl';
 import { HomeProductCard } from '@/components/home/HomeCollections';
@@ -9,6 +11,8 @@ import type { Product } from '@/components/shop/ShopTypes';
 import type { Category } from '@/lib/types';
 
 export default function HomeCategoryDeals({ products, categories }: { products: Product[]; categories: Category[] }) {
+  const [seed, setSeed] = useState(0);
+  useEffect(() => setSeed(railSeed()), []);
   const visible = [...categories]
     .filter((category) => category.active !== false && String(category.title || '').trim())
     .sort((a, b) => Number(a.sortOrder ?? 999) - Number(b.sortOrder ?? 999) || a.title.localeCompare(b.title));
@@ -16,8 +20,8 @@ export default function HomeCategoryDeals({ products, categories }: { products: 
   return (
     <section className="mt-8 space-y-7" aria-label="Shop products by category">
       {visible.map((category) => {
-        const matches = products.filter((product) => product.published !== false &&
-          productMatchesCategory(category.title, product, categories));
+        const matches = orderHomeProducts(products.filter((product) => product.published !== false &&
+          productMatchesCategory(category.title, product, categories)), seed);
         if (!matches.length) return null;
         const image = normalizeImageUrl(category.iconUrl || category.imageUrl || '');
         return <div key={category.id} className="rounded-[24px] border border-[#DCCCA8]/60 bg-[#FFFCF7] py-4 shadow-sm">

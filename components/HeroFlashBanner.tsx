@@ -18,7 +18,7 @@ import { collection, onSnapshot } from "firebase/firestore";
 import { useSettings } from "@/lib/useSettings";
 import { useCartStore } from "@/lib/cartStore";
 import { db } from "@/lib/firebase";
-import { getEffectivePrice } from "@/lib/dealPricing";
+import { weeklyCartPrice } from '@/lib/weeklyCartPrice';
 import { normalizeImageUrl } from "@/lib/imageUrl";
 import { makeTikTokContent, trackTikTokEvent } from "@/lib/tiktokPixel";
 import type { Product, Weekday } from "@/lib/types";
@@ -32,6 +32,7 @@ import {
 } from "@/lib/weeklyDealUtils";
 import {
   bigDealConfiguredSlotCount,
+  bigDealRotationIndex,
   nextBigDealRotationIndex,
 } from "@/lib/bigDealRotation";
 
@@ -152,6 +153,7 @@ export default function HeroFlashBanner({ initialProducts = [], liveUpdates = tr
   }, [liveUpdates]);
 
   const todayKey = nowTick === null ? null : pakistanNowWeekday(new Date(nowTick));
+  const activeBigSlot = bigDealSlotAt(bigDeal, bigDealRotationIndex(bigDeal?.rotationStartedAt, new Date(nowTick ?? 0), bigDealConfiguredSlotCount(bigDeal)));
   const countdown = useMemo(() => {
     if (nowTick === null) return { days: 0, hours: 0, minutes: 0, seconds: 0 };
     const end = bigDeal?.endAt ? new Date(bigDeal.endAt).getTime() : 0;
@@ -168,11 +170,7 @@ export default function HeroFlashBanner({ initialProducts = [], liveUpdates = tr
 
   function addDealToCart(deal: NonNullable<typeof weeklyDeals>[number]) {
     const product = products[deal.productId];
-    const normalPrice = Number(deal.normalPrice || deal.originalPrice || product?.normalPrice || product?.price || 0);
-    const specialPrice = Number(deal.dealPrice || 0);
-    const dealDay = deal.day ? `${deal.day.charAt(0).toUpperCase()}${deal.day.slice(1)}` : undefined;
-    const price = getEffectivePrice({ price: normalPrice, dealPrice: specialPrice, dealDay }, new Date(nowTick ?? 0));
-    const isLive = todayKey === deal.day && specialPrice > 0 && price === specialPrice;
+    const { price, regular: normalPrice, live: isLive } = weeklyCartPrice(deal, product);
     if (!deal.productId || price <= 0 || Number((product as ProductDealFields | undefined)?.stock ?? 1) <= 0) return;
     const image = normalizeImageUrl(product?.imageUrl || deal.imageUrl || "");
     const productWithDealPrice = {
@@ -180,7 +178,7 @@ export default function HeroFlashBanner({ initialProducts = [], liveUpdates = tr
       id: deal.productId,
       title: product?.title || deal.title,
       price,
-      originalPrice: isLive ? Number(product?.originalPrice || deal.originalPrice || price) : normalPrice,
+      originalPrice: normalPrice,
       image,
       imageUrl: image,
     } as Product;
@@ -204,31 +202,35 @@ export default function HeroFlashBanner({ initialProducts = [], liveUpdates = tr
   }
 
   function addBigDealToCart() {
-    if (!bigDeal?.productId) return;
-    const product = products[bigDeal.productId];
+    if (!bigDeal?.active || !activeBigSlot?.productId) return;
+    const now = Date.now();
+    const start = bigDeal.startAt ? new Date(bigDeal.startAt).getTime() : 0;
+    const end = bigDeal.endAt ? new Date(bigDeal.endAt).getTime() : 0;
+    if ((start && now < start) || (end && now >= end)) return;
+    const product = products[activeBigSlot.productId];
     const productData = product as ProductDealFields | undefined;
-    const currentPrice = Number(bigDeal.dealPrice || productData?.dealPrice || productData?.price || 0);
-    const normalPrice = Number(bigDeal.normalPrice || productData?.originalPrice || productData?.normalPrice || currentPrice);
+    const currentPrice = Number(activeBigSlot.dealPrice || productData?.dealPrice || productData?.price || 0);
+    const normalPrice = Number(activeBigSlot.originalPrice || productData?.originalPrice || productData?.normalPrice || currentPrice);
     const stock = Number(productData?.stock ?? productData?.quantity ?? bigDeal.stock ?? 0);
     if (currentPrice <= 0 || stock <= 0) return;
-    const image = normalizeImageUrl(productData?.imageUrl || bigDeal.imageUrl || "");
-    const productWithDealPrice = { ...product, id: bigDeal.productId, title: product?.title || bigDeal.title, price: currentPrice, originalPrice: normalPrice, image, imageUrl: image } as Product;
+    const image = normalizeImageUrl(activeBigSlot.imageUrl || productData?.imageUrl || "");
+    const productWithDealPrice = { ...product, id: activeBigSlot.productId, title: activeBigSlot.title, price: currentPrice, originalPrice: normalPrice, image, imageUrl: image } as Product;
     if (hasProductVariants(productWithDealPrice) && openVariantModal(productWithDealPrice, "cart")) return;
-    addItem({ id: bigDeal.productId, productId: bigDeal.productId, category: String(product?.category || ""), name: productWithDealPrice.title || bigDeal.title, price: currentPrice, originalPrice: productWithDealPrice.originalPrice || currentPrice, image, imageUrl: image });
+    addItem({ id: activeBigSlot.productId, productId: activeBigSlot.productId, category: String(product?.category || ""), name: productWithDealPrice.title, price: currentPrice, originalPrice: productWithDealPrice.originalPrice || currentPrice, image, imageUrl: image });
     trackTikTokEvent("AddToCart", {
-      contents: [makeTikTokContent({ id: bigDeal.productId, name: productWithDealPrice.title || bigDeal.title, category: product?.category, price: currentPrice, quantity: 1 })],
+      contents: [makeTikTokContent({ id: activeBigSlot.productId, name: productWithDealPrice.title, category: product?.category, price: currentPrice, quantity: 1 })],
       value: currentPrice,
       currency: "PKR",
     });
   }
 
   if (homeLayout) {
-    const product = bigDeal?.productId ? (products[bigDeal.productId] as ProductDealFields | undefined) : undefined;
-    const price = Number(bigDeal?.dealPrice || product?.dealPrice || product?.price || 0);
-    const regularPrice = Number(bigDeal?.normalPrice || bigDeal?.originalPrice || product?.normalPrice || product?.originalPrice || product?.price || price);
+    const product = activeBigSlot?.productId ? (products[activeBigSlot.productId] as ProductDealFields | undefined) : undefined;
+    const price = Number(activeBigSlot?.dealPrice || product?.dealPrice || product?.price || 0);
+    const regularPrice = Number(activeBigSlot?.originalPrice || product?.normalPrice || product?.originalPrice || product?.price || price);
     const saved = Math.max(0, regularPrice - price);
     const stock = Number(product?.stock ?? product?.quantity ?? bigDeal?.stock ?? 0);
-    const src = normalizeImageUrl(bigDeal?.imageUrl || product?.imageUrl || "");
+    const src = normalizeImageUrl(activeBigSlot?.imageUrl || product?.imageUrl || "");
     const slotCount = bigDealConfiguredSlotCount(bigDeal);
     const nextDeal = bigDealSlotAt(bigDeal, nextBigDealRotationIndex(bigDeal?.rotationStartedAt, new Date(nowTick ?? 0), slotCount));
     const nextSrc = normalizeImageUrl(nextDeal?.imageUrl || "");
@@ -295,14 +297,14 @@ export default function HeroFlashBanner({ initialProducts = [], liveUpdates = tr
             <HomeHeading>PrimeHubMall Big Deal of the Day</HomeHeading>
             <div className="home-big-grid">
               <article className="home-big-card">
-                <Link className="home-big-image" href={bigDeal.productId ? `/product/${bigDeal.productId}?deal=big` : "/deals/big"} prefetch={false}>
-                  {src && <Image src={src} alt={bigDeal.title} fill priority loading="eager" fetchPriority="high" unoptimized sizes="(max-width: 600px) 50vw, 600px" className="object-cover" />}
+                <Link className="home-big-image" href="/deals/big" prefetch={false}>
+                  {src && <Image src={src} alt={activeBigSlot?.title || bigDeal.title} fill priority loading="eager" fetchPriority="high" unoptimized sizes="(max-width: 600px) 50vw, 600px" className="object-cover" />}
                   <span className="home-live">{live ? "● LIVE" : "SCHEDULED"}</span>
                   {stock > 0 && stock <= 10 ? <span className="home-urgency">Only {stock} left</span> : null}
                   <span className="home-big-seal">BIG<br />DEAL<small>OF THE DAY</small></span>
                 </Link>
                 <div className="home-big-info">
-                  <Link href={bigDeal.productId ? `/product/${bigDeal.productId}?deal=big` : "/deals/big"} prefetch={false}>{bigDeal.title}</Link>
+                  <Link href="/deals/big" prefetch={false}>{activeBigSlot?.title || bigDeal.title}</Link>
                   <div className="home-big-prices">
                     <strong>Rs. {price.toLocaleString("en-PK")}</strong>
                     {regularPrice > price ? <s>Rs. {regularPrice.toLocaleString("en-PK")}</s> : null}
@@ -379,16 +381,16 @@ export default function HeroFlashBanner({ initialProducts = [], liveUpdates = tr
         </div>
       </section>
       {bigDeal?.active && bigDeal.title && (() => {
-        const product = bigDeal.productId ? products[bigDeal.productId] : undefined;
+        const product = activeBigSlot?.productId ? products[activeBigSlot.productId] : undefined;
         const productData = product as ProductDealFields | undefined;
         const deal = bigDeal;
-        const title = deal.title;
-        const currentPrice = Number(deal.dealPrice || productData?.dealPrice || productData?.price || 0);
-        const normalPrice = Number(deal.normalPrice || productData?.originalPrice || productData?.normalPrice || currentPrice);
+        const title = activeBigSlot?.title || deal.title;
+        const currentPrice = Number(activeBigSlot?.dealPrice || productData?.dealPrice || productData?.price || 0);
+        const normalPrice = Number(activeBigSlot?.originalPrice || productData?.originalPrice || productData?.normalPrice || currentPrice);
         const savedAmount = normalPrice > currentPrice ? normalPrice - currentPrice : 0;
         const stock = Number(productData?.stock ?? productData?.quantity ?? deal.stock ?? 0);
-        const productImage = normalizeImageUrl(productData?.imageUrl || deal.imageUrl || "");
-        const productHref = deal.productId ? `/product/${deal.productId}?deal=big` : "/deals/big";
+        const productImage = normalizeImageUrl(activeBigSlot?.imageUrl || productData?.imageUrl || deal.imageUrl || "");
+        const productHref = "/deals/big";
         return (
           <section className="mx-4 mt-4 overflow-hidden rounded-[30px] border border-black/8 bg-white shadow-[0_20px_52px_rgba(20,20,15,0.12)]">
             <Link href={productHref} prefetch={false} aria-label={`View ${title}`} className="block">
@@ -402,7 +404,7 @@ export default function HeroFlashBanner({ initialProducts = [], liveUpdates = tr
               <Link href={productHref} prefetch={false} className="group/title block" aria-label={`View ${title}`}><h2 className="line-clamp-2 text-2xl font-black leading-tight tracking-tight text-[#14140F] transition group-hover/title:text-[#0F6A5F] sm:text-4xl">{title}</h2></Link>
               <div className="mt-4 flex flex-wrap items-center gap-2.5"><span className="text-3xl font-black text-[#E1352B] sm:text-4xl">Rs. {currentPrice.toLocaleString()}</span>{normalPrice > currentPrice && <span className="text-sm font-bold text-black/40 line-through sm:text-base">Rs. {normalPrice.toLocaleString()}</span>}</div>
               {stock > 0 && stock <= 10 && <div className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/15 px-3 py-1 text-[11px] font-black text-amber-700"><span className="h-2 w-2 rounded-full bg-amber-500 animate-ping" />Only {stock} left in stock - order soon!</div>}
-              <div className="mt-4"><button type="button" onClick={(event) => { event.preventDefault(); event.stopPropagation(); addBigDealToCart(); }} disabled={!deal.productId || !product || stock <= 0 || currentPrice <= 0} className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#14140F] px-5 py-3 text-xs font-black text-white transition hover:bg-[#0F6A5F] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"><ShoppingCart size={15} /> Add to Cart</button></div>
+              <div className="mt-4"><button type="button" onClick={(event) => { event.preventDefault(); event.stopPropagation(); addBigDealToCart(); }} disabled={!activeBigSlot?.productId || !product || stock <= 0 || currentPrice <= 0} className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#14140F] px-5 py-3 text-xs font-black text-white transition hover:bg-[#0F6A5F] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"><ShoppingCart size={15} /> Add to Cart</button></div>
             </div>
           </section>
         );

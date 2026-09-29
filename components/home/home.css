@@ -533,6 +533,19 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
 }
+.home-sale-home-frame {
+  margin: 0 0 22px;
+}
+.home-sale-home-frame .home-sale-row {
+  display: block;
+  margin: 0;
+}
+.home-sale-home-frame .home-sale-products {
+  padding: 0 16px 8px;
+}
+.home-sale-home-frame .home-product {
+  height: 100%;
+}
 .home-budget {
   display: flex;
   flex-direction: column;

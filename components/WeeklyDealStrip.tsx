@@ -9,6 +9,7 @@ import type { WeeklyDeal } from '@/lib/types';
 import { weeklyDealSavings } from '@/lib/weeklyDealUtils';
 import { useCartStore, type VariantModalProduct } from '@/lib/cartStore';
 import { getPakistanDay } from '@/lib/dealPricing';
+import { weeklyCartPrice } from '@/lib/weeklyCartPrice';
 
 type DealProduct = VariantModalProduct & {
   stock?: number;
@@ -46,11 +47,6 @@ function getProductImage(product: any): string {
   return '';
 }
 
-function numericPrice(value: unknown): number {
-  const parsed = Number(String(value ?? '').replace(/[^0-9.]/g, ''));
-  return Number.isFinite(parsed) ? parsed : 0;
-}
-
 export default function WeeklyDealStrip() {
   const [deals, setDeals] = useState<WeeklyDeal[]>([]);
   const [loadingDealId, setLoadingDealId] = useState<string | null>(null);
@@ -83,24 +79,13 @@ export default function WeeklyDealStrip() {
       const fullProduct = snap.exists() ? { id: snap.id, ...snap.data() } : deal;
       const product = fullProduct as DealProduct;
       const image = getProductImage(product);
-      const productPrice = numericPrice((product as any).price);
-      const dealPrice = numericPrice(deal.dealPrice || (product as any).dealPrice || productPrice);
-      const isLiveToday = deal.active !== false && deal.day === getToday();
-      const effectivePrice = isLiveToday && dealPrice > 0 && dealPrice < productPrice ? dealPrice : productPrice;
-      const originalPrice = numericPrice(
-        deal.originalPrice ||
-        (product as any).normalPrice ||
-        product.originalPrice ||
-        product.compareAtPrice ||
-        productPrice ||
-        dealPrice,
-      );
+      const { price: effectivePrice, regular: originalPrice, live: isLiveToday } = weeklyCartPrice(deal, product);
       const productWithDealPrice: DealProduct = {
         ...product,
         price: effectivePrice,
         dealPrice: effectivePrice,
         dealDay: isLiveToday ? deal.day : undefined,
-        originalPrice: originalPrice || productPrice,
+        originalPrice,
         image,
         imageUrl: image,
       };
@@ -114,7 +99,7 @@ export default function WeeklyDealStrip() {
         id: productWithDealPrice.id,
         name: productWithDealPrice.title || productWithDealPrice.name || deal.title || 'PrimeHub Deal',
         price: effectivePrice,
-        originalPrice: originalPrice || productPrice,
+        originalPrice,
         image,
         imageUrl: image,
         dealDay: isLiveToday ? deal.day : undefined,
