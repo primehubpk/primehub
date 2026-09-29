@@ -11,4 +11,4 @@ export function statusForDay(day:Weekday,today:Weekday):DealStatus{const a=DAY_O
 export function statusLabel(status:DealStatus){return status==='live'?'🔴 LIVE TODAY':status==='upcoming'?'🔵 UPCOMING':'🔵 UPCOMING (NEXT WEEK)'}
 export function statusStyles(status:DealStatus){return status==='live'?'bg-emerald-50 text-emerald-700 border-emerald-200':'bg-sky-50 text-sky-700 border-sky-200'}
 export function imageOf(product:DealProduct|null,deal:WeeklyDeal){return product?.imageUrl||deal.imageUrl||''}
-export function regularPriceOf(product:DealProduct|null,deal:WeeklyDeal){const p=Number(product?.price||0);return p>0?p:Number(deal.originalPrice||0)}
+export function regularPriceOf(product:DealProduct|null,deal:WeeklyDeal){return Number(deal.normalPrice)||Number(product?.normalPrice)||Number(product?.price)||Number(deal.originalPrice)||Number(product?.originalPrice)||0}

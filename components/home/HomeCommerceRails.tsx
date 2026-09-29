@@ -3,8 +3,10 @@
 import { fetchPublicStorefront } from '@/lib/storefrontClient';
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { MessageCircle, Play, PlayCircle, Sparkles } from "lucide-react";
+import { MessageCircle, Package, Play, PlayCircle, Sparkles } from "lucide-react";
 import HomeHeading from "./HomeHeading";
+import HomeRailFrame from './HomeRailFrame';
+import { orderHomeCards, railSeed } from '@/lib/homeRailOrder';
 import { useSettings } from "@/lib/useSettings";
 import { PRIME_SKILLS_SEED } from "@/lib/primeSkillsSeed";
 import { normalizeImageUrl } from "@/lib/imageUrl";
@@ -58,11 +60,13 @@ function skillDisplayPrice(item: PrimeSkillHomeItem) {
 }
 
 export function HomeWholesaleVideos() {
+  const [seed, setSeed] = useState(0);
+  useEffect(() => setSeed(railSeed()), []);
   const { settings, contact } = useSettings();
-  const videos = (
+  const videos = orderHomeCards((
     (settings as typeof settings & { wholesaleVideos?: WholesaleVideo[] })
       .wholesaleVideos || []
-  ).filter((video) => video.active !== false);
+  ).filter((video) => video.active !== false), seed);
 
   const storeWhatsApp =
     cleanWhatsApp(contact?.whatsappNumber) ||
@@ -74,6 +78,7 @@ export function HomeWholesaleVideos() {
   return (
     <section className="home-video-packages home-commerce-section">
       <HomeHeading>Wholesale Packages</HomeHeading>
+      <HomeRailFrame title="Wholesale Packages" href="/wholesale-video-hub" icon={<Package size={27}/>}>
       <div className="home-commerce-rail-wrap">
         <div
           className="home-two-row-rail home-commerce-rail"
@@ -141,11 +146,14 @@ export function HomeWholesaleVideos() {
           })}
         </div>
       </div>
+      </HomeRailFrame>
     </section>
   );
 }
 
 export function HomePrimeSkills() {
+  const [seed, setSeed] = useState(0);
+  useEffect(() => setSeed(railSeed()), []);
   const { settings, contact } = useSettings();
   const sectionRef = useRef<HTMLElement | null>(null);
   const [items, setItems] = useState<PrimeSkillHomeItem[]>(
@@ -196,10 +204,10 @@ export function HomePrimeSkills() {
 
   const skills = useMemo(
     () =>
-      items
+      orderHomeCards(items
         .filter((item) => item.active !== false)
-        .sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0)),
-    [items],
+        .sort((a, b) => Number(a.sortOrder || 0) - Number(b.sortOrder || 0)), seed),
+    [items, seed],
   );
 
   const storeWhatsApp =
@@ -212,6 +220,7 @@ export function HomePrimeSkills() {
   return (
     <section ref={sectionRef} className="home-prime-skills home-commerce-section">
       <HomeHeading>Prime Skills</HomeHeading>
+      <HomeRailFrame title="Prime Skills" href="/skills" image={normalizeImageUrl(skills[0]?.thumbnailUrl || skills[0]?.imageUrl || '')} icon={<Sparkles size={27}/>}>
       <div className="home-commerce-rail-wrap">
         <div
           className="home-two-row-rail home-commerce-rail"
@@ -279,6 +288,7 @@ export function HomePrimeSkills() {
           })}
         </div>
       </div>
+      </HomeRailFrame>
     </section>
   );
 }

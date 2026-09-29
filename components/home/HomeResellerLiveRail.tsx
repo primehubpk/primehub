@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { doc, onSnapshot } from "firebase/firestore";
 import { CheckCircle2, ChevronRight, Gift, Users } from "lucide-react";
+import HomeRailFrame from './HomeRailFrame';
 import { auth, db } from "@/lib/firebase";
 import { DEFAULT_MONTHLY_CHALLENGE, DEFAULT_RESELLER_TASKS, type ResellerTask } from "@/lib/resellerTasks";
 import { getResellerTiers } from "@/lib/resellerTiers";
@@ -149,6 +150,7 @@ ${url||location.origin}`)}`,"_blank","noopener,noreferrer");return;}if(url)windo
 
   return <section ref={sectionRef} className="ph-live-rail" id="reseller-home">
     <HomeHeading>Reseller Club</HomeHeading>
+    <HomeRailFrame title="PrimeHubMall Reseller Club" href="/reseller/dashboard" icon={<Users size={27}/> }>
     <div className="ph-live-tabs"><a href="#reseller-rewards">Rewards</a><a href="#reseller-tasks">Tasks</a><a href="#reseller-wallet">Wallet</a><a href="#reseller-tiers">Tiers</a><Link href="/reseller/dashboard" prefetch={false}>Open Club</Link></div>
     <div className="ph-live-hint">Swipe → all tasks, wallet, tiers, vouchers & gifts</div>
     <div className="ph-live-scroll"><div className="ph-live-grid">
@@ -173,6 +175,7 @@ ${url||location.origin}`)}`,"_blank","noopener,noreferrer");return;}if(url)windo
       </div>
     </div></div>
     {message?<div className="ph-live-message">{message}</div>:null}
+    </HomeRailFrame>
     {selectedPrize?<div className="ph-win-backdrop" role="presentation" onClick={()=>setSelectedPrize(null)}><div className="ph-win-modal" role="dialog" aria-modal="true" aria-labelledby="ph-win-title" onClick={event=>event.stopPropagation()}><button className="ph-win-close" type="button" onClick={()=>setSelectedPrize(null)} aria-label="Close reward result">×</button><span className="ph-win-kicker">PRIMEHUB REWARD</span><div className="ph-win-art"><img src={rewardWheelArtworkSource(selectedPrize)} alt={selectedPrize.name||"Won reward"}/></div><h3 id="ph-win-title">Congratulations!</h3><p>{rewardMessage(selectedPrize,Boolean(user))}</p><Link href={user?"/reseller/wallet":"/login?redirect=/#reseller-rewards"}>{user?"View my wallet":"Sign in to claim"}</Link></div></div>:null}
   </section>;
 }

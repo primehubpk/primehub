@@ -9,7 +9,7 @@ test('home Sale Mela shuffles only exact bucket-price cards and freezes the firs
 
   assert.match(source, /function orderHomeSaleMelaProducts\(/);
   assert.match(source, /homePrice\(product\) === amount/);
-  assert.match(source, /seededUnit\(seed \^ amount, a\.id\) - seededUnit\(seed \^ amount, b\.id\)/);
+  assert.match(source, /orderHomeProducts\([\s\S]*?homePrice\(product\) === amount/);
   assert.match(source, /return \[\.\.\.exactPrice, \.\.\.higherPrices\]/);
   assert.match(source, /homePrice\(product\) > amount/);
   assert.match(source, /priceDifference = homePrice\(a\) - homePrice\(b\)/);
@@ -55,8 +55,5 @@ test('bot/admin stock defaults stay at 30 and the active test branch is Vercel-d
   assert.match(types, /stock:'30'/);
   assert.match(manager, /form\.stock \|\| '30'/);
   assert.match(manager, /row\.stock \?\? legacyStock \?\? 30/);
-  assert.equal(
-    vercel.git?.deploymentEnabled?.['fix/salar-home-catalog-sep27'],
-    false,
-  );
+  assert.equal(vercel.git?.deploymentEnabled?.['fix/home-rails-deals-usage-sep29'], false);
 });

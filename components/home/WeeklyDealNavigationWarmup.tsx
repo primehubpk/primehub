@@ -26,11 +26,11 @@ export default function WeeklyDealNavigationWarmup({ weeklyDeals }: { weeklyDeal
       return aDistance - bDistance;
     });
     const hrefs = Array.from(
-      new Set(ordered.map((deal) => `/product/${encodeURIComponent(deal.productId)}`)),
+      new Set(ordered.map((deal) => `/deals/${deal.day}`)),
     );
     if (!hrefs.length) return;
 
-    // The live weekly deal is above the fold and is the most likely product tap.
+    // The live weekly deal is above the fold and is the most likely deal tap.
     // Warm its App Router payload immediately so the click does not wait on route code/RSC.
     router.prefetch(hrefs[0]);
 

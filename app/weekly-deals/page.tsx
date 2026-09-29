@@ -3,8 +3,8 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, CalendarDays, ShoppingCart, Sparkles, LockKeyhole } from 'lucide-react';
-import FastProductLink from '@/components/FastProductLink';
 import { useCartStore } from '@/lib/cartStore';
+import { weeklyCartPrice } from '@/lib/weeklyCartPrice';
 import { useSettings } from '@/lib/useSettings';
 import { loadProductsForNavigation } from '@/lib/productNavigationCache';
 import type { Product, Weekday, WeeklyDeal } from '@/lib/types';
@@ -56,6 +56,7 @@ function imageOf(product: Product | undefined, deal: WeeklyDeal) {
 export default function WeeklyDealsPage() {
   const { settings, loading } = useSettings();
   const addItem = useCartStore((state) => state.addItem);
+  const openVariantModal = useCartStore((state) => state.openVariantModal);
   const [products, setProducts] = useState<Record<string, Product>>({});
   const [addedId, setAddedId] = useState<string | null>(null);
   const [nowTick, setNowTick] = useState(Date.now());
@@ -94,17 +95,15 @@ export default function WeeklyDealsPage() {
   const addToCart = (deal: WeeklyDeal) => {
     const product = products[deal.productId];
     if (!product || Number(product.stock ?? 0) <= 0) return;
-    const regularPrice = Number(product.price || deal.originalPrice || 0);
-    const dealPrice = Number(deal.dealPrice || 0);
-    const isLiveToday = deal.day === today && dealPrice > 0;
-    const price = isLiveToday ? dealPrice : regularPrice;
+    const { price, comparison, live: isLiveToday } = weeklyCartPrice(deal, product);
     if (price <= 0) return;
     const image = imageOf(product, deal);
+    if (openVariantModal({ ...product, price, originalPrice: comparison, image, imageUrl: image }, 'cart')) return;
     addItem({
       id: product.id,
       name: product.title || deal.title || `${LABELS[deal.day]} Deal`,
       price,
-      originalPrice: isLiveToday ? Number(product.originalPrice || deal.originalPrice || price) : regularPrice,
+      originalPrice: comparison,
       image: image || undefined,
       imageUrl: image || undefined,
       dealDay: isLiveToday ? deal.day : undefined,
@@ -135,29 +134,26 @@ export default function WeeklyDealsPage() {
               const product = products[deal.productId];
               const title = product?.title || deal.title || `${LABELS[deal.day]} Deal`;
               const image = imageOf(product, deal);
-              const regularPrice = Number(product?.price || deal.originalPrice || 0);
+              const { regular: regularPrice, comparison, savings, discount, live: isLiveToday } = weeklyCartPrice(deal, product);
               const dealPrice = Number(deal.dealPrice || 0);
-              const isLiveToday = deal.day === today && dealPrice > 0;
               const price = isLiveToday ? dealPrice : regularPrice;
-              const original = isLiveToday ? Number(product?.originalPrice || deal.originalPrice || price) : regularPrice;
-              const discount = isLiveToday && original > price && price > 0 ? Math.round(((original - price) / original) * 100) : 0;
               const inStock = Boolean(product && Number(product.stock ?? 0) > 0 && price > 0);
               const unlockCountdown = countdownParts(countdownToNextUnlock(deal.day, new Date(nowTick)));
               return (
                 <article key={deal.id} className={`overflow-hidden rounded-[28px] border bg-white shadow-[0_12px_40px_rgba(0,0,0,0.06)] ${isLiveToday ? 'border-emerald-300 ring-2 ring-emerald-100' : 'border-black/5'}`}>
-                  <FastProductLink productId={deal.productId} product={product} aria-label={`View ${title}`} className="group block">
+                  <Link href={`/deals/${deal.day}`} prefetch={false} aria-label={`View ${title}`} className="group block">
                     <div className="relative aspect-square overflow-hidden bg-[#F4F4F1]">
                       {image ? <img src={image} alt={title} className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]" /> : <div className="flex h-full items-center justify-center text-xs font-bold text-black/25">No product image</div>}
-                      <div className="absolute left-3 right-3 top-3 flex items-center justify-between gap-2"><span className={`rounded-full px-2.5 py-1.5 text-[8px] font-black uppercase tracking-wide ${isLiveToday ? 'bg-emerald-500 text-white' : 'bg-white/95 text-black/70'}`}>{isLiveToday ? "LIVE TODAY" : `${LABELS[deal.day]} DEAL`}</span>{discount > 0 && <span className="rounded-full bg-[#E1352B] px-2.5 py-1.5 text-[9px] font-black text-white">-{discount}% OFF</span>}</div>
+                      <div className="absolute left-3 right-3 top-3 flex items-center justify-between gap-2"><span className={`rounded-full px-2.5 py-1.5 text-[8px] font-black uppercase tracking-wide ${isLiveToday ? 'bg-emerald-500 text-white' : 'bg-white/95 text-black/70'}`}>{isLiveToday ? "LIVE TODAY" : `${LABELS[deal.day]} DEAL`}</span>{discount > 0 && <span className="rounded-full bg-[#E1352B] px-2.5 py-1.5 text-[9px] font-black text-white">-{discount}% OFF · Rs. {savings.toLocaleString()}</span>}</div>
                     </div>
-                  </FastProductLink>
+                  </Link>
                   <div className="p-4">
                     <p className="text-[9px] font-black uppercase tracking-[0.2em] text-[#E1352B]">{LABELS[deal.day]} Deal</p>
                     <h2 className="mt-1.5 line-clamp-2 min-h-[44px] text-lg font-black">{title}</h2>
                     {isLiveToday ? (
-                      <div className="mt-3 rounded-xl bg-emerald-50 px-3 py-2"><p className="text-[8px] font-black uppercase tracking-[0.12em] text-emerald-700">🟢 Live for today</p><div className="mt-1 flex items-end gap-2"><span className="font-[family-name:var(--font-mono)] text-xl font-black text-[#E1352B]">Rs. {price.toLocaleString()}</span>{original > price && <span className="pb-0.5 text-xs text-black/35 line-through">Rs. {original.toLocaleString()}</span>}</div></div>
+                      <div className="mt-3 rounded-xl bg-emerald-50 px-3 py-2"><p className="text-[8px] font-black uppercase tracking-[0.12em] text-emerald-700">🟢 Live for today</p><div className="mt-1 flex items-end gap-2"><span className="font-[family-name:var(--font-mono)] text-xl font-black text-[#E1352B]">Rs. {price.toLocaleString()}</span><span className="text-xs font-bold text-[#0F6A5F]">Regular Rs. {regularPrice.toLocaleString()}</span>{comparison > regularPrice && <span className="pb-0.5 text-xs text-black/35 line-through">Rs. {comparison.toLocaleString()}</span>}</div></div>
                     ) : (
-                      <div className="mt-3 rounded-xl bg-[#F7F7F4] px-3 py-2.5"><p className="flex items-center gap-1.5 text-[8px] font-black uppercase tracking-[0.1em] text-black/60"><LockKeyhole size={11} /> 🔒 Unlocks Next {LABELS[deal.day]}</p><p className="mt-1 font-[family-name:var(--font-mono)] text-sm font-black text-[#0F6A5F]">{unlockCountdown.days}d {String(unlockCountdown.hours).padStart(2, '0')}h {String(unlockCountdown.minutes).padStart(2, '0')}m {String(unlockCountdown.seconds).padStart(2, '0')}s</p><p className="mt-1 text-[9px] text-black/35">Normal price: Rs. {price.toLocaleString()}</p></div>
+                      <div className="mt-3 rounded-xl bg-[#F7F7F4] px-3 py-2.5"><p className="flex items-center gap-1.5 text-[8px] font-black uppercase tracking-[0.1em] text-black/60"><LockKeyhole size={11} /> 🔒 Unlocks Next {LABELS[deal.day]}</p><p className="mt-1 font-[family-name:var(--font-mono)] text-sm font-black text-[#0F6A5F]">{unlockCountdown.days}d {String(unlockCountdown.hours).padStart(2, '0')}h {String(unlockCountdown.minutes).padStart(2, '0')}m {String(unlockCountdown.seconds).padStart(2, '0')}s</p><p className="mt-1 text-[9px] text-black/55">Regular price: Rs. {price.toLocaleString()}</p>{comparison > regularPrice && <p className="text-[9px] text-black/35 line-through">Was Rs. {comparison.toLocaleString()}</p>}</div>
                     )}
                     <button type="button" disabled={!inStock || addedId === deal.id} onClick={() => addToCart(deal)} className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-[#14140F] px-3 py-3 text-[10px] font-black text-white disabled:cursor-not-allowed disabled:opacity-35"><ShoppingCart size={14} />{addedId === deal.id ? 'ADDED TO CART' : 'ADD TO CART'}</button>
                   </div>

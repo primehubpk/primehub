@@ -6,9 +6,9 @@ import { db } from '@/lib/firebase';
 import Link from 'next/link';
 import { ArrowRight, Clock3, ShoppingBag } from 'lucide-react';
 import type { WeeklyDeal } from '@/lib/types';
-import { weeklyDealSavings } from '@/lib/weeklyDealUtils';
 import { useCartStore, type VariantModalProduct } from '@/lib/cartStore';
 import { getPakistanDay } from '@/lib/dealPricing';
+import { weeklyCartPrice } from '@/lib/weeklyCartPrice';
 
 type DealProduct = VariantModalProduct & {
   stock?: number;
@@ -46,11 +46,6 @@ function getProductImage(product: any): string {
   return '';
 }
 
-function numericPrice(value: unknown): number {
-  const parsed = Number(String(value ?? '').replace(/[^0-9.]/g, ''));
-  return Number.isFinite(parsed) ? parsed : 0;
-}
-
 export default function WeeklyDealStrip() {
   const [deals, setDeals] = useState<WeeklyDeal[]>([]);
   const [loadingDealId, setLoadingDealId] = useState<string | null>(null);
@@ -83,24 +78,13 @@ export default function WeeklyDealStrip() {
       const fullProduct = snap.exists() ? { id: snap.id, ...snap.data() } : deal;
       const product = fullProduct as DealProduct;
       const image = getProductImage(product);
-      const productPrice = numericPrice((product as any).price);
-      const dealPrice = numericPrice(deal.dealPrice || (product as any).dealPrice || productPrice);
-      const isLiveToday = deal.active !== false && deal.day === getToday();
-      const effectivePrice = isLiveToday && dealPrice > 0 && dealPrice < productPrice ? dealPrice : productPrice;
-      const originalPrice = numericPrice(
-        deal.originalPrice ||
-        (product as any).normalPrice ||
-        product.originalPrice ||
-        product.compareAtPrice ||
-        productPrice ||
-        dealPrice,
-      );
+      const { price: effectivePrice, comparison, live: isLiveToday } = weeklyCartPrice(deal, product);
       const productWithDealPrice: DealProduct = {
         ...product,
         price: effectivePrice,
         dealPrice: effectivePrice,
         dealDay: isLiveToday ? deal.day : undefined,
-        originalPrice: originalPrice || productPrice,
+        originalPrice: comparison,
         image,
         imageUrl: image,
       };
@@ -114,7 +98,7 @@ export default function WeeklyDealStrip() {
         id: productWithDealPrice.id,
         name: productWithDealPrice.title || productWithDealPrice.name || deal.title || 'PrimeHub Deal',
         price: effectivePrice,
-        originalPrice: originalPrice || productPrice,
+        originalPrice: comparison,
         image,
         imageUrl: image,
         dealDay: isLiveToday ? deal.day : undefined,
@@ -139,9 +123,9 @@ export default function WeeklyDealStrip() {
           {orderedDeals.map((deal) => {
             if (!deal.active) return null;
             const dayLabel = DAY_LABELS[deal.day];
-            const href = deal.productId ? `/product/${deal.productId}` : (deal.buttonLink || '/shop');
+            const href = deal.productId ? `/deals/${deal.day}` : (deal.buttonLink || '/weekly-deals');
             const isLoading = loadingDealId === (deal.id || deal.productId);
-            const savings = weeklyDealSavings(deal);
+            const { savings, discount } = weeklyCartPrice(deal, null);
             return (
               <article key={deal.id || deal.day} className={`min-w-[180px] shrink-0 snap-start overflow-hidden rounded-[24px] bg-white shadow-sm ${deal.day === today ? 'ring-2 ring-[#E1352B]' : ''}`}>
                 <Link href={href} className="block">
@@ -152,7 +136,7 @@ export default function WeeklyDealStrip() {
                     {deal.day === today && <span className="pointer-events-none absolute bottom-3 left-3 rounded-full bg-[#E1352B] px-2 py-1 text-[7px] font-black text-white">TODAY</span>}
                     {savings > 0 && (
                       <span className="pointer-events-none absolute right-2 top-2 z-10 rounded-md bg-[#0F6A5F] px-2 py-0.5 text-[10px] font-semibold text-white shadow-sm">
-                        Save Rs. {savings.toLocaleString()}
+                        Save Rs. {savings.toLocaleString()} · {discount}%
                       </span>
                     )}
                   </div>

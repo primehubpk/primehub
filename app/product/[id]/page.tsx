@@ -2,7 +2,9 @@ import ProductDetailPageClient from '@/components/product-detail/ProductDetailPa
 import type { Product } from '@/components/product-detail/ProductDetailTypes';
 import { getPublicProductSnapshot } from '@/lib/publicCatalogServer';
 
-export const revalidate = 300;
+// Client refreshes this product on mount; admin writes invalidate the tagged
+// server cache. Keep the CDN page warm longer to reduce per-product ISR writes.
+export const revalidate = 600;
 
 export default async function ProductDetailPage(
   props: {

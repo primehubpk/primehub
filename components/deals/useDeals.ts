@@ -4,8 +4,9 @@ import { useCartStore } from '@/lib/cartStore';
 import { useSettings } from '@/lib/useSettings';
 import { loadProductsForNavigation } from '@/lib/productNavigationCache';
 import type { WeeklyDeal,Weekday } from '@/lib/types';
-import { DAY_ORDER,imageOf,regularPriceOf } from './DealsTypes';
+import { DAY_ORDER,imageOf } from './DealsTypes';
 import type { DealProduct,DealProducts,DealStatus } from './DealsTypes';
+import { weeklyCartPrice } from '@/lib/weeklyCartPrice';
 
 export default function useDeals(){
   const {settings,loading}=useSettings();
@@ -35,10 +36,10 @@ export default function useDeals(){
   const addToCart=(deal:WeeklyDeal,status:DealStatus)=>{
     const product=products[deal.productId];
     if(!product||Number(product.stock??0)<=0)return;
-    const regularPrice=regularPriceOf(product,deal),dealPrice=Number(deal.dealPrice||0),price=status==='live'&&deal.active!==false&&dealPrice>0?dealPrice:regularPrice;
+    const {price,comparison,live}=weeklyCartPrice(deal,product);
     if(price<=0)return;
     const image=imageOf(product,deal);
-    addItem({id:product.id,name:product.title||deal.title||`${deal.day} Deal`,price,originalPrice:regularPrice>price?regularPrice:Number(product.originalPrice||regularPrice),image:image||undefined,imageUrl:image||undefined,...(status==='live'?{dealDay:deal.day}:{})});
+    addItem({id:product.id,name:product.title||deal.title||`${deal.day} Deal`,price,originalPrice:comparison,image:image||undefined,imageUrl:image||undefined,...(live?{dealDay:deal.day}:{})});
     setAddingId(deal.id);
     window.setTimeout(()=>setAddingId(current=>current===deal.id?null:current),1200);
   };
