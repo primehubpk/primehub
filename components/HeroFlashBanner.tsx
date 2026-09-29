@@ -170,7 +170,7 @@ export default function HeroFlashBanner({ initialProducts = [], liveUpdates = tr
 
   function addDealToCart(deal: NonNullable<typeof weeklyDeals>[number]) {
     const product = products[deal.productId];
-    const { price, regular: normalPrice, live: isLive } = weeklyCartPrice(deal, product);
+    const { price, regular: normalPrice, comparison, live: isLive } = weeklyCartPrice(deal, product);
     if (!deal.productId || price <= 0 || Number((product as ProductDealFields | undefined)?.stock ?? 1) <= 0) return;
     const image = normalizeImageUrl(product?.imageUrl || deal.imageUrl || "");
     const productWithDealPrice = {
@@ -178,7 +178,7 @@ export default function HeroFlashBanner({ initialProducts = [], liveUpdates = tr
       id: deal.productId,
       title: product?.title || deal.title,
       price,
-      originalPrice: normalPrice,
+      originalPrice: comparison,
       image,
       imageUrl: image,
     } as Product;
@@ -249,7 +249,7 @@ export default function HeroFlashBanner({ initialProducts = [], liveUpdates = tr
               const deal = weeklyDeals.find((d) => d.day === key && d.active !== false && Number(d.dealPrice) > 0);
               const dealProduct = deal ? (products[deal.productId] as ProductDealFields | undefined) : undefined;
               const dealPrice = Number(deal?.dealPrice || 0);
-              const weeklyRegular = Number(deal?.normalPrice || deal?.originalPrice || dealProduct?.normalPrice || dealProduct?.price || dealPrice);
+              const weeklyRegular = deal ? weeklyCartPrice(deal, dealProduct).regular : 0;
               const saving = Math.max(0, weeklyRegular - dealPrice);
               const dealImage = normalizeImageUrl(deal?.imageUrl || (deal ? products[deal.productId]?.imageUrl : "") || "");
               const isLive = Boolean(deal && todayKey === key);
@@ -257,7 +257,7 @@ export default function HeroFlashBanner({ initialProducts = [], liveUpdates = tr
               const dealCountdown = weeklyTiming && nowTick !== null ? countdownParts(weeklyTiming.unlockAt.getTime() - nowTick) : null;
               return (
                 <article key={key} className={`home-week-card ${isLive ? "is-live" : ""}`}>
-                  <Link className="home-week-link" href={deal ? `/product/${deal.productId}` : "/weekly-deals"} prefetch={false}>
+                  <Link className="home-week-link" href={deal ? `/deals/${key}` : "/weekly-deals"} prefetch={false}>
                     <strong>{key.slice(0, 3).toUpperCase()}</strong>
                     {saving > 0 ? (
                       <em className="home-week-saving">Save Rs. {saving.toLocaleString("en-PK")}</em>
@@ -341,7 +341,9 @@ export default function HeroFlashBanner({ initialProducts = [], liveUpdates = tr
               const product = deal ? products[deal.productId] : undefined;
               const dealPrice = Number(deal?.dealPrice || 0);
               const savings = deal ? weeklyDealSavings(deal) : 0;
-              const normalPrice = Number(deal?.normalPrice) || Number(deal?.originalPrice) || 0;
+              const prices = deal ? weeklyCartPrice(deal, product) : null;
+              const normalPrice = prices?.regular || 0;
+              const comparisonPrice = prices?.comparison || 0;
               const isLive = Boolean(deal && todayKey === key && dealPrice > 0);
               const timing = nowTick !== null ? dealTiming(key, new Date(nowTick)) : null;
               const cardClass = isLive ? "border-emerald-500 bg-white text-[#14140F] shadow-[0_12px_28px_rgba(16,185,129,0.16)]" : deal ? "border-[#E1352B]/20 bg-gradient-to-b from-[#FFF9F5] to-white text-[#14140F] shadow-[0_10px_24px_rgba(225,53,43,0.10)] hover:-translate-y-1 hover:border-[#E1352B]/45 hover:shadow-[0_14px_30px_rgba(225,53,43,0.18)]" : "border-black/7 bg-[#FCFBF8] text-[#14140F] hover:-translate-y-0.5 hover:border-[#0F6A5F]/25 hover:shadow-[0_10px_26px_rgba(20,20,15,0.08)]";
@@ -349,7 +351,7 @@ export default function HeroFlashBanner({ initialProducts = [], liveUpdates = tr
               return (
                 <div key={key} className={"group relative min-w-[145px] flex-1 overflow-hidden rounded-[20px] border-2 text-center transition duration-200 " + cardClass}>
                   {deal && dealImage ? (
-                    <Link href={`/product/${deal.productId}`} prefetch={false} aria-label={`View ${deal.title}`} className="block">
+                    <Link href={`/deals/${key}`} prefetch={false} aria-label={`View ${deal.title}`} className="block">
                       <span className="relative block aspect-[4/3] w-full overflow-hidden">
                         <Image src={dealImage} alt={label} fill priority={isLive} loading={isLive ? "eager" : "lazy"} sizes="(max-width: 640px) 145px, (max-width: 1024px) 20vw, 180px" quality={72} className="object-cover transition duration-200 group-hover:scale-105" />
                         <span className="absolute left-1.5 top-1.5 rounded-full bg-[#E1352B] px-1.5 py-0.5 text-[6px] font-black uppercase tracking-[0.08em] text-white shadow-sm">{isLive ? "Sale" : label}</span>
@@ -362,13 +364,14 @@ export default function HeroFlashBanner({ initialProducts = [], liveUpdates = tr
                   )}
                   <span className="relative z-10 block px-2.5 pb-3 pt-2">
                     {deal?.productId ? (
-                      <Link href={`/product/${deal.productId}`} prefetch={false} className="block cursor-pointer">
+                      <Link href={`/deals/${key}`} prefetch={false} className="block cursor-pointer">
                         <span className="block whitespace-nowrap text-[10px] font-black uppercase tracking-[0.07em] text-[#14140F]">{label.toUpperCase()}</span>
                         {!isLive && <span className="mt-1 flex items-center justify-center gap-1 text-[7px] font-black uppercase tracking-[0.04em] text-black/55"><LockKeyhole size={9} /> 🔒 Unlocks {WEEKDAY_LABELS[key]}</span>}
                         <span className="mt-1 block text-[7px] font-black uppercase tracking-[0.08em] text-[#E1352B]">Deal Price</span>
                         <span className="block text-[12px] font-black text-[#E1352B]">Rs. {dealPrice.toLocaleString()}</span>
-                        <span className="mt-0.5 block text-[7px] font-black uppercase tracking-[0.08em] text-black/40">Normal Price</span>
-                        <span className="block text-[9px] font-bold text-black/40 line-through">Rs. {normalPrice.toLocaleString()}</span>
+                        <span className="mt-0.5 block text-[7px] font-black uppercase tracking-[0.08em] text-black/40">Regular Price</span>
+                        <span className="block text-[9px] font-bold text-[#0F6A5F]">Rs. {normalPrice.toLocaleString()}</span>
+                        {comparisonPrice > normalPrice && <span className="block text-[8px] text-black/35 line-through">Was Rs. {comparisonPrice.toLocaleString()}</span>}
                       </Link>
                     ) : <span className="block whitespace-nowrap text-[10px] font-black uppercase tracking-[0.07em] text-[#14140F]">{label.toUpperCase()}</span>}
                     {deal && <button type="button" onClick={(event) => { event.preventDefault(); event.stopPropagation(); addDealToCart(deal); }} disabled={!product || Number((product as ProductDealFields).stock ?? 1) <= 0} className="mt-2 inline-flex items-center gap-1 rounded-full bg-[#14140F] px-2.5 py-1.5 text-[7px] font-black uppercase tracking-[0.08em] text-white hover:bg-[#0F6A5F] disabled:cursor-not-allowed disabled:opacity-50"><ShoppingCart size={8} /> Add to Cart</button>}

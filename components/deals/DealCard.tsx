@@ -6,6 +6,7 @@ import { ShoppingBag } from 'lucide-react';
 import type { DealCardProps } from './DealsTypes';
 import { imageOf, regularPriceOf, statusLabel, statusStyles } from './DealsTypes';
 import { useCartStore } from '@/lib/cartStore';
+import { weeklyCartPrice } from '@/lib/weeklyCartPrice';
 
 export default function DealCard({ deal, label, status, product, adding }: DealCardProps) {
   const addItem = useCartStore((state) => state.addItem);
@@ -13,19 +14,15 @@ export default function DealCard({ deal, label, status, product, adding }: DealC
 
   const regularPrice = regularPriceOf(product, deal);
   const dealPrice = Number(deal.dealPrice || 0);
-  const livePrice = status === 'live' && deal.active !== false && dealPrice > 0 && dealPrice < regularPrice ? dealPrice : regularPrice;
-  const discount = regularPrice > dealPrice && dealPrice > 0
-    ? Math.round(((regularPrice - dealPrice) / regularPrice) * 100)
+  const { price: livePrice, comparison, live } = weeklyCartPrice(deal, product);
+  const discount = comparison > dealPrice && dealPrice > 0
+    ? Math.round(((comparison - dealPrice) / comparison) * 100)
     : 0;
   const image = imageOf(product, deal);
   const title = product?.title || deal.title || `${label} Deal`;
   const stock = Number(product?.stock ?? 0);
   const canBuy = Boolean(product && stock > 0 && regularPrice > 0);
-  const productHref = product?.id
-    ? `/product/${product.id}`
-    : deal.productId
-      ? `/product/${deal.productId}`
-      : `/deals/${deal.day}`;
+  const productHref = `/deals/${deal.day}`;
 
   function handleAddToCart(event: MouseEvent<HTMLButtonElement>) {
     event.preventDefault();
@@ -45,8 +42,8 @@ export default function DealCard({ deal, label, status, product, adding }: DealC
         ...product,
         price: livePrice,
         dealPrice: livePrice,
-        dealDay: status === 'live' ? deal.day : undefined,
-        originalPrice: regularPrice,
+        dealDay: live ? deal.day : undefined,
+        originalPrice: comparison,
         image,
         imageUrl: image,
       };
@@ -57,10 +54,10 @@ export default function DealCard({ deal, label, status, product, adding }: DealC
       id: product.id,
       name: title,
       price: livePrice,
-      originalPrice: regularPrice,
+      originalPrice: comparison,
       image,
       imageUrl: image,
-      dealDay: status === 'live' ? deal.day : undefined,
+      dealDay: live ? deal.day : undefined,
     });
   }
 
@@ -93,9 +90,8 @@ export default function DealCard({ deal, label, status, product, adding }: DealC
             <span className="font-[family-name:var(--font-mono)] text-xl font-black text-[#E1352B]">
               Rs. {dealPrice > 0 ? dealPrice.toLocaleString() : '—'}
             </span>
-            {regularPrice > dealPrice && (
-              <span className="pb-0.5 text-xs text-black/35 line-through">Rs. {regularPrice.toLocaleString()}</span>
-            )}
+            <span className="pb-0.5 text-xs font-bold text-[#0F6A5F]">Regular Rs. {regularPrice.toLocaleString()}</span>
+            {comparison > regularPrice && <span className="pb-0.5 text-xs text-black/35 line-through">Rs. {comparison.toLocaleString()}</span>}
           </div>
           <p className="mt-1 text-[10px] text-black/40">
             {status === 'live' ? 'Special price active today.' : status === 'upcoming' ? 'Special price unlocks on this day.' : 'Special price returns next week.'}

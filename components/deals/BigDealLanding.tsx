@@ -88,10 +88,17 @@ export default function BigDealLanding({ deal, products }: { deal?: BigDeal; pro
       {locked.length > 0 && <section className="mt-8" aria-label="Upcoming locked Big Deals">
         <h2 className="mb-4 text-xl font-black">Upcoming locked deals</h2>
         <div className="flex snap-x gap-3 overflow-x-auto pb-3 [scrollbar-width:none]">
-          {locked.map((slot, index) => <article key={`${slot.productId}-${index}`} className="w-[170px] shrink-0 snap-start overflow-hidden rounded-[22px] border border-[#DCCCA8] bg-white sm:w-[220px]">
+          {locked.map((slot, index) => <article key={`${slot.productId}-${index}`} className="w-[180px] shrink-0 snap-start overflow-hidden rounded-[22px] border border-[#DCCCA8] bg-white sm:w-[260px]">
             <div className="relative aspect-square overflow-hidden bg-[#EAE6DE]">
-              {slot.imageUrl && <Image src={slot.imageUrl} alt="" fill unoptimized sizes="220px" loading="lazy" className="object-cover blur-md brightness-75"/>}
-              <span className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/25 text-center text-white"><LockKeyhole size={26}/><b>LOCKED</b><small>Upcoming Big Deal</small></span>
+              {slot.imageUrl && <Image src={slot.imageUrl} alt="" fill unoptimized sizes="260px" loading="lazy" className="object-cover opacity-70 blur-[3px] saturate-[.82]"/>}
+              <span className="absolute inset-0 flex items-center justify-center bg-[#fffdf9]/20">
+                <span className="flex h-[130px] w-[130px] flex-col items-center justify-center gap-1 rounded-full bg-[#fffdf9]/90 p-3 text-center text-[#14140F] shadow-lg backdrop-blur-sm sm:h-[150px] sm:w-[150px]">
+                  <LockKeyhole size={16}/><b className="text-[11px]">LOCKED</b><small className="line-clamp-2 text-[9px]">{slot.title}</small>
+                  <strong className="text-sm text-[#D60707]">Rs. {slot.price.toLocaleString('en-PK')}</strong>
+                  {slot.regular > slot.price && <small className="text-[9px] text-black/45 line-through">Rs. {slot.regular.toLocaleString('en-PK')}</small>}
+                  <small className="text-[8px] font-bold text-[#064d40]">Upcoming deal</small>
+                </span>
+              </span>
             </div>
             <div className="p-3"><h3 className="line-clamp-2 text-xs font-bold">{slot.title}</h3><strong className="mt-2 block text-sm text-[#E1352B]">Rs. {slot.price.toLocaleString('en-PK')}</strong></div>
           </article>)}

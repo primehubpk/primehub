@@ -17,3 +17,15 @@ test('weekly cart uses regular price when locked and live deal price on its day'
   assert.equal(weeklyCartPrice({ ...deal, day: 'monday' }, product).price, 1999);
   assert.equal(weeklyCartPrice({ ...deal, day: 'monday', active: false }, product).price, 3000);
 });
+
+test('original comparison price never replaces the current store price', () => {
+  const product = { price: 3500, originalPrice: 5000 };
+  const deal = { day: 'wednesday', active: true, originalPrice: 5000, dealPrice: 2499 };
+  const locked = weeklyCartPrice(deal, product);
+  assert.equal(locked.price, 3500);
+  assert.equal(locked.regular, 3500);
+  assert.equal(locked.comparison, 5000);
+  const live = weeklyCartPrice({ ...deal, day: 'monday' }, product);
+  assert.equal(live.price, 2499);
+  assert.equal(live.comparison, 5000);
+});

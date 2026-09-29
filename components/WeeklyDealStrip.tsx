@@ -79,13 +79,13 @@ export default function WeeklyDealStrip() {
       const fullProduct = snap.exists() ? { id: snap.id, ...snap.data() } : deal;
       const product = fullProduct as DealProduct;
       const image = getProductImage(product);
-      const { price: effectivePrice, regular: originalPrice, live: isLiveToday } = weeklyCartPrice(deal, product);
+      const { price: effectivePrice, comparison, live: isLiveToday } = weeklyCartPrice(deal, product);
       const productWithDealPrice: DealProduct = {
         ...product,
         price: effectivePrice,
         dealPrice: effectivePrice,
         dealDay: isLiveToday ? deal.day : undefined,
-        originalPrice,
+        originalPrice: comparison,
         image,
         imageUrl: image,
       };
@@ -99,7 +99,7 @@ export default function WeeklyDealStrip() {
         id: productWithDealPrice.id,
         name: productWithDealPrice.title || productWithDealPrice.name || deal.title || 'PrimeHub Deal',
         price: effectivePrice,
-        originalPrice,
+        originalPrice: comparison,
         image,
         imageUrl: image,
         dealDay: isLiveToday ? deal.day : undefined,
@@ -124,7 +124,7 @@ export default function WeeklyDealStrip() {
           {orderedDeals.map((deal) => {
             if (!deal.active) return null;
             const dayLabel = DAY_LABELS[deal.day];
-            const href = deal.productId ? `/product/${deal.productId}` : (deal.buttonLink || '/shop');
+            const href = deal.productId ? `/deals/${deal.day}` : (deal.buttonLink || '/weekly-deals');
             const isLoading = loadingDealId === (deal.id || deal.productId);
             const savings = weeklyDealSavings(deal);
             return (
