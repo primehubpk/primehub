@@ -8,6 +8,7 @@ import { useCartStore } from '@/lib/cartStore';
 import { weeklyCartPrice } from '@/lib/weeklyCartPrice';
 import { useSettings } from '@/lib/useSettings';
 import { loadProductsForNavigation } from '@/lib/productNavigationCache';
+import LiveDealCelebration from './LiveDealCelebration';
 import type { Product, Weekday, WeeklyDeal } from '@/lib/types';
 
 const DAYS: Array<{ key: Weekday; label: string }> = [
@@ -144,6 +145,8 @@ export default function DayDealPage({ initialProducts = [] }: { initialProducts?
       <div className="flex flex-wrap items-center gap-3"><Link href="/deals" className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2.5 text-[10px] font-black shadow-sm"><ArrowLeft size={14} /> Back to Deals</Link><span className="text-[9px] font-black uppercase tracking-[0.22em] text-black/35">Weekly Deal • {label}</span></div>
 
       <header className="mt-5 rounded-[28px] bg-white p-5 shadow-sm md:p-7"><p className="text-[9px] font-black uppercase tracking-[0.25em] text-[#E1352B]">{label} Deal</p><h1 className="mt-1 text-3xl font-black tracking-tight md:text-5xl">{title}</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-black/50">{live ? 'Today’s special offer is live in Pakistan time.' : `This offer is scheduled for ${label}. The special price unlocks on ${label}.`}</p></header>
+
+      {live && <LiveDealCelebration day={label} />}
 
       <section className="mt-5 overflow-hidden rounded-[30px] border border-black/5 bg-white shadow-sm">
         <div className="grid lg:grid-cols-[1.05fr_.95fr]">
