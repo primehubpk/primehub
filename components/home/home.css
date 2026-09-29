@@ -7,6 +7,16 @@
   color: #171510;
   font-family: var(--font-body), sans-serif;
 }
+/* Keep dynamically reordered cards from shifting horizontal rails on load. */
+.home-content .home-week-grid,
+.home-content .home-sale-home-frame .home-sale-products,
+.home-content .home-commerce-rail,
+.home-content .home-two-row-rail,
+.home-content .ph-live-scroll,
+.home-content .ph-live-tabs,
+.home-content .snap-x {
+  overflow-anchor: none;
+}
 .home-content {
   max-width: 1200px;
   margin: auto;

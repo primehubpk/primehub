@@ -63,6 +63,44 @@ export default function HomePageClient({
   const lastCatalogRefreshRef = useRef(initialProducts.length > 0 ? Date.now() : 0);
 
   useEffect(() => {
+    // Several homepage rails reorder immediately after hydration (today's deal,
+    // arrivals and shuffled collections). Mobile browsers can keep the old
+    // first card anchored and open the reordered rail halfway through.
+    const rails = document.querySelectorAll<HTMLElement>(
+      ".home-content .home-week-grid, .home-content .home-sale-home-frame .home-sale-products, " +
+      ".home-content .home-commerce-rail, .home-content .home-two-row-rail, " +
+      ".home-content .ph-live-scroll, .home-content .ph-live-tabs, " +
+      ".home-content .snap-x",
+    );
+    let interacted = false;
+    const markInteracted = () => { interacted = true; };
+    const reset = () => {
+      if (interacted) return;
+      rails.forEach((rail) => { rail.scrollTo({ left: 0, behavior: "instant" }); });
+    };
+    window.addEventListener("pointerdown", markInteracted, { passive: true });
+    window.addEventListener("touchstart", markInteracted, { passive: true });
+    window.addEventListener("wheel", markInteracted, { passive: true });
+    let secondFrame = 0;
+    const firstFrame = window.requestAnimationFrame(() => {
+      reset();
+      secondFrame = window.requestAnimationFrame(() => {
+        reset();
+        window.removeEventListener("pointerdown", markInteracted);
+        window.removeEventListener("touchstart", markInteracted);
+        window.removeEventListener("wheel", markInteracted);
+      });
+    });
+    return () => {
+      window.cancelAnimationFrame(firstFrame);
+      window.cancelAnimationFrame(secondFrame);
+      window.removeEventListener("pointerdown", markInteracted);
+      window.removeEventListener("touchstart", markInteracted);
+      window.removeEventListener("wheel", markInteracted);
+    };
+  }, []);
+
+  useEffect(() => {
     setProducts(initialProducts);
     setCategories(initialCategories);
     setRecoveringCatalog(initialProducts.length === 0);
