@@ -8,7 +8,7 @@ Set these in the website's **production Vercel environment**, not in GitHub or c
 
 - `TIKTOK_SANDBOX_CLIENT_KEY`: sandbox client key from TikTok Developer Portal.
 - `TIKTOK_SANDBOX_CLIENT_SECRET`: sandbox client secret from TikTok Developer Portal.
-- `TIKTOK_POSTING_ADMIN_PIN`: unique random secret of at least 16 characters, distinct from the existing website admin password. Treat the current admin password as compromised and rotate it before connecting TikTok.
+- `TIKTOK_POSTING_ADMIN_PIN`: a non-empty secret distinct from the existing website admin password. The app checks the exact configured value and imposes no fixed length. Use a strong unique value; treat the current admin password as compromised and rotate it before connecting TikTok.
 - Existing `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and `SALAR_KEYS_ENCRYPTION_KEY` configure the existing encrypted `integration_secrets` store. Keep encryption key stable to preserve refresh tokens.
 
 In the sandbox configuration, enable Login Kit and Content Posting API / Direct Post, select `user.info.basic` and `video.publish`, add the `@primehubpk1` test user, and register the exact redirect URI `https://www.primehubmall.com/api/tiktok/oauth/callback`. The `www.primehubmall.com` URL property must be verified. The callback is fixed to the production host; preview deployments can show the UI but cannot complete the OAuth redirect.
