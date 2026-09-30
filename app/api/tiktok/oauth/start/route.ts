@@ -8,7 +8,7 @@ export async function POST(request: Request) {
   if (!sameOrigin(request) || !await postingAdmin(request)) return NextResponse.json({ error: 'TikTok admin authorization required.' }, { status: 403 });
   try {
     const { clientKey, redirectUri } = tiktokConfig();
-    const state = signOAuthState(randomBytes(24).toString('base64url'));
+    const state = await signOAuthState(randomBytes(24).toString('base64url'));
     const url = new URL('https://www.tiktok.com/v2/auth/authorize/');
     for (const [key, value] of Object.entries({
       client_key: clientKey, response_type: 'code', scope: 'user.info.basic,video.publish', redirect_uri: redirectUri, state,
