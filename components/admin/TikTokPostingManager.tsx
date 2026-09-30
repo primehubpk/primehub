@@ -133,8 +133,8 @@ export default function TikTokPostingManager() {
       <label className="mt-4 block text-xs font-bold">TikTok posting admin PIN (server setting)</label>
       <input type="password" autoComplete="off" value={pin} onChange={e => setPin(e.target.value)} className={input} />
       <div className="mt-3 flex flex-wrap gap-2">
-        <button type="button" className={button} disabled={busy || pin.length < 16} onClick={() => void load()}>Check account</button>
-        <button type="button" className={button} disabled={busy || pin.length < 16} onClick={() => void connect()}>Connect TikTok</button>
+        <button type="button" className={button} disabled={busy || !pin} onClick={() => void load()}>Check account</button>
+        <button type="button" className={button} disabled={busy || !pin} onClick={() => void connect()}>Connect TikTok</button>
         {connected && <button type="button" className={button} disabled={busy} onClick={() => void disconnect()}>Disconnect</button>}
       </div>
       {creator && <p className="mt-4 text-sm font-bold">Connected creator: {creator.creator_nickname} (@{creator.creator_username})</p>}
