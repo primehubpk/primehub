@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
     result.headers.set('Cache-Control', 'no-store');
     return result;
   };
-  if (!await verifyPrimeHubAdminRequest(request) || !validOAuthState(state) || !saved || saved.length !== state.length || !timingSafeEqual(Buffer.from(saved), Buffer.from(state))) {
+  if (!await verifyPrimeHubAdminRequest(request) || !await validOAuthState(state) || !saved || saved.length !== state.length || !timingSafeEqual(Buffer.from(saved), Buffer.from(state))) {
     destination.searchParams.set('posting', 'Invalid or expired TikTok connection. Please retry.');
     return finish();
   }
