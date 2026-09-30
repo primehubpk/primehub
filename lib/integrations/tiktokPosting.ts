@@ -63,6 +63,18 @@ export async function getPostingCredentials(): Promise<Credentials | null> {
   return rows[0] ? openCredentials(CONTEXT, rows[0].envelope) as Credentials : null;
 }
 
+// A browser may request the same callback twice. TikTok authorization codes are
+// single use, so recognize a connection written after this OAuth flow began.
+export async function wasPostingConnectedSince(issuedAtSeconds: number): Promise<boolean> {
+  if (!Number.isFinite(issuedAtSeconds)) return false;
+  const result = await requestStorage(`?select=envelope,updated_at&integration=eq.${INTEGRATION}&limit=1`);
+  const rows = await result.json() as Array<{ envelope: string; updated_at: string }>;
+  const updatedAt = Date.parse(rows[0]?.updated_at || '');
+  if (!rows[0]?.envelope || !Number.isFinite(updatedAt) || updatedAt < issuedAtSeconds * 1000 || updatedAt > Date.now()) return false;
+  const credentials = openCredentials(CONTEXT, rows[0].envelope) as Credentials;
+  return credentials.scope.split(',').includes('video.publish');
+}
+
 async function savePostingCredentials(value: Credentials) {
   await requestStorage('?on_conflict=integration', {
     method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
