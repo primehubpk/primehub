@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { postingAdmin, sameOrigin } from '@/lib/integrations/tiktokPostingAuth';
 import { disconnectPosting, getPostingCredentials, postingApi, tiktokConfig } from '@/lib/integrations/tiktokPosting';
+import { isUploadedPostingVideo, readUploadedPostingVideo, transferPostingVideo } from '@/lib/integrations/tiktokVideoTransfer';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -56,6 +57,9 @@ export async function POST(request: Request) {
     if (body.commercial === true && !brandOrganic && !brandContent) throw new Error('Select your brand or paid partnership.');
     if (brandContent && privacy === 'SELF_ONLY') throw new Error('Paid partnership cannot be posted privately.');
     const disabled = (key: string) => creator[key] === true || body[key.replace('_disabled', '')] !== true;
+    // Direct file transfer is supported by TikTok and does not require the
+    // R2 media subdomain to be verified for PULL_FROM_URL.
+    const bytes = isUploadedPostingVideo(parsed) ? await readUploadedPostingVideo(parsed) : null;
     const published = await postingApi('video/init/', {
       post_info: {
         title, privacy_level: privacy,
@@ -65,8 +69,16 @@ export async function POST(request: Request) {
         is_aigc: body.aiGenerated === true,
         video_cover_timestamp_ms: Number.isInteger(body.coverTimestampMs) && body.coverTimestampMs >= 0 ? body.coverTimestampMs : 0,
       },
-      source_info: { source: 'PULL_FROM_URL', video_url: videoUrl },
+      source_info: bytes
+        ? { source: 'FILE_UPLOAD', video_size: bytes.byteLength, chunk_size: bytes.byteLength, total_chunk_count: 1 }
+        : { source: 'PULL_FROM_URL', video_url: videoUrl },
     });
+    if (bytes) {
+      try { await transferPostingVideo(published.upload_url, bytes); }
+      catch (error) {
+        return NextResponse.json({ publishId: published.publish_id, error: error instanceof Error ? error.message : 'TikTok file transfer failed.' }, { status: 502, headers: noStore });
+      }
+    }
     return NextResponse.json({ publishId: published.publish_id }, { headers: noStore });
   } catch (error) { return failed(error); }
 }
