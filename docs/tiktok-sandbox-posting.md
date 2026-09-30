@@ -19,7 +19,7 @@ The separate TikTok Events API token already on the admin page is for Pixel even
 
 1. Open `/admin/tiktok`, enter the new TikTok posting admin PIN, and click **Connect TikTok**. Approve `video.publish` as `@primehubpk1`.
 2. Enter the PIN again after returning from TikTok and click **Check account**. Confirm that the displayed username is `primehubpk1`.
-3. Supply an original MP4 or MOV video accessible over HTTPS on `www.primehubmall.com`. The sandbox test form accepts a URL on this verified domain, because TikTok pulls server-hosted media from a verified URL property. It does not upload a local file to the website.
+3. Upload an original MP4 smaller than 3.5 MB through the posting form. It stores the video on `images.primehubmall.com`, a subdomain of the verified `primehubmall.com` domain. TikTok pulls the video directly without a redirect. Alternatively, supply a publicly accessible MP4/MOV URL under `www.primehubmall.com` or `images.primehubmall.com`. Confirm the video loads in the preview.
 4. Play the preview, enter an editable caption, select **Only me** privacy, choose available interaction settings, mark own-brand promotion when appropriate, and explicitly consent to posting. Click **Post privately to TikTok** and check the publish status.
 5. Record the actual browser interaction including login/consent, preview, posting options, response and TikTok result. TikTok's review upload accepts MP4/MOV up to 50 MB per video. Recording a mock screen or claiming public posting in the sandbox is inaccurate.
 
