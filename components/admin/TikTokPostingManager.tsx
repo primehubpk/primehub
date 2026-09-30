@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { Eye, EyeOff } from 'lucide-react';
 
 type Creator = {
   creator_nickname?: string;
@@ -14,6 +15,8 @@ type Creator = {
 
 export default function TikTokPostingManager() {
   const [pin, setPin] = useState('');
+  const [pinConfigured, setPinConfigured] = useState(false);
+  const [showPin, setShowPin] = useState(false);
   const [creator, setCreator] = useState<Creator | null>(null);
   const [connected, setConnected] = useState(false);
   const [videoUrl, setVideoUrl] = useState('');
@@ -37,7 +40,50 @@ export default function TikTokPostingManager() {
   useEffect(() => {
     const note = new URLSearchParams(window.location.search).get('posting');
     if (note) queueMicrotask(() => setMessage(note));
+    let active = true;
+    void fetch('/api/admin/tiktok/posting/pin', { credentials: 'same-origin', cache: 'no-store' })
+      .then(async response => {
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'TikTok PIN settings could not load.');
+        if (active) setPinConfigured(Boolean(result.configured));
+      })
+      .catch(error => { if (active) setMessage(error instanceof Error ? error.message : 'TikTok PIN settings could not load.'); });
+    return () => { active = false; };
   }, []);
+
+  async function pinSettings(action: 'save' | 'reveal') {
+    const response = await fetch('/api/admin/tiktok/posting/pin', {
+      method: 'POST', credentials: 'same-origin', cache: 'no-store',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(action === 'save' ? { action, pin } : { action }),
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || 'TikTok PIN request failed.');
+    return result;
+  }
+
+  async function savePin() {
+    setBusy(true); setMessage('');
+    try {
+      const result = await pinSettings('save');
+      setPin(pin.trim());
+      setPinConfigured(Boolean(result.configured));
+      setMessage('TikTok posting PIN saved securely. You can reveal it with the eye button.');
+    } catch (error) { setMessage(error instanceof Error ? error.message : 'TikTok PIN could not be saved.'); }
+    finally { setBusy(false); }
+  }
+
+  async function togglePin() {
+    if (showPin) { setShowPin(false); return; }
+    if (!pinConfigured) { setShowPin(true); return; }
+    setBusy(true); setMessage('');
+    try {
+      const result = await pinSettings('reveal');
+      setPin(result.pin);
+      setShowPin(true);
+    } catch (error) { setMessage(error instanceof Error ? error.message : 'TikTok PIN could not be revealed.'); }
+    finally { setBusy(false); }
+  }
 
   async function api(method: string, body?: object) {
     const response = await fetch('/api/admin/tiktok/posting', {
@@ -130,9 +176,14 @@ export default function TikTokPostingManager() {
     <div className="rounded-3xl bg-white p-5 shadow-sm sm:p-6">
       <h2 className="text-lg font-black">Sandbox video posting</h2>
       <p className="mt-2 text-xs leading-5 text-black/60">Only me posts during sandbox testing. TikTok public posting requires its separate app review.</p>
-      <label className="mt-4 block text-xs font-bold">TikTok posting admin PIN (server setting)</label>
-      <input type="password" autoComplete="off" value={pin} onChange={e => setPin(e.target.value)} className={input} />
+      <label htmlFor="tiktok-posting-pin" className="mt-4 block text-xs font-bold">TikTok posting admin PIN</label>
+      <div className="relative">
+        <input id="tiktok-posting-pin" type={showPin ? 'text' : 'password'} autoComplete="off" value={pin} onChange={e => setPin(e.target.value)} className={`${input} pr-12`} placeholder={pinConfigured ? 'Saved PIN • click the eye to reveal' : 'Choose a PIN and save it'} />
+        <button type="button" className="absolute right-3 top-1/2 mt-0.5 -translate-y-1/2 rounded p-1 text-black/60" onClick={() => void togglePin()} disabled={busy} aria-label={showPin ? 'Hide TikTok posting PIN' : 'Show saved TikTok posting PIN'} title={showPin ? 'Hide PIN' : 'Show PIN'}>{showPin ? <EyeOff size={18} /> : <Eye size={18} />}</button>
+      </div>
+      <p className="mt-2 text-xs text-black/60">{pinConfigured ? 'PIN saved. Use the eye to reveal it after returning from TikTok.' : 'Save a PIN here first. No Vercel PIN setting is needed.'}</p>
       <div className="mt-3 flex flex-wrap gap-2">
+        <button type="button" className={button} disabled={busy || !pin.trim()} onClick={() => void savePin()}>Save PIN</button>
         <button type="button" className={button} disabled={busy || !pin} onClick={() => void load()}>Check account</button>
         <button type="button" className={button} disabled={busy || !pin} onClick={() => void connect()}>Connect TikTok</button>
         {connected && <button type="button" className={button} disabled={busy} onClick={() => void disconnect()}>Disconnect</button>}
