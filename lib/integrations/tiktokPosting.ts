@@ -4,6 +4,8 @@ import { openCredentials, sealCredentials } from '@/lib/salar/credentialCrypto';
 
 const INTEGRATION = 'tiktok_posting_sandbox';
 const CONTEXT = `integration:${INTEGRATION}`;
+const PIN_INTEGRATION = 'tiktok_posting_admin_pin';
+const PIN_CONTEXT = `integration:${PIN_INTEGRATION}`;
 
 type Credentials = {
   openId: string;
@@ -32,6 +34,27 @@ async function requestStorage(query: string, init: RequestInit = {}) {
   });
   if (!result.ok) throw new Error(`Secure integration storage failed (${result.status}).`);
   return result;
+}
+
+export async function getPostingPin(): Promise<string> {
+  const result = await requestStorage(`?select=envelope&integration=eq.${PIN_INTEGRATION}&limit=1`);
+  const rows = await result.json() as Array<{ envelope: string }>;
+  if (!rows[0]?.envelope) return '';
+  const value = openCredentials(PIN_CONTEXT, rows[0].envelope) as { pin?: unknown };
+  return typeof value.pin === 'string' ? value.pin : '';
+}
+
+export async function savePostingPin(value: string) {
+  const pin = value.trim();
+  if (!pin) throw new Error('Enter a TikTok posting PIN before saving.');
+  await requestStorage('?on_conflict=integration', {
+    method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+    body: JSON.stringify({
+      integration: PIN_INTEGRATION,
+      envelope: sealCredentials(PIN_CONTEXT, { pin }),
+      updated_at: new Date().toISOString(),
+    }),
+  });
 }
 
 export async function getPostingCredentials(): Promise<Credentials | null> {
