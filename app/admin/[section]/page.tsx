@@ -20,6 +20,7 @@ import WhatsAppCoexistenceSetup from '@/components/admin/WhatsAppCoexistenceSetu
 import WholesaleVideoManager from '@/components/admin/WholesaleVideoManager';
 import SalarControlPanel from '@/components/admin/SalarControlPanel';
 import TikTokEventsManager from '@/components/admin/TikTokEventsManager';
+import TikTokPostingManager from '@/components/admin/TikTokPostingManager';
 
 type SectionDefinition = {
   title: string;
@@ -104,8 +105,8 @@ const SECTIONS: Record<string, SectionDefinition> = {
   tiktok: {
     title: 'TikTok',
     eyebrow: 'Tracking',
-    description: 'Manage TikTok Pixel and server-side Events API from Admin.',
-    content: <TikTokEventsManager />,
+    description: 'Manage TikTok tracking and sandbox video posting from Admin.',
+    content: <><TikTokEventsManager /><TikTokPostingManager /></>,
   },
   suppliers: {
     title: 'Suppliers',
