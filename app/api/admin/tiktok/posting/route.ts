@@ -41,8 +41,8 @@ export async function POST(request: Request) {
     if (body.consent !== true) throw new Error('Confirm the TikTok posting terms first.');
     const videoUrl = String(body.videoUrl || '');
     const parsed = new URL(videoUrl);
-    if (parsed.protocol !== 'https:' || parsed.hostname !== 'www.primehubmall.com' || !/\.(mp4|mov)$/i.test(parsed.pathname)) {
-      throw new Error('Video must be an HTTPS MP4/MOV URL hosted on the verified www.primehubmall.com domain.');
+    if (parsed.protocol !== 'https:' || !['www.primehubmall.com', 'images.primehubmall.com'].includes(parsed.hostname) || !/\.(mp4|mov)$/i.test(parsed.pathname)) {
+      throw new Error('Video must be an HTTPS MP4/MOV URL hosted on the verified PrimeHubMall domain.');
     }
     const creator = await postingApi('creator_info/query/');
     if (creator.can_post === false || creator.can_post_video === false) throw new Error('This creator cannot post right now.');
