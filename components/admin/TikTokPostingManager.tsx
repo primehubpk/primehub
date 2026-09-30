@@ -92,6 +92,7 @@ export default function TikTokPostingManager() {
       ...(body ? { body: JSON.stringify(body) } : {}),
     });
     const data = await response.json().catch(() => ({}));
+    if (data.publishId) setPublishId(data.publishId);
     if (!response.ok) throw new Error(data.error || 'TikTok request failed.');
     return data;
   }
@@ -145,7 +146,7 @@ export default function TikTokPostingManager() {
       if (!response.ok) throw new Error(result.error || 'Video upload failed.');
       setVideoUrl(result.url);
       setDuration(null);
-      setMessage('Video uploaded to PrimeHubMall media domain. Preview it before posting.');
+      setMessage('Video uploaded. Preview it before posting; the app will transfer this file directly to TikTok.');
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Video upload failed.'); }
     finally { setBusy(false); }
   }
