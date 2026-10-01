@@ -22,6 +22,8 @@ export default function TikTokPostingManager() {
   const [connected, setConnected] = useState(false);
   const [videoUrl, setVideoUrl] = useState('');
   const [file, setFile] = useState<File | null>(null);
+  const [localPreviewUrl, setLocalPreviewUrl] = useState('');
+  const [videoError, setVideoError] = useState('');
   const [duration, setDuration] = useState<number | null>(null);
   const [title, setTitle] = useState('');
   const [privacy, setPrivacy] = useState('');
@@ -37,6 +39,11 @@ export default function TikTokPostingManager() {
   const [status, setStatus] = useState('');
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!localPreviewUrl) return;
+    return () => URL.revokeObjectURL(localPreviewUrl);
+  }, [localPreviewUrl]);
 
   useEffect(() => {
     const note = new URLSearchParams(window.location.search).get('posting');
@@ -180,7 +187,6 @@ export default function TikTokPostingManager() {
         throw new Error(result.error || 'Video upload failed.');
       }
       setVideoUrl(result.url);
-      setDuration(null);
       setMessage('Video uploaded. Preview it before posting; the app will transfer this file directly to TikTok.');
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Video upload failed.'); }
     finally { setBusy(false); }
@@ -206,7 +212,7 @@ export default function TikTokPostingManager() {
   const button = 'rounded-full bg-[#14140F] px-4 py-2.5 text-xs font-bold text-white disabled:opacity-40';
   const validUrl = /^https:\/\/(?:www|images)\.primehubmall\.com\/[^?#]+\.(mp4|mov)(?:\?[^#]*)?$/i.test(videoUrl);
   const durationValid = duration !== null && Number.isFinite(duration) && duration > 0 && duration <= (creator?.max_video_post_duration_sec || 0);
-  const canPublish = connected && creator && validUrl && durationValid && title.trim() && privacy === 'SELF_ONLY' && consent && (!commercial || brandOrganic || brandContent) && !brandContent;
+  const canPublish = connected && creator && validUrl && durationValid && !videoError && title.trim() && privacy === 'SELF_ONLY' && consent && (!commercial || brandOrganic || brandContent) && !brandContent;
 
   return <section className="mx-auto max-w-4xl px-4 pb-10 sm:px-6">
     <div className="rounded-3xl bg-white p-5 shadow-sm sm:p-6">
@@ -231,12 +237,29 @@ export default function TikTokPostingManager() {
     {creator && <div className="mt-4 rounded-3xl bg-white p-5 shadow-sm sm:p-6">
       <h3 className="text-lg font-black">Preview and post</h3>
       <label className="mt-4 block text-xs font-bold">Upload an original MP4 (up to 3.5 MB)</label>
-      <input type="file" accept="video/mp4,.mp4" onChange={e => setFile(e.target.files?.[0] || null)} className={input} />
+      <input type="file" accept="video/mp4,.mp4" onChange={e => {
+        const selected = e.target.files?.[0] || null;
+        setFile(selected); setLocalPreviewUrl(selected ? URL.createObjectURL(selected) : '');
+        setVideoUrl(''); setDuration(null); setVideoError(''); setConsent(false);
+      }} className={input} />
+      {file && file.size > 3_500_000 && <p role="alert" className="mt-2 text-xs text-[#A52F25]">This file is larger than 3.5 MB. Compress the MP4 before uploading.</p>}
       <button type="button" className={`mt-2 ${button}`} disabled={busy || !file || file.size > 3_500_000} onClick={() => void upload()}>Upload video to PrimeHubMall</button>
       <label className="mt-4 block text-xs font-bold">Video URL on verified PrimeHubMall domain (MP4/MOV)</label>
-      <input type="url" value={videoUrl} onChange={e => { setVideoUrl(e.target.value); setDuration(null); }} className={input} placeholder="https://www.primehubmall.com/.../video.mp4" />
-      {validUrl && <video key={videoUrl} controls preload="metadata" className="mt-3 max-h-96 w-full rounded-xl bg-black" src={videoUrl}
-        onLoadedMetadata={e => setDuration(e.currentTarget.duration)} onError={() => setDuration(null)} />}
+      <input type="url" value={videoUrl} onChange={e => {
+        if (e.target.value === videoUrl) return;
+        setVideoUrl(e.target.value); setFile(null); setLocalPreviewUrl('');
+        setDuration(null); setVideoError(''); setConsent(false);
+      }} className={input} placeholder="https://www.primehubmall.com/.../video.mp4" />
+      {(localPreviewUrl || validUrl) && <video key={localPreviewUrl || videoUrl} controls preload="metadata" className="mt-3 max-h-96 w-full rounded-xl bg-black" src={localPreviewUrl || videoUrl}
+        onLoadedMetadata={e => { setDuration(e.currentTarget.duration); setVideoError(''); }}
+        onDurationChange={e => { if (Number.isFinite(e.currentTarget.duration) && e.currentTarget.duration > 0) setDuration(e.currentTarget.duration); }}
+        onError={e => {
+          setDuration(null);
+          setVideoError(e.currentTarget.error?.code === 3 || e.currentTarget.error?.code === 4
+            ? 'This browser cannot play this video. Export it as MP4 with H.264 video and AAC audio, then select it again.'
+            : 'Video preview could not load. Select the MP4 from your computer and upload it again.');
+        }} />}
+      {videoError && <p role="alert" className="mt-2 text-xs text-[#A52F25]">{videoError}</p>}
       {duration !== null && <p className="mt-2 text-xs">Duration: {Math.round(duration)}s / TikTok maximum: {creator.max_video_post_duration_sec}s</p>}
       <label className="mt-4 block text-xs font-bold">Editable caption and hashtags</label>
       <textarea maxLength={2200} value={title} onChange={e => setTitle(e.target.value)} className={input} rows={3} />
@@ -257,7 +280,9 @@ export default function TikTokPostingManager() {
       <label className="mt-3 flex items-center gap-2 text-xs"><input type="checkbox" checked={aiGenerated} onChange={e => setAiGenerated(e.target.checked)} /> AI generated video</label>
       <label className="mt-4 flex items-start gap-2 text-xs"><input type="checkbox" checked={consent} onChange={e => setConsent(e.target.checked)} /> <span>I previewed this video and expressly consent to upload it. By posting, I agree to TikTok’s <a className="underline" target="_blank" rel="noreferrer" href="https://www.tiktok.com/legal/page/global/music-usage-confirmation/en">Music Usage Confirmation</a>.</span></label>
       <button type="button" className={`mt-4 ${button}`} disabled={busy || !canPublish} onClick={() => void publish()}>Post privately to TikTok</button>
-      {!durationValid && validUrl && <p className="mt-2 text-xs text-black/50">Video must load and fit this creator’s duration limit.</p>}
+      {!videoError && duration === null && (localPreviewUrl || validUrl) && <p className="mt-2 text-xs text-black/50">Loading video preview. Press play to check it before posting.</p>}
+      {duration !== null && !durationValid && <p role="alert" className="mt-2 text-xs text-[#A52F25]">Video duration must be between 1 and {creator.max_video_post_duration_sec || 0} seconds.</p>}
+      {localPreviewUrl && !validUrl && <p className="mt-2 text-xs text-black/50">Preview ready. Click Upload video to PrimeHubMall before posting.</p>}
       {publishId && <div className="mt-5 rounded-xl bg-[#F4F4F1] p-4 text-xs"><p>Post ID: {publishId}</p><p className="mt-2 break-all">{status}</p><button type="button" className={`mt-3 ${button}`} disabled={busy} onClick={() => void checkStatus()}>Check TikTok status</button></div>}
     </div>}
   </section>;
