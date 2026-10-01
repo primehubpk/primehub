@@ -16,6 +16,7 @@ type Creator = {
 export default function TikTokPostingManager() {
   const [pin, setPin] = useState('');
   const [pinConfigured, setPinConfigured] = useState(false);
+  const [postingAuthorized, setPostingAuthorized] = useState(false);
   const [showPin, setShowPin] = useState(false);
   const [creator, setCreator] = useState<Creator | null>(null);
   const [connected, setConnected] = useState(false);
@@ -45,16 +46,29 @@ export default function TikTokPostingManager() {
       .then(async response => {
         const result = await response.json();
         if (!response.ok) throw new Error(result.error || 'TikTok PIN settings could not load.');
-        if (active) setPinConfigured(Boolean(result.configured));
+        if (!active) return;
+        setPinConfigured(Boolean(result.configured));
+        setPostingAuthorized(Boolean(result.authorized));
+        if (result.authorized) {
+          const accountResponse = await fetch('/api/admin/tiktok/posting', { credentials: 'same-origin', cache: 'no-store' });
+          const account = await accountResponse.json();
+          if (!active) return;
+          if (!accountResponse.ok) {
+            if (accountResponse.status === 403) setPostingAuthorized(false);
+            throw new Error(account.error || 'TikTok account could not load.');
+          }
+          setConnected(Boolean(account.connected));
+          setCreator(account.creator || null);
+        }
       })
       .catch(error => { if (active) setMessage(error instanceof Error ? error.message : 'TikTok PIN settings could not load.'); });
     return () => { active = false; };
   }, []);
 
-  async function pinSettings(action: 'save' | 'reveal') {
+  async function pinSettings(action: 'save' | 'reveal' | 'unlock') {
     const response = await fetch('/api/admin/tiktok/posting/pin', {
       method: 'POST', credentials: 'same-origin', cache: 'no-store',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...(action === 'unlock' ? { 'x-tiktok-posting-pin': pin } : {}) },
       body: JSON.stringify(action === 'save' ? { action, pin } : { action }),
     });
     const result = await response.json().catch(() => ({}));
@@ -66,9 +80,10 @@ export default function TikTokPostingManager() {
     setBusy(true); setMessage('');
     try {
       const result = await pinSettings('save');
-      setPin(pin.trim());
+      setPin(''); setShowPin(false);
       setPinConfigured(Boolean(result.configured));
-      setMessage('TikTok posting PIN saved securely. You can reveal it with the eye button.');
+      setPostingAuthorized(Boolean(result.authorized));
+      setMessage('PIN saved. Check account or Connect TikTok is ready.');
     } catch (error) { setMessage(error instanceof Error ? error.message : 'TikTok PIN could not be saved.'); }
     finally { setBusy(false); }
   }
@@ -85,15 +100,27 @@ export default function TikTokPostingManager() {
     finally { setBusy(false); }
   }
 
+  async function ensurePostingSession() {
+    if (postingAuthorized) return;
+    if (!pin.trim()) throw new Error('Enter your saved PIN once to unlock this browser, then Check account or Connect TikTok.');
+    const result = await pinSettings('unlock');
+    setPostingAuthorized(Boolean(result.authorized));
+    setPin(''); setShowPin(false);
+  }
+
   async function api(method: string, body?: object) {
+    await ensurePostingSession();
     const response = await fetch('/api/admin/tiktok/posting', {
       method, cache: 'no-store', credentials: 'same-origin',
-      headers: { 'x-tiktok-posting-pin': pin, ...(body ? { 'Content-Type': 'application/json' } : {}) },
+      headers: { ...(body ? { 'Content-Type': 'application/json' } : {}) },
       ...(body ? { body: JSON.stringify(body) } : {}),
     });
     const data = await response.json().catch(() => ({}));
     if (data.publishId) setPublishId(data.publishId);
-    if (!response.ok) throw new Error(data.error || 'TikTok request failed.');
+    if (!response.ok) {
+      if (response.status === 403) setPostingAuthorized(false);
+      throw new Error(data.error || 'TikTok request failed.');
+    }
     return data;
   }
 
@@ -110,11 +137,15 @@ export default function TikTokPostingManager() {
   async function connect() {
     setBusy(true); setMessage('');
     try {
+      await ensurePostingSession();
       const response = await fetch('/api/tiktok/oauth/start', {
-        method: 'POST', headers: { 'x-tiktok-posting-pin': pin }, credentials: 'same-origin', cache: 'no-store',
+        method: 'POST', credentials: 'same-origin', cache: 'no-store',
       });
       const result = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(result.error || 'Connection failed.');
+      if (!response.ok) {
+        if (response.status === 403) setPostingAuthorized(false);
+        throw new Error(result.error || 'Connection failed.');
+      }
       window.location.assign(result.url);
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Connection failed.'); setBusy(false); }
   }
@@ -136,14 +167,18 @@ export default function TikTokPostingManager() {
     if (!file) return;
     setBusy(true); setMessage('');
     try {
+      await ensurePostingSession();
       const form = new FormData();
       form.set('video', file);
       const response = await fetch('/api/admin/tiktok/posting/video', {
         method: 'POST', credentials: 'same-origin', cache: 'no-store',
-        headers: { 'x-tiktok-posting-pin': pin }, body: form,
+        body: form,
       });
       const result = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(result.error || 'Video upload failed.');
+      if (!response.ok) {
+        if (response.status === 403) setPostingAuthorized(false);
+        throw new Error(result.error || 'Video upload failed.');
+      }
       setVideoUrl(result.url);
       setDuration(null);
       setMessage('Video uploaded. Preview it before posting; the app will transfer this file directly to TikTok.');
@@ -179,14 +214,14 @@ export default function TikTokPostingManager() {
       <p className="mt-2 text-xs leading-5 text-black/60">Only me posts during sandbox testing. TikTok public posting requires its separate app review.</p>
       <label htmlFor="tiktok-posting-pin" className="mt-4 block text-xs font-bold">TikTok posting admin PIN</label>
       <div className="relative">
-        <input id="tiktok-posting-pin" type={showPin ? 'text' : 'password'} autoComplete="off" value={pin} onChange={e => setPin(e.target.value)} className={`${input} pr-12`} placeholder={pinConfigured ? 'Saved PIN • click the eye to reveal' : 'Choose a PIN and save it'} />
+        <input id="tiktok-posting-pin" type={showPin ? 'text' : 'password'} autoComplete="off" value={pin} onChange={e => setPin(e.target.value)} className={`${input} pr-12`} placeholder={postingAuthorized ? 'PIN saved • ready to connect' : pinConfigured ? 'Enter saved PIN once for this browser' : 'Choose a PIN and save it'} />
         <button type="button" className="absolute right-3 top-1/2 mt-0.5 -translate-y-1/2 rounded p-1 text-black/60" onClick={() => void togglePin()} disabled={busy} aria-label={showPin ? 'Hide TikTok posting PIN' : 'Show saved TikTok posting PIN'} title={showPin ? 'Hide PIN' : 'Show PIN'}>{showPin ? <EyeOff size={18} /> : <Eye size={18} />}</button>
       </div>
-      <p className="mt-2 text-xs text-black/60">{pinConfigured ? 'PIN saved. Use the eye to reveal it after returning from TikTok.' : 'Save a PIN here first. No Vercel PIN setting is needed.'}</p>
+      <p role="status" className="mt-2 text-xs text-black/60">{postingAuthorized ? 'PIN saved. This browser is ready; no need to reveal it after connecting.' : pinConfigured ? 'PIN saved. Enter it once to unlock this browser. The eye button only shows the PIN.' : 'Save a PIN here first. No Vercel PIN setting is needed.'}</p>
       <div className="mt-3 flex flex-wrap gap-2">
         <button type="button" className={button} disabled={busy || !pin.trim()} onClick={() => void savePin()}>Save PIN</button>
-        <button type="button" className={button} disabled={busy || !pin} onClick={() => void load()}>Check account</button>
-        <button type="button" className={button} disabled={busy || !pin} onClick={() => void connect()}>Connect TikTok</button>
+        <button type="button" className={button} disabled={busy || !(postingAuthorized || pinConfigured || pin.trim())} onClick={() => void load()}>Check account</button>
+        <button type="button" className={button} disabled={busy || !(postingAuthorized || pinConfigured || pin.trim())} onClick={() => void connect()}>Connect TikTok</button>
         {connected && <button type="button" className={button} disabled={busy} onClick={() => void disconnect()}>Disconnect</button>}
       </div>
       {creator && <p className="mt-4 text-sm font-bold">Connected creator: {creator.creator_nickname} (@{creator.creator_username})</p>}
