@@ -2,12 +2,14 @@ import 'server-only';
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { verifyPrimeHubAdminRequest } from '@/lib/adminSession';
 import { getPostingPin } from '@/lib/integrations/tiktokPosting';
+import { postingSessionFromRequest, validPostingSession } from '@/lib/integrations/tiktokPostingSession';
 
 export async function postingAdmin(request: Request) {
   if (!await verifyPrimeHubAdminRequest(request)) return false;
   const expected = await getPostingPin();
   const supplied = request.headers.get('x-tiktok-posting-pin') || '';
   if (!expected) return false;
+  if (!supplied) return validPostingSession(postingSessionFromRequest(request), expected);
   return timingSafeEqual(createHash('sha256').update(expected).digest(), createHash('sha256').update(supplied).digest());
 }
 

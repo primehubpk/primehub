@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { POSTING_SESSION_COOKIE, postingSessionCookieOptions } from '@/lib/integrations/tiktokPostingSession';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -30,6 +31,7 @@ export async function DELETE(request: Request) {
     path: '/',
     maxAge: 0,
   });
+  response.cookies.set(POSTING_SESSION_COOKIE, '', { ...postingSessionCookieOptions(), maxAge: 0 });
   response.headers.set('Cache-Control', 'no-store');
   return response;
 }
