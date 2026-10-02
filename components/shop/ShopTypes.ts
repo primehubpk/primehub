@@ -4,7 +4,7 @@ import { normalizeImageUrl } from '@/lib/imageUrl';
 
 export type Product = {
   id: string; title?: string; name?: string; price?: number; compareAtPrice?: number; originalPrice?: number;
-  imageUrl?: string; image?: string; images?: Array<string | { url?: string; imageUrl?: string } | null>; category?: string; categoryId?: string;
+  imageUrl?: string; image?: string; images?: string[]; category?: string; categoryId?: string;
   isFlashSale?: boolean; stock?: number; quantity?: number; isWholesale?: boolean; [key: string]: any;
 };
 
@@ -45,7 +45,7 @@ export function imageCandidatesOf(p: Product) {
   const raw = [
     p.imageUrl,
     p.image,
-    ...(Array.isArray(p.images) ? p.images : []),
+    ...(Array.isArray(p.images) ? (p.images as unknown[]) : []),
   ];
   const seen = new Set<string>();
   const images: string[] = [];
