@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { Outfit } from 'next/font/google';
 import { useEffect, useMemo, useState, type ElementType } from 'react';
-import { onAuthStateChanged } from 'firebase/auth';
+import { onAuthStateChanged, type User } from 'firebase/auth';
 import { doc, onSnapshot } from 'firebase/firestore';
 import {
   ArrowLeft,
@@ -21,7 +21,6 @@ import {
   Users,
   X,
 } from 'lucide-react';
-import { useRouter } from 'next/navigation';
 import { auth, db } from '@/lib/firebase';
 import {
   DEFAULT_MONTHLY_CHALLENGE,
@@ -87,7 +86,7 @@ function currentGuestId() {
 }
 
 export default function ResellerDashboardPage() {
-  const router = useRouter();
+  const [memberUser, setMemberUser] = useState<User | null>(() => auth.currentUser);
   const [profile, setProfile] = useState<ResellerProfile | null>(null);
   const [tasks, setTasks] = useState<ResellerTask[]>(DEFAULT_RESELLER_TASKS);
   const [challenge, setChallenge] = useState<MonthlyChallengeSettings>(DEFAULT_MONTHLY_CHALLENGE);
@@ -109,8 +108,12 @@ export default function ResellerDashboardPage() {
     let stopProfile: (() => void) | undefined;
     const stopAuth = onAuthStateChanged(auth, user => {
       stopProfile?.();
+      setMemberUser(user);
+
       if (!user) {
-        router.replace('/reseller/join');
+        setProfile(null);
+        setRewardWallet({ points: 0, streak: 0 });
+        setLoading(false);
         return;
       }
 
@@ -118,11 +121,7 @@ export default function ResellerDashboardPage() {
       stopProfile = onSnapshot(
         doc(db, 'reseller_profiles', user.uid),
         snapshot => {
-          if (!snapshot.exists()) {
-            router.replace('/reseller/join');
-            return;
-          }
-          setProfile(snapshot.data() as ResellerProfile);
+          setProfile(snapshot.exists() ? snapshot.data() as ResellerProfile : null);
           setLoading(false);
         },
         () => setLoading(false),
@@ -147,7 +146,7 @@ export default function ResellerDashboardPage() {
       stopAuth();
       stopProfile?.();
     };
-  }, [router]);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -368,10 +367,10 @@ export default function ResellerDashboardPage() {
   const filteredVouchers = vouchers.filter(voucher => filter === 'all' || voucher.type === filter);
   const nextTask = activeTasks[0];
 
-  if (loading || !profile) {
+  if (loading) {
     return (
       <main className={`${outfit.className} flex min-h-screen items-center justify-center bg-[#F6F1E8] text-sm font-bold text-black/45`}>
-        Loading your Reseller Club…
+        Loading Prime Family…
       </main>
     );
   }
@@ -380,8 +379,8 @@ export default function ResellerDashboardPage() {
     <main className={`${outfit.className} min-h-screen bg-[#111] text-[#14140F]`}>
       <div className="relative mx-auto min-h-screen max-w-[1180px] overflow-hidden bg-[#F6F1E8] shadow-2xl lg:my-6 lg:min-h-[calc(100vh-3rem)] lg:rounded-[32px]">
         <header className="relative bg-[linear-gradient(165deg,#16332E_0%,#0C1C19_70%)] px-4 pb-[22px] pt-3 text-white sm:px-6 lg:px-8 lg:pb-7 lg:pt-5">
-          <div id="club-home" className="flex items-center justify-between gap-3"><Link href="/reseller" className="inline-flex items-center gap-1.5 text-xs font-semibold text-white/80"><ArrowLeft size={14} /> Reseller Club</Link><div className="flex items-center gap-2"><Link href="/reseller/wallet" aria-label="Reward history" className="grid h-9 w-9 place-items-center rounded-full bg-white/10 text-white"><History size={16}/></Link><a href="#club-tasks" aria-label="Notifications" className="relative grid h-9 w-9 place-items-center rounded-full bg-white/10 text-white"><Bell size={16}/><span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-[#FF9A3C] ring-2 ring-[#16332E]"/></a></div></div>
-          <div className="mt-4 grid gap-3 sm:grid-cols-[1.3fr_.7fr]"><div className="flex min-w-0 items-center gap-3 rounded-2xl border border-white/10 bg-white/[.07] p-3"><div className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-[#FFCF68] text-lg font-extrabold text-[#14140F]">{(profile?.displayName||profile?.email||'P').charAt(0).toUpperCase()}</div><div className="min-w-0"><p className="text-[9px] font-extrabold uppercase tracking-[.2em] text-[#FFCF68]">Profile</p><h1 className="truncate text-lg font-extrabold">{profile?.displayName||'PrimeHub Reseller'}</h1><p className="truncate text-[10px] text-white/55">{profile?.email}</p></div></div><div className="grid grid-cols-2 gap-2"><div className="rounded-2xl border border-white/10 bg-white/[.07] p-3"><p className="text-[8px] font-extrabold uppercase tracking-wider text-white/45">Cash Wallet</p><p className="mt-1 text-base font-extrabold">Rs. {walletAvailable.toLocaleString()}</p></div><div className="rounded-2xl border border-white/10 bg-white/[.07] p-3"><p className="text-[8px] font-extrabold uppercase tracking-wider text-white/45">Points Wallet</p><p className="mt-1 text-base font-extrabold">{Number(rewardWallet.points||0).toLocaleString()}</p></div></div></div>
+          <div id="club-home" className="flex items-center justify-between gap-3"><Link href="/" className="inline-flex items-center gap-1.5 text-xs font-semibold text-white/80"><ArrowLeft size={14} /> Prime Family</Link><div className="flex items-center gap-2">{memberUser ? <><Link href="/reseller/wallet" aria-label="Reward history" className="grid h-9 w-9 place-items-center rounded-full bg-white/10 text-white"><History size={16}/></Link><a href="#club-tasks" aria-label="Notifications" className="relative grid h-9 w-9 place-items-center rounded-full bg-white/10 text-white"><Bell size={16}/><span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-[#FF9A3C] ring-2 ring-[#16332E]"/></a></> : <Link href="/reseller/join" className="rounded-full bg-[#FFCF68] px-3 py-2 text-[10px] font-extrabold text-[#14140F]">Sign In / Join</Link>}</div></div>
+          <div className="mt-4 grid gap-3 sm:grid-cols-[1.3fr_.7fr]"><div className="flex min-w-0 items-center gap-3 rounded-2xl border border-white/10 bg-white/[.07] p-3"><div className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-[#FFCF68] text-lg font-extrabold text-[#14140F]">{(profile?.displayName||profile?.email||'P').charAt(0).toUpperCase()}</div><div className="min-w-0"><p className="text-[9px] font-extrabold uppercase tracking-[.2em] text-[#FFCF68]">{memberUser ? 'Profile' : 'Guest access'}</p><h1 className="truncate text-lg font-extrabold">{profile?.displayName||profile?.email||'Prime Family Guest'}</h1><p className="truncate text-[10px] text-white/55">{profile?.email || (memberUser ? 'Member account' : 'Browse tasks & rewards — sign in to claim')}</p></div></div><div className="grid grid-cols-2 gap-2"><div className="rounded-2xl border border-white/10 bg-white/[.07] p-3"><p className="text-[8px] font-extrabold uppercase tracking-wider text-white/45">Cash Wallet</p><p className="mt-1 text-base font-extrabold">Rs. {walletAvailable.toLocaleString()}</p></div><div className="rounded-2xl border border-white/10 bg-white/[.07] p-3"><p className="text-[8px] font-extrabold uppercase tracking-wider text-white/45">Points Wallet</p><p className="mt-1 text-base font-extrabold">{Number(rewardWallet.points||0).toLocaleString()}</p></div></div></div>
         </header>
 
         <nav className="sticky top-0 z-30 flex gap-1.5 overflow-x-auto border-b border-black/5 bg-[#F6F1E8]/95 px-4 py-3 backdrop-blur sm:px-6 lg:justify-center lg:px-8 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
