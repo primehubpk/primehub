@@ -1,6 +1,6 @@
 'use client';
 
-import Image from 'next/image';
+import RetryableStorefrontImage from '@/components/RetryableStorefrontImage';
 import HomeHeading from '@/components/home/HomeHeading';
 import { HomeProductCard } from '@/components/home/HomeCollections';
 import FastProductLink from '@/components/FastProductLink';
@@ -10,8 +10,8 @@ import { ArrowRight, ShoppingCart, Sparkles } from 'lucide-react';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useCartStore } from '@/lib/cartStore';
-import { imageOf, originalOf, priceOf, productHasVariants, titleOf, type Product } from '@/components/shop/ShopTypes';
-import { isDirectStorefrontImage, normalizeImageUrl } from '@/lib/imageUrl';
+import { imageCandidatesOf, imageOf, originalOf, priceOf, productHasVariants, titleOf, type Product } from '@/components/shop/ShopTypes';
+import { isDirectStorefrontImage } from '@/lib/imageUrl';
 import { isWholesaleProduct } from '@/lib/wholesale';
 import { makeTikTokContent, trackTikTokEvent } from '@/lib/tiktokPixel';
 import '@/components/home/NewArrivalsPremium.css';
@@ -131,14 +131,16 @@ export default function NewArrivalsRail({
 
       <div className="flex snap-x gap-2.5 overflow-x-auto px-4 pb-2 [scrollbar-width:none]">
         {newest.map((p, index) => {
-          const src = normalizeImageUrl(imageOf(p));
+          const imageCandidates = imageCandidatesOf(p);
+          const src = imageCandidates[0] || '';
           return (
             <article key={p.id} className="w-[132px] shrink-0 snap-start overflow-hidden rounded-[18px] bg-white shadow-sm ring-1 ring-black/5 sm:w-[160px]">
               <FastProductLink product={p} className="block">
                 <div className="relative aspect-square overflow-hidden bg-white">
                   {src ? (
-                    <Image
+                    <RetryableStorefrontImage
                       src={src}
+                      fallbackSrcs={imageCandidates.slice(1)}
                       alt={titleOf(p)}
                       fill
                       priority={index < 3}
