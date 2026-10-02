@@ -557,6 +557,9 @@
 .home-sale-home-frame {
   margin: 0 0 22px;
 }
+.home-sale-home-frame.home-sale-wholesale-frame {
+  margin-top: -14px;
+}
 .home-sale-home-frame .home-sale-row {
   display: block;
   margin: 0;
