@@ -177,25 +177,30 @@ test('existing Prime Skills showcase sits below the embedded Sale Mela without a
 });
 
 
-test('Prime Family always opens the dashboard for guests while reward claims stay login-gated', () => {
+test('Prime Family reuses one guest-visible dashboard on route and home while reward claims stay login-gated', () => {
   const nav = read('components/BottomNav.tsx');
-  const dashboard = read('app/reseller/dashboard/page.tsx');
+  const dashboardPage = read('app/reseller/dashboard/page.tsx');
+  const dashboard = read('components/reseller/PrimeFamilyDashboard.tsx');
+  const home = read('components/HomePageClient.tsx');
   const join = read('app/reseller/join/page.tsx');
-  const tasksPage = read('app/reseller/tasks/page.tsx');
-  const tasksContent = read('components/reseller/ResellerTasksContent.tsx');
 
   assert.match(nav, /key: 'reseller', label: 'Prime Family', href: RESELLER_DASHBOARD/);
   assert.doesNotMatch(nav, /RESELLER_JOIN/);
-  assert.doesNotMatch(nav, /auth\.authStateReady/);
+  assert.match(dashboardPage, /<PrimeFamilyDashboard \/>/);
   assert.doesNotMatch(dashboard, /router\.replace\('\/reseller\/join'\)/);
   assert.match(dashboard, /Sign In \/ Join/);
   assert.match(dashboard, /Prime Family Guest/);
   assert.match(dashboard, /if \(!user \|\| rewardBusy/);
   assert.match(dashboard, /if \(!user \|\| spinning/);
+  assert.match(dashboard, /view === 'wallet'/);
+  assert.doesNotMatch(dashboard, /view === 'home' && <section[^>]*>[\s\S]*?>Wallet<\/span>/);
+  assert.match(dashboard, /Cash Wallet/);
+  assert.match(
+    home,
+    /<SkillsShowcase[\s\S]*?embedded[\s\S]*?<PrimeFamilyDashboard embedded \/>/,
+  );
+  assert.doesNotMatch(home, /HomeResellerClubFull/);
   assert.doesNotMatch(join, /ResellerTasksContent/);
-  assert.match(tasksPage, /<ResellerTasksContent \/>/);
-  assert.match(tasksContent, /Tasks & Monthly Challenge/);
-  assert.match(tasksContent, /activeTasks\.map/);
   assert.match(join, /signInReseller\(email, password, rememberMe\)/);
   assert.match(join, /createResellerAccount\(email, password\)/);
 });
