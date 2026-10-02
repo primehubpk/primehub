@@ -110,6 +110,7 @@ export default function CatalogProductCard({ product, addedId, addProduct, compa
           {image ? (
             <RetryableStorefrontImage
               src={image}
+              fallbackSrcs={imageCandidates.slice(1)}
               alt={titleOf(product)}
               fill
               priority={priority}
