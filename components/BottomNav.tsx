@@ -3,12 +3,9 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { onAuthStateChanged, type User } from 'firebase/auth';
 import { GraduationCap, Home, Package, ShoppingBag, Users } from 'lucide-react';
-import { auth } from '@/lib/firebase';
 
 const RESELLER_DASHBOARD = '/reseller/dashboard';
-const RESELLER_JOIN = '/reseller/join';
 
 const NAV_ITEMS = [
   { key: 'home', label: 'Home', href: '/', icon: Home },
@@ -54,14 +51,6 @@ export default function BottomNav() {
   const pathname = usePathname();
   const router = useRouter();
   const [pendingHref, setPendingHref] = useState<string | null>(null);
-  const [resellerUser, setResellerUser] = useState<User | null>(() => auth.currentUser);
-  const [authResolved, setAuthResolved] = useState(() => Boolean(auth.currentUser));
-
-  useEffect(() => onAuthStateChanged(auth, user => {
-    setResellerUser(user);
-    setAuthResolved(true);
-  }), []);
-
   useEffect(() => {
     setPendingHref(null);
   }, [pathname]);
@@ -80,11 +69,7 @@ export default function BottomNav() {
       <div className="mx-auto grid min-h-[72px] w-full max-w-[650px] grid-cols-5">
         {NAV_ITEMS.map((item) => {
           const { key, label, icon: Icon } = item;
-          const href = key === 'reseller'
-            ? authResolved && resellerUser
-              ? RESELLER_DASHBOARD
-              : RESELLER_JOIN
-            : item.href;
+          const href = item.href;
           const routeIsActive = isItemActive(pathname, item);
           const isPending = pendingHref === href && pathname !== href;
           const visuallyActive = pendingHref ? pendingHref === href : routeIsActive;
@@ -93,7 +78,7 @@ export default function BottomNav() {
             <Link
               key={key}
               href={href}
-              prefetch={key === 'home' || key === 'shop' || key === 'skills' || key === 'orders'}
+              prefetch={key === 'home' || key === 'shop' || key === 'reseller' || key === 'skills' || key === 'orders'}
               scroll
               aria-current={routeIsActive ? 'page' : undefined}
               aria-busy={isPending || undefined}
@@ -116,24 +101,6 @@ export default function BottomNav() {
                     setPendingHref('/');
                     router.push('/', { scroll: true });
                   }
-                  return;
-                }
-
-                if (key === 'reseller') {
-                  event.preventDefault();
-                  setPendingHref(href);
-                  void auth.authStateReady().then(() => {
-                    const target = auth.currentUser ? RESELLER_DASHBOARD : RESELLER_JOIN;
-                    setResellerUser(auth.currentUser);
-                    setAuthResolved(true);
-                    router.prefetch(target);
-                    setPendingHref(target);
-                    if (pathname === target) {
-                      window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
-                    } else {
-                      router.push(target, { scroll: true });
-                    }
-                  });
                   return;
                 }
 
