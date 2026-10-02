@@ -144,3 +144,15 @@ test('homepage commerce rails use only their card headers with compact spacing',
   assert.match(css, /\.home-commerce-section\s*\{[\s\S]*?margin-top: 10px;/);
   assert.match(css, /\.home-commerce-section \+ \.home-commerce-section\s*\{[\s\S]*?margin-top: 10px;/);
 });
+
+
+test('mobile wholesale and Prime Skills cards use square larger media with horizontal trail', () => {
+  const css = read('components/home/HomeCommerceRails.css');
+  const source = read('components/home/HomeCommerceRails.tsx');
+
+  assert.match(css, /\.home-commerce-section \.home-commerce-card\s*\{[\s\S]*?flex: 0 0 72%;/);
+  assert.match(css, /\.home-commerce-media,[\s\S]*?\.home-video-packages \.home-commerce-media\s*\{[\s\S]*?aspect-ratio: 1 \/ 1;/);
+  assert.match(css, /\.home-video-packages \.home-commerce-rail\s*\{[\s\S]*?display: flex;/);
+  assert.match(css, /\.home-prime-skills \.home-commerce-media\s*\{[\s\S]*?aspect-ratio: 1 \/ 1;/);
+  assert.match(source, /Wholesale packages\. Swipe horizontally for more\./);
+});
