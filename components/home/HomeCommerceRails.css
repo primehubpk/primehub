@@ -1,5 +1,9 @@
 .home-commerce-section {
   position: relative;
+  margin-top: 10px;
+}
+.home-commerce-section + .home-commerce-section {
+  margin-top: 10px;
 }
 .home-commerce-section .home-commerce-rail-wrap {
   padding: 0 16px;
