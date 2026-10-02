@@ -177,17 +177,22 @@ test('existing Prime Skills showcase sits below the embedded Sale Mela without a
 });
 
 
-test('Prime Family nav keeps reseller auth logic and shows existing task rail below compact login', () => {
+test('Prime Family nav keeps reseller auth logic and reuses the full reseller tasks view below compact login', () => {
   const nav = read('components/BottomNav.tsx');
   const join = read('app/reseller/join/page.tsx');
+  const tasksPage = read('app/reseller/tasks/page.tsx');
+  const tasksContent = read('components/reseller/ResellerTasksContent.tsx');
 
   assert.match(nav, /key: 'reseller', label: 'Prime Family'/);
   assert.match(nav, /const target = auth\.currentUser \? RESELLER_DASHBOARD : RESELLER_JOIN/);
-  assert.match(join, /import HomeResellerClubFull/);
-  assert.match(join, /<HomeResellerClubFull \/>/);
+  assert.doesNotMatch(join, /HomeResellerClubFull/);
+  assert.match(join, /import \{ ResellerTasksContent \}/);
+  assert.match(join, /<ResellerTasksContent embedded \/>/);
+  assert.match(tasksPage, /<ResellerTasksContent \/>/);
+  assert.match(tasksContent, /Tasks & Monthly Challenge/);
+  assert.match(tasksContent, /activeTasks\.map/);
+  assert.match(tasksContent, /const Shell = embedded \? "section" : "main"/);
   assert.match(join, /Prime Family<\/Link>/);
-  assert.match(join, /px-4 pb-4 pt-3/);
-  assert.match(join, /px-4 pb-4 pt-4 text-white/);
   assert.match(join, /signInReseller\(email, password, rememberMe\)/);
   assert.match(join, /createResellerAccount\(email, password\)/);
 });
