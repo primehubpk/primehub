@@ -21,7 +21,7 @@ export type SkillItem = {
   packages?: SkillPackage[];
 };
 
-type PageSettings = { eyebrow: string; title: string; description: string; ctaText: string; ctaWhatsapp: string };
+export type PageSettings = { eyebrow: string; title: string; description: string; ctaText: string; ctaWhatsapp: string };
 const DEFAULT_PAGE: PageSettings = {
   eyebrow: 'Prime Skills',
   title: 'Apni skill se online customers hasil karein',
@@ -65,7 +65,15 @@ function displayPrice(item: SkillItem) {
   return { price: Number(item.price || 0), from: false };
 }
 
-export default function SkillsShowcase({ initialItems = [], initialPage = null }: { initialItems?: SkillItem[]; initialPage?: Partial<PageSettings> | null }) {
+export default function SkillsShowcase({
+  initialItems = [],
+  initialPage = null,
+  embedded = false,
+}: {
+  initialItems?: SkillItem[];
+  initialPage?: Partial<PageSettings> | null;
+  embedded?: boolean;
+}) {
   const items = initialItems;
   const page: PageSettings = { ...DEFAULT_PAGE, ...(initialPage || {}), description: DEFAULT_PAGE.description };
   const loading = false;
@@ -77,7 +85,12 @@ export default function SkillsShowcase({ initialItems = [], initialPage = null }
 
   const ctaHref = sellerWhatsappUrl(page.ctaWhatsapp);
 
-  return <main className="min-h-screen overflow-x-hidden bg-[#F4F4F1] px-2.5 pb-28 pt-3 sm:px-6 sm:pt-8">
+  const Shell = embedded ? 'section' : 'main';
+  const shellClassName = embedded
+    ? 'home-prime-skills-showcase overflow-x-hidden bg-[#F4F4F1] px-0 pb-6 pt-3 sm:px-0 sm:pt-5'
+    : 'min-h-screen overflow-x-hidden bg-[#F4F4F1] px-2.5 pb-28 pt-3 sm:px-6 sm:pt-8';
+
+  return <Shell className={shellClassName}>
     <section className="mx-auto max-w-5xl">
       <div className="relative overflow-hidden rounded-[24px] border border-black/[0.06] bg-gradient-to-br from-[#FFFDF8] via-[#F8F5EE] to-[#F1EEE7] shadow-[0_16px_42px_rgba(20,20,15,0.08)] sm:rounded-[34px]">
         <div className="pointer-events-none absolute -right-20 -top-20 h-56 w-56 rounded-full bg-[#0F6A5F]/10 blur-3xl"/>
@@ -109,5 +122,5 @@ export default function SkillsShowcase({ initialItems = [], initialPage = null }
         <div className="p-2 pt-2 sm:p-5 sm:pt-3">{packageCount > 0 ? <Link href={detailHref} className="flex min-h-9 w-full items-center justify-center gap-1.5 rounded-lg bg-[#181914] px-2 py-2 text-[9px] font-black text-white sm:min-h-11 sm:rounded-xl sm:px-4 sm:py-3 sm:text-xs">View Packages <ArrowRight size={12}/></Link> : waHref ? <Link href={waHref} target="_blank" rel="noreferrer" className="flex min-h-9 w-full items-center justify-center gap-1.5 rounded-lg bg-[#0F6A5F] px-2 py-2 text-[9px] font-black text-white sm:min-h-11 sm:rounded-xl sm:px-4 sm:py-3 sm:text-xs"><MessageCircle size={12}/>{item.buttonText || 'Order on WhatsApp'}</Link> : <Link href={detailHref} className="flex min-h-9 w-full items-center justify-center gap-1.5 rounded-lg bg-[#181914] px-2 py-2 text-[9px] font-black text-white sm:min-h-11 sm:rounded-xl sm:px-4 sm:py-3 sm:text-xs">View Details <ArrowRight size={12}/></Link>}</div>
       </article>;
     })}</div>}</section>
-  </main>;
+  </Shell>;
 }
