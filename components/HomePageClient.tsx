@@ -7,7 +7,6 @@ import Header from "@/components/home/HomeHeader";
 import HomeCollections from "@/components/home/HomeCollections";
 import HomeCategoryDeals from "@/components/home/HomeCategoryDeals";
 import BigDealNextPreviewSync from "@/components/home/BigDealNextPreviewSync";
-import HomeResellerClubFull from "@/components/home/HomeResellerClubFull";
 import { HomeWholesaleVideos } from "@/components/home/HomeCommerceRails";
 import "./home/home.css";
 import "./home/WeeklyDealsHomeFix.css";
@@ -22,6 +21,7 @@ import SkillsShowcase, {
   type PageSettings as PrimeSkillsPageSettings,
   type SkillItem,
 } from "@/components/SkillsShowcase";
+import PrimeFamilyDashboard from "@/components/reseller/PrimeFamilyDashboard";
 import Footer from "@/components/Footer";
 import {
   cacheCatalogForNavigation,
@@ -256,7 +256,6 @@ export default function HomePageClient({
             onSelect={selectPrice}
             onWholesaleSelect={selectWholesale}
           />
-          <HomeResellerClubFull initialProducts={products} />
           <HomeWholesaleVideos />
           <HomeCategoryDeals products={products} categories={categories} />
           <div id="discover-deals-section">
@@ -327,6 +326,7 @@ export default function HomePageClient({
             initialItems={initialSkills}
             initialPage={initialSkillsPage}
           />
+          <PrimeFamilyDashboard embedded />
         </main>
         <YouTubeGuide />
         <Footer onWholesaleSelect={selectWholesale} />
