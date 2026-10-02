@@ -146,14 +146,15 @@ test('homepage commerce rails use only their card headers with compact spacing',
 });
 
 
-test('mobile wholesale and Prime Skills cards use square larger media with horizontal trail', () => {
+test('mobile wholesale and Prime Skills cards use 16:9 thumbnails with a larger swipe trail', () => {
   const css = read('components/home/HomeCommerceRails.css');
   const source = read('components/home/HomeCommerceRails.tsx');
 
-  assert.match(css, /\.home-commerce-section \.home-commerce-card\s*\{[\s\S]*?flex: 0 0 72%;/);
-  assert.match(css, /\.home-commerce-media,[\s\S]*?\.home-video-packages \.home-commerce-media\s*\{[\s\S]*?aspect-ratio: 1 \/ 1;/);
+  assert.match(css, /\.home-video-packages \.home-commerce-card\s*\{[\s\S]*?flex(?:-basis)?: 82%;/);
+  assert.match(css, /\.home-prime-skills \.home-commerce-card\s*\{[\s\S]*?flex(?:-basis)?: 86%;/);
+  assert.match(css, /\.home-video-packages \.home-commerce-media,[\s\S]*?\.home-prime-skills \.home-commerce-media\s*\{[\s\S]*?aspect-ratio: 16 \/ 9;/);
+  assert.match(css, /\.home-prime-skills \.home-commerce-media > img\s*\{[\s\S]*?object-fit: contain;/);
   assert.match(css, /\.home-video-packages \.home-commerce-rail\s*\{[\s\S]*?display: flex;/);
-  assert.match(css, /\.home-prime-skills \.home-commerce-media\s*\{[\s\S]*?aspect-ratio: 1 \/ 1;/);
   assert.match(source, /Wholesale packages\. Swipe horizontally for more\./);
 });
 
