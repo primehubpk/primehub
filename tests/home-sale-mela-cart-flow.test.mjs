@@ -74,3 +74,15 @@ test('New Arrivals places View all on the right with a forward arrow', () => {
   assert.match(css, /\.home-sale-home\s*\{[\s\S]*?margin-top: 2px;[\s\S]*?padding-top: 0;/);
   assert.match(css, /\.home-sale\.home-sale-home > h2\s*\{[\s\S]*?margin-top: 0;[\s\S]*?margin-bottom: 10px;/);
 });
+
+
+test('homepage reuses the existing standalone Sale Mela where PrimeHubMall Deals used to render', () => {
+  const home = read('components/HomePageClient.tsx');
+
+  assert.doesNotMatch(home, /import ProductGridRewards/);
+  assert.doesNotMatch(home, /<ProductGridRewards/);
+  assert.match(
+    home,
+    /<HomeCategoryDeals[\s\S]*?<div id="discover-deals-section">[\s\S]*?<HomeCollections[\s\S]*?products=\{products\}[\s\S]*?standalone/,
+  );
+});
