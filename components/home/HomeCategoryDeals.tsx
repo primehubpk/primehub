@@ -52,7 +52,7 @@ export default function HomeCategoryDeals({ products, categories }: { products: 
   }, [refreshSeed, products.length, categories.length]);
 
   return (
-    <section ref={sectionRef} className="mt-2 space-y-5" aria-label="Shop products by category">
+    <section ref={sectionRef} className="mt-2 space-y-2.5" aria-label="Shop products by category">
       {visible.map((category) => {
         const matches = orderHomeProducts(
           products.filter((product) => product.published !== false &&
