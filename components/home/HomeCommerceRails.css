@@ -191,7 +191,15 @@
   }
 
   .home-commerce-section .home-commerce-card {
-    flex: 0 0 72%;
+    flex: 0 0 80%;
+  }
+
+  .home-video-packages .home-commerce-card {
+    flex-basis: 82%;
+  }
+
+  .home-prime-skills .home-commerce-card {
+    flex-basis: 86%;
   }
 
   .home-video-packages .home-commerce-rail {
@@ -210,8 +218,19 @@
   }
 
   .home-commerce-media,
-  .home-video-packages .home-commerce-media {
-    aspect-ratio: 1 / 1;
+  .home-video-packages .home-commerce-media,
+  .home-prime-skills .home-commerce-media {
+    aspect-ratio: 16 / 9;
+  }
+
+  .home-prime-skills .home-commerce-media {
+    background: #fffdf9;
+  }
+
+  .home-prime-skills .home-commerce-media > img {
+    object-fit: contain;
+    object-position: center;
+    background: #fffdf9;
   }
 
   .home-commerce-info {
@@ -288,12 +307,16 @@
   }
 
   .home-video-packages .home-commerce-card {
-    flex: 0 0 72%;
+    flex: 0 0 82%;
     min-height: 0;
+  }
+
+  .home-prime-skills .home-commerce-card {
+    flex: 0 0 86%;
   }
 
   .home-video-packages .home-commerce-media,
   .home-prime-skills .home-commerce-media {
-    aspect-ratio: 1 / 1;
+    aspect-ratio: 16 / 9;
   }
 }
