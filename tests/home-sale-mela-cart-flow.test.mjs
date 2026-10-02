@@ -14,6 +14,7 @@ test('home Sale Mela keeps bucket boundaries, prioritizes fresh top-row cards, a
   assert.match(source, /homeShuffleSeed \|\| stableCatalogSeed/);
   assert.match(source, /buildHomeTwoRowProducts\([\s\S]*?baseMatches,[\s\S]*?amount,[\s\S]*?saleShuffleSeed,[\s\S]*?wholesale/);
   assert.match(source, /matchesSaleMelaBucket\(price, amount\)/);
+  assert.match(source, /gridTemplateColumns: "none"/);
   assert.match(source, /gridAutoFlow: "column"/);
   assert.match(source, /gridTemplateRows: "repeat\(2, auto\)"/);
   assert.match(source, /gridAutoColumns: "calc\(\(100% - 10px\) \/ 2\)"/);
