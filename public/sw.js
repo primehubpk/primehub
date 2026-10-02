@@ -1,11 +1,17 @@
 // PrimeHubMall PWA service worker.
 // Only static/app-shell assets are cached. Live HTML, APIs, cart, checkout,
 // orders, account data and price-bearing responses always stay network-driven.
-const VERSION = 'primehub-pwa-v3';
+const VERSION = 'primehub-pwa-v4';
 const SHELL_CACHE = `${VERSION}-shell`;
 const STATIC_CACHE = `${VERSION}-static`;
 const IMAGE_CACHE = `${VERSION}-images`;
 const PRIMEHUB_CACHES = [SHELL_CACHE, STATIC_CACHE, IMAGE_CACHE];
+const TRUSTED_IMAGE_ORIGINS = new Set([
+  self.location.origin,
+  'https://images.primehubmall.com',
+  'https://pub-157b90419bf04016bdea666e4cbce181.r2.dev',
+  'https://i.ibb.co',
+]);
 const SHELL_ASSETS = [
   '/offline.html',
   '/manifest.webmanifest',
@@ -21,8 +27,8 @@ async function trimCache(cacheName, maxEntries) {
   await Promise.all(keys.slice(0, overflow).map((request) => cache.delete(request)));
 }
 
-async function cacheResponse(cacheName, request, response, maxEntries) {
-  if (!response || !response.ok || response.type === 'opaque') return response;
+async function cacheResponse(cacheName, request, response, maxEntries, allowOpaque = false) {
+  if (!response || (!response.ok && !(allowOpaque && response.type === 'opaque'))) return response;
   const cache = await caches.open(cacheName);
   await cache.put(request, response.clone());
   if (maxEntries) await trimCache(cacheName, maxEntries);
@@ -36,20 +42,16 @@ async function cacheFirst(request) {
   return cacheResponse(STATIC_CACHE, request, response, 120);
 }
 
-async function imageStaleWhileRevalidate(event) {
-  const request = event.request;
+async function imageCacheFirst(request) {
   const cached = await caches.match(request);
-  const network = fetch(request)
-    .then((response) => cacheResponse(IMAGE_CACHE, request, response, 80))
-    .catch(() => null);
+  if (cached) return cached;
 
-  if (cached) {
-    event.waitUntil(network);
-    return cached;
+  try {
+    const response = await fetch(request);
+    return await cacheResponse(IMAGE_CACHE, request, response, 180, true);
+  } catch {
+    return Response.error();
   }
-
-  const response = await network;
-  return response || Response.error();
 }
 
 async function networkNavigation(event) {
@@ -92,7 +94,21 @@ self.addEventListener('fetch', (event) => {
   if (request.method !== 'GET') return;
 
   const url = new URL(request.url);
-  if (url.origin !== self.location.origin) return;
+  const isSameOrigin = url.origin === self.location.origin;
+  const isOptimizedImage = isSameOrigin && url.pathname === '/_next/image';
+  const isImage =
+    request.destination === 'image' ||
+    /\.(?:png|jpe?g|webp|avif|gif|svg|ico)$/i.test(url.pathname);
+
+  // Product/category images live on the PrimeHub R2 custom domain. Cache those
+  // trusted immutable upload URLs locally so route remounts paint from CacheStorage
+  // instead of downloading the same picture again.
+  if ((isOptimizedImage || isImage) && TRUSTED_IMAGE_ORIGINS.has(url.origin)) {
+    event.respondWith(imageCacheFirst(request));
+    return;
+  }
+
+  if (!isSameOrigin) return;
 
   // Never intercept customer/business data endpoints.
   if (url.pathname.startsWith('/api/')) return;
@@ -113,14 +129,5 @@ self.addEventListener('fetch', (event) => {
 
   if (isNextStatic || isCoreShellAsset || isStaticDestination) {
     event.respondWith(cacheFirst(request));
-    return;
-  }
-
-  // Optimized/product imagery is safe to cache because it contains no price,
-  // stock, cart, order or account state. Limit entries so storage cannot grow forever.
-  const isOptimizedImage = url.pathname === '/_next/image';
-  const isImage = request.destination === 'image' || /\.(?:png|jpe?g|webp|avif|gif|svg|ico)$/i.test(url.pathname);
-  if (isOptimizedImage || isImage) {
-    event.respondWith(imageStaleWhileRevalidate(event));
   }
 });

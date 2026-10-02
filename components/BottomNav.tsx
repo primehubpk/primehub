@@ -78,16 +78,16 @@ export default function BottomNav() {
             <Link
               key={key}
               href={href}
-              prefetch={key === 'home' || key === 'shop' || key === 'reseller' || key === 'skills' || key === 'orders'}
+              prefetch={key === 'home' && pathname !== '/'}
               scroll
               aria-current={routeIsActive ? 'page' : undefined}
               aria-busy={isPending || undefined}
               data-nav-key={key}
               data-active={routeIsActive ? 'true' : 'false'}
               data-pending={isPending ? 'true' : 'false'}
-              onPointerEnter={() => router.prefetch(href)}
-              onPointerDown={() => router.prefetch(href)}
-              onFocus={() => router.prefetch(href)}
+              onPointerEnter={() => { if (pathname !== href) router.prefetch(href); }}
+              onPointerDown={() => { if (pathname !== href) router.prefetch(href); }}
+              onFocus={() => { if (pathname !== href) router.prefetch(href); }}
               onClick={(event) => {
                 if (!isPlainLeftClick(event)) return;
 
