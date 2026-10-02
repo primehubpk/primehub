@@ -156,3 +156,22 @@ test('mobile wholesale and Prime Skills cards use square larger media with horiz
   assert.match(css, /\.home-prime-skills \.home-commerce-media\s*\{[\s\S]*?aspect-ratio: 1 \/ 1;/);
   assert.match(source, /Wholesale packages\. Swipe horizontally for more\./);
 });
+
+
+test('existing Prime Skills showcase sits below the embedded Sale Mela without a duplicate home rail', () => {
+  const home = read('components/HomePageClient.tsx');
+  const page = read('app/page.tsx');
+  const skills = read('components/SkillsShowcase.tsx');
+
+  assert.doesNotMatch(home, /HomePrimeSkills/);
+  assert.match(
+    home,
+    /<div id="discover-deals-section">[\s\S]*?<HomeCollections[\s\S]*?standalone[\s\S]*?embeddedHome[\s\S]*?<SkillsShowcase[\s\S]*?embedded/,
+  );
+  assert.match(page, /getPrimeSkillsSnapshot\(\)/);
+  assert.match(page, /initialSkills=\{initialSkills\}/);
+  assert.match(page, /initialSkillsPage=\{initialSkillsPage\}/);
+  assert.match(skills, /const Shell = embedded \? 'section' : 'main'/);
+  assert.match(skills, /visibleItems\.map\(\(item, index\) =>/);
+  assert.doesNotMatch(skills, /visibleItems\.slice\(/);
+});
