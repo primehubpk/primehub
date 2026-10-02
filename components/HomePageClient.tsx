@@ -7,7 +7,10 @@ import Header from "@/components/home/HomeHeader";
 import HomeCollections from "@/components/home/HomeCollections";
 import HomeCategoryDeals from "@/components/home/HomeCategoryDeals";
 import BigDealNextPreviewSync from "@/components/home/BigDealNextPreviewSync";
-import { HomeWholesaleVideos } from "@/components/home/HomeCommerceRails";
+import {
+  HomePrimeSkills,
+  HomeWholesaleVideos,
+} from "@/components/home/HomeCommerceRails";
 import "./home/home.css";
 import "./home/WeeklyDealsHomeFix.css";
 import "./home/HomeFeatureRails.css";
@@ -257,6 +260,7 @@ export default function HomePageClient({
             onWholesaleSelect={selectWholesale}
           />
           <HomeWholesaleVideos />
+          <HomePrimeSkills />
           <HomeCategoryDeals products={products} categories={categories} />
           <div id="discover-deals-section">
             {(selectedMaxPrice !== null || wholesaleSelected) && (
