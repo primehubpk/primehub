@@ -9,6 +9,8 @@ type HeadingDestination = {
   title: string;
   label?: string;
   displayText?: string;
+  actionPlacement?: "legacy" | "right";
+  actionArrow?: boolean;
 };
 
 const CLICKABLE_HEADINGS: Record<string, HeadingDestination> = {
@@ -19,6 +21,9 @@ const CLICKABLE_HEADINGS: Record<string, HeadingDestination> = {
   "New Arrivals": {
     href: "/new-arrivals",
     title: "Open all new arrivals",
+    label: "View all",
+    actionPlacement: "right",
+    actionArrow: true,
   },
   "Reseller Club": {
     href: "/reseller/dashboard",
@@ -85,17 +90,20 @@ export default function HomeHeading({
   };
 
   if (destination) {
+    const actionOnRight = destination.actionPlacement === "right";
     return (
       <h2 className="home-heading relative">
         <span className="relative">
           <span aria-hidden="true">❧</span>
-          <Link
-            href={destination.href}
-            prefetch={true}
-            className="absolute right-1 bottom-[62%] z-10 whitespace-nowrap bg-[#fffcf7] px-1 text-[8px] font-black uppercase tracking-[0.12em] text-[#8A651F] no-underline sm:text-[9px]"
-          >
-            {destination.label || "View all"}
-          </Link>
+          {!actionOnRight ? (
+            <Link
+              href={destination.href}
+              prefetch={true}
+              className="absolute right-1 bottom-[62%] z-10 whitespace-nowrap bg-[#fffcf7] px-1 text-[8px] font-black uppercase tracking-[0.12em] text-[#8A651F] no-underline sm:text-[9px]"
+            >
+              {destination.label || "View all"}
+            </Link>
+          ) : null}
         </span>
         <span
           role="link"
@@ -109,7 +117,19 @@ export default function HomeHeading({
         >
           {destination.displayText || children}
         </span>
-        <span aria-hidden="true">❧</span>
+        <span className="relative">
+          <span aria-hidden="true">❧</span>
+          {actionOnRight ? (
+            <Link
+              href={destination.href}
+              prefetch={true}
+              className="absolute right-0 bottom-[62%] z-10 inline-flex items-center gap-1 whitespace-nowrap bg-[#fffcf7] px-1 text-[8px] font-black uppercase tracking-[0.12em] text-[#8A651F] no-underline sm:text-[9px]"
+            >
+              {destination.label || "View all"}
+              {destination.actionArrow ? <span aria-hidden="true">→</span> : null}
+            </Link>
+          ) : null}
+        </span>
       </h2>
     );
   }

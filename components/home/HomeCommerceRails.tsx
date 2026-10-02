@@ -4,7 +4,6 @@ import { fetchPublicStorefront } from '@/lib/storefrontClient';
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { MessageCircle, Package, Play, PlayCircle, Sparkles } from "lucide-react";
-import HomeHeading from "./HomeHeading";
 import HomeRailFrame from './HomeRailFrame';
 import { useSettings } from "@/lib/useSettings";
 import { PRIME_SKILLS_SEED } from "@/lib/primeSkillsSeed";
@@ -21,7 +20,7 @@ type SkillPackage = {
 
 type PrimeSkillHomeItem = {
   id: string;
-  title: string;
+  title?: string;
   subtitle?: string;
   price?: number;
   thumbnailUrl?: string;
@@ -72,12 +71,11 @@ export function HomeWholesaleVideos() {
 
   return (
     <section className="home-video-packages home-commerce-section">
-      <HomeHeading>Wholesale Packages</HomeHeading>
       <HomeRailFrame title="Wholesale Packages" href="/wholesale-video-hub" icon={<Package size={27}/>}>
       <div className="home-commerce-rail-wrap">
         <div
           className="home-two-row-rail home-commerce-rail"
-          aria-label="Wholesale packages. Four are visible as a 2 by 2 preview when available; swipe horizontally for more."
+          aria-label="Wholesale packages. Swipe horizontally for more."
         >
           {videos.map((video) => {
             const thumbnail = normalizeImageUrl(thumbnailOf(video));
@@ -146,14 +144,19 @@ export function HomeWholesaleVideos() {
   );
 }
 
-export function HomePrimeSkills() {
+export function HomePrimeSkills({ initialItems = [] }: { initialItems?: PrimeSkillHomeItem[] }) {
   const { settings, contact } = useSettings();
   const sectionRef = useRef<HTMLElement | null>(null);
   const [items, setItems] = useState<PrimeSkillHomeItem[]>(
-    PRIME_SKILLS_SEED as PrimeSkillHomeItem[],
+    () => initialItems.length ? initialItems : PRIME_SKILLS_SEED as PrimeSkillHomeItem[],
   );
 
   useEffect(() => {
+    if (initialItems.length) {
+      setItems(initialItems);
+      return;
+    }
+
     let cancelled = false;
     let started = false;
 
@@ -193,7 +196,7 @@ export function HomePrimeSkills() {
       cancelled = true;
       observer.disconnect();
     };
-  }, []);
+  }, [initialItems]);
 
   const skills = useMemo(
     () =>
@@ -212,7 +215,6 @@ export function HomePrimeSkills() {
 
   return (
     <section ref={sectionRef} className="home-prime-skills home-commerce-section">
-      <HomeHeading>Prime Skills</HomeHeading>
       <HomeRailFrame title="Prime Skills" href="/skills" image={normalizeImageUrl(skills[0]?.thumbnailUrl || skills[0]?.imageUrl || '')} icon={<Sparkles size={27}/>}>
       <div className="home-commerce-rail-wrap">
         <div

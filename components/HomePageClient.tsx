@@ -7,7 +7,6 @@ import Header from "@/components/home/HomeHeader";
 import HomeCollections from "@/components/home/HomeCollections";
 import HomeCategoryDeals from "@/components/home/HomeCategoryDeals";
 import BigDealNextPreviewSync from "@/components/home/BigDealNextPreviewSync";
-import HomeResellerClubFull from "@/components/home/HomeResellerClubFull";
 import {
   HomePrimeSkills,
   HomeWholesaleVideos,
@@ -19,9 +18,13 @@ import "./home/HomeCommerceRails.css";
 import HeroFlashBanner from "@/components/HeroFlashBanner";
 import CategorySwiper from "@/components/CategorySwiper";
 import NewArrivalsRail from "@/components/NewArrivalsRail";
-import ProductGridRewards from "@/components/ProductGridRewards";
 import YouTubeGuide from "@/components/YouTubeGuide";
 import HomeGuideVideo from "@/components/home/HomeGuideVideo";
+import SkillsShowcase, {
+  type PageSettings as PrimeSkillsPageSettings,
+  type SkillItem,
+} from "@/components/SkillsShowcase";
+import HomePrimeFamilyLazy from "@/components/home/HomePrimeFamilyLazy";
 import Footer from "@/components/Footer";
 import {
   cacheCatalogForNavigation,
@@ -43,6 +46,8 @@ type Props = {
   initialCategories: Category[];
   initialSettings: Partial<SiteSettings>;
   initialWeekday: Weekday;
+  initialSkills: SkillItem[];
+  initialSkillsPage: Partial<PrimeSkillsPageSettings> | null;
 };
 
 const RECOVERY_DELAYS_MS = [0];
@@ -53,6 +58,8 @@ export default function HomePageClient({
   initialCategories,
   initialSettings,
   initialWeekday,
+  initialSkills,
+  initialSkillsPage,
 }: Props) {
   const router = useRouter();
   const [selectedMaxPrice, setSelectedMaxPrice] = useState<number | null>(null);
@@ -252,9 +259,8 @@ export default function HomePageClient({
             onSelect={selectPrice}
             onWholesaleSelect={selectWholesale}
           />
-          <HomeResellerClubFull initialProducts={products} />
           <HomeWholesaleVideos />
-          <HomePrimeSkills />
+          <HomePrimeSkills initialItems={initialSkills} />
           <HomeCategoryDeals products={products} categories={categories} />
           <div id="discover-deals-section">
             {(selectedMaxPrice !== null || wholesaleSelected) && (
@@ -312,15 +318,19 @@ export default function HomePageClient({
                 </div>
               </section>
             ) : (
-              <ProductGridRewards
-                homeLayout
-                initialProducts={products}
-                liveUpdates={false}
-                selectedMaxPrice={selectedMaxPrice}
-                wholesaleSelected={wholesaleSelected}
+              <HomeCollections
+                products={products}
+                standalone
+                embeddedHome
               />
             )}
           </div>
+          <SkillsShowcase
+            embedded
+            initialItems={initialSkills}
+            initialPage={initialSkillsPage}
+          />
+          <HomePrimeFamilyLazy initialSettings={initialSettings as Record<string, unknown>} />
         </main>
         <YouTubeGuide />
         <Footer onWholesaleSelect={selectWholesale} />

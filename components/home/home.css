@@ -524,6 +524,14 @@
   padding: 10px 0;
   background: radial-gradient(ellipse at top, #fae7bd44, transparent 60%);
 }
+.home-sale-home {
+  margin-top: 2px;
+  padding-top: 0;
+}
+.home-sale.home-sale-home > h2 {
+  margin-top: 0;
+  margin-bottom: 10px;
+}
 .home-sale > h2 {
   text-align: center;
   font-size: clamp(24px, 3.6vw, 42px);
@@ -548,6 +556,9 @@
 }
 .home-sale-home-frame {
   margin: 0 0 22px;
+}
+.home-sale-home-frame.home-sale-wholesale-frame {
+  margin-top: -14px;
 }
 .home-sale-home-frame .home-sale-row {
   display: block;
