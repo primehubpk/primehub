@@ -20,7 +20,7 @@ import { isDirectStorefrontImage } from "@/lib/imageUrl";
 import { getEffectivePrice } from "@/lib/dealPricing";
 import { isWholesaleProduct } from "@/lib/wholesale";
 import HomeRailFrame from './HomeRailFrame';
-import { orderHomeProducts } from '@/lib/homeRailOrder';
+import { orderHomeProducts, railSeed } from '@/lib/homeRailOrder';
 import {
   isWholesalePriceBucket,
   matchesPriceBucket,
@@ -77,6 +77,75 @@ function shuffleWithNewArrivalPriority(products: Product[], seed: number) {
     const bScore = seededUnit(seed, b.id) * 0.55 + bFreshness * 0.9;
     return bScore - aScore || b.id.localeCompare(a.id);
   });
+}
+
+function shuffleBySeed(products: Product[], seed: number) {
+  if (products.length < 2 || seed === 0) return [...products];
+  return [...products].sort(
+    (a, b) =>
+      seededUnit(seed, b.id) - seededUnit(seed, a.id) ||
+      a.id.localeCompare(b.id),
+  );
+}
+
+function newestHomeRow(
+  products: Product[],
+  amount: number,
+  wholesale: boolean,
+) {
+  return [...products].sort((a, b) => {
+    if (!wholesale) {
+      const exactDifference =
+        Number(homePrice(b) === amount) - Number(homePrice(a) === amount);
+      if (exactDifference !== 0) return exactDifference;
+    }
+
+    const freshnessDifference = productTime(b) - productTime(a);
+    if (freshnessDifference !== 0) return freshnessDifference;
+
+    const priceDifference = homePrice(a) - homePrice(b);
+    if (priceDifference !== 0) return priceDifference;
+    return a.id.localeCompare(b.id);
+  });
+}
+
+function buildHomeTwoRowProducts(
+  products: Product[],
+  amount: number,
+  seed: number,
+  wholesale: boolean,
+) {
+  if (products.length < 2) return [...products];
+
+  // The upper row stays freshness-first, while the lower row is mixed on
+  // every browser refresh. Retail buckets keep exact medallion-price items
+  // ahead of the rest of that bucket; no product can cross bucket boundaries.
+  const priorityOrder = newestHomeRow(products, amount, wholesale);
+  const topRowCount = Math.ceil(products.length / 2);
+  const topRow = priorityOrder.slice(0, topRowCount);
+  const topRowIds = new Set(topRow.map((product) => product.id));
+  const bottomSource = products.filter((product) => !topRowIds.has(product.id));
+
+  const bottomRow = wholesale
+    ? shuffleBySeed(bottomSource, (seed ^ 0x7f4a7c15) >>> 0)
+    : [
+        ...shuffleBySeed(
+          bottomSource.filter((product) => homePrice(product) === amount),
+          (seed ^ amount ^ 0x3c6ef372) >>> 0,
+        ),
+        ...shuffleBySeed(
+          bottomSource.filter((product) => homePrice(product) !== amount),
+          (seed ^ amount ^ 0xa54ff53a) >>> 0,
+        ),
+      ];
+
+  const interleaved: Product[] = [];
+  const columns = Math.max(topRow.length, bottomRow.length);
+  for (let index = 0; index < columns; index += 1) {
+    if (topRow[index]) interleaved.push(topRow[index]);
+    if (bottomRow[index]) interleaved.push(bottomRow[index]);
+  }
+  return interleaved;
 }
 
 function isKidsWholesaleProduct(product: Product) {
@@ -301,6 +370,12 @@ export default function HomeCollections({
   const [homeSaleCatalog, setHomeSaleCatalog] = useState<Product[]>(
     () => (standalone ? [] : liveCatalog),
   );
+  const [homeShuffleSeed, setHomeShuffleSeed] = useState(0);
+
+  useEffect(() => {
+    if (standalone) return;
+    setHomeShuffleSeed(railSeed());
+  }, [standalone]);
 
   useEffect(() => {
     if (standalone || homeSaleCatalog.length > 0 || liveCatalog.length === 0) return;
@@ -312,7 +387,10 @@ export default function HomeCollections({
     : homeSaleCatalog.length > 0
       ? homeSaleCatalog
       : liveCatalog;
-  const saleShuffleSeed = stableSaleMelaSeed(catalog);
+  const stableCatalogSeed = stableSaleMelaSeed(catalog);
+  const saleShuffleSeed = standalone
+    ? stableCatalogSeed
+    : homeShuffleSeed || stableCatalogSeed;
   const buckets = sortPriceBuckets(
     (settings.priceBuckets || []).filter((b) => b.active),
   );
@@ -323,7 +401,10 @@ export default function HomeCollections({
   return (
     <>
       {buckets.length > 0 && (
-        <section className="home-sale" aria-label="PrimeHubMall Sale Mela">
+        <section
+          className={standalone ? "home-sale" : "home-sale home-sale-home"}
+          aria-label="PrimeHubMall Sale Mela"
+        >
           <HomeHeading
             href={standalone ? undefined : "/primehubmall/salemela"}
             actionLabel={standalone ? undefined : "Open"}
@@ -354,11 +435,16 @@ export default function HomeCollections({
                       : matchesPriceBucket(price, buckets, amount);
                   }),
                 );
-            const matches = standalone && !wholesale
-              ? baseMatches
-              : wholesale
+            const matches = standalone
+              ? wholesale
                 ? shuffleWithNewArrivalPriority(baseMatches, saleShuffleSeed)
-                : orderHomeSaleMelaProducts(baseMatches, amount, saleShuffleSeed);
+                : baseMatches
+              : buildHomeTwoRowProducts(
+                  baseMatches,
+                  amount,
+                  saleShuffleSeed,
+                  wholesale,
+                );
             const kidsMatches = standalone && wholesale
               ? shuffleWithNewArrivalPriority(
                   sortBySalePrice(kidsPacks),
@@ -434,9 +520,11 @@ export default function HomeCollections({
                 <div
                   className="home-sale-products [scrollbar-width:none]"
                   style={standalone ? standaloneGridStyle : {
-                    display: "flex",
-                    gridTemplateColumns: "none",
-                    gap: "10px",
+                    display: "grid",
+                    gridAutoFlow: "column",
+                    gridTemplateRows: "repeat(2, auto)",
+                    gridAutoColumns: "calc((100% - 10px) / 2)",
+                    gap: "8px 10px",
                     overflowX: "auto",
                     overscrollBehaviorX: "contain",
                     paddingBottom: "3px",
@@ -451,7 +539,6 @@ export default function HomeCollections({
                         style={standalone ? {
                           minWidth: 0,
                         } : {
-                          flex: "0 0 clamp(156px, 44%, 196px)",
                           minWidth: 0,
                           scrollSnapAlign: "start",
                         }}
