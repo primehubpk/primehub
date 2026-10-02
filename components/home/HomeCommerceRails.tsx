@@ -20,7 +20,7 @@ type SkillPackage = {
 
 type PrimeSkillHomeItem = {
   id: string;
-  title: string;
+  title?: string;
   subtitle?: string;
   price?: number;
   thumbnailUrl?: string;
@@ -144,14 +144,19 @@ export function HomeWholesaleVideos() {
   );
 }
 
-export function HomePrimeSkills() {
+export function HomePrimeSkills({ initialItems = [] }: { initialItems?: PrimeSkillHomeItem[] }) {
   const { settings, contact } = useSettings();
   const sectionRef = useRef<HTMLElement | null>(null);
   const [items, setItems] = useState<PrimeSkillHomeItem[]>(
-    PRIME_SKILLS_SEED as PrimeSkillHomeItem[],
+    () => initialItems.length ? initialItems : PRIME_SKILLS_SEED as PrimeSkillHomeItem[],
   );
 
   useEffect(() => {
+    if (initialItems.length) {
+      setItems(initialItems);
+      return;
+    }
+
     let cancelled = false;
     let started = false;
 
@@ -191,7 +196,7 @@ export function HomePrimeSkills() {
       cancelled = true;
       observer.disconnect();
     };
-  }, []);
+  }, [initialItems]);
 
   const skills = useMemo(
     () =>
