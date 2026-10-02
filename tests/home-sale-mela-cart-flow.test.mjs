@@ -111,3 +111,22 @@ test('homepage category rails stay anchored to the first card while keeping refr
   assert.match(source, /overscrollBehaviorX: 'none'/);
   assert.match(source, /direction: 'ltr'/);
 });
+
+
+test('embedded home Sale Mela hides retail browse headers but keeps wholesale header', () => {
+  const home = read('components/HomePageClient.tsx');
+  const collections = read('components/home/HomeCollections.tsx');
+  const frame = read('components/home/HomeRailFrame.tsx');
+
+  assert.match(home, /<HomeCollections[\s\S]*?standalone[\s\S]*?embeddedHome/);
+  assert.match(collections, /hideHeader=\{standalone && embeddedHome && !wholesale\}/);
+  assert.match(frame, /!hideHeader \? \(/);
+});
+
+test('embedded standalone retail Sale Mela renders every matched product without a display limit', () => {
+  const source = read('components/home/HomeCollections.tsx');
+
+  assert.match(source, /const matches = standalone[\s\S]*?: baseMatches/);
+  assert.match(source, /matches\.map\(\(product\) =>/);
+  assert.doesNotMatch(source, /matches\.slice\(/);
+});
