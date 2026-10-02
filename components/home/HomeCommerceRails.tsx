@@ -4,7 +4,6 @@ import { fetchPublicStorefront } from '@/lib/storefrontClient';
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { MessageCircle, Package, Play, PlayCircle, Sparkles } from "lucide-react";
-import HomeHeading from "./HomeHeading";
 import HomeRailFrame from './HomeRailFrame';
 import { useSettings } from "@/lib/useSettings";
 import { PRIME_SKILLS_SEED } from "@/lib/primeSkillsSeed";
@@ -72,7 +71,6 @@ export function HomeWholesaleVideos() {
 
   return (
     <section className="home-video-packages home-commerce-section">
-      <HomeHeading>Wholesale Packages</HomeHeading>
       <HomeRailFrame title="Wholesale Packages" href="/wholesale-video-hub" icon={<Package size={27}/>}>
       <div className="home-commerce-rail-wrap">
         <div
@@ -212,7 +210,6 @@ export function HomePrimeSkills() {
 
   return (
     <section ref={sectionRef} className="home-prime-skills home-commerce-section">
-      <HomeHeading>Prime Skills</HomeHeading>
       <HomeRailFrame title="Prime Skills" href="/skills" image={normalizeImageUrl(skills[0]?.thumbnailUrl || skills[0]?.imageUrl || '')} icon={<Sparkles size={27}/>}>
       <div className="home-commerce-rail-wrap">
         <div
