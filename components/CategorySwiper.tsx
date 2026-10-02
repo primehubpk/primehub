@@ -51,8 +51,11 @@ export default function CategorySwiper({
     <section className="home-categories mx-auto mt-7 max-w-6xl px-4">
       <div className="mb-3 grid grid-cols-[68px_minmax(0,1fr)_68px] items-center gap-1 sm:grid-cols-[76px_minmax(0,1fr)_76px] sm:gap-2" style={{ display: 'grid' }}>
         <div className="flex justify-center">
-          <a
+          <Link
           href="/primehubmall/salemela"
+          prefetch={false}
+          onPointerDown={() => router.prefetch('/primehubmall/salemela')}
+          onFocus={() => router.prefetch('/primehubmall/salemela')}
           aria-label="Open PrimeHubMall Sale Mela"
           className="group flex flex-col items-center gap-1 text-center"
         >
@@ -61,7 +64,7 @@ export default function CategorySwiper({
             <BadgePercent size={27} strokeWidth={2.4} aria-hidden="true" />
           </span>
           <span className="max-w-full text-[8px] font-black leading-tight text-[#E1352B] sm:text-[9px]">Sale Mela</span>
-          </a>
+          </Link>
         </div>
 
         <div className="min-w-0 text-center">
@@ -79,8 +82,11 @@ export default function CategorySwiper({
         </div>
 
         <div className="flex justify-center">
-          <a
+          <Link
           href="/primehubmall/salemela#bucket-wholesale"
+          prefetch={false}
+          onPointerDown={() => router.prefetch('/primehubmall/salemela')}
+          onFocus={() => router.prefetch('/primehubmall/salemela')}
           aria-label="Open PrimeHubMall Wholesale Deals"
           className="group flex flex-col items-center gap-1 text-center"
         >
@@ -89,7 +95,7 @@ export default function CategorySwiper({
             <Package size={27} strokeWidth={2.25} aria-hidden="true" />
           </span>
           <span className="max-w-full text-[8px] font-black leading-tight text-[#0F6A5F] sm:text-[9px]">Wholesale</span>
-          </a>
+          </Link>
         </div>
       </div>
 

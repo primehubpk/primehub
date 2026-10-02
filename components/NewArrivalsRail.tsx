@@ -58,6 +58,15 @@ export default function NewArrivalsRail({
     () => newestFirst(products, homeLayout).slice(0, homeLayout ? 100 : products.length),
     [products, homeLayout],
   );
+  const [homeVisibleCount, setHomeVisibleCount] = useState(16);
+
+  useEffect(() => {
+    if (homeLayout) setHomeVisibleCount(16);
+  }, [homeLayout, products.length]);
+
+  const visibleNewest = homeLayout
+    ? newest.slice(0, homeVisibleCount)
+    : newest;
 
   const addProduct = (product: Product) => {
     const image = imageOf(product);
@@ -88,8 +97,19 @@ export default function NewArrivalsRail({
     return (
       <section className="home-arrivals">
         <HomeHeading>New Arrivals</HomeHeading>
-        <div className="grid grid-flow-col grid-rows-2 auto-cols-[calc((100%-7px)/2)] gap-2 overflow-x-auto overscroll-x-contain pb-2 scroll-smooth snap-x snap-mandatory [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {newest.map((p) => (
+        <div
+          className="grid grid-flow-col grid-rows-2 auto-cols-[calc((100%-7px)/2)] gap-2 overflow-x-auto overscroll-x-contain pb-2 scroll-smooth snap-x snap-mandatory [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          onScroll={(event) => {
+            if (homeVisibleCount >= newest.length) return;
+            const rail = event.currentTarget;
+            const nearEnd =
+              rail.scrollLeft + rail.clientWidth >= rail.scrollWidth - rail.clientWidth * 1.25;
+            if (nearEnd) {
+              setHomeVisibleCount((count) => Math.min(newest.length, count + 16));
+            }
+          }}
+        >
+          {visibleNewest.map((p) => (
             <div key={p.id} className="min-w-0 snap-start">
               <HomeProductCard product={p} horizontal badgeText="New Arrival" />
             </div>
