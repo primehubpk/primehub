@@ -8,7 +8,7 @@ import { normalizeImageUrl } from '@/lib/imageUrl';
 import { HomeProductCard } from '@/components/home/HomeCollections';
 import type { Product } from '@/components/shop/ShopTypes';
 import type { Category } from '@/lib/types';
-import { orderHomeProducts, railSeed } from '@/lib/homeRailOrder';
+import { orderHomeProducts, sessionRailSeed } from '@/lib/homeRailOrder';
 
 export default function HomeCategoryDeals({ products, categories }: { products: Product[]; categories: Category[] }) {
   const [refreshSeed, setRefreshSeed] = useState(0);
@@ -18,7 +18,7 @@ export default function HomeCategoryDeals({ products, categories }: { products: 
     // Keep the server/first browser render stable, then rotate category cards
     // once per page load. orderHomeProducts gives newer items a stronger
     // freshness weight while still mixing older stock into the rail.
-    setRefreshSeed(railSeed());
+    setRefreshSeed(sessionRailSeed());
   }, []);
 
   const visible = [...categories]

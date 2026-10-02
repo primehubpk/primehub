@@ -191,7 +191,30 @@ export default function ProductGridRewards({
   const openVariantModal = useCartStore((s) => s.openVariantModal);
 
   useEffect(() => {
-    setProducts((current) => shuffleProducts(current));
+    const storageKey = 'ph-grid-shuffle-order';
+    setProducts((current) => {
+      if (current.length < 2) return current;
+      try {
+        const saved = window.sessionStorage.getItem(storageKey);
+        if (saved) {
+          const ids = JSON.parse(saved) as string[];
+          const byId = new Map(current.map((product) => [product.id, product]));
+          const seen = new Set(ids);
+          const ordered = ids.map((id) => byId.get(id)).filter((product): product is Product => Boolean(product));
+          const extras = current.filter((product) => !seen.has(product.id));
+          if (ordered.length > 0) return [...ordered, ...extras];
+        }
+      } catch {
+        // Storage can be blocked; fall through to one shuffle.
+      }
+      const shuffled = shuffleProducts(current);
+      try {
+        window.sessionStorage.setItem(storageKey, JSON.stringify(shuffled.map((product) => product.id)));
+      } catch {
+        // Ignore storage failures.
+      }
+      return shuffled;
+    });
   }, []);
 
   useEffect(() => {

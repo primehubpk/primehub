@@ -20,7 +20,7 @@ import { isDirectStorefrontImage } from "@/lib/imageUrl";
 import { getEffectivePrice } from "@/lib/dealPricing";
 import { isWholesaleProduct } from "@/lib/wholesale";
 import HomeRailFrame from './HomeRailFrame';
-import { orderHomeProducts, railSeed } from '@/lib/homeRailOrder';
+import { orderHomeProducts, sessionRailSeed } from '@/lib/homeRailOrder';
 import {
   isWholesalePriceBucket,
   matchesPriceBucket,
@@ -381,7 +381,7 @@ export default function HomeCollections({
 
   useEffect(() => {
     if (standalone) return;
-    setHomeShuffleSeed(railSeed());
+    setHomeShuffleSeed(sessionRailSeed());
   }, [standalone]);
 
   useEffect(() => {

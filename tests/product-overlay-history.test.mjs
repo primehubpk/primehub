@@ -62,8 +62,9 @@ test('product open adds one history step and back restores the same page', async
   assert.equal(entries.length, 2);
   assert.equal(entries[index].url, '/product/ring-2');
 
-  window.history.back();
+  overlay.closeProductOverlayNow();
   assert.equal(overlay.isProductOverlayOpen(), false);
   assert.equal(entries[index].url, '/shop?q=bangles');
   assert.equal(window.scrollY, 640);
+  assert.equal(entries.length, 2);
 });

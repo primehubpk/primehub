@@ -25,7 +25,21 @@ const listeners = new Set<() => void>();
 let frame: ProductOverlayFrame | null = null;
 let background: BackgroundEntry | null = null;
 let popListenerInstalled = false;
-let pendingNavigation: string | null = null;
+let swallowNextPop = false;
+let overlayHistory = false;
+
+// Next.js replaces window.history.pushState and treats that as a real page
+// change. That fetches the product route (white screen) and makes back wait
+// on the server. The original History methods only update the address bar.
+function rawPushState(data: unknown, url: string) {
+  const push = typeof History === 'undefined' ? window.history.pushState : History.prototype.pushState;
+  push.call(window.history, data, '', url);
+}
+
+function rawReplaceState(data: unknown, url: string) {
+  const replace = typeof History === 'undefined' ? window.history.replaceState : History.prototype.replaceState;
+  replace.call(window.history, data, '', url);
+}
 
 const serverSnapshot: OverlaySnapshot = { frame: null };
 let clientSnapshot: OverlaySnapshot = { frame: null };
@@ -107,9 +121,10 @@ export function openProductOverlay(next: ProductOverlayFrame) {
       state: window.history.state,
       url: `${window.location.pathname}${window.location.search}${window.location.hash}`,
     };
-    window.history.pushState({ __phProductOverlay: true }, '', next.href);
+    rawPushState(null, next.href);
+    overlayHistory = true;
   } else {
-    window.history.replaceState({ __phProductOverlay: true }, '', next.href);
+    rawReplaceState(null, next.href);
   }
   frame = next;
   emit();
@@ -118,24 +133,43 @@ export function openProductOverlay(next: ProductOverlayFrame) {
 export function closeProductOverlayFromPop() {
   frame = null;
   background = null;
+  overlayHistory = false;
   emit();
+}
+
+// Hide the product in this same tap. The list underneath never unmounted, so
+// the customer is back on the same picture and the same scroll immediately.
+export function closeProductOverlayNow() {
+  if (!frame && !background) return;
+  const shouldPop = overlayHistory;
+  frame = null;
+  background = null;
+  overlayHistory = false;
+  emit();
+  if (!shouldPop || typeof window === 'undefined') return;
+  swallowNextPop = true;
+  window.history.back();
 }
 
 export function navigateFromProductOverlay(href: string) {
   if (!frame || typeof window === 'undefined') return false;
-  pendingNavigation = href;
-  window.history.back();
+  const previous = background;
+  frame = null;
+  background = null;
+  overlayHistory = false;
+  emit();
+  if (previous) rawReplaceState(previous.state, previous.url);
+  window.dispatchEvent(new CustomEvent('ph-overlay-navigate', { detail: href }));
   return true;
 }
 
 function onOverlayPopState(event: PopStateEvent) {
-  if (!frame) return;
+  if (!frame && !swallowNextPop) return;
   event.stopImmediatePropagation();
-  const next = pendingNavigation;
-  pendingNavigation = null;
+  const swallowing = swallowNextPop;
+  swallowNextPop = false;
+  if (swallowing) return;
   closeProductOverlayFromPop();
-  if (!next) return;
-  window.dispatchEvent(new CustomEvent('ph-overlay-navigate', { detail: next }));
 }
 
 export function installProductOverlayHistoryListener() {

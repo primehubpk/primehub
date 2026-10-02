@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { normalizeProductVariants, useCartStore } from '@/lib/cartStore';
 import { useSettings } from '@/lib/useSettings';
 import { WEEKDAY_LABELS, WEEKDAY_ORDER, countdownParts, dealTiming } from '@/lib/weeklyDealUtils';
@@ -78,11 +78,10 @@ export function useProductDetail(options?: {
 }): ProductDetailModel {
   const params = useParams<{ id: string }>();
   const router = useRouter();
-  const searchParams = useSearchParams();
   const id = String(options?.productId || params?.id || '');
   const { settings } = useSettings();
   const addItem = useCartStore((state) => state.addItem);
-  const bigDealRequested = options?.bigDeal ?? searchParams.get('deal') === 'big';
+  const bigDealRequested = options?.bigDeal === true;
 
   const cachedAtStart = seedProduct(id, options?.initialProduct);
   const [product, setProduct] = useState<Product | null>(cachedAtStart);

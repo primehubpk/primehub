@@ -1,10 +1,11 @@
 'use client';
 
-import { Suspense, useEffect, useSyncExternalStore } from 'react';
+import { useEffect, useSyncExternalStore } from 'react';
 import { useRouter } from 'next/navigation';
 import ProductDetailPageClient from '@/components/product-detail/ProductDetailPageClient';
 import { readCachedProduct } from '@/lib/productNavigationCache';
 import {
+  closeProductOverlayNow,
   getProductOverlayBackgroundPath,
   getProductOverlayServerSnapshot,
   getProductOverlaySnapshot,
@@ -59,11 +60,16 @@ function handleStorefrontClick(event: MouseEvent) {
 
   if (!isProductOverlayOpen()) return;
   const backgroundPath = getProductOverlayBackgroundPath();
-  const destination = `${url.pathname}${url.search}`;
+  let backgroundPathname = '';
+  try {
+    backgroundPathname = backgroundPath ? new URL(backgroundPath, window.location.origin).pathname : '';
+  } catch {
+    backgroundPathname = '';
+  }
   event.preventDefault();
   event.stopPropagation();
-  if (backgroundPath === destination) {
-    window.history.back();
+  if (backgroundPathname === url.pathname) {
+    closeProductOverlayNow();
     return;
   }
   navigateFromProductOverlay(`${url.pathname}${url.search}${url.hash}`);
@@ -95,15 +101,13 @@ export default function ProductOverlayHost() {
   if (!frame) return null;
 
   return (
-    <div data-ph-product-overlay="" className="fixed inset-0 z-[45] overflow-y-auto overscroll-contain bg-[#F4F4F1]">
-      <Suspense fallback={null}>
-        <ProductDetailPageClient
-          key={`${frame.id}:${frame.bigDeal ? 'big' : 'regular'}`}
-          initialProduct={frame.product as never}
-          productId={frame.id}
-          bigDeal={frame.bigDeal}
-        />
-      </Suspense>
+    <div data-ph-product-overlay="" className="fixed inset-0 z-[35] overflow-y-auto overscroll-contain bg-[#F4F4F1]">
+      <ProductDetailPageClient
+        key={`${frame.id}:${frame.bigDeal ? 'big' : 'regular'}`}
+        initialProduct={frame.product as never}
+        productId={frame.id}
+        bigDeal={frame.bigDeal}
+      />
     </div>
   );
 }

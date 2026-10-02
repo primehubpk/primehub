@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useRef } from 'react';
 import {
   ArrowLeft,
@@ -23,7 +23,7 @@ import ProductVideoModal from '@/components/product-detail/ProductVideoModal';
 import VariantSelectorBottomSheet from '@/components/product-detail/VariantSelectorBottomSheet';
 import { useProductDetail } from '@/components/product-detail/useProductDetail';
 import { cacheProductForNavigation } from '@/lib/productNavigationCache';
-import { isProductOverlayOpen, productBackAction } from '@/lib/productOverlay';
+import { closeProductOverlayNow, isProductOverlayOpen, productBackAction } from '@/lib/productOverlay';
 import type { Product } from '@/components/product-detail/ProductDetailTypes';
 import { rememberSalarProductHelpContext } from '@/lib/salar/clientProductHelp';
 import { makeTikTokContent, trackTikTokEvent } from '@/lib/tiktokPixel';
@@ -49,7 +49,7 @@ function ProductBackButton() {
           origin: window.location.origin,
         });
         if (action === 'overlay-back') {
-          window.history.back();
+          closeProductOverlayNow();
           return;
         }
         if (action === 'history-back') {
@@ -92,12 +92,26 @@ export default function ProductDetailPageClient({
   }, [initialProduct]);
 
   const contentKey = productId || String(initialProduct?.id || 'route');
+  if (bigDeal !== undefined) {
+    return (
+      <ProductDetailContent
+        key={contentKey}
+        initialProduct={initialProduct}
+        productId={productId}
+        bigDeal={bigDeal}
+      />
+    );
+  }
+  return <DealAwareProductDetail key={contentKey} initialProduct={initialProduct} productId={productId} />;
+}
+
+function DealAwareProductDetail({ initialProduct = null, productId }: Props) {
+  const searchParams = useSearchParams();
   return (
     <ProductDetailContent
-      key={contentKey}
       initialProduct={initialProduct}
       productId={productId}
-      bigDeal={bigDeal}
+      bigDeal={searchParams.get('deal') === 'big'}
     />
   );
 }
