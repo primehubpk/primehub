@@ -130,3 +130,17 @@ test('embedded standalone retail Sale Mela renders every matched product without
   assert.match(source, /matches\.map\(\(product\) =>/);
   assert.doesNotMatch(source, /matches\.slice\(/);
 });
+
+
+test('homepage commerce rails use only their card headers with compact spacing', () => {
+  const source = read('components/home/HomeCommerceRails.tsx');
+  const css = read('components/home/HomeCommerceRails.css');
+
+  assert.doesNotMatch(source, /import HomeHeading/);
+  assert.doesNotMatch(source, /<HomeHeading>Wholesale Packages<\/HomeHeading>/);
+  assert.doesNotMatch(source, /<HomeHeading>Prime Skills<\/HomeHeading>/);
+  assert.match(source, /<HomeRailFrame title="Wholesale Packages"/);
+  assert.match(source, /<HomeRailFrame title="Prime Skills"/);
+  assert.match(css, /\.home-commerce-section\s*\{[\s\S]*?margin-top: 10px;/);
+  assert.match(css, /\.home-commerce-section \+ \.home-commerce-section\s*\{[\s\S]*?margin-top: 10px;/);
+});
