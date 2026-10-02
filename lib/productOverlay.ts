@@ -259,7 +259,6 @@ export function closeProductOverlayNow() {
   if (!frame && !background) return;
   const previous = background;
   const scrollY = previous?.scrollY ?? currentScrollY();
-  const shouldPop = overlayHistory;
   frame = null;
   background = null;
   overlayHistory = false;
@@ -269,15 +268,11 @@ export function closeProductOverlayNow() {
     unlockScrollRestoration();
     return;
   }
-  // Put the real page back on the address bar immediately. history.back()
-  // alone waits on the browser and lets Next.js reload the product route,
-  // which is why the arrow sometimes does nothing and sometimes feels stuck.
+  // Restore the address bar without history.back(). A real tap's history.back()
+  // races Next.js: the product route stays on screen, and the next New Arrivals
+  // arrow is swallowed too. The list underneath never unmounted.
+  clearSwallow();
   rawReplaceState(previous.state, previous.url);
-  if (shouldPop) {
-    pendingScrollY = scrollY;
-    armSwallow();
-    window.history.back();
-  }
   rememberScroll(scrollY);
   unlockScrollRestoration();
 }

@@ -38,32 +38,20 @@ function ProductBackButton() {
   const router = useRouter();
   const handledRef = useRef(false);
   const goBack = () => {
-    if (isProductOverlayOpen()) {
-      closeProductOverlayNow();
-      return;
-    }
-    const here = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    if (isProductOverlayOpen()) closeProductOverlayNow();
+    // Overlay close puts the shop URL back in this same tap. A real product
+    // page, or a restore that did not stick, still has to leave. Client
+    // navigation keeps the pictures; a full reload is only the stuck fallback.
+    if (!window.location.pathname.startsWith('/product/')) return;
+    const here = `${window.location.pathname}${window.location.search}`;
     const saved = readReturnPath();
     clearReturnPath();
-    const destination = saved && saved !== here && saved.startsWith('/') ? saved : '/';
-    const leaveIfStuck = () => {
-      window.setTimeout(() => {
-        const now = `${window.location.pathname}${window.location.search}${window.location.hash}`;
-        if (now === here) window.location.assign(destination);
-      }, 450);
-    };
-    if (destination !== '/') {
-      router.push(destination);
-      leaveIfStuck();
-      return;
-    }
-    if (window.history.length > 1 && document.referrer.startsWith(window.location.origin)) {
-      router.back();
-      leaveIfStuck();
-      return;
-    }
-    router.push('/');
-    leaveIfStuck();
+    const destination = saved && saved.startsWith('/') && !saved.startsWith('/product/') ? saved : '/';
+    router.push(destination);
+    window.setTimeout(() => {
+      const now = `${window.location.pathname}${window.location.search}`;
+      if (now === here) window.location.replace(destination);
+    }, 450);
   };
   return (
     <button
@@ -234,7 +222,10 @@ function ProductDetailContent({
   // handled because product remains null.
   if (!product) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#F4F4F1] px-5">
+      <main className="relative flex min-h-screen items-center justify-center bg-[#F4F4F1] px-5">
+        <div className="absolute left-4 top-4">
+          <ProductBackButton />
+        </div>
         <div className="w-full max-w-sm rounded-[28px] bg-white p-8 text-center shadow-sm">
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-black/5">
             <ShoppingBag size={22} className="text-black/35" />

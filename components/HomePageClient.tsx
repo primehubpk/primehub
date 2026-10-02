@@ -30,6 +30,7 @@ import {
   cacheCatalogForNavigation,
   cacheProductForNavigation,
 } from "@/lib/productNavigationCache";
+import { useKeptHomeCover } from "@/lib/homeKeep";
 import { SettingsProvider } from "@/lib/useSettings";
 import type {
   Category,
@@ -70,6 +71,7 @@ export default function HomePageClient({
   );
   const catalogUnavailable = products.length === 0;
   const lastCatalogRefreshRef = useRef(initialProducts.length > 0 ? Date.now() : 0);
+  const keptHome = useKeptHomeCover();
 
   useEffect(() => {
     // Always open every horizontal homepage rail at its real first item.
@@ -170,11 +172,16 @@ export default function HomePageClient({
     if (initialProducts.length === 0) void refreshCatalog(true);
 
     // Keep an already-open storefront synchronized with Admin/Bot catalog writes.
+    const homeIsOpen = () => window.location.pathname === '/';
     const refreshTimer = window.setInterval(() => {
-      if (document.visibilityState === "visible") void refreshCatalog();
+      // Home stays mounted under other pages so its pictures do not reload.
+      // That hidden copy must not keep asking the catalog API.
+      if (!homeIsOpen() || document.visibilityState !== 'visible') return;
+      void refreshCatalog();
     }, BACKGROUND_REFRESH_INTERVAL_MS);
     const refreshWhenVisible = () => {
-      if (document.visibilityState === "visible") void refreshCatalog();
+      if (!homeIsOpen() || document.visibilityState !== 'visible') return;
+      void refreshCatalog();
     };
     const refreshAfterAdminWrite = () => {
       invalidatePublicStorefront('catalog');
@@ -234,8 +241,12 @@ export default function HomePageClient({
 
   return (
     <SettingsProvider initialSettings={initialSettings}>
+      <div ref={keptHome.frameRef} className="relative" data-ph-home-frame="1">
       <div
         className="home-storefront"
+        data-ph-home-root="1"
+        data-ph-home-live="1"
+        style={keptHome.covering ? { opacity: 0, position: 'relative', zIndex: 2 } : undefined}
         onPointerDownCapture={handleStorefrontClickCapture}
         onClickCapture={handleStorefrontClickCapture}
       >
@@ -334,6 +345,7 @@ export default function HomePageClient({
         </main>
         <YouTubeGuide />
         <Footer onWholesaleSelect={selectWholesale} />
+      </div>
       </div>
     </SettingsProvider>
   );

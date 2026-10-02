@@ -25,10 +25,7 @@ test('product open adds one history step and back restores the same page', async
         entries[index] = { state, url };
       },
       back() {
-        index -= 1;
-        globalThis.window.scrollY = 0;
-        globalThis.window.pageYOffset = 0;
-        for (const listener of popListeners) listener({ stopImmediatePropagation() {} });
+        throw new Error('history.back should not run while closing the product');
       },
     },
     location: {
