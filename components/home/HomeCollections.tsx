@@ -117,27 +117,32 @@ function buildHomeTwoRowProducts(
 ) {
   if (products.length < 2) return [...products];
 
-  // The upper row stays freshness-first, while the lower row is mixed on
-  // every browser refresh. Retail buckets keep exact medallion-price items
-  // ahead of the rest of that bucket; no product can cross bucket boundaries.
-  const priorityOrder = newestHomeRow(products, amount, wholesale);
+  if (!wholesale) {
+    // Keep the medallion price in the first visible 2x2 slots whenever enough
+    // exact-price products exist. Rotate those exact-price cards on refresh
+    // with a strong freshness/new-arrival bias. The horizontal trail can then
+    // continue with every higher-priced product in the same Sale Mela rail.
+    const exactPrice = shuffleWithNewArrivalPriority(
+      products.filter((product) => homePrice(product) === amount),
+      (seed ^ amount) >>> 0,
+    );
+    const higherPriceTrail = shuffleWithNewArrivalPriority(
+      products.filter((product) => homePrice(product) > amount),
+      (seed ^ amount ^ 0xa54ff53a) >>> 0,
+    );
+    return [...exactPrice, ...higherPriceTrail];
+  }
+
+  // Wholesale keeps its two-row refresh rotation with newer packs favoured.
+  const priorityOrder = newestHomeRow(products, amount, true);
   const topRowCount = Math.ceil(products.length / 2);
   const topRow = priorityOrder.slice(0, topRowCount);
   const topRowIds = new Set(topRow.map((product) => product.id));
   const bottomSource = products.filter((product) => !topRowIds.has(product.id));
-
-  const bottomRow = wholesale
-    ? shuffleBySeed(bottomSource, (seed ^ 0x7f4a7c15) >>> 0)
-    : [
-        ...shuffleBySeed(
-          bottomSource.filter((product) => homePrice(product) === amount),
-          (seed ^ amount ^ 0x3c6ef372) >>> 0,
-        ),
-        ...shuffleBySeed(
-          bottomSource.filter((product) => homePrice(product) !== amount),
-          (seed ^ amount ^ 0xa54ff53a) >>> 0,
-        ),
-      ];
+  const bottomRow = shuffleBySeed(
+    bottomSource,
+    (seed ^ 0x7f4a7c15) >>> 0,
+  );
 
   const interleaved: Product[] = [];
   const columns = Math.max(topRow.length, bottomRow.length);
@@ -481,7 +486,7 @@ export default function HomeCollections({
             );
 
             return (
-              <HomeRailFrame key={bucket.id} title={wholesale ? 'Wholesale' : `Sale Mela · ${saleMelaBucketLabel(amount)}`} href={href} icon={wholesale ? <Package size={27} /> : <b className="text-lg">{amount}</b>} className={standalone ? 'home-sale-standalone-frame' : 'home-sale-home-frame'}>
+              <HomeRailFrame key={bucket.id} title={wholesale ? 'Wholesale' : `Sale Mela · ${saleMelaBucketLabel(amount)}`} href={href} icon={wholesale ? <Package size={27} /> : <b className="text-lg">{amount}</b>} className={standalone ? 'home-sale-standalone-frame' : `home-sale-home-frame${wholesale ? ' home-sale-wholesale-frame' : ''}`}>
               <div
                 id={anchor}
                 className={`home-sale-row scroll-mt-24 ${wholesale ? "home-sale-wholesale" : ""}`}
