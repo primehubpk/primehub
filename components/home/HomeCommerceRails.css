@@ -2,6 +2,9 @@
   position: relative;
   margin-top: 10px;
 }
+.home-video-packages {
+  margin-top: -14px;
+}
 .home-commerce-section + .home-commerce-section {
   margin-top: 10px;
 }
