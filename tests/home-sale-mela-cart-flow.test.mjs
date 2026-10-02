@@ -177,22 +177,25 @@ test('existing Prime Skills showcase sits below the embedded Sale Mela without a
 });
 
 
-test('Prime Family nav keeps reseller auth logic and reuses the full reseller tasks view below compact login', () => {
+test('Prime Family always opens the dashboard for guests while reward claims stay login-gated', () => {
   const nav = read('components/BottomNav.tsx');
+  const dashboard = read('app/reseller/dashboard/page.tsx');
   const join = read('app/reseller/join/page.tsx');
   const tasksPage = read('app/reseller/tasks/page.tsx');
   const tasksContent = read('components/reseller/ResellerTasksContent.tsx');
 
-  assert.match(nav, /key: 'reseller', label: 'Prime Family'/);
-  assert.match(nav, /const target = auth\.currentUser \? RESELLER_DASHBOARD : RESELLER_JOIN/);
-  assert.doesNotMatch(join, /HomeResellerClubFull/);
-  assert.match(join, /import \{ ResellerTasksContent \}/);
-  assert.match(join, /<ResellerTasksContent embedded \/>/);
+  assert.match(nav, /key: 'reseller', label: 'Prime Family', href: RESELLER_DASHBOARD/);
+  assert.doesNotMatch(nav, /RESELLER_JOIN/);
+  assert.doesNotMatch(nav, /auth\.authStateReady/);
+  assert.doesNotMatch(dashboard, /router\.replace\('\/reseller\/join'\)/);
+  assert.match(dashboard, /Sign In \/ Join/);
+  assert.match(dashboard, /Prime Family Guest/);
+  assert.match(dashboard, /if \(!user \|\| rewardBusy/);
+  assert.match(dashboard, /if \(!user \|\| spinning/);
+  assert.doesNotMatch(join, /ResellerTasksContent/);
   assert.match(tasksPage, /<ResellerTasksContent \/>/);
   assert.match(tasksContent, /Tasks & Monthly Challenge/);
   assert.match(tasksContent, /activeTasks\.map/);
-  assert.match(tasksContent, /const Shell = embedded \? "section" : "main"/);
-  assert.match(join, /Prime Family<\/Link>/);
   assert.match(join, /signInReseller\(email, password, rememberMe\)/);
   assert.match(join, /createResellerAccount\(email, password\)/);
 });
