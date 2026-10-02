@@ -78,29 +78,27 @@ export default function BottomNav() {
             <Link
               key={key}
               href={href}
-              prefetch={key === 'home' || key === 'shop' || key === 'reseller' || key === 'skills' || key === 'orders'}
+              prefetch={key === 'home' && pathname !== '/'}
               scroll
               aria-current={routeIsActive ? 'page' : undefined}
               aria-busy={isPending || undefined}
               data-nav-key={key}
               data-active={routeIsActive ? 'true' : 'false'}
               data-pending={isPending ? 'true' : 'false'}
-              onPointerEnter={() => router.prefetch(href)}
-              onPointerDown={() => router.prefetch(href)}
-              onFocus={() => router.prefetch(href)}
+              onPointerEnter={() => { if (pathname !== href) router.prefetch(href); }}
+              onPointerDown={() => { if (pathname !== href) router.prefetch(href); }}
+              onFocus={() => { if (pathname !== href) router.prefetch(href); }}
               onClick={(event) => {
                 if (!isPlainLeftClick(event)) return;
 
-                if (key === 'home') {
+                // Let Next's <Link> own cross-route navigation so its prefetched
+                // App Router payload can be reused. Only intercept a repeat Home tap
+                // to scroll the already-open homepage back to the top.
+                if (key === 'home' && pathname === '/') {
                   event.preventDefault();
-                  if (pathname === '/') {
-                    setPendingHref(null);
-                    if (window.location.hash) window.history.replaceState(null, '', '/');
-                    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
-                  } else {
-                    setPendingHref('/');
-                    router.push('/', { scroll: true });
-                  }
+                  setPendingHref(null);
+                  if (window.location.hash) window.history.replaceState(null, '', '/');
+                  window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
                   return;
                 }
 

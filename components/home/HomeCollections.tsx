@@ -2,7 +2,7 @@
 
 import RetryableStorefrontImage from '@/components/RetryableStorefrontImage';
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ChevronRight, Package, ShoppingCart } from "lucide-react";
 import FastProductLink from "@/components/FastProductLink";
 import HomeHeading from "@/components/home/HomeHeading";
@@ -361,6 +361,118 @@ const standaloneGridStyle = {
   scrollSnapType: "none",
 } as const;
 
+const HOME_RAIL_INITIAL_PRODUCTS = 16;
+const HOME_RAIL_PRODUCT_BATCH = 16;
+const HOME_GRID_INITIAL_PRODUCTS = 24;
+const HOME_GRID_PRODUCT_BATCH = 24;
+
+function ProgressiveHomeSaleProducts({
+  products,
+  standalone,
+  wholesale,
+  href,
+  label,
+  cropImageEdges = false,
+}: {
+  products: Product[];
+  standalone: boolean;
+  wholesale: boolean;
+  href: string;
+  label: string;
+  cropImageEdges?: boolean;
+}) {
+  const initialLimit = standalone ? HOME_GRID_INITIAL_PRODUCTS : HOME_RAIL_INITIAL_PRODUCTS;
+  const batchSize = standalone ? HOME_GRID_PRODUCT_BATCH : HOME_RAIL_PRODUCT_BATCH;
+  const [limit, setLimit] = useState(initialLimit);
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    setLimit(initialLimit);
+  }, [initialLimit, products.length]);
+
+  useEffect(() => {
+    if (!standalone || limit >= products.length) return;
+    const node = loadMoreRef.current;
+    if (!node || typeof IntersectionObserver === "undefined") return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          setLimit((count) => Math.min(products.length, count + batchSize));
+        }
+      },
+      { rootMargin: "700px 0px" },
+    );
+
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [batchSize, limit, products.length, standalone]);
+
+  const visibleProducts = products.slice(0, limit);
+
+  return (
+    <div
+      className="home-sale-products [scrollbar-width:none]"
+      style={standalone ? standaloneGridStyle : {
+        display: "grid",
+        gridTemplateColumns: "none",
+        gridAutoFlow: "column",
+        gridTemplateRows: "repeat(2, auto)",
+        gridAutoColumns: "calc((100% - 10px) / 2)",
+        gap: "8px 10px",
+        overflowX: "auto",
+        overscrollBehaviorX: "contain",
+        paddingBottom: "3px",
+        scrollSnapType: "x mandatory",
+      }}
+      aria-label={label}
+      onScroll={standalone ? undefined : (event) => {
+        if (limit >= products.length) return;
+        const rail = event.currentTarget;
+        const nearEnd =
+          rail.scrollLeft + rail.clientWidth >= rail.scrollWidth - rail.clientWidth * 1.25;
+        if (nearEnd) {
+          setLimit((count) => Math.min(products.length, count + batchSize));
+        }
+      }}
+    >
+      {visibleProducts.length ? (
+        visibleProducts.map((product) => (
+          <div
+            key={product.id}
+            style={standalone ? {
+              minWidth: 0,
+            } : {
+              minWidth: 0,
+              scrollSnapAlign: "start",
+            }}
+          >
+            <HomeProductCard
+              product={product}
+              pack={wholesale}
+              cropImageEdges={cropImageEdges}
+            />
+          </div>
+        ))
+      ) : (
+        <p className="home-empty">
+          New offers are on their way.{" "}
+          <Link href={href} prefetch={!standalone}>
+            Browse collection <ChevronRight size={14} />
+          </Link>
+        </p>
+      )}
+      {standalone && limit < products.length ? (
+        <div
+          ref={loadMoreRef}
+          aria-hidden="true"
+          style={{ gridColumn: "1 / -1", height: "1px" }}
+        />
+      ) : null}
+    </div>
+  );
+}
+
 export default function HomeCollections({
   products,
   standalone = false,
@@ -535,49 +647,14 @@ export default function HomeCollections({
                   </div>
                 ) : standalone ? budgetLink : null}
 
-                <div
-                  className="home-sale-products [scrollbar-width:none]"
-                  style={standalone ? standaloneGridStyle : {
-                    display: "grid",
-                    gridTemplateColumns: "none",
-                    gridAutoFlow: "column",
-                    gridTemplateRows: "repeat(2, auto)",
-                    gridAutoColumns: "calc((100% - 10px) / 2)",
-                    gap: "8px 10px",
-                    overflowX: "auto",
-                    overscrollBehaviorX: "contain",
-                    paddingBottom: "3px",
-                    scrollSnapType: "x mandatory",
-                  }}
-                  aria-label={`${bucket.title} products`}
-                >
-                  {matches.length ? (
-                    matches.map((product) => (
-                      <div
-                        key={product.id}
-                        style={standalone ? {
-                          minWidth: 0,
-                        } : {
-                          minWidth: 0,
-                          scrollSnapAlign: "start",
-                        }}
-                      >
-                        <HomeProductCard
-                          product={product}
-                          pack={wholesale}
-                          cropImageEdges={standalone && wholesale}
-                        />
-                      </div>
-                    ))
-                  ) : (
-                    <p className="home-empty">
-                      New offers are on their way.{" "}
-                      <Link href={href} prefetch={!standalone}>
-                        Browse collection <ChevronRight size={14} />
-                      </Link>
-                    </p>
-                  )}
-                </div>
+                <ProgressiveHomeSaleProducts
+                  products={matches}
+                  standalone={standalone}
+                  wholesale={wholesale}
+                  href={href}
+                  label={`${bucket.title} products`}
+                  cropImageEdges={standalone && wholesale}
+                />
 
                 {standalone && wholesale && kidsPacks.length > 0 ? (
                   <section
@@ -617,16 +694,14 @@ export default function HomeCollections({
                       </span>
                     </div>
 
-                    <div
-                      className="home-sale-products [scrollbar-width:none]"
-                      style={standaloneGridStyle}
-                    >
-                      {kidsMatches.map((product) => (
-                        <div key={product.id} style={{ minWidth: 0 }}>
-                          <HomeProductCard product={product} pack cropImageEdges />
-                        </div>
-                      ))}
-                    </div>
+                    <ProgressiveHomeSaleProducts
+                      products={kidsMatches}
+                      standalone
+                      wholesale
+                      href="#bucket-kids-metal-wholesale"
+                      label="Kids Metal Wholesale products"
+                      cropImageEdges
+                    />
                   </section>
                 ) : null}
               </div>
