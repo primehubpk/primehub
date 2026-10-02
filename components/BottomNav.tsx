@@ -91,16 +91,14 @@ export default function BottomNav() {
               onClick={(event) => {
                 if (!isPlainLeftClick(event)) return;
 
-                if (key === 'home') {
+                // Let Next's <Link> own cross-route navigation so its prefetched
+                // App Router payload can be reused. Only intercept a repeat Home tap
+                // to scroll the already-open homepage back to the top.
+                if (key === 'home' && pathname === '/') {
                   event.preventDefault();
-                  if (pathname === '/') {
-                    setPendingHref(null);
-                    if (window.location.hash) window.history.replaceState(null, '', '/');
-                    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
-                  } else {
-                    setPendingHref('/');
-                    router.push('/', { scroll: true });
-                  }
+                  setPendingHref(null);
+                  if (window.location.hash) window.history.replaceState(null, '', '/');
+                  window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
                   return;
                 }
 
