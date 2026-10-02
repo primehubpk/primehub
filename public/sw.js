@@ -1,7 +1,7 @@
 // PrimeHubMall PWA service worker.
 // Only static/app-shell assets are cached. Live HTML, APIs, cart, checkout,
 // orders, account data and price-bearing responses always stay network-driven.
-const VERSION = 'primehub-pwa-v5';
+const VERSION = 'primehub-pwa-v6';
 const SHELL_CACHE = `${VERSION}-shell`;
 const STATIC_CACHE = `${VERSION}-static`;
 const IMAGE_CACHE = `${VERSION}-images`;
@@ -28,8 +28,10 @@ async function trimCache(cacheName, maxEntries) {
   await Promise.all(keys.slice(0, overflow).map((request) => cache.delete(request)));
 }
 
-async function cacheResponse(cacheName, request, response, maxEntries, allowOpaque = false) {
-  if (!response || (!response.ok && !(allowOpaque && response.type === 'opaque'))) return response;
+async function cacheResponse(cacheName, request, response, maxEntries) {
+  // Never persist opaque responses. Cross-origin image failures are opaque too,
+  // so caching them can permanently turn a temporary CDN error into a broken card.
+  if (!response || !response.ok) return response;
   const cache = await caches.open(cacheName);
   await cache.put(request, response.clone());
   if (maxEntries) await trimCache(cacheName, maxEntries);
@@ -49,7 +51,7 @@ async function imageCacheFirst(request) {
 
   try {
     const response = await fetch(request);
-    return await cacheResponse(IMAGE_CACHE, request, response, 180, true);
+    return await cacheResponse(IMAGE_CACHE, request, response, 180);
   } catch {
     return Response.error();
   }
@@ -142,10 +144,13 @@ self.addEventListener('fetch', (event) => {
     request.destination === 'image' ||
     /\.(?:png|jpe?g|webp|avif|gif|svg|ico)$/i.test(url.pathname);
 
-  // Product/category images live on the PrimeHub R2 custom domain. Cache those
-  // trusted immutable upload URLs locally so route remounts paint from CacheStorage
-  // instead of downloading the same picture again.
+  // Cross-origin R2/IBB image responses are normally opaque to a service worker.
+  // An opaque 404/5xx looks identical to a successful image, so putting it in
+  // CacheStorage can poison that product image until the worker cache is cleared.
+  // Let the browser/CDN HTTP cache handle remote images; only cache verifiable
+  // same-origin images here. This also avoids duplicate persistent image caches.
   if ((isOptimizedImage || isImage) && TRUSTED_IMAGE_ORIGINS.has(url.origin)) {
+    if (!isSameOrigin) return;
     event.respondWith(imageCacheFirst(request));
     return;
   }

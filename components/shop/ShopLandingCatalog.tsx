@@ -1,6 +1,6 @@
 'use client';
 
-import Image from 'next/image';
+import RetryableStorefrontImage from '@/components/RetryableStorefrontImage';
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
@@ -27,6 +27,7 @@ import { isWholesaleProduct } from '@/lib/wholesale';
 import { matchesSaleMelaBucket } from '@/lib/priceBucketUtils';
 import {
   discountOf,
+  imageCandidatesOf,
   imageOf,
   titleOf,
   type Product,
@@ -320,20 +321,27 @@ export default function ShopLandingCatalog({
           </div>
           {dealProducts.length > 0 && (
             <div className="shop-deal-products" aria-label="Deal product previews">
-              {dealProducts.map((product) => (
-                <FastProductLink
-                  key={product.id}
-                  product={product}
-                  aria-label={`View ${titleOf(product)}`}
-                >
-                  <Image
-                    src={imageOf(product)}
-                    alt={titleOf(product)}
-                    fill
-                    sizes="110px"
-                  />
-                </FastProductLink>
-              ))}
+              {dealProducts.map((product) => {
+                const imageCandidates = imageCandidatesOf(product);
+                const image = imageCandidates[0] || '';
+                return (
+                  <FastProductLink
+                    key={product.id}
+                    product={product}
+                    aria-label={`View ${titleOf(product)}`}
+                  >
+                    {image ? (
+                      <RetryableStorefrontImage
+                        src={image}
+                        fallbackSrcs={imageCandidates.slice(1)}
+                        alt={titleOf(product)}
+                        fill
+                        sizes="110px"
+                      />
+                    ) : null}
+                  </FastProductLink>
+                );
+              })}
             </div>
           )}
           <Link href="/weekly-deals" prefetch className="shop-deal-link">

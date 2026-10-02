@@ -6,7 +6,7 @@ import FastProductLink from '@/components/FastProductLink';
 import WholesaleBadge from '@/components/WholesaleBadge';
 import { isWholesaleProduct } from '@/lib/wholesale';
 import { isDirectStorefrontImage } from '@/lib/imageUrl';
-import { Product, availableStockOf, discountOf, imageOf, originalOf, priceOf, titleOf } from './ShopTypes';
+import { Product, availableStockOf, discountOf, imageCandidatesOf, originalOf, priceOf, titleOf } from './ShopTypes';
 
 type Props = {
   product: Product;
@@ -22,7 +22,8 @@ export default function CatalogProductCard({ product, addedId, addProduct, compa
   const price = priceOf(product);
   const original = originalOf(product);
   const discount = discountOf(product);
-  const image = imageOf(product);
+  const imageCandidates = imageCandidatesOf(product);
+  const image = imageCandidates[0] || '';
   const stock = availableStockOf(product);
   const unavailable = stock <= 0;
   const added = addedId === product.id;
@@ -45,6 +46,7 @@ export default function CatalogProductCard({ product, addedId, addProduct, compa
             {image ? (
               <RetryableStorefrontImage
                 src={image}
+                fallbackSrcs={imageCandidates.slice(1)}
                 alt={titleOf(product)}
                 fill
                 priority={priority}
@@ -108,6 +110,7 @@ export default function CatalogProductCard({ product, addedId, addProduct, compa
           {image ? (
             <RetryableStorefrontImage
               src={image}
+              fallbackSrcs={imageCandidates.slice(1)}
               alt={titleOf(product)}
               fill
               priority={priority}

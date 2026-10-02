@@ -10,6 +10,7 @@ import { useSettings } from "@/lib/useSettings";
 import { useCartStore } from "@/lib/cartStore";
 import {
   availableStockOf,
+  imageCandidatesOf,
   imageOf,
   originalOf,
   productHasVariants,
@@ -176,7 +177,8 @@ export function HomeProductCard({
   const [added, setAdded] = useState(false);
   const [unavailable, setUnavailable] = useState(false);
   const price = homePrice(product);
-  const src = imageOf(product);
+  const imageCandidates = imageCandidatesOf(product);
+  const src = imageCandidates[0] || '';
   const cardHasPrice = price > 0;
 
   async function add() {
@@ -252,6 +254,7 @@ export function HomeProductCard({
         {src ? (
           <RetryableStorefrontImage
             src={src}
+            fallbackSrcs={imageCandidates.slice(1)}
             alt={titleOf(product)}
             fill
             unoptimized={isDirectStorefrontImage(src)}

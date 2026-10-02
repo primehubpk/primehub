@@ -26,7 +26,39 @@ export type ShopCatalogModel = FilterState & ShopCatalogActions & {
 };
 
 export function titleOf(p: Product) { return p.title || p.name || ''; }
-export function imageOf(p: Product) { return normalizeImageUrl(p.imageUrl || p.image || p.images?.[0] || ''); }
+
+function imageValue(value: unknown) {
+  if (typeof value === 'string') return normalizeImageUrl(value);
+  if (value && typeof value === 'object') {
+    const item = value as { url?: unknown; imageUrl?: unknown };
+    const nested = typeof item.url === 'string'
+      ? item.url
+      : typeof item.imageUrl === 'string'
+        ? item.imageUrl
+        : '';
+    return normalizeImageUrl(nested);
+  }
+  return '';
+}
+
+export function imageCandidatesOf(p: Product) {
+  const raw = [
+    p.imageUrl,
+    p.image,
+    ...(Array.isArray(p.images) ? (p.images as unknown[]) : []),
+  ];
+  const seen = new Set<string>();
+  const images: string[] = [];
+  for (const value of raw) {
+    const image = imageValue(value);
+    if (!image || seen.has(image)) continue;
+    seen.add(image);
+    images.push(image);
+  }
+  return images;
+}
+
+export function imageOf(p: Product) { return imageCandidatesOf(p)[0] || ''; }
 export function priceOf(p: Product) { return Number(p.price || 0); }
 export function originalOf(p: Product) { return Number(p.compareAtPrice ?? p.originalPrice ?? 0); }
 export function slugify(value: string) { return slugifyCategory(value); }
