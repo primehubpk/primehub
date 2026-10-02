@@ -1,6 +1,6 @@
 import HomePageClient from '@/components/HomePageClient';
 import WeeklyDealNavigationWarmup from '@/components/home/WeeklyDealNavigationWarmup';
-import { compactPublicCatalogSnapshot, getPublicCatalogSnapshot, getStorefrontSettingsResultSnapshot } from '@/lib/publicCatalogServer';
+import { compactPublicCatalogSnapshot, getPrimeSkillsSnapshot, getPublicCatalogSnapshot, getStorefrontSettingsResultSnapshot } from '@/lib/publicCatalogServer';
 import { getCachedWholesaleVideosSnapshot } from '@/lib/wholesaleVideosServer';
 import { normalizeImageUrl } from '@/lib/imageUrl';
 import { pakistanNowWeekday } from '@/lib/weeklyDealUtils';
@@ -48,10 +48,11 @@ function hydrateBigDealImages(settings: Record<string, any>, products: any[]) {
 }
 
 export default async function HomePage() {
-  const [catalogResult, settingsResult, wholesaleResult] = await Promise.allSettled([
+  const [catalogResult, settingsResult, wholesaleResult, skillsResult] = await Promise.allSettled([
     getPublicCatalogSnapshot(),
     getStorefrontSettingsResultSnapshot(),
     getCachedWholesaleVideosSnapshot(),
+    getPrimeSkillsSnapshot(),
   ]);
 
   const snapshot = catalogResult.status === 'fulfilled'
@@ -73,6 +74,12 @@ export default async function HomePage() {
     ...(wholesaleVideos.length ? { wholesaleVideos } : {}),
     homeRewardSettings: rewardSettings,
   };
+  const initialSkills = skillsResult.status === 'fulfilled'
+    ? skillsResult.value.skills
+    : [];
+  const initialSkillsPage = skillsResult.status === 'fulfilled'
+    ? skillsResult.value.skillsPage
+    : null;
 
   const weeklyDeals = Array.isArray(initialSettings.weeklyDeals) ? initialSettings.weeklyDeals : [];
   const today = pakistanNowWeekday(new Date());
@@ -95,6 +102,8 @@ export default async function HomePage() {
         initialCategories={snapshot.categories as Category[]}
         initialSettings={initialSettings as Partial<SiteSettings>}
         initialWeekday={today}
+        initialSkills={initialSkills}
+        initialSkillsPage={initialSkillsPage}
       />
     </>
   );
