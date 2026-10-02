@@ -204,3 +204,17 @@ test('Prime Family reuses one guest-visible dashboard on route and home while re
   assert.match(join, /signInReseller\(email, password, rememberMe\)/);
   assert.match(join, /createResellerAccount\(email, password\)/);
 });
+
+
+test('homepage keeps Wholesale Packages above the small Prime Skills rail in single-row trails', () => {
+  const home = read('components/HomePageClient.tsx');
+  const css = read('components/home/HomeCommerceRails.css');
+
+  assert.match(
+    home,
+    /<HomeWholesaleVideos \/>[\s\S]*?<HomePrimeSkills \/>[\s\S]*?<HomeCategoryDeals/,
+  );
+  assert.match(css, /\.home-video-packages\s*\{[\s\S]*?margin-top: -14px;/);
+  assert.match(css, /\.home-commerce-section \.home-commerce-rail\s*\{[\s\S]*?display: flex;/);
+  assert.match(css, /\.home-commerce-section \.home-commerce-card\s*\{[\s\S]*?flex: 0 0/);
+});
