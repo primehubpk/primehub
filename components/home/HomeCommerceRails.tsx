@@ -75,7 +75,7 @@ export function HomeWholesaleVideos() {
       <div className="home-commerce-rail-wrap">
         <div
           className="home-two-row-rail home-commerce-rail"
-          aria-label="Wholesale packages. Four are visible as a 2 by 2 preview when available; swipe horizontally for more."
+          aria-label="Wholesale packages. Swipe horizontally for more."
         >
           {videos.map((video) => {
             const thumbnail = normalizeImageUrl(thumbnailOf(video));
