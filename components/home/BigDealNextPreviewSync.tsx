@@ -160,9 +160,17 @@ export default function BigDealNextPreviewSync() {
       const image = card.querySelector<HTMLImageElement>(":scope > img");
       if (image) {
         if (nextDeal.imageUrl) {
-          image.removeAttribute("srcset");
-          image.removeAttribute("sizes");
-          image.src = nextDeal.imageUrl;
+          // Countdown ticks must not restart the download or overwrite a
+          // successful alternate R2 URL. Change the image only when its slot
+          // actually changes, keeping normal browser caching intact.
+          if (image.dataset.dealSource !== nextDeal.imageUrl) {
+            image.dataset.dealSource = nextDeal.imageUrl;
+            if (image.getAttribute("src") !== nextDeal.imageUrl) {
+              image.removeAttribute("srcset");
+              image.removeAttribute("sizes");
+              image.src = nextDeal.imageUrl;
+            }
+          }
           image.style.display = "block";
         } else {
           image.style.display = "none";

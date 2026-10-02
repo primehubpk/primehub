@@ -22,7 +22,8 @@
       "cursor/product-back-keep-place-3680": false,
       "cursor/customer-back-home-3680": false,
       "cursor/sale-back-images-3680": false,
-      "fix/storefront-image-recovery-oct02": false
+      "fix/storefront-image-recovery-oct02": false,
+      "fix/storefront-image-delivery-oct02": false
     }
   }
 }

@@ -1,7 +1,7 @@
 // PrimeHubMall PWA service worker.
 // Only static/app-shell assets are cached. Live HTML, APIs, cart, checkout,
 // orders, account data and price-bearing responses always stay network-driven.
-const VERSION = 'primehub-pwa-v6';
+const VERSION = 'primehub-pwa-v7';
 const SHELL_CACHE = `${VERSION}-shell`;
 const STATIC_CACHE = `${VERSION}-static`;
 const IMAGE_CACHE = `${VERSION}-images`;
@@ -32,21 +32,26 @@ async function cacheResponse(cacheName, request, response, maxEntries) {
   // Never persist opaque responses. Cross-origin image failures are opaque too,
   // so caching them can permanently turn a temporary CDN error into a broken card.
   if (!response || !response.ok) return response;
-  const cache = await caches.open(cacheName);
-  await cache.put(request, response.clone());
-  if (maxEntries) await trimCache(cacheName, maxEntries);
+  try {
+    const cache = await caches.open(cacheName);
+    await cache.put(request, response.clone());
+    if (maxEntries) await trimCache(cacheName, maxEntries);
+  } catch {
+    // Private browsing/storage quota failures must not discard a good network
+    // response. Persistence is optional; displaying the asset is not.
+  }
   return response;
 }
 
 async function cacheFirst(request) {
-  const cached = await caches.match(request);
+  const cached = await caches.match(request).catch(() => undefined);
   if (cached) return cached;
   const response = await fetch(request);
   return cacheResponse(STATIC_CACHE, request, response, 120);
 }
 
 async function imageCacheFirst(request) {
-  const cached = await caches.match(request);
+  const cached = await caches.match(request).catch(() => undefined);
   if (cached) return cached;
 
   try {
