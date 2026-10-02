@@ -75,18 +75,18 @@ export default function RetryableStorefrontImage({
       onError={() => {
         if (timer.current) clearTimeout(timer.current);
 
-        // One same-URL retry handles brief radio/CDN hiccups without a
-        // cache-busting query string that would create a second R2 request key.
-        if (retry === 0) {
-          timer.current = setTimeout(() => setRetry(1), 700);
-          return;
-        }
-
-        // If a product has another stored image, use it instead of leaving a
-        // permanent placeholder because one cover file is missing.
+        // If a product has another stored image, switch immediately instead of
+        // requesting a known-bad cover twice. This is the cheapest recovery path.
         if (sourceIndex + 1 < sources.length) {
           setSourceIndex((index) => index + 1);
           setRetry(0);
+          return;
+        }
+
+        // A product with no remaining fallback gets one delayed retry for a brief
+        // radio/CDN hiccup. Reuse the exact URL so the browser/CDN cache can help.
+        if (retry === 0) {
+          timer.current = setTimeout(() => setRetry(1), 700);
           return;
         }
 
