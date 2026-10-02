@@ -24,7 +24,7 @@ import SkillsShowcase, {
   type PageSettings as PrimeSkillsPageSettings,
   type SkillItem,
 } from "@/components/SkillsShowcase";
-import PrimeFamilyDashboard from "@/components/reseller/PrimeFamilyDashboard";
+import HomePrimeFamilyLazy from "@/components/home/HomePrimeFamilyLazy";
 import Footer from "@/components/Footer";
 import {
   cacheCatalogForNavigation,
@@ -260,7 +260,7 @@ export default function HomePageClient({
             onWholesaleSelect={selectWholesale}
           />
           <HomeWholesaleVideos />
-          <HomePrimeSkills />
+          <HomePrimeSkills initialItems={initialSkills} />
           <HomeCategoryDeals products={products} categories={categories} />
           <div id="discover-deals-section">
             {(selectedMaxPrice !== null || wholesaleSelected) && (
@@ -330,7 +330,7 @@ export default function HomePageClient({
             initialItems={initialSkills}
             initialPage={initialSkillsPage}
           />
-          <PrimeFamilyDashboard embedded />
+          <HomePrimeFamilyLazy initialSettings={initialSettings as Record<string, unknown>} />
         </main>
         <YouTubeGuide />
         <Footer onWholesaleSelect={selectWholesale} />
