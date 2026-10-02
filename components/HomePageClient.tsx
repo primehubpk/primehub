@@ -19,7 +19,6 @@ import "./home/HomeCommerceRails.css";
 import HeroFlashBanner from "@/components/HeroFlashBanner";
 import CategorySwiper from "@/components/CategorySwiper";
 import NewArrivalsRail from "@/components/NewArrivalsRail";
-import ProductGridRewards from "@/components/ProductGridRewards";
 import YouTubeGuide from "@/components/YouTubeGuide";
 import HomeGuideVideo from "@/components/home/HomeGuideVideo";
 import Footer from "@/components/Footer";
@@ -312,12 +311,9 @@ export default function HomePageClient({
                 </div>
               </section>
             ) : (
-              <ProductGridRewards
-                homeLayout
-                initialProducts={products}
-                liveUpdates={false}
-                selectedMaxPrice={selectedMaxPrice}
-                wholesaleSelected={wholesaleSelected}
+              <HomeCollections
+                products={products}
+                standalone
               />
             )}
           </div>
