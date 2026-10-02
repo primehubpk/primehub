@@ -158,12 +158,11 @@ test('mobile wholesale and Prime Skills cards use square larger media with horiz
 });
 
 
-test('existing Prime Skills showcase sits below the embedded Sale Mela without a duplicate home rail', () => {
+test('existing full Prime Skills showcase sits below the embedded Sale Mela', () => {
   const home = read('components/HomePageClient.tsx');
   const page = read('app/page.tsx');
   const skills = read('components/SkillsShowcase.tsx');
 
-  assert.doesNotMatch(home, /HomePrimeSkills/);
   assert.match(
     home,
     /<div id="discover-deals-section">[\s\S]*?<HomeCollections[\s\S]*?standalone[\s\S]*?embeddedHome[\s\S]*?<SkillsShowcase[\s\S]*?embedded/,
@@ -197,8 +196,12 @@ test('Prime Family reuses one guest-visible dashboard on route and home while re
   assert.match(dashboard, /Cash Wallet/);
   assert.match(
     home,
-    /<SkillsShowcase[\s\S]*?embedded[\s\S]*?<PrimeFamilyDashboard embedded \/>/,
+    /<SkillsShowcase[\s\S]*?embedded[\s\S]*?<HomePrimeFamilyLazy[\s\S]*?initialSettings=/,
   );
+  const lazy = read('components/home/HomePrimeFamilyLazy.tsx');
+  assert.match(lazy, /IntersectionObserver/);
+  assert.match(lazy, /rootMargin: '1200px 0px'/);
+  assert.match(lazy, /<PrimeFamilyDashboard[\s\S]*?embedded[\s\S]*?initialSettings=/);
   assert.doesNotMatch(home, /HomeResellerClubFull/);
   assert.doesNotMatch(join, /ResellerTasksContent/);
   assert.match(join, /signInReseller\(email, password, rememberMe\)/);
@@ -212,9 +215,23 @@ test('homepage keeps Wholesale Packages above the small Prime Skills rail in sin
 
   assert.match(
     home,
-    /<HomeWholesaleVideos \/>[\s\S]*?<HomePrimeSkills \/>[\s\S]*?<HomeCategoryDeals/,
+    /<HomeWholesaleVideos \/>[\s\S]*?<HomePrimeSkills initialItems=\{initialSkills\} \/>[\s\S]*?<HomeCategoryDeals/,
   );
   assert.match(css, /\.home-video-packages\s*\{[\s\S]*?margin-top: -14px;/);
   assert.match(css, /\.home-commerce-section \.home-commerce-rail\s*\{[\s\S]*?display: flex;/);
   assert.match(css, /\.home-commerce-section \.home-commerce-card\s*\{[\s\S]*?flex: 0 0/);
+});
+
+
+test('homepage avoids redundant skills/settings reads before lower sections are needed', () => {
+  const home = read('components/HomePageClient.tsx');
+  const commerce = read('components/home/HomeCommerceRails.tsx');
+  const dashboard = read('components/reseller/PrimeFamilyDashboard.tsx');
+  const lazy = read('components/home/HomePrimeFamilyLazy.tsx');
+
+  assert.match(home, /<HomePrimeSkills initialItems=\{initialSkills\} \/>/);
+  assert.match(commerce, /if \(initialItems\.length\) \{[\s\S]*?setItems\(initialItems\);[\s\S]*?return;/);
+  assert.match(lazy, /setReady\(true\)/);
+  assert.match(dashboard, /hasSeededSettings/);
+  assert.match(dashboard, /Promise\.resolve<Response \| null>\(null\)/);
 });
