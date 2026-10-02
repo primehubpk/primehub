@@ -6,7 +6,6 @@ import { useRouter } from 'next/navigation';
 import { ArrowLeft, Check, ChevronRight, Crown, Eye, EyeOff, LockKeyhole, Mail, ShieldCheck } from 'lucide-react';
 import { createResellerAccount, resetResellerPassword, signInReseller } from '@/lib/resellerAuth';
 import { createResellerProfile } from '@/lib/resellerFirestore';
-import { ResellerTasksContent } from '@/components/reseller/ResellerTasksContent';
 
 function authMessage(code: string, rawMessage = '') {
   switch (code) {
@@ -102,6 +101,5 @@ export default function ResellerJoinPage() {
         </div>
       </div>
     </div></section>
-    <ResellerTasksContent embedded />
   </main>;
 }
