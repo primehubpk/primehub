@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { GraduationCap, Home, Package, ShoppingBag, Users } from 'lucide-react';
+import { isProductOverlayOpen, storefrontClickClaimed } from '@/lib/productOverlay';
 
 const RESELLER_DASHBOARD = '/reseller/dashboard';
 
@@ -90,6 +91,14 @@ export default function BottomNav() {
               onFocus={() => { if (pathname !== href) router.prefetch(href); }}
               onClick={(event) => {
                 if (!isPlainLeftClick(event)) return;
+
+                // A product opened on top of this page. The overlay handler already
+                // returned the shopper to the same spot, or moved them to another tab.
+                // Scrolling Home to the top here would throw that place away.
+                if (storefrontClickClaimed() || isProductOverlayOpen()) {
+                  event.preventDefault();
+                  return;
+                }
 
                 // Let Next's <Link> own cross-route navigation so its prefetched
                 // App Router payload can be reused. Only intercept a repeat Home tap

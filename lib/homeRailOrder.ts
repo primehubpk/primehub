@@ -9,6 +9,27 @@ export function railSeed() {
   return (Date.now() ^ Math.floor(Math.random() * 0xffffffff)) >>> 0;
 }
 
+const HOME_SHUFFLE_SEED_KEY = 'ph-home-shuffle-seed';
+
+// One shuffle for the whole app session. Coming back from a product must not
+// deal the cards again or the pictures look like they reloaded.
+export function sessionRailSeed() {
+  if (typeof window === 'undefined') return 0;
+  try {
+    const saved = Number(window.sessionStorage.getItem(HOME_SHUFFLE_SEED_KEY) || '');
+    if (Number.isFinite(saved) && saved > 0) return saved >>> 0;
+  } catch {
+    return railSeed();
+  }
+  const seed = railSeed() || 1;
+  try {
+    window.sessionStorage.setItem(HOME_SHUFFLE_SEED_KEY, String(seed));
+  } catch {
+    // Private mode can block storage; this visit still gets one shuffle.
+  }
+  return seed;
+}
+
 function unit(seed: number, id: string) {
   let hash = (seed ^ 2166136261) >>> 0;
   for (const char of id) {

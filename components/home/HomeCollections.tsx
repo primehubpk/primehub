@@ -2,7 +2,7 @@
 
 import RetryableStorefrontImage from '@/components/RetryableStorefrontImage';
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ChevronRight, Package, ShoppingCart } from "lucide-react";
 import FastProductLink from "@/components/FastProductLink";
 import HomeHeading from "@/components/home/HomeHeading";
@@ -20,7 +20,7 @@ import { isDirectStorefrontImage } from "@/lib/imageUrl";
 import { getEffectivePrice } from "@/lib/dealPricing";
 import { isWholesaleProduct } from "@/lib/wholesale";
 import HomeRailFrame from './HomeRailFrame';
-import { orderHomeProducts, railSeed } from '@/lib/homeRailOrder';
+import { orderHomeProducts, sessionRailSeed } from '@/lib/homeRailOrder';
 import {
   isWholesalePriceBucket,
   matchesPriceBucket,
@@ -491,9 +491,9 @@ export default function HomeCollections({
   );
   const [homeShuffleSeed, setHomeShuffleSeed] = useState(0);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (standalone) return;
-    setHomeShuffleSeed(railSeed());
+    setHomeShuffleSeed(sessionRailSeed());
   }, [standalone]);
 
   useEffect(() => {

@@ -12,6 +12,6 @@ const PAGES_WITH_OWN_FOOTER = new Set([
 
 export default function GlobalFooter() {
   const pathname = usePathname();
-  if (PAGES_WITH_OWN_FOOTER.has(pathname)) return null;
+  if (PAGES_WITH_OWN_FOOTER.has(pathname) || pathname.startsWith('/product/') || pathname === '/product') return null;
   return <Footer />;
 }

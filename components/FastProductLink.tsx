@@ -1,7 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useCallback } from 'react';
 import type { ComponentProps } from 'react';
 import {
@@ -39,16 +38,16 @@ export default function FastProductLink({
   onFocus,
   ...props
 }: FastProductLinkProps) {
-  const router = useRouter();
   const id = String(productId || product?.id || '').trim();
   const baseHref = href || (id ? `/product/${encodeURIComponent(id)}` : '/shop');
   const resolvedHref = dealContext === 'big' ? addBigDealContext(baseHref) : baseHref;
 
+  // Keep the product object ready for the overlay. Do not prefetch /product,
+  // because that asks Vercel for a page this tap never opens.
   const warm = useCallback(() => {
     if (product) cacheProductForNavigation(product);
     if (id && !product && !readCachedProduct(id)) void loadProductsForNavigation([id]);
-    router.prefetch(resolvedHref);
-  }, [id, product, resolvedHref, router]);
+  }, [id, product]);
 
   return (
     <Link

@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useEffect, useRef } from 'react';
 import {
   ArrowLeft,
   Heart,
@@ -22,13 +23,46 @@ import ProductVideoModal from '@/components/product-detail/ProductVideoModal';
 import VariantSelectorBottomSheet from '@/components/product-detail/VariantSelectorBottomSheet';
 import { useProductDetail } from '@/components/product-detail/useProductDetail';
 import { cacheProductForNavigation } from '@/lib/productNavigationCache';
+import { closeProductOverlayNow, isProductOverlayOpen, productBackAction } from '@/lib/productOverlay';
 import type { Product } from '@/components/product-detail/ProductDetailTypes';
 import { rememberSalarProductHelpContext } from '@/lib/salar/clientProductHelp';
 import { makeTikTokContent, trackTikTokEvent } from '@/lib/tiktokPixel';
 
 type Props = {
   initialProduct?: Product | null;
+  productId?: string;
+  bigDeal?: boolean;
 };
+
+function ProductBackButton() {
+  const router = useRouter();
+  return (
+    <button
+      type="button"
+      className="flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-sm"
+      aria-label="Go back"
+      onClick={() => {
+        const action = productBackAction({
+          overlayOpen: isProductOverlayOpen(),
+          referrer: document.referrer,
+          historyLength: window.history.length,
+          origin: window.location.origin,
+        });
+        if (action === 'overlay-back') {
+          closeProductOverlayNow();
+          return;
+        }
+        if (action === 'history-back') {
+          router.back();
+          return;
+        }
+        router.push('/');
+      }}
+    >
+      <ArrowLeft size={17} />
+    </button>
+  );
+}
 
 function ProductRouteLoading() {
   return (
@@ -48,25 +82,46 @@ function ProductRouteLoading() {
   );
 }
 
-export default function ProductDetailPageClient({ initialProduct = null }: Props) {
-  const seedKey = String(initialProduct?.id || '__no-server-seed__');
-  const [seededKey, setSeededKey] = useState('');
-
-  useLayoutEffect(() => {
+export default function ProductDetailPageClient({
+  initialProduct = null,
+  productId,
+  bigDeal,
+}: Props) {
+  useEffect(() => {
     if (initialProduct) cacheProductForNavigation(initialProduct);
-    setSeededKey(seedKey);
-  }, [initialProduct, seedKey]);
+  }, [initialProduct]);
 
-  // Keep the server and first hydration render identical. Immediately after
-  // hydration the server-provided product is copied into the existing navigation
-  // cache, so useProductDetail can paint it without waiting for another API round trip.
-  if (seededKey !== seedKey) return <ProductRouteLoading />;
-
-  return <ProductDetailContent />;
+  const contentKey = productId || String(initialProduct?.id || 'route');
+  if (bigDeal !== undefined) {
+    return (
+      <ProductDetailContent
+        key={contentKey}
+        initialProduct={initialProduct}
+        productId={productId}
+        bigDeal={bigDeal}
+      />
+    );
+  }
+  return <DealAwareProductDetail key={contentKey} initialProduct={initialProduct} productId={productId} />;
 }
 
-function ProductDetailContent() {
-  const model = useProductDetail();
+function DealAwareProductDetail({ initialProduct = null, productId }: Props) {
+  const searchParams = useSearchParams();
+  return (
+    <ProductDetailContent
+      initialProduct={initialProduct}
+      productId={productId}
+      bigDeal={searchParams.get('deal') === 'big'}
+    />
+  );
+}
+
+function ProductDetailContent({
+  initialProduct,
+  productId,
+  bigDeal,
+}: Props) {
+  const model = useProductDetail({ initialProduct, productId, bigDeal });
   const viewedTikTokProduct = useRef('');
   const {
     product,
@@ -178,13 +233,7 @@ function ProductDetailContent() {
 
       <div className="mx-auto max-w-6xl">
         <header className="sticky top-0 z-30 flex items-center justify-between bg-[#F4F4F1]/92 px-3 py-3 backdrop-blur md:px-5">
-          <Link
-            href="/"
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-sm"
-            aria-label="Back to home"
-          >
-            <ArrowLeft size={17} />
-          </Link>
+          <ProductBackButton />
           <span className="text-[10px] font-black uppercase tracking-[0.24em] text-black/40">
             PrimeHub Product
           </span>

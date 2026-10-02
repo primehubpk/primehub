@@ -1,6 +1,6 @@
 export default function ProductLoading() {
   return (
-    <main className="min-h-screen bg-[#F4F4F1] px-4 pb-28 pt-4">
+    <main className="fixed inset-0 z-[35] overflow-y-auto bg-[#F4F4F1] px-4 pb-28 pt-4">
       <div className="mx-auto max-w-6xl">
         <div className="mb-4 h-10 w-10 animate-pulse rounded-full bg-black/8" />
         <div className="grid gap-4 md:grid-cols-[1.05fr_.95fr]">
