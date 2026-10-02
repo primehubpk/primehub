@@ -148,7 +148,7 @@ export default function ProductOverlayHost() {
       window.setTimeout(() => {
         const now = `${window.location.pathname}${window.location.search}`;
         if (now !== wanted) window.location.assign(`${wanted}${target.hash}`);
-      }, 700);
+      }, 2500);
     };
     document.addEventListener('click', handleStorefrontClick, true);
     window.addEventListener('ph-overlay-navigate', onNavigate);

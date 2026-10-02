@@ -6,6 +6,7 @@ import '@fontsource-variable/inter/wght.css';
 import '@fontsource/space-mono/latin-400.css';
 import '@fontsource/space-mono/latin-700.css';
 import BottomNav from '@/components/BottomNav';
+import StorefrontPageCache from '@/components/StorefrontPageCache';
 import GlobalFooter from '@/components/GlobalFooter';
 import ProductOverlayHost from '@/components/ProductOverlayHost';
 import CartMiniBar from '@/components/CartMiniBar';
@@ -125,7 +126,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <script
           dangerouslySetInnerHTML={{
-            __html: `document.addEventListener('click',function(event){if(event.button!==0||event.metaKey||event.ctrlKey||event.shiftKey||event.altKey||event.defaultPrevented)return;var node=event.target;if(!node||!node.closest)return;var anchor=node.closest('a[href]');if(!anchor||anchor.target&&anchor.target!=='_self'||anchor.hasAttribute('download'))return;var url;try{url=new URL(anchor.href,location.href)}catch(e){return}if(url.origin!==location.origin||url.pathname.indexOf('/product/')!==0)return;event.preventDefault();event.stopImmediatePropagation();var href=url.pathname+url.search;if(anchor.closest('.home-big-deal')&&href.indexOf('deal=big')<0)href+=(href.indexOf('?')<0?'?':'&')+'deal=big';if(typeof window.__phOpenProduct==='function'){window.__phOpenProduct(href);return}window.__phPendingProduct=href},true);`,
+            __html: `document.addEventListener('click',function(event){if(event.button!==0||event.metaKey||event.ctrlKey||event.shiftKey||event.altKey||event.defaultPrevented)return;var node=event.target;if(!node||!node.closest)return;var anchor=node.closest('a[href]');if(!anchor||anchor.target&&anchor.target!=='_self'||anchor.hasAttribute('download'))return;var url;try{url=new URL(anchor.href,location.href)}catch(e){return}if(url.origin!==location.origin||url.pathname.indexOf('/product/')!==0)return;event.preventDefault();event.stopImmediatePropagation();var href=url.pathname+url.search;if(location.pathname.indexOf('/product/')!==0){try{sessionStorage.setItem('ph-return-path',location.pathname+location.search+location.hash)}catch(e){}}if(anchor.closest('.home-big-deal')&&href.indexOf('deal=big')<0)href+=(href.indexOf('?')<0?'?':'&')+'deal=big';if(typeof window.__phOpenProduct==='function'){window.__phOpenProduct(href);return}window.__phPendingProduct=href},true);`,
           }}
         />
         <link rel="preconnect" href="https://images.primehubmall.com" />
@@ -152,7 +153,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
         <BottomNav />
         <SettingsProvider>
-          {children}
+          <StorefrontPageCache>{children}</StorefrontPageCache>
           <ProductOverlayHost />
           <GlobalFooter />
           <GlobalVariantSelector />

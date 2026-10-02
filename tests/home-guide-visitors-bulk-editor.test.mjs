@@ -67,5 +67,5 @@ test('local development unregisters the PWA worker and clears PrimeHub caches', 
   assert.match(register, /navigator\.serviceWorker\.getRegistrations\(\)/);
   assert.match(register, /registration\.unregister\(\)/);
   assert.match(register, /name\.startsWith\('primehub-pwa-'\)/);
-  assert.match(sw, /const VERSION = 'primehub-pwa-v3'/);
+  assert.match(sw, /const VERSION = 'primehub-pwa-v5'/);
 });

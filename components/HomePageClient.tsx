@@ -170,11 +170,16 @@ export default function HomePageClient({
     if (initialProducts.length === 0) void refreshCatalog(true);
 
     // Keep an already-open storefront synchronized with Admin/Bot catalog writes.
+    const homeIsOpen = () => window.location.pathname === '/';
     const refreshTimer = window.setInterval(() => {
-      if (document.visibilityState === "visible") void refreshCatalog();
+      // Home stays mounted under other pages so its pictures do not reload.
+      // That hidden copy must not keep asking the catalog API.
+      if (!homeIsOpen() || document.visibilityState !== 'visible') return;
+      void refreshCatalog();
     }, BACKGROUND_REFRESH_INTERVAL_MS);
     const refreshWhenVisible = () => {
-      if (document.visibilityState === "visible") void refreshCatalog();
+      if (!homeIsOpen() || document.visibilityState !== 'visible') return;
+      void refreshCatalog();
     };
     const refreshAfterAdminWrite = () => {
       invalidatePublicStorefront('catalog');
@@ -236,6 +241,7 @@ export default function HomePageClient({
     <SettingsProvider initialSettings={initialSettings}>
       <div
         className="home-storefront"
+        data-ph-home-root=""
         onPointerDownCapture={handleStorefrontClickCapture}
         onClickCapture={handleStorefrontClickCapture}
       >

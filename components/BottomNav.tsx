@@ -80,7 +80,7 @@ export default function BottomNav() {
               key={key}
               href={href}
               prefetch={key === 'home' && pathname !== '/'}
-              scroll
+              scroll={key !== 'home'}
               aria-current={routeIsActive ? 'page' : undefined}
               aria-busy={isPending || undefined}
               data-nav-key={key}

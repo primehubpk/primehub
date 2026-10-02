@@ -28,9 +28,11 @@ export default function BackHomeLink({ className, children, ariaLabel }: Props) 
     if (action === 'overlay-home' || action === 'pushed-home') return;
     const target = '/';
     router.push(target);
+    // A short fallback used to reload the whole homepage, which fetched every
+    // picture again. Only leave the client router if it truly never started.
     window.setTimeout(() => {
       if (window.location.pathname !== '/') window.location.assign(target);
-    }, 700);
+    }, 2500);
   };
 
   const onPointerDown = (event: PointerEvent<HTMLAnchorElement>) => {

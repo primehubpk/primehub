@@ -154,7 +154,9 @@ export default function HeroFlashBanner({ initialProducts = [], liveUpdates = tr
   const todayKey = nowTick === null
     ? (initialWeekday || pakistanNowWeekday(new Date()))
     : pakistanNowWeekday(new Date(nowTick));
-  const activeBigSlot = bigDealSlotAt(bigDeal, bigDealRotationIndex(bigDeal?.rotationStartedAt, new Date(nowTick ?? 0), bigDealConfiguredSlotCount(bigDeal)));
+  // nowTick starts empty so the clock can hydrate. Date(0) would pick a 1970
+  // slot and then swap the picture on every return to home.
+  const activeBigSlot = bigDealSlotAt(bigDeal, bigDealRotationIndex(bigDeal?.rotationStartedAt, nowTick === null ? new Date() : new Date(nowTick), bigDealConfiguredSlotCount(bigDeal)));
   const countdown = useMemo(() => {
     if (nowTick === null) return { days: 0, hours: 0, minutes: 0, seconds: 0 };
     const end = bigDeal?.endAt ? new Date(bigDeal.endAt).getTime() : 0;
@@ -233,7 +235,7 @@ export default function HeroFlashBanner({ initialProducts = [], liveUpdates = tr
     const stock = Number(product?.stock ?? product?.quantity ?? bigDeal?.stock ?? 0);
     const src = normalizeImageUrl(activeBigSlot?.imageUrl || product?.imageUrl || "");
     const slotCount = bigDealConfiguredSlotCount(bigDeal);
-    const nextDeal = bigDealSlotAt(bigDeal, nextBigDealRotationIndex(bigDeal?.rotationStartedAt, new Date(nowTick ?? 0), slotCount));
+    const nextDeal = bigDealSlotAt(bigDeal, nextBigDealRotationIndex(bigDeal?.rotationStartedAt, nowTick === null ? new Date() : new Date(nowTick), slotCount));
     const nextSrc = normalizeImageUrl(nextDeal?.imageUrl || "");
     const nextPrice = Number(nextDeal?.dealPrice || 0);
     const nextRegularPrice = Number(nextDeal?.originalPrice || nextPrice || 0);

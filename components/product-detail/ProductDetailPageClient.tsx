@@ -38,32 +38,20 @@ function ProductBackButton() {
   const router = useRouter();
   const handledRef = useRef(false);
   const goBack = () => {
-    if (isProductOverlayOpen()) {
-      closeProductOverlayNow();
-      return;
-    }
-    const here = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    if (isProductOverlayOpen()) closeProductOverlayNow();
+    // Overlay close puts the shop URL back in this same tap. A real product
+    // page, or a restore that did not stick, still has to leave. Client
+    // navigation keeps the pictures; a full reload is only the stuck fallback.
+    if (!window.location.pathname.startsWith('/product/')) return;
+    const here = `${window.location.pathname}${window.location.search}`;
     const saved = readReturnPath();
     clearReturnPath();
-    const destination = saved && saved !== here && saved.startsWith('/') ? saved : '/';
-    const leaveIfStuck = () => {
-      window.setTimeout(() => {
-        const now = `${window.location.pathname}${window.location.search}${window.location.hash}`;
-        if (now === here) window.location.assign(destination);
-      }, 450);
-    };
-    if (destination !== '/') {
-      router.push(destination);
-      leaveIfStuck();
-      return;
-    }
-    if (window.history.length > 1 && document.referrer.startsWith(window.location.origin)) {
-      router.back();
-      leaveIfStuck();
-      return;
-    }
-    router.push('/');
-    leaveIfStuck();
+    const destination = saved && saved.startsWith('/') && !saved.startsWith('/product/') ? saved : '/';
+    router.push(destination);
+    window.setTimeout(() => {
+      const now = `${window.location.pathname}${window.location.search}`;
+      if (now === here) window.location.replace(destination);
+    }, 450);
   };
   return (
     <button
