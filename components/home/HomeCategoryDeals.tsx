@@ -14,7 +14,7 @@ export default function HomeCategoryDeals({ products, categories }: { products: 
     .sort((a, b) => Number(a.sortOrder ?? 999) - Number(b.sortOrder ?? 999) || a.title.localeCompare(b.title));
 
   return (
-    <section className="mt-8 space-y-7" aria-label="Shop products by category">
+    <section className="mt-2 space-y-5" aria-label="Shop products by category">
       {visible.map((category) => {
         const matches = products.filter((product) => product.published !== false &&
           productMatchesCategory(category.title, product, categories));
@@ -29,10 +29,22 @@ export default function HomeCategoryDeals({ products, categories }: { products: 
             <span><span className="block text-[9px] font-black uppercase tracking-widest text-[#A26D13]">Browse category</span>
               <span className="block text-base font-black text-[#14140F] group-hover:text-[#0F6A5F]">{category.title} →</span></span>
           </Link>
-          <div className="flex snap-x snap-mandatory gap-2.5 overflow-x-auto overscroll-x-contain px-4 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {matches.map((product) => <div key={product.id} className="w-[156px] shrink-0 snap-start sm:w-[196px]">
-              <HomeProductCard product={product} />
-            </div>)}
+          <div
+            className="snap-x snap-mandatory overflow-x-auto overscroll-x-contain px-4 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'none',
+              gridAutoFlow: 'column',
+              gridTemplateRows: 'repeat(2, auto)',
+              gridAutoColumns: 'calc((100% - 10px) / 2)',
+              gap: '8px 10px',
+            }}
+          >
+            {matches.map((product) => (
+              <div key={product.id} className="min-w-0 snap-start">
+                <HomeProductCard product={product} />
+              </div>
+            ))}
           </div>
         </div>;
       })}
