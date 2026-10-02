@@ -521,6 +521,7 @@ export default function HomeCollections({
                   className="home-sale-products [scrollbar-width:none]"
                   style={standalone ? standaloneGridStyle : {
                     display: "grid",
+                    gridTemplateColumns: "none",
                     gridAutoFlow: "column",
                     gridTemplateRows: "repeat(2, auto)",
                     gridAutoColumns: "calc((100% - 10px) / 2)",
