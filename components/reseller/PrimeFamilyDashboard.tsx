@@ -85,24 +85,49 @@ function currentGuestId() {
   try { return String(window.localStorage.getItem(GUEST_ID_KEY) || ''); } catch { return ''; }
 }
 
-export default function PrimeFamilyDashboard({ embedded = false }: { embedded?: boolean }) {
+export default function PrimeFamilyDashboard({
+  embedded = false,
+  initialSettings = null,
+}: {
+  embedded?: boolean;
+  initialSettings?: Record<string, unknown> | null;
+}) {
   const [memberUser, setMemberUser] = useState<User | null>(() => auth.currentUser);
   const [profile, setProfile] = useState<ResellerProfile | null>(null);
-  const [tasks, setTasks] = useState<ResellerTask[]>(DEFAULT_RESELLER_TASKS);
-  const [challenge, setChallenge] = useState<MonthlyChallengeSettings>(DEFAULT_MONTHLY_CHALLENGE);
-  const [wheel, setWheel] = useState<ResellerWheelSettings>(DEFAULT_RESELLER_WHEEL);
+  const seededSettings = (initialSettings || {}) as SettingsSnapshot & { homeRewardSettings?: RewardSettings };
+  const [tasks, setTasks] = useState<ResellerTask[]>(
+    () => Array.isArray(seededSettings.resellerTasks) ? seededSettings.resellerTasks : DEFAULT_RESELLER_TASKS,
+  );
+  const [challenge, setChallenge] = useState<MonthlyChallengeSettings>(
+    () => ({ ...DEFAULT_MONTHLY_CHALLENGE, ...(seededSettings.resellerMonthlyChallenge || {}) }),
+  );
+  const [wheel, setWheel] = useState<ResellerWheelSettings>(
+    () => ({ ...DEFAULT_RESELLER_WHEEL, ...(seededSettings.resellerWheel || {}) }),
+  );
   const [view, setView] = useState<View>('home');
   const [filter, setFilter] = useState<VoucherFilter>('all');
   const [selectedVoucher, setSelectedVoucher] = useState<Voucher | null>(null);
   const [loading, setLoading] = useState(true);
   const [rewardWallet, setRewardWallet] = useState<RewardWallet>({ points: 0, streak: 0 });
-  const [rewardSettings, setRewardSettings] = useState<RewardSettings>({ checkInRewards: [10, 15, 20, 25, 30, 50, 100], spinWheelSlots: [] });
+  const [rewardSettings, setRewardSettings] = useState<RewardSettings>(
+    () => ({
+      checkInRewards: [10, 15, 20, 25, 30, 50, 100],
+      spinWheelSlots: [],
+      ...(seededSettings.homeRewardSettings || {}),
+    }),
+  );
   const [rewardGifts, setRewardGifts] = useState<RewardGift[]>([]);
   const [rewardProducts, setRewardProducts] = useState<Record<string, RewardProduct>>({});
   const [rewardBusy, setRewardBusy] = useState(false);
   const [rewardMessage, setRewardMessage] = useState('');
-  const [voucherImages, setVoucherImages] = useState<Record<string, string>>({});
-  const [resellerTiers, setResellerTiers] = useState<ResellerTier[]>(getResellerTiers());
+  const [voucherImages, setVoucherImages] = useState<Record<string, string>>(
+    () => seededSettings.resellerVoucherImages || {},
+  );
+  const [resellerTiers, setResellerTiers] = useState<ResellerTier[]>(
+    () => Array.isArray(seededSettings.resellerTiers) && seededSettings.resellerTiers.length === 4
+      ? seededSettings.resellerTiers
+      : getResellerTiers(),
+  );
 
   useEffect(() => {
     let stopProfile: (() => void) | undefined;
@@ -150,34 +175,41 @@ export default function PrimeFamilyDashboard({ embedded = false }: { embedded?: 
 
   useEffect(() => {
     let cancelled = false;
+    const hasSeededSettings = Boolean(initialSettings && Object.keys(initialSettings).length);
+
     Promise.all([
-      fetch('/api/storefront/read?type=settings', { cache: 'no-store' }),
+      hasSeededSettings
+        ? Promise.resolve<Response | null>(null)
+        : fetch('/api/storefront/read?type=settings', { cache: 'no-store' }),
       fetch('/api/storefront/read?type=rewards', { cache: 'no-store' }),
     ])
       .then(async ([settingsResponse, rewardsResponse]) => {
-        const settingsData = settingsResponse.ok ? await settingsResponse.json() : null;
+        const settingsData = settingsResponse?.ok ? await settingsResponse.json() : null;
         const rewardsData = rewardsResponse.ok ? await rewardsResponse.json() : null;
         if (cancelled) return;
 
-        const data = settingsData?.documents?.main as SettingsSnapshot | undefined;
+        const data = (settingsData?.documents?.main || initialSettings || null) as SettingsSnapshot | null;
         if (Array.isArray(data?.resellerTasks)) setTasks(data.resellerTasks);
         if (data?.resellerMonthlyChallenge) {
           setChallenge({ ...DEFAULT_MONTHLY_CHALLENGE, ...data.resellerMonthlyChallenge });
         }
         if (data?.resellerWheel) setWheel({ ...DEFAULT_RESELLER_WHEEL, ...data.resellerWheel });
-        setVoucherImages(data?.resellerVoucherImages || {});
+        if (data?.resellerVoucherImages) setVoucherImages(data.resellerVoucherImages);
         if (Array.isArray(data?.resellerTiers) && data.resellerTiers.length === 4) setResellerTiers(data.resellerTiers);
 
         const gifts = (Array.isArray(rewardsData?.gifts) ? rewardsData.gifts : [])
           .filter((gift: RewardGift) => gift.active !== false);
         setRewardGifts(gifts);
+        if (rewardsData?.settings) {
+          setRewardSettings(current => ({ ...current, ...rewardsData.settings }));
+        }
       })
       .catch(() => undefined);
 
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [initialSettings]);
 
   useEffect(() => {
     const productIds = Array.from(
