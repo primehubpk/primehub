@@ -13,7 +13,7 @@ const RESELLER_JOIN = '/reseller/join';
 const NAV_ITEMS = [
   { key: 'home', label: 'Home', href: '/', icon: Home },
   { key: 'shop', label: 'Shop', href: '/shop', icon: ShoppingBag },
-  { key: 'reseller', label: 'Reseller Club', href: RESELLER_DASHBOARD, icon: Users },
+  { key: 'reseller', label: 'Prime Family', href: RESELLER_DASHBOARD, icon: Users },
   { key: 'skills', label: 'Prime Skills', href: '/skills', icon: GraduationCap },
   { key: 'orders', label: 'Orders', href: '/orders', icon: Package },
 ] as const;
