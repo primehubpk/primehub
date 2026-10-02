@@ -314,6 +314,7 @@ export default function HomePageClient({
               <HomeCollections
                 products={products}
                 standalone
+                embeddedHome
               />
             )}
           </div>
