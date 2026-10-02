@@ -4,12 +4,15 @@ import fs from 'node:fs';
 
 const read = (path) => fs.readFileSync(path, 'utf8').replace(/\r\n/g, '\n');
 
-test('home Sale Mela keeps bucket boundaries, prioritizes fresh top-row cards, and shuffles the mixed row per refresh', () => {
+test('home Sale Mela keeps exact medallion-price cards first and higher prices in the trail', () => {
   const source = read('components/home/HomeCollections.tsx');
 
   assert.match(source, /function buildHomeTwoRowProducts\(/);
-  assert.match(source, /const topRowCount = Math\.ceil\(products\.length \/ 2\)/);
-  assert.match(source, /Number\(homePrice\(b\) === amount\) - Number\(homePrice\(a\) === amount\)/);
+  assert.match(source, /const exactPrice = shuffleWithNewArrivalPriority\(/);
+  assert.match(source, /homePrice\(product\) === amount/);
+  assert.match(source, /const higherPriceTrail = shuffleWithNewArrivalPriority\(/);
+  assert.match(source, /homePrice\(product\) > amount/);
+  assert.match(source, /return \[\.\.\.exactPrice, \.\.\.higherPriceTrail\]/);
   assert.match(source, /setHomeShuffleSeed\(railSeed\(\)\)/);
   assert.match(source, /homeShuffleSeed \|\| stableCatalogSeed/);
   assert.match(source, /buildHomeTwoRowProducts\([\s\S]*?baseMatches,[\s\S]*?amount,[\s\S]*?saleShuffleSeed,[\s\S]*?wholesale/);
@@ -19,6 +22,7 @@ test('home Sale Mela keeps bucket boundaries, prioritizes fresh top-row cards, a
   assert.match(source, /gridTemplateRows: "repeat\(2, auto\)"/);
   assert.match(source, /gridAutoColumns: "calc\(\(100% - 10px\) \/ 2\)"/);
 
+  assert.match(source, /const topRowCount = Math\.ceil\(products\.length \/ 2\)/);
   assert.match(source, /const \[homeSaleCatalog, setHomeSaleCatalog\] = useState<Product\[\]>/);
   assert.match(source, /homeSaleCatalog\.length > 0/);
   assert.match(source, /setHomeSaleCatalog\(liveCatalog\)/);
@@ -85,4 +89,13 @@ test('homepage reuses the existing standalone Sale Mela where PrimeHubMall Deals
     home,
     /<HomeCategoryDeals[\s\S]*?<div id="discover-deals-section">[\s\S]*?<HomeCollections[\s\S]*?products=\{products\}[\s\S]*?standalone/,
   );
+});
+
+
+test('homepage wholesale Sale Mela rail is pulled upward without changing standalone layout', () => {
+  const source = read('components/home/HomeCollections.tsx');
+  const css = read('components/home/home.css');
+
+  assert.match(source, /home-sale-wholesale-frame/);
+  assert.match(css, /\.home-sale-home-frame\.home-sale-wholesale-frame\s*\{[\s\S]*?margin-top: -14px;/);
 });
