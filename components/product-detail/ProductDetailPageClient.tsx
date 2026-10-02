@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useRef } from 'react';
 import {
@@ -23,7 +22,8 @@ import ProductVideoModal from '@/components/product-detail/ProductVideoModal';
 import VariantSelectorBottomSheet from '@/components/product-detail/VariantSelectorBottomSheet';
 import { useProductDetail } from '@/components/product-detail/useProductDetail';
 import { cacheProductForNavigation } from '@/lib/productNavigationCache';
-import { closeProductOverlayNow, isProductOverlayOpen, productBackAction } from '@/lib/productOverlay';
+import BackHomeLink from '@/components/BackHomeLink';
+import { clearReturnPath, closeProductOverlayNow, isProductOverlayOpen, readReturnPath } from '@/lib/productOverlay';
 import type { Product } from '@/components/product-detail/ProductDetailTypes';
 import { rememberSalarProductHelpContext } from '@/lib/salar/clientProductHelp';
 import { makeTikTokContent, trackTikTokEvent } from '@/lib/tiktokPixel';
@@ -36,27 +36,52 @@ type Props = {
 
 function ProductBackButton() {
   const router = useRouter();
+  const handledRef = useRef(false);
+  const goBack = () => {
+    if (isProductOverlayOpen()) {
+      closeProductOverlayNow();
+      return;
+    }
+    const here = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    const saved = readReturnPath();
+    clearReturnPath();
+    const destination = saved && saved !== here && saved.startsWith('/') ? saved : '/';
+    const leaveIfStuck = () => {
+      window.setTimeout(() => {
+        const now = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+        if (now === here) window.location.assign(destination);
+      }, 450);
+    };
+    if (destination !== '/') {
+      router.push(destination);
+      leaveIfStuck();
+      return;
+    }
+    if (window.history.length > 1 && document.referrer.startsWith(window.location.origin)) {
+      router.back();
+      leaveIfStuck();
+      return;
+    }
+    router.push('/');
+    leaveIfStuck();
+  };
   return (
     <button
       type="button"
-      className="flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-sm"
+      className="flex h-11 w-11 touch-manipulation items-center justify-center rounded-full bg-white shadow-sm"
       aria-label="Go back"
+      onPointerDown={(event) => {
+        if (event.button !== 0) return;
+        event.preventDefault();
+        handledRef.current = true;
+        goBack();
+      }}
       onClick={() => {
-        const action = productBackAction({
-          overlayOpen: isProductOverlayOpen(),
-          referrer: document.referrer,
-          historyLength: window.history.length,
-          origin: window.location.origin,
-        });
-        if (action === 'overlay-back') {
-          closeProductOverlayNow();
+        if (handledRef.current) {
+          handledRef.current = false;
           return;
         }
-        if (action === 'history-back') {
-          router.back();
-          return;
-        }
-        router.push('/');
+        goBack();
       }}
     >
       <ArrowLeft size={17} />
@@ -68,7 +93,9 @@ function ProductRouteLoading() {
   return (
     <main className="min-h-screen bg-[#F4F4F1] px-4 pb-28 pt-4">
       <div className="mx-auto max-w-6xl">
-        <div className="mb-4 h-10 w-10 animate-pulse rounded-full bg-black/8" />
+        <div className="mb-4">
+          <ProductBackButton />
+        </div>
         <div className="grid gap-4 md:grid-cols-[1.05fr_.95fr]">
           <div className="aspect-square animate-pulse rounded-[30px] bg-white md:aspect-[4/3]" />
           <div className="rounded-[30px] bg-white p-6">
@@ -216,12 +243,9 @@ function ProductDetailContent({
           <p className="mt-1 text-xs leading-5 text-black/45">
             This deal may have been removed or is no longer available.
           </p>
-          <Link
-            href="/"
-            className="mt-5 inline-flex rounded-full bg-[#14140F] px-5 py-3 text-[10px] font-black text-white"
-          >
-            Back to Deals
-          </Link>
+          <BackHomeLink className="mt-5 inline-flex rounded-full bg-[#14140F] px-5 py-3 text-[10px] font-black text-white">
+            Back to Home
+          </BackHomeLink>
         </div>
       </main>
     );

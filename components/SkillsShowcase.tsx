@@ -3,6 +3,7 @@
 import { useMemo } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
+import BackHomeLink from '@/components/BackHomeLink';
 import { ArrowRight, Image as ImageIcon, MessageCircle, Sparkles } from 'lucide-react';
 import { PRIME_SKILLS_SEED } from '@/lib/primeSkillsSeed';
 import { normalizeImageUrl } from '@/lib/imageUrl';
@@ -91,6 +92,13 @@ export default function SkillsShowcase({
     : 'min-h-screen overflow-x-hidden bg-[#F4F4F1] px-2.5 pb-28 pt-3 sm:px-6 sm:pt-8';
 
   return <Shell className={shellClassName}>
+    {!embedded && (
+      <div className="mx-auto mb-3 max-w-5xl">
+        <BackHomeLink className="inline-flex items-center rounded-full bg-white px-3 py-2 text-[10px] font-black shadow-sm">
+          ← Back to Home
+        </BackHomeLink>
+      </div>
+    )}
     <section className="mx-auto max-w-5xl">
       <div className="relative overflow-hidden rounded-[24px] border border-black/[0.06] bg-gradient-to-br from-[#FFFDF8] via-[#F8F5EE] to-[#F1EEE7] shadow-[0_16px_42px_rgba(20,20,15,0.08)] sm:rounded-[34px]">
         <div className="pointer-events-none absolute -right-20 -top-20 h-56 w-56 rounded-full bg-[#0F6A5F]/10 blur-3xl"/>

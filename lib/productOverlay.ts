@@ -32,6 +32,9 @@ let pendingScrollY: number | null = null;
 let scrollGeneration = 0;
 let savedScrollRestoration: ScrollRestoration | null = null;
 let clickClaimed = false;
+let swallowTimer = 0;
+
+const RETURN_PATH_KEY = 'ph-return-path';
 
 type ScrollRestoration = 'auto' | 'manual';
 
@@ -79,6 +82,49 @@ function rememberScroll(y: number) {
 function cancelScrollRestore() {
   scrollGeneration += 1;
   pendingScrollY = null;
+}
+
+function armSwallow() {
+  swallowNextPop = true;
+  if (typeof window === 'undefined') return;
+  window.clearTimeout(swallowTimer);
+  // If the browser never emits popstate, forget the swallow so the next
+  // real back tap is not eaten.
+  swallowTimer = window.setTimeout(() => {
+    swallowNextPop = false;
+  }, 600);
+}
+
+function clearSwallow() {
+  swallowNextPop = false;
+  if (typeof window !== 'undefined') window.clearTimeout(swallowTimer);
+}
+
+function rememberReturnPath(url: string) {
+  if (typeof window === 'undefined') return;
+  try {
+    window.sessionStorage.setItem(RETURN_PATH_KEY, url);
+  } catch {
+    // Private mode can block storage. The in-memory overlay still returns.
+  }
+}
+
+export function readReturnPath() {
+  if (typeof window === 'undefined') return '';
+  try {
+    return window.sessionStorage.getItem(RETURN_PATH_KEY) || '';
+  } catch {
+    return '';
+  }
+}
+
+export function clearReturnPath() {
+  if (typeof window === 'undefined') return;
+  try {
+    window.sessionStorage.removeItem(RETURN_PATH_KEY);
+  } catch {
+    // Ignore storage failures.
+  }
 }
 
 export function resetStorefrontClickClaim() {
@@ -191,6 +237,7 @@ export function openProductOverlay(next: ProductOverlayFrame) {
     };
     rawPushState(null, next.href);
     overlayHistory = true;
+    rememberReturnPath(background.url);
     rememberScroll(scrollY);
   } else {
     rawReplaceState(null, next.href);
@@ -210,21 +257,29 @@ export function closeProductOverlayFromPop() {
 // the customer is back on the same picture and the same scroll immediately.
 export function closeProductOverlayNow() {
   if (!frame && !background) return;
-  const scrollY = background?.scrollY ?? currentScrollY();
+  const previous = background;
+  const scrollY = previous?.scrollY ?? currentScrollY();
   const shouldPop = overlayHistory;
   frame = null;
   background = null;
   overlayHistory = false;
   emit();
-  if (!shouldPop || typeof window === 'undefined') {
+  if (!previous || typeof window === 'undefined') {
     rememberScroll(scrollY);
     unlockScrollRestoration();
     return;
   }
-  pendingScrollY = scrollY;
-  swallowNextPop = true;
-  window.history.back();
+  // Put the real page back on the address bar immediately. history.back()
+  // alone waits on the browser and lets Next.js reload the product route,
+  // which is why the arrow sometimes does nothing and sometimes feels stuck.
+  rawReplaceState(previous.state, previous.url);
+  if (shouldPop) {
+    pendingScrollY = scrollY;
+    armSwallow();
+    window.history.back();
+  }
   rememberScroll(scrollY);
+  unlockScrollRestoration();
 }
 
 export function navigateFromProductOverlay(href: string) {
@@ -241,11 +296,36 @@ export function navigateFromProductOverlay(href: string) {
   return true;
 }
 
+function backgroundPathname() {
+  const backgroundPath = getProductOverlayBackgroundPath();
+  if (!backgroundPath || typeof window === 'undefined') return '';
+  try {
+    return new URL(backgroundPath, window.location.origin).pathname;
+  } catch {
+    return '';
+  }
+}
+
+// One decision for every "Back to Home" control. The caller navigates only
+// when this returns router-home, so a weekly deal cannot stop on the deals list.
+export function requestStorefrontHome(): 'overlay-home' | 'pushed-home' | 'router-home' | 'scroll-top' {
+  if (typeof window === 'undefined') return 'scroll-top';
+  if (isProductOverlayOpen()) {
+    if (backgroundPathname() === '/') {
+      closeProductOverlayNow();
+      return 'overlay-home';
+    }
+    if (navigateFromProductOverlay('/')) return 'pushed-home';
+  }
+  if (window.location.pathname === '/' && !window.location.search) return 'scroll-top';
+  return 'router-home';
+}
+
 function onOverlayPopState(event: PopStateEvent) {
   if (!frame && !swallowNextPop) return;
   event.stopImmediatePropagation();
   const swallowing = swallowNextPop;
-  swallowNextPop = false;
+  clearSwallow();
   const scrollY = pendingScrollY ?? background?.scrollY ?? currentScrollY();
   pendingScrollY = null;
   if (!swallowing) closeProductOverlayFromPop();

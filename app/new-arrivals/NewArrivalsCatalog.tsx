@@ -1,5 +1,5 @@
 'use client';
-import Link from 'next/link';
+import BackHomeLink from '@/components/BackHomeLink';
 import { ArrowLeft, Sparkles } from 'lucide-react';
 import { useMemo } from 'react';
 import { useShopCatalog } from '@/components/shop/useShopCatalog';
@@ -19,7 +19,7 @@ export default function NewArrivalsCatalog() {
   return <main className="min-h-screen bg-[#F4F4F1] pb-28">
     <div className="mx-auto max-w-6xl px-4 py-5">
       <div className="flex items-center gap-3">
-        <Link href="/" className="flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-sm"><ArrowLeft size={18}/></Link>
+        <BackHomeLink ariaLabel="Back to Home" className="flex h-11 w-11 touch-manipulation items-center justify-center rounded-full bg-white shadow-sm"><ArrowLeft size={18}/></BackHomeLink>
         <div>
           <p className="flex items-center gap-1 text-[8px] font-black uppercase tracking-[.2em] text-[#B7791F]"><Sparkles size={11}/>Premium Collection</p>
           <h1 className="text-xl font-black">New Arrivals</h1>

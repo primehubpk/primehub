@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import BackHomeLink from '@/components/BackHomeLink';
 import { useParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, ShoppingBag, Tag } from 'lucide-react';
@@ -137,12 +138,12 @@ export default function DayDealPage({ initialProducts = [] }: { initialProducts?
     window.setTimeout(() => setAddingId((current) => current === itemDeal.id ? null : current), 1200);
   };
 
-  if (!valid) return <main className="min-h-screen bg-neutral-50 px-4 py-10 pb-28"><div className="mx-auto max-w-2xl rounded-[30px] bg-white p-10 text-center shadow-sm"><Tag className="mx-auto h-10 w-10 text-black/20" /><h1 className="mt-4 text-2xl font-black">Deal day not found</h1><Link href="/deals" className="mt-5 inline-flex rounded-full bg-[#14140F] px-5 py-3 text-xs font-black text-white">Back to Deals</Link></div></main>;
-  if (loading) return <main className="min-h-screen bg-neutral-50 px-4 py-5 pb-28"><div className="mx-auto max-w-6xl"><div className="h-10 w-28 animate-pulse rounded-full bg-white" /><div className="mt-5 h-16 animate-pulse rounded-[24px] bg-white" /><div className="mt-5 grid gap-4 lg:grid-cols-[1.05fr_.95fr]"><div className="aspect-square animate-pulse rounded-[30px] bg-white" /><div className="min-h-[420px] animate-pulse rounded-[30px] bg-white" /></div></div></main>;
+  if (!valid) return <main className="min-h-screen bg-neutral-50 px-4 py-10 pb-28"><div className="mx-auto max-w-2xl rounded-[30px] bg-white p-10 text-center shadow-sm"><Tag className="mx-auto h-10 w-10 text-black/20" /><h1 className="mt-4 text-2xl font-black">Deal day not found</h1><BackHomeLink className="mt-5 inline-flex rounded-full bg-[#14140F] px-5 py-3 text-xs font-black text-white">Back to Home</BackHomeLink></div></main>;
+  if (loading) return <main className="min-h-screen bg-neutral-50 px-4 py-5 pb-28"><div className="mx-auto max-w-6xl"><BackHomeLink className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2.5 text-[10px] font-black shadow-sm"><ArrowLeft size={14} /> Back to Home</BackHomeLink><div className="mt-5 h-16 animate-pulse rounded-[24px] bg-white" /><div className="mt-5 grid gap-4 lg:grid-cols-[1.05fr_.95fr]"><div className="aspect-square animate-pulse rounded-[30px] bg-white" /><div className="min-h-[420px] animate-pulse rounded-[30px] bg-white" /></div></div></main>;
 
   return <main className={`min-h-screen pb-28 ${live ? 'deal-festival-page' : 'bg-neutral-50'}`}>
     <div className="mx-auto max-w-6xl px-4 py-5 md:px-6 md:py-7">
-      <div className="flex flex-wrap items-center gap-3"><Link href="/deals" className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2.5 text-[10px] font-black shadow-sm"><ArrowLeft size={14} /> Back to Deals</Link><span className="text-[9px] font-black uppercase tracking-[0.22em] text-black/35">Weekly Deal • {label}</span></div>
+      <div className="flex flex-wrap items-center gap-3"><BackHomeLink className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2.5 text-[10px] font-black shadow-sm"><ArrowLeft size={14} /> Back to Home</BackHomeLink><span className="text-[9px] font-black uppercase tracking-[0.22em] text-black/35">Weekly Deal • {label}</span></div>
 
       <header className="mt-5 rounded-[28px] bg-white p-5 shadow-sm md:p-7"><p className="text-[9px] font-black uppercase tracking-[0.25em] text-[#E1352B]">{label} Deal</p><h1 className="mt-1 text-3xl font-black tracking-tight md:text-5xl">{title}</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-black/50">{live ? 'Today’s special offer is live in Pakistan time.' : `This offer is scheduled for ${label}. The special price unlocks on ${label}.`}</p></header>
 

@@ -47,7 +47,11 @@ test('product open adds one history step and back restores the same page', async
       globalThis.window.pageYOffset = top;
     },
     requestAnimationFrame(callback) { callback(); },
-    setTimeout(callback) { callback(); return 0; },
+    setTimeout(callback, delay) {
+      if (!delay || delay < 100) callback();
+      return 0;
+    },
+    clearTimeout() {},
   };
   globalThis.document = { body };
 
@@ -80,4 +84,39 @@ test('product open adds one history step and back restores the same page', async
   assert.equal(entries[index].url, '/shop?q=bangles');
   assert.equal(window.scrollY, 640);
   assert.equal(entries.length, 2);
+});
+
+test('a weekly deal page asks to go home in one step', async () => {
+  globalThis.window = {
+    scrollY: 20,
+    pageYOffset: 20,
+    history: {
+      scrollRestoration: 'auto',
+      state: { __NA: true },
+      pushState() {},
+      replaceState() {},
+      back() {},
+    },
+    location: {
+      pathname: '/deals/friday',
+      search: '',
+      hash: '',
+      origin: 'https://primehubmall.com',
+    },
+    addEventListener() {},
+    dispatchEvent() { return true; },
+    scrollTo() {},
+    requestAnimationFrame(callback) { callback(); },
+    setTimeout() { return 0; },
+    clearTimeout() {},
+    sessionStorage: {
+      getItem() { return null; },
+      setItem() {},
+      removeItem() {},
+    },
+  };
+
+  const overlay = await import('../lib/productOverlay.ts');
+  assert.equal(overlay.isProductOverlayOpen(), false);
+  assert.equal(overlay.requestStorefrontHome(), 'router-home');
 });

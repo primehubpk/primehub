@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import BackHomeLink from '@/components/BackHomeLink';
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, CalendarDays, ShoppingCart, Sparkles, LockKeyhole } from 'lucide-react';
 import { useCartStore } from '@/lib/cartStore';
@@ -113,13 +114,13 @@ export default function WeeklyDealsPage() {
   };
 
   if (loading) {
-    return <main className="min-h-screen bg-neutral-50 pb-28"><div className="mx-auto max-w-6xl px-4 py-8"><div className="h-10 w-28 animate-pulse rounded-full bg-white" /><div className="mt-6 h-32 animate-pulse rounded-[30px] bg-black/5" /><div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">{Array.from({ length: 7 }).map((_, i) => <div key={i} className="h-[390px] animate-pulse rounded-[28px] bg-white" />)}</div></div></main>;
+    return <main className="min-h-screen bg-neutral-50 pb-28"><div className="mx-auto max-w-6xl px-4 py-8"><BackHomeLink className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2.5 text-[10px] font-black shadow-sm"><ArrowLeft size={14} /> Back to Home</BackHomeLink><div className="mt-6 h-32 animate-pulse rounded-[30px] bg-black/5" /><div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">{Array.from({ length: 7 }).map((_, i) => <div key={i} className="h-[390px] animate-pulse rounded-[28px] bg-white" />)}</div></div></main>;
   }
 
   return (
     <main className="min-h-screen bg-neutral-50 pb-28">
       <div className="mx-auto max-w-6xl px-4 py-6 md:px-6 md:py-8">
-        <Link href="/" className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2.5 text-[10px] font-black shadow-sm"><ArrowLeft size={14} /> Back to Home</Link>
+        <BackHomeLink className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2.5 text-[10px] font-black shadow-sm"><ArrowLeft size={14} /> Back to Home</BackHomeLink>
         <header className="mt-5 overflow-hidden rounded-[30px] bg-white p-6 shadow-sm md:p-8">
           <div className="flex items-center gap-2 text-[#0F6A5F]"><CalendarDays size={18} /><span className="text-[9px] font-black uppercase tracking-[0.24em]">PrimeHub Weekly Deals</span></div>
           <h1 className="mt-2 text-3xl font-black tracking-tight md:text-5xl">7 Days. 7 Deals. Every Week.</h1>

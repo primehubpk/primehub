@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
+import BackHomeLink from '@/components/BackHomeLink';
 import HomeCollections from '@/components/home/HomeCollections';
 import ProductNavigationSeed from '@/components/ProductNavigationSeed';
 import { SettingsProvider } from '@/lib/useSettings';
@@ -40,13 +40,9 @@ export default async function SaleMelaPage() {
         <ProductNavigationSeed products={catalog.products} />
         <main className="home-content pb-20 pt-4">
           <div className="flex items-center justify-between gap-3">
-            <Link
-              href="/"
-              prefetch={true}
-              className="inline-flex items-center rounded-full border border-black/10 bg-white px-4 py-2 text-xs font-black shadow-sm"
-            >
+            <BackHomeLink className="inline-flex items-center rounded-full border border-black/10 bg-white px-4 py-2 text-xs font-black shadow-sm">
               ← Home
-            </Link>
+            </BackHomeLink>
             <p className="text-[10px] font-black uppercase tracking-[0.16em] text-black/40">
               PrimeHubMall · Sale Mela
             </p>
