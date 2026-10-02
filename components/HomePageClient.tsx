@@ -8,10 +8,7 @@ import HomeCollections from "@/components/home/HomeCollections";
 import HomeCategoryDeals from "@/components/home/HomeCategoryDeals";
 import BigDealNextPreviewSync from "@/components/home/BigDealNextPreviewSync";
 import HomeResellerClubFull from "@/components/home/HomeResellerClubFull";
-import {
-  HomePrimeSkills,
-  HomeWholesaleVideos,
-} from "@/components/home/HomeCommerceRails";
+import { HomeWholesaleVideos } from "@/components/home/HomeCommerceRails";
 import "./home/home.css";
 import "./home/WeeklyDealsHomeFix.css";
 import "./home/HomeFeatureRails.css";
@@ -21,6 +18,10 @@ import CategorySwiper from "@/components/CategorySwiper";
 import NewArrivalsRail from "@/components/NewArrivalsRail";
 import YouTubeGuide from "@/components/YouTubeGuide";
 import HomeGuideVideo from "@/components/home/HomeGuideVideo";
+import SkillsShowcase, {
+  type PageSettings as PrimeSkillsPageSettings,
+  type SkillItem,
+} from "@/components/SkillsShowcase";
 import Footer from "@/components/Footer";
 import {
   cacheCatalogForNavigation,
@@ -42,6 +43,8 @@ type Props = {
   initialCategories: Category[];
   initialSettings: Partial<SiteSettings>;
   initialWeekday: Weekday;
+  initialSkills: SkillItem[];
+  initialSkillsPage: Partial<PrimeSkillsPageSettings> | null;
 };
 
 const RECOVERY_DELAYS_MS = [0];
@@ -52,6 +55,8 @@ export default function HomePageClient({
   initialCategories,
   initialSettings,
   initialWeekday,
+  initialSkills,
+  initialSkillsPage,
 }: Props) {
   const router = useRouter();
   const [selectedMaxPrice, setSelectedMaxPrice] = useState<number | null>(null);
@@ -253,7 +258,6 @@ export default function HomePageClient({
           />
           <HomeResellerClubFull initialProducts={products} />
           <HomeWholesaleVideos />
-          <HomePrimeSkills />
           <HomeCategoryDeals products={products} categories={categories} />
           <div id="discover-deals-section">
             {(selectedMaxPrice !== null || wholesaleSelected) && (
@@ -318,6 +322,11 @@ export default function HomePageClient({
               />
             )}
           </div>
+          <SkillsShowcase
+            embedded
+            initialItems={initialSkills}
+            initialPage={initialSkillsPage}
+          />
         </main>
         <YouTubeGuide />
         <Footer onWholesaleSelect={selectWholesale} />
