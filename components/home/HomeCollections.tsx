@@ -364,9 +364,11 @@ const standaloneGridStyle = {
 export default function HomeCollections({
   products,
   standalone = false,
+  embeddedHome = false,
 }: {
   products: Product[];
   standalone?: boolean;
+  embeddedHome?: boolean;
   onSelect?: (amount: number | null) => void;
   onWholesaleSelect?: () => void;
 }) {
@@ -486,7 +488,18 @@ export default function HomeCollections({
             );
 
             return (
-              <HomeRailFrame key={bucket.id} title={wholesale ? 'Wholesale' : `Sale Mela · ${saleMelaBucketLabel(amount)}`} href={href} icon={wholesale ? <Package size={27} /> : <b className="text-lg">{amount}</b>} className={standalone ? 'home-sale-standalone-frame' : `home-sale-home-frame${wholesale ? ' home-sale-wholesale-frame' : ''}`}>
+              <HomeRailFrame
+                key={bucket.id}
+                title={wholesale ? 'Wholesale' : `Sale Mela · ${saleMelaBucketLabel(amount)}`}
+                href={href}
+                icon={wholesale ? <Package size={27} /> : <b className="text-lg">{amount}</b>}
+                className={
+                  standalone
+                    ? `home-sale-standalone-frame${embeddedHome && !wholesale ? ' home-sale-embedded-retail-frame' : ''}`
+                    : `home-sale-home-frame${wholesale ? ' home-sale-wholesale-frame' : ''}`
+                }
+                hideHeader={standalone && embeddedHome && !wholesale}
+              >
               <div
                 id={anchor}
                 className={`home-sale-row scroll-mt-24 ${wholesale ? "home-sale-wholesale" : ""}`}
