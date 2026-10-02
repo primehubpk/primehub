@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type MouseEvent } from "react";
 import Header from "@/components/home/HomeHeader";
 import HomeCollections from "@/components/home/HomeCollections";
@@ -61,7 +60,6 @@ export default function HomePageClient({
   initialSkills,
   initialSkillsPage,
 }: Props) {
-  const router = useRouter();
   const [selectedMaxPrice, setSelectedMaxPrice] = useState<number | null>(null);
   const [wholesaleSelected, setWholesaleSelected] = useState(false);
   const [products, setProducts] = useState<Product[]>(initialProducts);
@@ -212,14 +210,6 @@ export default function HomePageClient({
     const selectedProduct = products.find((product) => product.id === productId);
     if (selectedProduct) cacheProductForNavigation(selectedProduct);
 
-    if (anchor.closest(".home-big-deal")) {
-      url.searchParams.set("deal", "big");
-    }
-
-    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-
-    event.preventDefault();
-    router.push(`${url.pathname}${url.search}${url.hash}`);
   };
 
   const selectPrice = (amount: number | null) => {
@@ -234,7 +224,11 @@ export default function HomePageClient({
 
   return (
     <SettingsProvider initialSettings={initialSettings}>
-      <div className="home-storefront" onClickCapture={handleStorefrontClickCapture}>
+      <div
+        className="home-storefront"
+        onPointerDownCapture={handleStorefrontClickCapture}
+        onClickCapture={handleStorefrontClickCapture}
+      >
         <Header categories={categories} />
         <main className="home-content">
           <h1 className="sr-only">

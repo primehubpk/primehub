@@ -5,6 +5,7 @@ import { useSettings } from '@/lib/useSettings';
 import { WEEKDAY_LABELS, WEEKDAY_ORDER, countdownParts, dealTiming } from '@/lib/weeklyDealUtils';
 import { bigDealConfiguredSlotCount, bigDealRotationIndex } from '@/lib/bigDealRotation';
 import { cacheProductForNavigation, loadProductsForNavigation, readCachedProduct } from '@/lib/productNavigationCache';
+import { navigateFromProductOverlay } from '@/lib/productOverlay';
 import { normalizeImageUrl } from '@/lib/imageUrl';
 import { rememberProduct } from '@/lib/recentlyViewedHistory';
 import { makeTikTokContent, trackTikTokEvent } from '@/lib/tiktokPixel';
@@ -65,16 +66,25 @@ function stableUrgencyProgress(product: Product | null, stock: number) {
   return 38 + (hash % 53);
 }
 
-export function useProductDetail(): ProductDetailModel {
+function seedProduct(id: string, initialProduct?: Product | null) {
+  if (initialProduct && String(initialProduct.id || '') === id) return initialProduct;
+  return readCachedProduct<Product>(id);
+}
+
+export function useProductDetail(options?: {
+  initialProduct?: Product | null;
+  productId?: string;
+  bigDeal?: boolean;
+}): ProductDetailModel {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const id = String(params?.id || '');
+  const id = String(options?.productId || params?.id || '');
   const { settings } = useSettings();
   const addItem = useCartStore((state) => state.addItem);
-  const bigDealRequested = searchParams.get('deal') === 'big';
+  const bigDealRequested = options?.bigDeal ?? searchParams.get('deal') === 'big';
 
-  const cachedAtStart = readCachedProduct<Product>(id);
+  const cachedAtStart = seedProduct(id, options?.initialProduct);
   const [product, setProduct] = useState<Product | null>(cachedAtStart);
   const [weeklyProducts, setWeeklyProducts] = useState<Record<string, Product>>(
     cachedAtStart ? { [id]: cachedAtStart } : {},
@@ -129,26 +139,22 @@ export function useProductDetail(): ProductDetailModel {
 
     if (!id) return () => { cancelled = true; };
 
-    const cached = readCachedProduct<Product>(id);
+    // A product already on screen (catalog card or server snapshot) is enough to
+    // paint the detail view. Another no-store read here would hit Supabase on
+    // every open, including when the shopper simply comes back.
+    const cached = seedProduct(id, options?.initialProduct);
     if (cached) {
-      setProduct((current) => (current?.id === cached.id ? current : cached));
-      setWeeklyProducts((current) => (current[id] === cached ? current : { [id]: cached }));
-      setLoading(false);
-      setFailed(false);
+      cacheProductForNavigation(cached);
       rememberProduct(id);
-      void loadFreshProduct();
-    } else {
-      setProduct(null);
-      setWeeklyProducts({});
-      setLoading(true);
-      setFailed(false);
-      void loadFreshProduct();
+      return () => { cancelled = true; };
     }
+
+    void loadFreshProduct();
 
     return () => {
       cancelled = true;
     };
-  }, [id]);
+  }, [id, options?.initialProduct]);
 
   const regularPrice = product ? regularPriceOf(product) : 0;
   const productOriginal = product ? originalPriceOf(product) : 0;
@@ -349,7 +355,7 @@ export function useProductDetail(): ProductDetailModel {
     }
     if (!product || currentPrice <= 0 || stock === 0) return;
     addResolved(undefined, quantity);
-    router.push('/checkout');
+    if (!navigateFromProductOverlay('/checkout')) router.push('/checkout');
   };
 
   const openVariantSelector = (mode: 'cart' | 'buy') => {
@@ -368,7 +374,7 @@ export function useProductDetail(): ProductDetailModel {
     setVariantSelection(selection);
     setVariantModalOpen(false);
     addResolved(selection, qty);
-    if (variantMode === 'buy') router.push('/checkout');
+    if (variantMode === 'buy' && !navigateFromProductOverlay('/checkout')) router.push('/checkout');
   };
 
   const buyWhatsApp = () => {

@@ -2,8 +2,8 @@ import ProductDetailPageClient from '@/components/product-detail/ProductDetailPa
 import type { Product } from '@/components/product-detail/ProductDetailTypes';
 import { getPublicProductSnapshot } from '@/lib/publicCatalogServer';
 
-// Client refreshes this product on mount; admin writes invalidate the tagged
-// server cache. Keep the CDN page warm longer to reduce per-product ISR writes.
+// Direct visits use this cached server snapshot. In-app opens paint from the
+// catalog already on screen and do not request the product again.
 export const revalidate = 600;
 
 export default async function ProductDetailPage(

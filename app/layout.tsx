@@ -7,6 +7,7 @@ import '@fontsource/space-mono/latin-400.css';
 import '@fontsource/space-mono/latin-700.css';
 import BottomNav from '@/components/BottomNav';
 import GlobalFooter from '@/components/GlobalFooter';
+import ProductOverlayHost from '@/components/ProductOverlayHost';
 import CartMiniBar from '@/components/CartMiniBar';
 import PWARegister from '@/components/PWARegister';
 import VisitorTracker from '@/components/VisitorTracker';
@@ -147,6 +148,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <BottomNav />
         <SettingsProvider>
           {children}
+          <ProductOverlayHost />
           <GlobalFooter />
           <GlobalVariantSelector />
           <CartMiniBar />

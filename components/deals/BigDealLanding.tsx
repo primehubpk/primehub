@@ -82,7 +82,7 @@ export default function BigDealLanding({ deal, products }: { deal?: BigDeal; pro
           <p className="mt-5 text-3xl font-black text-[#E1352B]">Rs. {active.price.toLocaleString('en-PK')}</p>
           {active.regular > active.price && <s className="mt-1 text-sm text-black/40">Rs. {active.regular.toLocaleString('en-PK')}</s>}
           <button type="button" onClick={() => void addActive()} disabled={!live || adding || !active.productId || active.price <= 0} className="mt-6 inline-flex items-center justify-center gap-2 rounded-xl bg-[#0F6A5F] px-5 py-3 text-sm font-bold text-white disabled:opacity-50"><ShoppingCart size={16}/>{adding ? 'Adding…' : live ? 'Add Big Deal to cart' : 'Deal unavailable'}</button>
-          {live && active.productId && <Link href={`/product/${encodeURIComponent(active.productId)}?deal=big`} className="mt-3 text-center text-xs font-bold text-[#0F6A5F]">View details and variants →</Link>}
+          {live && active.productId && <Link href={`/product/${encodeURIComponent(active.productId)}?deal=big`} prefetch={false} className="mt-3 text-center text-xs font-bold text-[#0F6A5F]">View details and variants →</Link>}
         </div>
       </article>
       {locked.length > 0 && <section className="mt-8" aria-label="Upcoming locked Big Deals">
