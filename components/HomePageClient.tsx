@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type MouseEvent } from "react";
 import Header from "@/components/home/HomeHeader";
 import HomeCollections from "@/components/home/HomeCollections";
-import HomeCategoryDeals from "@/components/home/HomeCategoryDeals";
+import HomeCategoryDealsLazy from "@/components/home/HomeCategoryDealsLazy";
 import BigDealNextPreviewSync from "@/components/home/BigDealNextPreviewSync";
 import {
   HomePrimeSkills,
@@ -25,6 +25,7 @@ import SkillsShowcase, {
   type SkillItem,
 } from "@/components/SkillsShowcase";
 import HomePrimeFamilyLazy from "@/components/home/HomePrimeFamilyLazy";
+import HomeDiscoverDealsLazy from "@/components/home/HomeDiscoverDealsLazy";
 import Footer from "@/components/Footer";
 import {
   cacheCatalogForNavigation,
@@ -100,7 +101,15 @@ export default function HomePageClient({
     );
     const frame = window.requestAnimationFrame(reset);
     const root = document.querySelector(".home-content");
-    const observer = root ? new MutationObserver(reset) : null;
+    let mutationFrame: number | null = null;
+    const scheduleReset = () => {
+      if (interacted || mutationFrame !== null) return;
+      mutationFrame = window.requestAnimationFrame(() => {
+        mutationFrame = null;
+        reset();
+      });
+    };
+    const observer = root ? new MutationObserver(scheduleReset) : null;
     observer?.observe(root as Node, { childList: true, subtree: true });
     const stopObserver = window.setTimeout(() => observer?.disconnect(), 1200);
 
@@ -108,6 +117,7 @@ export default function HomePageClient({
       timers.forEach((timer) => window.clearTimeout(timer));
       window.clearTimeout(stopObserver);
       window.cancelAnimationFrame(frame);
+      if (mutationFrame !== null) window.cancelAnimationFrame(mutationFrame);
       observer?.disconnect();
       window.removeEventListener("pointerdown", markInteracted);
       window.removeEventListener("touchstart", markInteracted);
@@ -261,7 +271,7 @@ export default function HomePageClient({
           />
           <HomeWholesaleVideos />
           <HomePrimeSkills initialItems={initialSkills} />
-          <HomeCategoryDeals products={products} categories={categories} />
+          <HomeCategoryDealsLazy products={products} categories={categories} />
           <div id="discover-deals-section">
             {(selectedMaxPrice !== null || wholesaleSelected) && (
               <div className="home-filter-status">
@@ -318,11 +328,7 @@ export default function HomePageClient({
                 </div>
               </section>
             ) : (
-              <HomeCollections
-                products={products}
-                standalone
-                embeddedHome
-              />
+              <HomeDiscoverDealsLazy products={products} />
             )}
           </div>
           <SkillsShowcase
