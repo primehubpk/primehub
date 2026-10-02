@@ -17,6 +17,7 @@ import AdminQuickAccess from '@/components/AdminQuickAccess';
 import SalarViewportShell from '@/components/salar/SalarViewportShell';
 import { SettingsProvider } from '@/lib/useSettings';
 import { TIKTOK_PIXEL_ID } from '@/lib/tiktokConfig';
+import { storefrontImageRecoveryScript } from '@/lib/storefrontImageRecovery';
 import './globals.css';
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL;
@@ -124,6 +125,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <head>
+        <script dangerouslySetInnerHTML={{ __html: storefrontImageRecoveryScript }} />
         <script
           dangerouslySetInnerHTML={{
             __html: `document.addEventListener('click',function(event){if(event.button!==0||event.metaKey||event.ctrlKey||event.shiftKey||event.altKey||event.defaultPrevented)return;var node=event.target;if(!node||!node.closest)return;var anchor=node.closest('a[href]');if(!anchor||anchor.target&&anchor.target!=='_self'||anchor.hasAttribute('download'))return;var url;try{url=new URL(anchor.href,location.href)}catch(e){return}if(url.origin!==location.origin||url.pathname.indexOf('/product/')!==0)return;event.preventDefault();event.stopImmediatePropagation();var href=url.pathname+url.search;if(location.pathname.indexOf('/product/')!==0){try{sessionStorage.setItem('ph-return-path',location.pathname+location.search+location.hash)}catch(e){}}if(anchor.closest('.home-big-deal')&&href.indexOf('deal=big')<0)href+=(href.indexOf('?')<0?'?':'&')+'deal=big';if(typeof window.__phOpenProduct==='function'){window.__phOpenProduct(href);return}window.__phPendingProduct=href},true);`,
