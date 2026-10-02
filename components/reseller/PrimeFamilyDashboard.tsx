@@ -1,0 +1,651 @@
+'use client';
+
+import Link from 'next/link';
+import { Outfit } from 'next/font/google';
+import { useEffect, useMemo, useState, type ElementType } from 'react';
+import { onAuthStateChanged, type User } from 'firebase/auth';
+import { doc, onSnapshot } from 'firebase/firestore';
+import {
+  ArrowLeft,
+  Bell,
+  Check,
+  ChevronRight,
+  History,
+  Instagram,
+  Lock,
+  Music2,
+  Package,
+  PlayCircle,
+  Share2,
+  ShoppingBag,
+  Users,
+  X,
+} from 'lucide-react';
+import { auth, db } from '@/lib/firebase';
+import {
+  DEFAULT_MONTHLY_CHALLENGE,
+  DEFAULT_RESELLER_TASKS,
+  DEFAULT_RESELLER_WHEEL,
+  type MonthlyChallengeSettings,
+  type ResellerTask,
+  type ResellerWheelSettings,
+} from '@/lib/resellerTasks';
+import { getResellerTiers } from '@/lib/resellerTiers';
+import type { ResellerProfile, ResellerTier } from '@/lib/resellerTypes';
+import PremiumSpinWheel from '@/components/rewards/PremiumSpinWheel';
+import { orderPremiumWheelPrizes, rewardWheelPrizeLabel } from '@/components/rewards/RewardWheelArtwork';
+
+const outfit = Outfit({ subsets: ['latin'] });
+const GUEST_ID_KEY = 'primehub_reseller_guest_id_v1';
+
+type View = 'home' | 'tiers' | 'tasks' | 'vouchers' | 'rewards' | 'wallet' | 'gifts';
+type VoucherType = 'cash' | 'gift' | 'discount' | 'brand';
+type VoucherFilter = 'all' | VoucherType;
+type SettingsSnapshot = {
+  resellerTasks?: ResellerTask[];
+  resellerMonthlyChallenge?: Partial<MonthlyChallengeSettings>;
+  resellerWheel?: Partial<ResellerWheelSettings>;
+  resellerVoucherImages?: Record<string, string>;
+  resellerTiers?: ResellerTier[];
+};
+type RewardPrize = { id: string; name: string; type: string; points?: number; probability?: number; active?: boolean; stock?: number; productId?: string; voucherCode?: string; voucherAmount?: number; imageUrl?: string };
+type RewardWallet = { points: number; streak: number; lastCheckIn?: string; lastSpin?: string; coupons?: string[]; freeDeliveryCredits?: number; history?: unknown[] };
+type RewardSettings = { checkInRewards?: number[]; spinWheelSlots?: RewardPrize[]; guestMode?: boolean };
+type RewardGift = { id: string; productId: string; pointsCost: number; active?: boolean; stock?: number; imageUrl?: string; title?: string; };
+type RewardProduct = { id: string; title?: string; name?: string; imageUrl?: string; image?: string; images?: string[] | { url?: string }[]; };
+
+type Voucher = {
+  id: string;
+  type: VoucherType;
+  title: string;
+  description: string;
+  requirement: string;
+  icon: string;
+  art: string;
+  minOrders: number;
+  value?: number;
+  imageUrl?: string;
+};
+
+function premiumVoucherImage(title: string, art: string, icon: string) {
+  const safeTitle = title.replace(/[<>&]/g, '');
+  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='640' height='360' viewBox='0 0 640 360'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop stop-color='${art}'/><stop offset='1' stop-color='#14140F'/></linearGradient><filter id='b'><feGaussianBlur stdDeviation='22'/></filter></defs><rect width='640' height='360' rx='36' fill='url(#g)'/><circle cx='540' cy='60' r='110' fill='white' opacity='.12'/><circle cx='90' cy='320' r='130' fill='#FFB020' opacity='.18' filter='url(#b)'/><text x='52' y='142' font-size='78' font-family='Arial'>${icon}</text><text x='52' y='230' fill='white' font-size='34' font-weight='800' font-family='Arial'>${safeTitle}</text><text x='52' y='276' fill='white' opacity='.72' font-size='18' font-family='Arial' letter-spacing='4'>PRIMEHUB PREMIUM REWARD</text></svg>`;
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+}
+const taskIcons: Record<string, ElementType> = {
+  youtube: PlayCircle,
+  instagram: Instagram,
+  tiktok: Music2,
+  whatsapp: Share2,
+  refer: Users,
+  order: ShoppingBag,
+  wholesale: Package,
+};
+function currentGuestId() {
+  try { return String(window.localStorage.getItem(GUEST_ID_KEY) || ''); } catch { return ''; }
+}
+
+export default function PrimeFamilyDashboard({ embedded = false }: { embedded?: boolean }) {
+  const [memberUser, setMemberUser] = useState<User | null>(() => auth.currentUser);
+  const [profile, setProfile] = useState<ResellerProfile | null>(null);
+  const [tasks, setTasks] = useState<ResellerTask[]>(DEFAULT_RESELLER_TASKS);
+  const [challenge, setChallenge] = useState<MonthlyChallengeSettings>(DEFAULT_MONTHLY_CHALLENGE);
+  const [wheel, setWheel] = useState<ResellerWheelSettings>(DEFAULT_RESELLER_WHEEL);
+  const [view, setView] = useState<View>('home');
+  const [filter, setFilter] = useState<VoucherFilter>('all');
+  const [selectedVoucher, setSelectedVoucher] = useState<Voucher | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [rewardWallet, setRewardWallet] = useState<RewardWallet>({ points: 0, streak: 0 });
+  const [rewardSettings, setRewardSettings] = useState<RewardSettings>({ checkInRewards: [10, 15, 20, 25, 30, 50, 100], spinWheelSlots: [] });
+  const [rewardGifts, setRewardGifts] = useState<RewardGift[]>([]);
+  const [rewardProducts, setRewardProducts] = useState<Record<string, RewardProduct>>({});
+  const [rewardBusy, setRewardBusy] = useState(false);
+  const [rewardMessage, setRewardMessage] = useState('');
+  const [voucherImages, setVoucherImages] = useState<Record<string, string>>({});
+  const [resellerTiers, setResellerTiers] = useState<ResellerTier[]>(getResellerTiers());
+
+  useEffect(() => {
+    let stopProfile: (() => void) | undefined;
+    const stopAuth = onAuthStateChanged(auth, user => {
+      stopProfile?.();
+      setMemberUser(user);
+
+      if (!user) {
+        setProfile(null);
+        setRewardWallet({ points: 0, streak: 0 });
+        setLoading(false);
+        return;
+      }
+
+      setLoading(true);
+      stopProfile = onSnapshot(
+        doc(db, 'reseller_profiles', user.uid),
+        snapshot => {
+          setProfile(snapshot.exists() ? snapshot.data() as ResellerProfile : null);
+          setLoading(false);
+        },
+        () => setLoading(false),
+      );
+
+      void (async () => {
+        try {
+          const token = await user.getIdToken();
+          const guestId = currentGuestId();
+          const response = await fetch(`/api/reseller/reward-action?guestId=${encodeURIComponent(guestId)}`, { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' });
+          const data = await response.json();
+          if (!response.ok) throw new Error(data.error || 'Reward state unavailable.');
+          setRewardWallet({ points: 0, streak: 0, ...(data.wallet || {}) });
+          setRewardSettings({ checkInRewards: [10, 15, 20, 25, 30, 50, 100], spinWheelSlots: [], ...(data.settings || {}) });
+        } catch (error) {
+          console.warn('Shared reseller reward state unavailable', error);
+        }
+      })();
+    });
+
+    return () => {
+      stopAuth();
+      stopProfile?.();
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([
+      fetch('/api/storefront/read?type=settings', { cache: 'no-store' }),
+      fetch('/api/storefront/read?type=rewards', { cache: 'no-store' }),
+    ])
+      .then(async ([settingsResponse, rewardsResponse]) => {
+        const settingsData = settingsResponse.ok ? await settingsResponse.json() : null;
+        const rewardsData = rewardsResponse.ok ? await rewardsResponse.json() : null;
+        if (cancelled) return;
+
+        const data = settingsData?.documents?.main as SettingsSnapshot | undefined;
+        if (Array.isArray(data?.resellerTasks)) setTasks(data.resellerTasks);
+        if (data?.resellerMonthlyChallenge) {
+          setChallenge({ ...DEFAULT_MONTHLY_CHALLENGE, ...data.resellerMonthlyChallenge });
+        }
+        if (data?.resellerWheel) setWheel({ ...DEFAULT_RESELLER_WHEEL, ...data.resellerWheel });
+        setVoucherImages(data?.resellerVoucherImages || {});
+        if (Array.isArray(data?.resellerTiers) && data.resellerTiers.length === 4) setResellerTiers(data.resellerTiers);
+
+        const gifts = (Array.isArray(rewardsData?.gifts) ? rewardsData.gifts : [])
+          .filter((gift: RewardGift) => gift.active !== false);
+        setRewardGifts(gifts);
+      })
+      .catch(() => undefined);
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    const productIds = Array.from(
+      new Set(rewardGifts.map(gift => String(gift.productId || '').trim()).filter(Boolean)),
+    ).slice(0, 24);
+
+    if (!productIds.length) {
+      setRewardProducts({});
+      return;
+    }
+
+    const controller = new AbortController();
+    void (async () => {
+      try {
+        const response = await fetch(
+          `/api/storefront/read?type=products&ids=${encodeURIComponent(JSON.stringify(productIds))}`,
+          { cache: 'no-store', signal: controller.signal },
+        );
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Reward products unavailable.');
+        const next: Record<string, RewardProduct> = {};
+        (Array.isArray(data.products) ? data.products : []).forEach((product: RewardProduct) => {
+          if (product?.id) next[String(product.id)] = product;
+        });
+        setRewardProducts(next);
+      } catch (error) {
+        if ((error as Error)?.name !== 'AbortError') {
+          console.warn('Reward product details unavailable', error);
+        }
+      }
+    })();
+
+    return () => controller.abort();
+  }, [rewardGifts]);
+
+  async function checkInReward() {
+    const user = auth.currentUser;
+    if (!user || rewardBusy || rewardWallet.lastCheckIn === rewardDayKey()) return;
+    setRewardBusy(true); setRewardMessage('');
+    try {
+      const token = await user.getIdToken();
+      const response = await fetch('/api/reseller/reward-action', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ action: 'checkin', guestId: currentGuestId() }) });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Check-in failed.');
+      setRewardWallet({ points: 0, streak: 0, ...(data.wallet || {}) });
+      const streak = Number(data.wallet?.streak || 0);
+      const points = Number(rewardSettings.checkInRewards?.[Math.max(0, streak - 1)] || 0);
+      setRewardMessage(`Day ${streak} complete — +${points} points added.`);
+    } catch (error) { setRewardMessage(error instanceof Error ? error.message : 'Check-in failed.'); }
+    finally { setRewardBusy(false); }
+  }
+
+  const activeTasks = useMemo(() => tasks.filter(task => task.active !== false), [tasks]);
+  const monthlyOrders = Number(profile?.monthlyOrders ?? 0);
+  const walletAvailable = Number(profile?.walletAvailable ?? 0);
+  const walletPending = Number(profile?.walletPending ?? 0);
+  const sortedTiers = [...resellerTiers].sort((a,b) => a.minMonthlyOrders - b.minMonthlyOrders);
+  const tier = [...sortedTiers].reverse().find(item => monthlyOrders >= item.minMonthlyOrders) || sortedTiers[0];
+  const tierIndex = Math.max(0, sortedTiers.findIndex(item => item.id === tier.id));
+  const nextTier = sortedTiers[tierIndex + 1] || null;
+  const tierProgress = nextTier ? Math.min(100, Math.round(((monthlyOrders-tier.minMonthlyOrders)/Math.max(1,nextTier.minMonthlyOrders-tier.minMonthlyOrders))*100)) : 100;
+  const target = Math.max(1, Number(challenge.targetOrders || DEFAULT_MONTHLY_CHALLENGE.targetOrders));
+  const challengePercent = Math.min(100, Math.round((monthlyOrders / target) * 100));
+  const remaining = Math.max(0, target - monthlyOrders);
+
+  const vouchers = useMemo<Voucher[]>(
+    () => [
+      {
+        id: 'cash-500',
+        imageUrl: voucherImages['cash-500'] || '',
+        type: 'cash',
+        title: 'Rs. 500 Cash',
+        description: 'Credit to wallet',
+        requirement: '5 orders',
+        icon: '₨',
+        art: '#0E7C6F',
+        minOrders: 5,
+        value: 500,
+      },
+      {
+        id: 'challenge-cash',
+        imageUrl: voucherImages['challenge-cash'] || '',
+        type: 'cash',
+        title: `Rs. ${Number(challenge.cashReward || 0).toLocaleString()} Cash`,
+        description: 'Monthly challenge',
+        requirement: `${target} orders`,
+        icon: '₨',
+        art: '#127C6A',
+        minOrders: target,
+        value: Number(challenge.cashReward || 0),
+      },
+      {
+        id: 'challenge-gift',
+        imageUrl: voucherImages['challenge-gift'] || '',
+        type: 'gift',
+        title: challenge.giftTitle || 'PrimeHub Gift Box',
+        description: 'Surprise bangles gift',
+        requirement: `${target} orders`,
+        icon: '🎁',
+        art: '#D94B3D',
+        minOrders: target,
+      },
+      {
+        id: 'bridal-gift',
+        imageUrl: voucherImages['bridal-gift'] || '',
+        type: 'gift',
+        title: 'Bridal Gift Voucher',
+        description: 'Free bridal pouch',
+        requirement: 'Gold tier',
+        icon: '💍',
+        art: '#9B2C4A',
+        minOrders: 25,
+      },
+      {
+        id: 'wholesale-off',
+        imageUrl: voucherImages['wholesale-off'] || '',
+        type: 'discount',
+        title: '10% Wholesale Off',
+        description: 'Next wholesale order',
+        requirement: '3 orders',
+        icon: '%',
+        art: '#E85D04',
+        minOrders: 3,
+      },
+      {
+        id: 'free-delivery',
+        imageUrl: voucherImages['free-delivery'] || '',
+        type: 'discount',
+        title: 'Free Delivery',
+        description: 'On any one order',
+        requirement: '2 orders',
+        icon: '📦',
+        art: '#1D4E89',
+        minOrders: 2,
+      },
+      {
+        id: 'jazzcash-300',
+        imageUrl: voucherImages['jazzcash-300'] || '',
+        type: 'brand',
+        title: 'JazzCash Rs. 300',
+        description: 'Payout voucher',
+        requirement: '8 orders',
+        icon: '📱',
+        art: '#C1121F',
+        minOrders: 8,
+        value: 300,
+      },
+      {
+        id: 'easypaisa-300',
+        imageUrl: voucherImages['easypaisa-300'] || '',
+        type: 'brand',
+        title: 'EasyPaisa Rs. 300',
+        description: 'Payout voucher',
+        requirement: '8 orders',
+        icon: '📱',
+        art: '#2A9D8F',
+        minOrders: 8,
+        value: 300,
+      },
+      {
+        id: 'kids-gift',
+        imageUrl: voucherImages['kids-gift'] || '',
+        type: 'gift',
+        title: 'Kids Deal Box Gift',
+        description: 'Kids gift voucher',
+        requirement: '6 orders',
+        icon: '🎀',
+        art: '#7B4B94',
+        minOrders: 6,
+      },
+      {
+        id: 'elite-cash',
+        imageUrl: voucherImages['elite-cash'] || '',
+        type: 'cash',
+        title: 'Rs. 2,000 Elite',
+        description: 'Elite members only',
+        requirement: 'Elite 40+',
+        icon: '👑',
+        art: '#C9A227',
+        minOrders: 40,
+        value: 2000,
+      },
+    ],
+    [challenge.cashReward, challenge.giftTitle, target, voucherImages],
+  );
+
+  const filteredVouchers = vouchers.filter(voucher => filter === 'all' || voucher.type === filter);
+  const nextTask = activeTasks[0];
+
+  if (loading) {
+    return (
+      <section className={`${outfit.className} flex ${embedded ? 'min-h-[220px]' : 'min-h-screen'} items-center justify-center bg-[#F6F1E8] text-sm font-bold text-black/45`}>
+        Loading Prime Family…
+      </section>
+    );
+  }
+
+  const Shell = embedded ? 'section' : 'main';
+
+  return (
+    <Shell className={`${outfit.className} ${embedded ? 'mt-4 bg-[#F6F1E8]' : 'min-h-screen bg-[#111]'} text-[#14140F]`}>
+      <div className={`relative mx-auto max-w-[1180px] overflow-hidden bg-[#F6F1E8] ${embedded ? 'min-h-0 shadow-none' : 'min-h-screen shadow-2xl lg:my-6 lg:min-h-[calc(100vh-3rem)] lg:rounded-[32px]'}`}>
+        <header className="relative bg-[linear-gradient(165deg,#16332E_0%,#0C1C19_70%)] px-4 pb-[22px] pt-3 text-white sm:px-6 lg:px-8 lg:pb-7 lg:pt-5">
+          <div id="club-home" className="flex items-center justify-between gap-3"><Link href="/" className="inline-flex items-center gap-1.5 text-xs font-semibold text-white/80"><ArrowLeft size={14} /> Prime Family</Link><div className="flex items-center gap-2">{memberUser ? <><Link href="/reseller/wallet" aria-label="Reward history" className="grid h-9 w-9 place-items-center rounded-full bg-white/10 text-white"><History size={16}/></Link><a href="#club-tasks" aria-label="Notifications" className="relative grid h-9 w-9 place-items-center rounded-full bg-white/10 text-white"><Bell size={16}/><span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-[#FF9A3C] ring-2 ring-[#16332E]"/></a></> : <Link href="/reseller/join" className="rounded-full bg-[#FFCF68] px-3 py-2 text-[10px] font-extrabold text-[#14140F]">Sign In / Join</Link>}</div></div>
+          <div className="mt-4 grid gap-3 sm:grid-cols-[1.3fr_.7fr]"><div className="flex min-w-0 items-center gap-3 rounded-2xl border border-white/10 bg-white/[.07] p-3"><div className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-[#FFCF68] text-lg font-extrabold text-[#14140F]">{(profile?.displayName||profile?.email||'P').charAt(0).toUpperCase()}</div><div className="min-w-0"><p className="text-[9px] font-extrabold uppercase tracking-[.2em] text-[#FFCF68]">{memberUser ? 'Profile' : 'Guest access'}</p><h1 className="truncate text-lg font-extrabold">{profile?.displayName||profile?.email||'Prime Family Guest'}</h1><p className="truncate text-[10px] text-white/55">{profile?.email || (memberUser ? 'Member account' : 'Browse tasks & rewards — sign in to claim')}</p></div></div><div className="grid grid-cols-2 gap-2"><div className="rounded-2xl border border-white/10 bg-white/[.07] p-3"><p className="text-[8px] font-extrabold uppercase tracking-wider text-white/45">Cash Wallet</p><p className="mt-1 text-base font-extrabold">Rs. {walletAvailable.toLocaleString()}</p></div><div className="rounded-2xl border border-white/10 bg-white/[.07] p-3"><p className="text-[8px] font-extrabold uppercase tracking-wider text-white/45">Points Wallet</p><p className="mt-1 text-base font-extrabold">{Number(rewardWallet.points||0).toLocaleString()}</p></div></div></div>
+        </header>
+
+        <nav className="sticky top-0 z-30 flex gap-1.5 overflow-x-auto border-b border-black/5 bg-[#F6F1E8]/95 px-4 py-3 backdrop-blur sm:px-6 lg:justify-center lg:px-8 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {(['home', 'rewards', 'tiers', 'tasks', 'vouchers', 'wallet', 'gifts'] as View[]).map(item => <button key={item} type="button" onClick={() => setView(item)} className={`shrink-0 rounded-full px-2.5 py-2 text-[10px] font-bold capitalize shadow-sm ${view === item ? 'bg-[#14140F] text-white' : 'bg-white text-[#6B6A62]'}`}>{item}</button>)}
+        </nav>
+
+        <section className={`space-y-4 px-4 pb-28 pt-3.5 sm:px-6 lg:px-8 ${view === 'home' ? 'lg:grid lg:grid-cols-2 lg:items-start lg:gap-5 lg:space-y-0' : 'lg:mx-auto lg:max-w-5xl'}`}>
+          {(view === 'home' || view === 'rewards') && <>
+          <section className="rounded-[18px] bg-[#FFFDF8] p-4 shadow-[0_8px_24px_rgba(20,20,15,.05)]">
+            <div className="flex items-end justify-between gap-3"><div><p className="text-[10px] font-extrabold uppercase tracking-[.14em] text-[#E85D04]">Weekly streak</p><h2 className="mt-1 text-xl font-extrabold">7-Day Check-in</h2><p className="mt-1 text-xs text-[#6B6A62]">Check in every day and unlock higher point rewards.</p></div><span className="rounded-full bg-[#FFF3E0] px-3 py-1.5 text-[10px] font-extrabold">{Math.min(7, Number(rewardWallet.streak || 0))}/7</span></div>
+            <div className="mt-4 grid grid-cols-7 gap-1.5">{Array.from({ length: 7 }, (_, index) => { const complete=index<Number(rewardWallet.streak||0); return <div key={index} className={`rounded-xl p-2 text-center ${complete?'bg-[#0E7C6F] text-white':'bg-[#F1ECE3] text-[#6B6A62]'}`}><p className="text-[8px] font-extrabold">D{index+1}</p><p className="mt-1 text-[9px] font-extrabold">+{Number(rewardSettings.checkInRewards?.[index]??0)}</p><p className="text-[7px] font-bold">PTS</p></div>; })}</div>
+            <button type="button" onClick={checkInReward} disabled={rewardBusy || rewardWallet.lastCheckIn===rewardDayKey()} className="mt-4 w-full rounded-xl bg-[#14140F] py-3.5 text-xs font-extrabold text-white disabled:opacity-45">{rewardWallet.lastCheckIn===rewardDayKey()?'✓ Checked in today':`Check in +${Number(rewardSettings.checkInRewards?.[Math.min(6,Number(rewardWallet.streak||0))]??10)} points`}</button>
+          </section>
+
+          {wheel.active && <RewardWheel settings={wheel} rewardSettings={rewardSettings} wallet={rewardWallet} onWallet={setRewardWallet} />}
+          </>}
+
+          {(view === 'home' || view === 'tiers') && <section className="rounded-[28px] border border-black/[.06] bg-[#FFFDF8] p-4 shadow-[0_16px_40px_rgba(20,20,15,.08)]"><div className="flex items-end justify-between gap-3"><div><p className="text-[9px] font-extrabold uppercase tracking-[.2em] text-[#B4871D]">Prime Loyalty Program</p><h2 className="mt-1 text-xl font-extrabold">Your reseller tiers</h2><p className="mt-1 text-[10px] text-black/45">Current tier: <b className="text-[#0E7C6F]">{tier.name}</b></p></div><span className="rounded-full bg-[#14140F] px-3 py-2 text-[9px] font-extrabold text-white">4 TIERS</span></div><div className="mt-4 grid grid-cols-2 gap-2.5 lg:grid-cols-4">{sortedTiers.map((item,index)=>{const active=item.id===tier.id;const colors=[['#7B3F1D','#F6D6B5'],['#59636E','#F1F5F8'],['#8A5A00','#FFE7A3'],['#171B2D','#B8C5FF']][index];const benefits=item.benefits?.length?item.benefits:['Exclusive member pricing','Earn bonus rewards','Special tier offers'];return <article key={item.id} className={`relative overflow-hidden rounded-[20px] border p-3 transition ${active?'border-[#14140F] shadow-[0_12px_26px_rgba(20,20,15,.16)]':'border-black/[.07]'}`} style={{background:'linear-gradient(145deg,#FFFDF8,'+colors[1]+')'}}><div className="absolute -right-7 -top-8 h-24 w-24 rounded-full opacity-20" style={{backgroundColor:colors[1]}}/><div className="relative flex items-center justify-between"><div className="grid h-9 w-9 place-items-center rounded-xl text-xs font-extrabold text-white shadow-md" style={{background:'linear-gradient(145deg,'+colors[0]+','+colors[1]+')'}}>{index+1}</div>{active&&<span className="rounded-full bg-[#14140F] px-2.5 py-1 text-[8px] font-extrabold text-white">CURRENT</span>}</div><h3 className="relative mt-3 text-base font-extrabold">{item.name}</h3><p className="mt-1 text-[10px] font-bold text-black/40">{item.minMonthlyOrders}+ monthly orders</p><p className="mt-2 text-xl font-extrabold" style={{color:colors[0]}}>{Number(item.discountPercent||0)}% <span className="text-[10px] text-black/35">OFF</span></p><div className="mt-3 space-y-1.5">{benefits.slice(0,4).map((benefit,n)=><p key={n} className="flex items-start gap-2 text-[9px] font-bold text-black/55"><span className="mt-0.5 grid h-3.5 w-3.5 shrink-0 place-items-center rounded-full bg-[#0E7C6F] text-[8px] text-white">✓</span>{benefit}</p>)}</div><div className={`mt-3 rounded-xl py-2 text-center text-[9px] font-extrabold ${active?'bg-[#14140F] text-white':'bg-white text-black/45'}`}>{active?'Your current tier':index<=tierIndex?'Unlocked':`Need ${Math.max(0,item.minMonthlyOrders-monthlyOrders)} orders`}</div></article>})}</div></section>}
+
+          {(view === 'home' || view === 'tasks') && <section className="rounded-[18px] bg-[#FFFDF8] p-3.5 shadow-[0_8px_24px_rgba(20,20,15,.05)]">
+            <div className="flex items-center justify-between"><div><span className="text-[10px] font-extrabold uppercase tracking-[.14em] text-[#E85D04]">Tasks</span><h2 className="mt-1 text-lg font-extrabold">Earn points & cash</h2></div><span className="rounded-full bg-[#E7F6F3] px-2 py-1 text-[11px] font-extrabold text-[#0E7C6F]">{activeTasks.length} live</span></div>
+            {challenge.active && <div className="mt-3 rounded-2xl bg-[#F6F1E8] p-3"><div className="flex items-center justify-between"><p className="text-xs font-extrabold">{target} orders = gift or cash</p><span className="text-[10px] font-extrabold text-[#0E7C6F]">{monthlyOrders}/{target}</span></div><Progress value={challengePercent}/><p className="text-[10px] text-[#6B6A62]">{remaining ? `${remaining} eligible orders remaining` : 'Challenge complete — choose your reward.'}</p></div>}
+            <div className="mt-2">{activeTasks.length ? activeTasks.map(task => <TaskRow key={task.id} task={task} monthlyOrders={monthlyOrders} target={target} />) : <p className="py-6 text-center text-xs text-[#6B6A62]">No active missions right now.</p>}</div>
+          </section>}
+
+          {(view === 'home' || view === 'vouchers') && <section>
+            <div className="mb-2.5 flex items-center justify-between"><div><p className="text-[10px] font-extrabold uppercase tracking-[.14em] text-[#E85D04]">Vouchers</p><h2 className="mt-1 text-lg font-extrabold">Unlock your rewards</h2></div><span className="rounded-full bg-white px-3 py-2 text-[10px] font-extrabold shadow-sm">{vouchers.length} rewards</span></div>
+            <div className="mb-2.5 flex gap-1.5 overflow-x-auto pb-1">{(['all','cash','gift','discount','brand'] as VoucherFilter[]).map(item=><button key={item} type="button" onClick={()=>setFilter(item)} className={`whitespace-nowrap rounded-full px-3 py-2 text-[11px] font-bold capitalize ${filter===item?'bg-[#14140F] text-white':'bg-white text-[#6B6A62]'}`}>{item}</button>)}</div>
+            <div className="grid grid-cols-2 gap-2.5 md:grid-cols-4">{filteredVouchers.map(voucher=><VoucherCard key={voucher.id} voucher={voucher} orders={monthlyOrders} onOpen={setSelectedVoucher}/>)}</div>
+          </section>}
+
+          {(view === 'home' || view === 'gifts') && <section className="rounded-[18px] bg-[#FFFDF8] p-4 shadow-[0_8px_24px_rgba(20,20,15,.05)]">
+            <div className="flex items-end justify-between gap-3"><div><p className="text-[10px] font-extrabold uppercase tracking-[.14em] text-[#0E7C6F]">Point store</p><h2 className="mt-1 text-xl font-extrabold">Gifts & Products</h2><p className="mt-1 text-xs text-[#6B6A62]">Rewards added from Admin appear here automatically.</p></div><span className="rounded-full bg-[#FFF3E0] px-3 py-1.5 text-[10px] font-extrabold">{Number(rewardWallet.points||0).toLocaleString()} PTS</span></div>
+            <div className="mt-4 grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">{rewardGifts.length ? rewardGifts.map(gift => { const product=rewardProducts[gift.productId]; const image=gift.imageUrl || rewardProductImage(product); const need=Math.max(0,Number(gift.pointsCost)-Number(rewardWallet.points||0)); return <article key={gift.id} className="overflow-hidden rounded-2xl border border-black/[.06] bg-white"><div className="aspect-[4/3] bg-[#F1ECE3]">{image?<img src={image} alt={gift.title||'Reward gift'} className="h-full w-full object-cover"/>:<div className="grid h-full place-items-center text-3xl">🎁</div>}</div><div className="p-3"><h3 className="text-sm font-extrabold">{gift.title||product?.title||product?.name||'Reward Gift'}</h3><p className="mt-1 text-xs font-extrabold text-[#E85D04]">{Number(gift.pointsCost).toLocaleString()} points</p><p className="mt-1 text-[10px] text-[#0E7C6F]">Free delivery included</p><Link href="/rewards#redeem-rewards" className="mt-3 block rounded-xl bg-[#14140F] px-3 py-2.5 text-center text-[10px] font-extrabold text-white">{need?`Need ${need} more points`:'Redeem gift'}</Link></div></article>; }) : <div className="rounded-2xl bg-[#F1ECE3] p-6 text-center text-xs text-[#6B6A62] sm:col-span-2 lg:col-span-3">Admin se add kiye gaye active gifts yahan show honge.</div>}</div>
+          </section>}
+
+          {view === 'tiers' && (
+            <section className="rounded-[18px] bg-[#FFFDF8] p-3.5 shadow-[0_8px_24px_rgba(20,20,15,.05)]">
+              <div className="flex items-center justify-between"><div><span className="text-[10px] font-extrabold uppercase tracking-[.14em] text-[#B4871D]">Tier progress</span><h2 className="mt-1 text-lg font-extrabold">{tier.name}</h2></div><span className="text-[11px] font-extrabold text-[#0E7C6F]">{monthlyOrders} orders</span></div>
+              <Progress value={tierProgress}/>
+              <p className="text-xs text-[#6B6A62]">{nextTier ? `${Math.max(0,nextTier.minMonthlyOrders-monthlyOrders)} more orders to ${nextTier.name}.` : 'Top tier unlocked.'}</p>
+            </section>
+          )}
+
+          {view === 'tasks' && (
+            <section id="club-tasks" className="rounded-[18px] bg-[#FFFDF8] p-3.5 shadow-[0_8px_24px_rgba(20,20,15,.05)]">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-extrabold uppercase tracking-[.14em] text-[#E85D04]">Reseller tasks</span>
+                <span className="rounded-full bg-[#E7F6F3] px-2 py-1 text-[11px] font-extrabold text-[#0E7C6F]">{activeTasks.length} live</span>
+              </div>
+              <h2 className="mt-1.5 text-lg font-extrabold">Earn extra beyond orders</h2>
+              <p className="mt-1 text-xs leading-relaxed text-[#6B6A62]">Complete social and growth missions to collect points after verification.</p>
+              <div className="mt-2">
+                {activeTasks.length ? activeTasks.map(task => <TaskRow key={task.id} task={task} monthlyOrders={monthlyOrders} target={target} />) : <p className="py-6 text-center text-xs text-[#6B6A62]">No active missions right now.</p>}
+              </div>
+            </section>
+          )}
+
+          {view === 'vouchers' && (
+            <>
+              <div className="mb-2.5 flex gap-1.5 overflow-x-auto pb-1">
+                {(['all', 'cash', 'gift', 'discount', 'brand'] as VoucherFilter[]).map(item => (
+                  <button
+                    key={item}
+                    type="button"
+                    onClick={() => setFilter(item)}
+                    className={`whitespace-nowrap rounded-full px-3 py-2 text-[11px] font-bold capitalize ${filter === item ? 'bg-[#14140F] text-white' : 'bg-white text-[#6B6A62]'}`}
+                  >
+                    {item}
+                  </button>
+                ))}
+              </div>
+              <div className="grid grid-cols-2 gap-2.5 md:grid-cols-4">
+                {filteredVouchers.map(voucher => (
+                  <VoucherCard key={voucher.id} voucher={voucher} orders={monthlyOrders} onOpen={setSelectedVoucher} />
+                ))}
+              </div>
+            </>
+          )}
+
+          {view === 'rewards' && (
+            <div className="space-y-3">
+              <section className="rounded-[18px] bg-[#FFFDF8] p-4 shadow-[0_8px_24px_rgba(20,20,15,.05)]">
+                <div className="flex items-end justify-between gap-3"><div><p className="text-[10px] font-extrabold uppercase tracking-[.14em] text-[#E85D04]">Daily streak</p><h2 className="mt-1 text-xl font-extrabold">7-Day Check-in</h2><p className="mt-1 text-xs text-[#6B6A62]">Complete every day to unlock higher point rewards.</p></div><span className="rounded-full bg-[#FFF3E0] px-3 py-1.5 text-[10px] font-extrabold">{Math.min(7, Number(rewardWallet.streak || 0))}/7</span></div>
+                <div className="mt-4 grid grid-cols-7 gap-1.5">{Array.from({ length: 7 }, (_, index) => { const complete=index<Number(rewardWallet.streak||0); return <div key={index} className={`rounded-xl p-2 text-center ${complete?'bg-[#0E7C6F] text-white':'bg-[#F1ECE3] text-[#6B6A62]'}`}><p className="text-[8px] font-extrabold">D{index+1}</p><p className="mt-1 text-[9px] font-extrabold">+{Number(rewardSettings.checkInRewards?.[index]??0)}</p><p className="text-[7px] font-bold">PTS</p></div>; })}</div>
+                <button type="button" onClick={checkInReward} disabled={rewardBusy || rewardWallet.lastCheckIn===rewardDayKey()} className="mt-4 w-full rounded-xl bg-[#14140F] py-3.5 text-xs font-extrabold text-white disabled:opacity-45">{rewardWallet.lastCheckIn===rewardDayKey()?'✓ Checked in today':`Check in +${Number(rewardSettings.checkInRewards?.[Math.min(6,Number(rewardWallet.streak||0))]??10)} points`}</button>
+              </section>
+              {wheel.active && <RewardWheel settings={wheel} rewardSettings={rewardSettings} wallet={rewardWallet} onWallet={setRewardWallet} />}
+              <section className="rounded-[18px] bg-[#FFFDF8] p-4 shadow-[0_8px_24px_rgba(20,20,15,.05)]">
+                <div className="flex items-end justify-between gap-3"><div><p className="text-[10px] font-extrabold uppercase tracking-[.14em] text-[#0E7C6F]">Point store</p><h2 className="mt-1 text-xl font-extrabold">Gifts & Products</h2><p className="mt-1 text-xs text-[#6B6A62]">Rewards added from Admin appear here automatically.</p></div><span className="rounded-full bg-[#FFF3E0] px-3 py-1.5 text-[10px] font-extrabold">{Number(rewardWallet.points||0).toLocaleString()} PTS</span></div>
+                <div className="mt-4 grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">{rewardGifts.length ? rewardGifts.map(gift => { const product=rewardProducts[gift.productId]; const image=gift.imageUrl || rewardProductImage(product); const need=Math.max(0,Number(gift.pointsCost)-Number(rewardWallet.points||0)); return <article key={gift.id} className="overflow-hidden rounded-2xl border border-black/[.06] bg-white"><div className="aspect-[4/3] bg-[#F1ECE3]">{image?<img src={image} alt={gift.title||'Reward gift'} className="h-full w-full object-cover"/>:<div className="grid h-full place-items-center text-3xl">🎁</div>}</div><div className="p-3"><h3 className="text-sm font-extrabold">{gift.title||product?.title||product?.name||'Reward Gift'}</h3><p className="mt-1 text-xs font-extrabold text-[#E85D04]">{Number(gift.pointsCost).toLocaleString()} points</p><p className="mt-1 text-[10px] text-[#0E7C6F]">Free delivery included</p><Link href="/rewards#redeem-rewards" className="mt-3 block rounded-xl bg-[#14140F] px-3 py-2.5 text-center text-[10px] font-extrabold text-white">{need?`Need ${need} more points`:'Redeem gift'}</Link></div></article>; }) : <div className="rounded-2xl bg-[#F1ECE3] p-6 text-center text-xs text-[#6B6A62] sm:col-span-2 lg:col-span-3">Admin se add kiye gaye active gifts yahan show honge.</div>}</div>
+              </section>
+              {rewardMessage && <div className="rounded-xl bg-[#0E7C6F] p-3 text-center text-xs font-extrabold text-white">{rewardMessage}</div>}
+            </div>
+          )}
+
+          {view === 'wallet' && (
+            <>
+              <section className="rounded-[18px] bg-[#FFFDF8] p-3.5 shadow-[0_8px_24px_rgba(20,20,15,.05)]">
+                <span className="text-[10px] font-extrabold uppercase tracking-[.14em] text-[#E85D04]">Reward wallet</span>
+                <div className="mt-3 grid grid-cols-2 gap-2"><div className="rounded-2xl bg-[#F1ECE3] p-3"><p className="text-[9px] font-extrabold uppercase tracking-wider text-[#6B6A62]">Cash wallet</p><h2 className="mt-1 text-2xl font-extrabold">Rs. {walletAvailable.toLocaleString()}</h2><p className="text-[10px] text-[#6B6A62]">Pending Rs. {walletPending.toLocaleString()}</p></div><div className="rounded-2xl bg-[#E7F6F3] p-3"><p className="text-[9px] font-extrabold uppercase tracking-wider text-[#0E7C6F]">Points wallet</p><h2 className="mt-1 text-2xl font-extrabold">{Number(rewardWallet.points||0).toLocaleString()}</h2><p className="text-[10px] text-[#0E7C6F]">Reward points</p></div></div>
+                <Link href="/reseller/wallet" className="mt-3 block w-full rounded-xl bg-[#14140F] px-3 py-3 text-center text-xs font-extrabold text-white">Request withdrawal</Link>
+              </section>
+              <section className="mt-3 rounded-[18px] bg-[#FFFDF8] p-3.5 shadow-[0_8px_24px_rgba(20,20,15,.05)]">
+                <span className="text-[10px] font-extrabold uppercase tracking-[.14em] text-[#E85D04]">My vouchers</span>
+                <p className="mt-2 text-xs leading-relaxed text-[#6B6A62]">Claimed gift vouchers appear here. JazzCash and EasyPaisa payouts are released after verification.</p>
+                <button type="button" onClick={() => setView('vouchers')} className="mt-3 rounded-xl bg-[#0E7C6F] px-3 py-2.5 text-xs font-extrabold text-white">Browse vouchers</button>
+              </section>
+            </>
+          )}
+        </section>
+
+        {selectedVoucher && (
+          <VoucherSheet voucher={selectedVoucher} orders={monthlyOrders} onClose={() => setSelectedVoucher(null)} />
+        )}
+      </div>
+    </Shell>
+  );
+}
+
+function rewardDayKey() {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Karachi' }).format(new Date());
+}
+
+function rewardProductImage(product?: RewardProduct) {
+  if (!product) return '';
+  if (product.imageUrl) return product.imageUrl;
+  if (product.image) return product.image;
+  const first=product.images?.[0];
+  return typeof first==='string'?first:first?.url||'';
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-[14px] border border-white/[.08] bg-white/[.07] px-3 py-2.5">
+      <small className="block text-[9px] font-bold uppercase tracking-[.12em] text-white/55">{label}</small>
+      <strong className="mt-0.5 block text-base font-extrabold">{value}</strong>
+    </div>
+  );
+}
+
+function Progress({ value }: { value: number }) {
+  return (
+    <div className="my-2.5 h-2 overflow-hidden rounded-full bg-[#EDE8DE]">
+      <div className="h-full rounded-full bg-[linear-gradient(90deg,#0E7C6F,#12A394)] transition-all" style={{ width: `${Math.max(0, Math.min(100, value))}%` }} />
+    </div>
+  );
+}
+
+function TaskRow({ task, monthlyOrders, target }: { task: ResellerTask; monthlyOrders: number; target: number }) {
+  const Icon = taskIcons[task.icon || 'order'] || Check;
+  const isMonthly = task.id.includes('monthly');
+  const isOrderTask = isMonthly || task.id.includes('weekly') || task.id.includes('order');
+  const taskTarget = isMonthly ? target : task.id.includes('weekly') ? 3 : 1;
+  const progress = isOrderTask ? Math.min(monthlyOrders, taskTarget) : 0;
+  const percent = Math.round((progress / Math.max(1, taskTarget)) * 100);
+  const href = task.url || '/reseller/tasks';
+  const external = href.startsWith('http');
+
+  return (
+    <div className="grid grid-cols-[42px_1fr_auto] items-center gap-2.5 border-b border-black/[.08] py-3 last:border-0 last:pb-0">
+      <div className="grid h-[42px] w-[42px] place-items-center rounded-[14px] bg-[#FFF3E0] text-[#0E7C6F]"><Icon size={18} /></div>
+      <div className="min-w-0">
+        <h3 className="text-[13px] font-bold">{task.title}</h3>
+        <p className="truncate text-xs text-[#6B6A62]">{task.description}</p>
+        <Progress value={percent} />
+      </div>
+      <div className="text-right">
+        <p className="text-[11px] font-extrabold text-[#0E7C6F]">{task.id === 'weekly-orders' || task.id === 'monthly-orders' ? <>Rs. {Number(task.reward || 0).toLocaleString()}</> : <>+{Number(task.reward || 0).toLocaleString()} pts</>}</p>
+        <Link href={href} target={external ? '_blank' : undefined} rel={external ? 'noreferrer' : undefined} className="mt-1.5 inline-flex items-center gap-1 rounded-xl bg-[#F1ECE3] px-2.5 py-2 text-[11px] font-extrabold">
+          {task.verification === 'manual' ? 'Submit' : 'Do'} <ChevronRight size={12} />
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+function prizeLabel(prize: RewardPrize) {
+  if (prize.type === 'product' && prize.name) return prize.name;
+  return rewardWheelPrizeLabel(prize);
+}
+
+function RewardWheel({ rewardSettings, wallet, onWallet }: { settings?: ResellerWheelSettings; rewardSettings: RewardSettings; wallet: RewardWallet; onWallet: (wallet: RewardWallet) => void }) {
+  const prizes = orderPremiumWheelPrizes((rewardSettings.spinWheelSlots || []).filter(prize => prize.active !== false && Number(prize.stock ?? 1) > 0));
+  const [rotation, setRotation] = useState(0);
+  const [spinning, setSpinning] = useState(false);
+  const [result, setResult] = useState('');
+  const [error, setError] = useState('');
+  const usedToday = wallet.lastSpin === rewardDayKey();
+
+  async function spin() {
+    const user = auth.currentUser;
+    if (!user || spinning || usedToday) return;
+    setSpinning(true); setResult(''); setError('');
+    try {
+      const token = await user.getIdToken();
+      const response = await fetch('/api/reseller/reward-action', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ action: 'spin', guestId: currentGuestId() }) });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Spin failed.');
+      const prize = data.prize as RewardPrize | undefined;
+      if (!prize) throw new Error('Prize result unavailable.');
+      const winner = Math.max(0, prizes.findIndex(item => item.id === prize.id));
+      setRotation(current => current + 1440 + (360 - winner * 72));
+      await new Promise(resolve => window.setTimeout(resolve, 3000));
+      onWallet({ points: 0, streak: 0, ...(data.wallet || {}) });
+      setResult(prizeLabel(prize));
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Spin failed.');
+    } finally {
+      setSpinning(false);
+    }
+  }
+  return (
+    <section className="psw-panel">
+      <span>Spin & win</span>
+      <h2>Your reward wheel</h2>
+      <p>Same Admin rewards and same daily count on Home & Reseller Club.</p>
+      <PremiumSpinWheel prizes={prizes} rotation={rotation} />
+      <button type="button" className="psw-spin" onClick={spin} disabled={spinning || usedToday || !prizes.length}>{spinning ? 'Spinning…' : usedToday ? 'Come tomorrow' : 'Spin the wheel'}</button>
+      {result && <p className="psw-note">You got: {result}</p>}
+      {error && <p className="psw-note is-error">{error}</p>}
+    </section>
+  );
+}
+
+function Mini({ icon, text }: { icon: React.ReactNode; text: string }) {
+  return <div className="flex items-center gap-2 rounded-xl bg-white p-3 text-[10px] font-semibold text-[#6B6A62]">{icon}{text}</div>;
+}
+
+function VoucherCard({ voucher, orders, onOpen }: { voucher: Voucher; orders: number; onOpen: (voucher: Voucher) => void }) {
+  const locked = orders < voucher.minOrders;
+  return (
+    <button type="button" onClick={() => onOpen(voucher)} className="w-full overflow-hidden rounded-2xl bg-white text-left shadow-[0_8px_20px_rgba(20,20,15,.05)]">
+      <div className="relative h-[94px] overflow-hidden" style={{ background: voucher.art }}>
+        <img src={voucher.imageUrl || premiumVoucherImage(voucher.title, voucher.art, voucher.icon)} alt={voucher.title} className="h-full w-full object-cover" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/35 to-transparent" />
+        {locked && <span className="absolute right-2 top-2 inline-flex items-center gap-1 rounded-full bg-black/55 px-2 py-1 text-[9px] font-extrabold text-white"><Lock size={9} /> Locked</span>}
+      </div>
+      <div className="p-2.5">
+        <h3 className="text-[13px] font-bold">{voucher.title}</h3>
+        <p className="text-xs leading-snug text-[#6B6A62]">{voucher.description}<br />{voucher.requirement}</p>
+      </div>
+    </button>
+  );
+}
+
+function VoucherSheet({ voucher, orders, onClose }: { voucher: Voucher; orders: number; onClose: () => void }) {
+  const locked = orders < voucher.minOrders;
+  return (
+    <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/45" role="dialog" aria-modal="true" aria-label={voucher.title}>
+      <button type="button" aria-label="Close voucher" onClick={onClose} className="absolute inset-0" />
+      <div className="relative w-full max-w-[430px] rounded-t-[22px] bg-white p-4 pb-[calc(24px+env(safe-area-inset-bottom))]">
+        <button type="button" onClick={onClose} className="absolute right-4 top-4 rounded-full bg-[#F1ECE3] p-2"><X size={16} /></button>
+        <p className="text-[10px] font-extrabold uppercase tracking-[.14em] text-[#E85D04]">{voucher.type} voucher</p>
+        <h2 className="mt-1.5 pr-10 text-xl font-extrabold">{voucher.title}</h2>
+        <p className="mt-2 text-xs leading-relaxed text-[#6B6A62]">{voucher.description}. Unlock requirement: {voucher.requirement}. Reward release is completed after verification.</p>
+        {locked ? (
+          <button type="button" disabled className="mt-3 w-full rounded-xl bg-[#14140F] px-3 py-3 text-xs font-extrabold text-white opacity-45">Locked — more orders needed</button>
+        ) : (
+          <Link href="/reseller/rewards-preview" className="mt-3 block w-full rounded-xl bg-[#14140F] px-3 py-3 text-center text-xs font-extrabold text-white">Redeem / choose this</Link>
+        )}
+        <button type="button" onClick={onClose} className="mt-2 w-full rounded-xl bg-[#F1ECE3] px-3 py-3 text-xs font-extrabold">Close</button>
+      </div>
+    </div>
+  );
+}
