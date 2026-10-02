@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { ArrowLeft, Check, ChevronRight, Crown, Eye, EyeOff, LockKeyhole, Mail, ShieldCheck } from 'lucide-react';
 import { createResellerAccount, resetResellerPassword, signInReseller } from '@/lib/resellerAuth';
 import { createResellerProfile } from '@/lib/resellerFirestore';
-import HomeResellerClubFull from '@/components/home/HomeResellerClubFull';
+import { ResellerTasksContent } from '@/components/reseller/ResellerTasksContent';
 
 function authMessage(code: string, rawMessage = '') {
   switch (code) {
@@ -102,8 +102,6 @@ export default function ResellerJoinPage() {
         </div>
       </div>
     </div></section>
-    <section className="mx-auto max-w-6xl pb-24">
-      <HomeResellerClubFull />
-    </section>
+    <ResellerTasksContent embedded />
   </main>;
 }
