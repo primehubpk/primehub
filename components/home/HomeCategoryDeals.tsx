@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { categoryHref, productMatchesCategory } from '@/lib/categoryUtils';
@@ -14,10 +14,9 @@ export default function HomeCategoryDeals({ products, categories }: { products: 
   const [refreshSeed, setRefreshSeed] = useState(0);
   const sectionRef = useRef<HTMLElement | null>(null);
 
-  useEffect(() => {
-    // Keep the server/first browser render stable, then rotate category cards
-    // once per page load. orderHomeProducts gives newer items a stronger
-    // freshness weight while still mixing older stock into the rail.
+  useLayoutEffect(() => {
+    // Keep the server render stable, then rotate category cards once per app
+    // session before the browser paints. Coming back must reuse that same order.
     setRefreshSeed(sessionRailSeed());
   }, []);
 
@@ -49,7 +48,7 @@ export default function HomeCategoryDeals({ products, categories }: { products: 
       window.cancelAnimationFrame(frame);
       timers.forEach((timer) => window.clearTimeout(timer));
     };
-  }, [refreshSeed, products.length, categories.length]);
+  }, [refreshSeed]);
 
   return (
     <section ref={sectionRef} className="mt-2 space-y-2.5" aria-label="Shop products by category">

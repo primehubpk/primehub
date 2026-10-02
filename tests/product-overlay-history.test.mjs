@@ -11,17 +11,23 @@ test('product open adds one history step and back restores the same page', async
     scrollY: 640,
     pageYOffset: 640,
     history: {
+      scrollRestoration: 'auto',
       get state() { return entries[index].state; },
       pushState(state, _title, url) {
         entries.splice(index + 1);
         entries.push({ state, url });
         index += 1;
+        // A history update in the WebView often jumps the page to the top.
+        globalThis.window.scrollY = 0;
+        globalThis.window.pageYOffset = 0;
       },
       replaceState(state, _title, url) {
         entries[index] = { state, url };
       },
       back() {
         index -= 1;
+        globalThis.window.scrollY = 0;
+        globalThis.window.pageYOffset = 0;
         for (const listener of popListeners) listener({ stopImmediatePropagation() {} });
       },
     },
@@ -35,8 +41,13 @@ test('product open adds one history step and back restores the same page', async
       if (type === 'popstate') popListeners.push(listener);
     },
     dispatchEvent() { return true; },
-    scrollTo() {},
+    scrollTo(_x, y) {
+      const top = typeof _x === 'object' && _x ? Number(_x.top || 0) : Number(y || 0);
+      globalThis.window.scrollY = top;
+      globalThis.window.pageYOffset = top;
+    },
     requestAnimationFrame(callback) { callback(); },
+    setTimeout(callback) { callback(); return 0; },
   };
   globalThis.document = { body };
 
@@ -50,7 +61,9 @@ test('product open adds one history step and back restores the same page', async
 
   assert.equal(overlay.isProductOverlayOpen(), true);
   assert.equal(entries[index].url, '/product/ring-1');
+  assert.equal(entries[index].state, null);
   assert.equal(overlay.getProductOverlayBackgroundPath(), '/shop?q=bangles');
+  assert.equal(window.scrollY, 640);
   assert.equal(body.style.position || '', '');
 
   overlay.openProductOverlay({

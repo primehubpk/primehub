@@ -15,6 +15,7 @@ export type ProductOverlayFrame = {
 type BackgroundEntry = {
   state: unknown;
   url: string;
+  scrollY: number;
 };
 
 type OverlaySnapshot = {
@@ -27,6 +28,70 @@ let background: BackgroundEntry | null = null;
 let popListenerInstalled = false;
 let swallowNextPop = false;
 let overlayHistory = false;
+let pendingScrollY: number | null = null;
+let scrollGeneration = 0;
+let savedScrollRestoration: ScrollRestoration | null = null;
+let clickClaimed = false;
+
+type ScrollRestoration = 'auto' | 'manual';
+
+function currentScrollY() {
+  if (typeof window === 'undefined') return 0;
+  return window.scrollY || window.pageYOffset || 0;
+}
+
+function lockScrollRestoration() {
+  if (savedScrollRestoration !== null || typeof window === 'undefined') return;
+  try {
+    savedScrollRestoration = window.history.scrollRestoration;
+    window.history.scrollRestoration = 'manual';
+  } catch {
+    savedScrollRestoration = 'auto';
+  }
+}
+
+function unlockScrollRestoration() {
+  if (savedScrollRestoration === null || typeof window === 'undefined') return;
+  const previous = savedScrollRestoration;
+  savedScrollRestoration = null;
+  try {
+    window.history.scrollRestoration = previous;
+  } catch {
+    // Some webviews do not expose scroll restoration.
+  }
+}
+
+// The address-bar update can jump the page to the top. Put the shopper back
+// on the same pixel, including the frame after the browser applies history.
+function rememberScroll(y: number) {
+  if (typeof window === 'undefined') return;
+  const generation = ++scrollGeneration;
+  const apply = () => {
+    if (generation !== scrollGeneration || typeof window === 'undefined') return;
+    if (currentScrollY() !== y) window.scrollTo(0, y);
+  };
+  apply();
+  window.requestAnimationFrame(apply);
+  window.setTimeout(apply, 0);
+  window.setTimeout(apply, 60);
+}
+
+function cancelScrollRestore() {
+  scrollGeneration += 1;
+  pendingScrollY = null;
+}
+
+export function resetStorefrontClickClaim() {
+  clickClaimed = false;
+}
+
+export function claimStorefrontClick() {
+  clickClaimed = true;
+}
+
+export function storefrontClickClaimed() {
+  return clickClaimed;
+}
 
 // Next.js replaces window.history.pushState and treats that as a real page
 // change. That fetches the product route (white screen) and makes back wait
@@ -117,12 +182,16 @@ export function openProductOverlay(next: ProductOverlayFrame) {
   if (typeof window === 'undefined') return;
   installProductOverlayHistoryListener();
   if (!background) {
+    lockScrollRestoration();
+    const scrollY = currentScrollY();
     background = {
       state: window.history.state,
       url: `${window.location.pathname}${window.location.search}${window.location.hash}`,
+      scrollY,
     };
     rawPushState(null, next.href);
     overlayHistory = true;
+    rememberScroll(scrollY);
   } else {
     rawReplaceState(null, next.href);
   }
@@ -141,24 +210,33 @@ export function closeProductOverlayFromPop() {
 // the customer is back on the same picture and the same scroll immediately.
 export function closeProductOverlayNow() {
   if (!frame && !background) return;
+  const scrollY = background?.scrollY ?? currentScrollY();
   const shouldPop = overlayHistory;
   frame = null;
   background = null;
   overlayHistory = false;
   emit();
-  if (!shouldPop || typeof window === 'undefined') return;
+  if (!shouldPop || typeof window === 'undefined') {
+    rememberScroll(scrollY);
+    unlockScrollRestoration();
+    return;
+  }
+  pendingScrollY = scrollY;
   swallowNextPop = true;
   window.history.back();
+  rememberScroll(scrollY);
 }
 
 export function navigateFromProductOverlay(href: string) {
   if (!frame || typeof window === 'undefined') return false;
+  cancelScrollRestore();
   const previous = background;
   frame = null;
   background = null;
   overlayHistory = false;
   emit();
   if (previous) rawReplaceState(previous.state, previous.url);
+  unlockScrollRestoration();
   window.dispatchEvent(new CustomEvent('ph-overlay-navigate', { detail: href }));
   return true;
 }
@@ -168,8 +246,11 @@ function onOverlayPopState(event: PopStateEvent) {
   event.stopImmediatePropagation();
   const swallowing = swallowNextPop;
   swallowNextPop = false;
-  if (swallowing) return;
-  closeProductOverlayFromPop();
+  const scrollY = pendingScrollY ?? background?.scrollY ?? currentScrollY();
+  pendingScrollY = null;
+  if (!swallowing) closeProductOverlayFromPop();
+  rememberScroll(scrollY);
+  unlockScrollRestoration();
 }
 
 export function installProductOverlayHistoryListener() {

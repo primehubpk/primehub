@@ -2,7 +2,7 @@
 
 import RetryableStorefrontImage from '@/components/RetryableStorefrontImage';
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ChevronRight, Package, ShoppingCart } from "lucide-react";
 import FastProductLink from "@/components/FastProductLink";
 import HomeHeading from "@/components/home/HomeHeading";
@@ -491,7 +491,7 @@ export default function HomeCollections({
   );
   const [homeShuffleSeed, setHomeShuffleSeed] = useState(0);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (standalone) return;
     setHomeShuffleSeed(sessionRailSeed());
   }, [standalone]);

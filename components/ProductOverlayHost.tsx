@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import ProductDetailPageClient from '@/components/product-detail/ProductDetailPageClient';
 import { readCachedProduct } from '@/lib/productNavigationCache';
 import {
+  claimStorefrontClick,
   closeProductOverlayNow,
   getProductOverlayBackgroundPath,
   getProductOverlayServerSnapshot,
@@ -14,6 +15,7 @@ import {
   navigateFromProductOverlay,
   openProductOverlay,
   productTargetFromHref,
+  resetStorefrontClickClaim,
   subscribeProductOverlay,
   type ProductOverlayProduct,
 } from '@/lib/productOverlay';
@@ -32,6 +34,7 @@ function productAnchor(target: EventTarget | null) {
 }
 
 function handleStorefrontClick(event: MouseEvent) {
+  resetStorefrontClickClaim();
   if (!isPlainLeftClick(event)) return;
   const anchor = productAnchor(event.target);
   if (!anchor) return;
@@ -48,6 +51,8 @@ function handleStorefrontClick(event: MouseEvent) {
       target.href = `${dealUrl.pathname}${dealUrl.search}`;
     }
     event.preventDefault();
+    event.stopImmediatePropagation();
+    claimStorefrontClick();
     const cached = readCachedProduct<ProductOverlayProduct>(target.id);
     openProductOverlay({
       id: target.id,
@@ -67,7 +72,8 @@ function handleStorefrontClick(event: MouseEvent) {
     backgroundPathname = '';
   }
   event.preventDefault();
-  event.stopPropagation();
+  event.stopImmediatePropagation();
+  claimStorefrontClick();
   if (backgroundPathname === url.pathname) {
     closeProductOverlayNow();
     return;
