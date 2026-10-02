@@ -17,7 +17,8 @@
       "fix/salar-home-catalog-sep27": true,
       "fix/home-rails-deals-usage-sep29": false,
       "fix/home-sale-mela-layout-shuffle-oct02": false,
-      "fix/home-commerce-youtube-ratio-oct02": false
+      "fix/home-commerce-youtube-ratio-oct02": false,
+      "fix/home-return-navigation-oct02": false
     }
   }
 }
