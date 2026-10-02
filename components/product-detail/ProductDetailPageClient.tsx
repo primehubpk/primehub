@@ -222,7 +222,10 @@ function ProductDetailContent({
   // handled because product remains null.
   if (!product) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#F4F4F1] px-5">
+      <main className="relative flex min-h-screen items-center justify-center bg-[#F4F4F1] px-5">
+        <div className="absolute left-4 top-4">
+          <ProductBackButton />
+        </div>
         <div className="w-full max-w-sm rounded-[28px] bg-white p-8 text-center shadow-sm">
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-black/5">
             <ShoppingBag size={22} className="text-black/35" />

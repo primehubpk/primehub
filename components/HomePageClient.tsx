@@ -30,6 +30,7 @@ import {
   cacheCatalogForNavigation,
   cacheProductForNavigation,
 } from "@/lib/productNavigationCache";
+import { useKeptHomeCover } from "@/lib/homeKeep";
 import { SettingsProvider } from "@/lib/useSettings";
 import type {
   Category,
@@ -70,6 +71,7 @@ export default function HomePageClient({
   );
   const catalogUnavailable = products.length === 0;
   const lastCatalogRefreshRef = useRef(initialProducts.length > 0 ? Date.now() : 0);
+  const keptHome = useKeptHomeCover();
 
   useEffect(() => {
     // Always open every horizontal homepage rail at its real first item.
@@ -239,9 +241,12 @@ export default function HomePageClient({
 
   return (
     <SettingsProvider initialSettings={initialSettings}>
+      <div ref={keptHome.frameRef} className="relative" data-ph-home-frame="1">
       <div
         className="home-storefront"
-        data-ph-home-root=""
+        data-ph-home-root="1"
+        data-ph-home-live="1"
+        style={keptHome.covering ? { opacity: 0, position: 'relative', zIndex: 2 } : undefined}
         onPointerDownCapture={handleStorefrontClickCapture}
         onClickCapture={handleStorefrontClickCapture}
       >
@@ -340,6 +345,7 @@ export default function HomePageClient({
         </main>
         <YouTubeGuide />
         <Footer onWholesaleSelect={selectWholesale} />
+      </div>
       </div>
     </SettingsProvider>
   );
