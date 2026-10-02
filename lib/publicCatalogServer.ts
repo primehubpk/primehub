@@ -113,8 +113,11 @@ export function compactPublicCatalogSnapshot<
         const compact = Object.fromEntries(
           Object.entries(product).filter(([key]) => !CATALOG_SEED_HEAVY_FIELDS.has(key)),
         );
-        if (Array.isArray(compact.images) && compact.images.length > 1) {
-          compact.images = compact.images.slice(0, 1);
+        if (Array.isArray(compact.images) && compact.images.length > 3) {
+          // Keep at most two lightweight fallback URLs behind the cover image.
+          // This adds no extra Supabase read and lets the storefront recover when
+          // one R2 cover object is missing, without shipping full variant payloads.
+          compact.images = compact.images.slice(0, 3);
         }
         return compact;
       })
