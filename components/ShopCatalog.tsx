@@ -13,6 +13,7 @@ import CategoryFilter from './shop/CategoryFilter';
 import { FilterDrawer, ShopFilterPanel } from './shop/CatalogFilters';
 import CatalogProductGrid from './shop/CatalogProductGrid';
 import FastProductLink from '@/components/FastProductLink';
+import BackHomeLink from '@/components/BackHomeLink';
 import { categoryHref, productMatchesCategory, slugifyCategory } from '@/lib/categoryUtils';
 import { isDirectStorefrontImage } from '@/lib/imageUrl';
 import { isWholesaleProduct } from '@/lib/wholesale';
@@ -323,13 +324,9 @@ export default function ShopCatalog({
         <HomeHeader />
 
         <main className="mx-auto w-full max-w-[900px] px-3 pb-10 pt-3 sm:px-4 md:px-5">
-          <Link
-            href="/"
-            prefetch
-            className="mb-4 inline-flex items-center rounded-full bg-white px-3 py-2 text-[10px] font-black text-[#0F6A5F] shadow-sm ring-1 ring-black/5 transition active:scale-95"
-          >
+          <BackHomeLink className="mb-4 inline-flex items-center rounded-full bg-white px-3 py-2 text-[10px] font-black text-[#0F6A5F] shadow-sm ring-1 ring-black/5 transition active:scale-95">
             ← Back to Home
-          </Link>
+          </BackHomeLink>
 
           <section aria-label={`${selectedLabel} category`}>
             <div className="mb-3 px-0.5">

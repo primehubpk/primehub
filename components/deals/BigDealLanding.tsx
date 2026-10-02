@@ -2,6 +2,7 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
+import BackHomeLink from '@/components/BackHomeLink';
 import { useEffect, useState } from 'react';
 import { ArrowLeft, LockKeyhole, ShoppingCart } from 'lucide-react';
 import { bigDealConfiguredSlotCount, bigDealRotationIndex } from '@/lib/bigDealRotation';
@@ -65,7 +66,7 @@ export default function BigDealLanding({ deal, products }: { deal?: BigDeal; pro
   }
 
   return <main className="mx-auto max-w-6xl px-4 pb-10 pt-5">
-    <Link href="/" className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-xs font-bold"><ArrowLeft size={14}/> Back to Home</Link>
+    <BackHomeLink className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-xs font-bold"><ArrowLeft size={14}/> Back to Home</BackHomeLink>
     <header className="mt-5 rounded-[28px] bg-[#14140F] p-6 text-white">
       <p className="text-[10px] font-black uppercase tracking-widest text-[#FFB020]">PrimeHubMall</p>
       <h1 className="mt-1 text-3xl font-black">Big Deal</h1>

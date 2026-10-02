@@ -15,6 +15,7 @@ import {
   navigateFromProductOverlay,
   openProductOverlay,
   productTargetFromHref,
+  requestStorefrontHome,
   resetStorefrontClickClaim,
   subscribeProductOverlay,
   type ProductOverlayProduct,
@@ -32,6 +33,40 @@ function productAnchor(target: EventTarget | null) {
   if (anchor.target && anchor.target !== '_self') return null;
   return anchor;
 }
+
+function openFromProductHref(href: string) {
+  const target = productTargetFromHref(href, window.location.origin);
+  if (!target) return;
+  const cached = readCachedProduct<ProductOverlayProduct>(target.id);
+  openProductOverlay({
+    id: target.id,
+    href: target.href,
+    bigDeal: target.bigDeal,
+    product: cached,
+  });
+}
+
+type ProductOpenerWindow = Window & {
+  __phOpenProduct?: (href: string) => void;
+  __phPendingProduct?: string;
+};
+
+function assignProductOpener() {
+  if (typeof window === 'undefined') return;
+  (window as ProductOpenerWindow).__phOpenProduct = openFromProductHref;
+}
+
+function flushPendingProduct() {
+  if (typeof window === 'undefined') return;
+  const browser = window as ProductOpenerWindow;
+  if (!browser.__phPendingProduct) return;
+  const pending = browser.__phPendingProduct;
+  delete browser.__phPendingProduct;
+  openFromProductHref(pending);
+}
+
+assignProductOpener();
+flushPendingProduct();
 
 function handleStorefrontClick(event: MouseEvent) {
   resetStorefrontClickClaim();
@@ -64,6 +99,16 @@ function handleStorefrontClick(event: MouseEvent) {
   }
 
   if (!isProductOverlayOpen()) return;
+  if (url.pathname === '/' && !url.search) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    claimStorefrontClick();
+    const action = requestStorefrontHome();
+    if (action === 'router-home') {
+      window.dispatchEvent(new CustomEvent('ph-overlay-navigate', { detail: '/' }));
+    }
+    return;
+  }
   const backgroundPath = getProductOverlayBackgroundPath();
   let backgroundPathname = '';
   try {
@@ -82,6 +127,7 @@ function handleStorefrontClick(event: MouseEvent) {
 }
 
 export default function ProductOverlayHost() {
+  assignProductOpener();
   const router = useRouter();
   const snapshot = useSyncExternalStore(
     subscribeProductOverlay,
@@ -90,10 +136,19 @@ export default function ProductOverlayHost() {
   );
 
   useEffect(() => {
+    assignProductOpener();
+    flushPendingProduct();
     installProductOverlayHistoryListener();
     const onNavigate = (event: Event) => {
       const href = (event as CustomEvent<string>).detail;
-      if (typeof href === 'string' && href.startsWith('/')) router.push(href);
+      if (typeof href !== 'string' || !href.startsWith('/')) return;
+      const target = new URL(href, window.location.origin);
+      const wanted = `${target.pathname}${target.search}`;
+      router.push(`${wanted}${target.hash}`);
+      window.setTimeout(() => {
+        const now = `${window.location.pathname}${window.location.search}`;
+        if (now !== wanted) window.location.assign(`${wanted}${target.hash}`);
+      }, 700);
     };
     document.addEventListener('click', handleStorefrontClick, true);
     window.addEventListener('ph-overlay-navigate', onNavigate);

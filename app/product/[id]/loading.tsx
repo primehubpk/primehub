@@ -1,8 +1,27 @@
+'use client';
+
+import { ArrowLeft } from 'lucide-react';
+
 export default function ProductLoading() {
   return (
     <main className="fixed inset-0 z-[35] overflow-y-auto bg-[#F4F4F1] px-4 pb-28 pt-4">
       <div className="mx-auto max-w-6xl">
-        <div className="mb-4 h-10 w-10 animate-pulse rounded-full bg-black/8" />
+        <a
+          href="/"
+          aria-label="Go back"
+          className="mb-4 flex h-11 w-11 touch-manipulation items-center justify-center rounded-full bg-white shadow-sm"
+          onClick={(event) => {
+            if (window.history.length <= 1) return;
+            event.preventDefault();
+            const here = window.location.pathname;
+            window.history.back();
+            window.setTimeout(() => {
+              if (window.location.pathname === here) window.location.assign('/');
+            }, 450);
+          }}
+        >
+          <ArrowLeft size={17} />
+        </a>
         <div className="grid gap-4 md:grid-cols-[1.05fr_.95fr]">
           <div className="aspect-square animate-pulse rounded-[30px] bg-white md:aspect-[4/3]" />
           <div className="rounded-[30px] bg-white p-6">

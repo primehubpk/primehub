@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { ArrowLeft, ExternalLink, Instagram, Play, Youtube } from 'lucide-react';
-import Link from 'next/link';
+import BackHomeLink from '@/components/BackHomeLink';
 import { thumbnailOf, type WholesaleVideo } from '@/lib/wholesaleVideos';
 
 export default function WholesaleVideoHub() {
@@ -38,9 +38,9 @@ export default function WholesaleVideoHub() {
     <main className="min-h-screen bg-[#F4F4F1] pb-28">
       <div className="mx-auto max-w-5xl px-4 py-5">
         <div className="flex items-center gap-3">
-          <Link href="/" className="flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-sm">
+          <BackHomeLink ariaLabel="Back to Home" className="flex h-11 w-11 touch-manipulation items-center justify-center rounded-full bg-white shadow-sm">
             <ArrowLeft size={18} />
-          </Link>
+          </BackHomeLink>
           <div>
             <p className="text-[8px] font-black uppercase tracking-[.2em] text-[#E1352B]">PrimeHub Wholesale</p>
             <h1 className="text-xl font-black">Prime Wholesale Packages</h1>
