@@ -99,3 +99,15 @@ test('homepage wholesale Sale Mela rail is pulled upward without changing standa
   assert.match(source, /home-sale-wholesale-frame/);
   assert.match(css, /\.home-sale-home-frame\.home-sale-wholesale-frame\s*\{[\s\S]*?margin-top: -14px;/);
 });
+
+
+test('homepage category rails stay anchored to the first card while keeping refresh shuffle', () => {
+  const source = read('components/home/HomeCategoryDeals.tsx');
+
+  assert.match(source, /setRefreshSeed\(railSeed\(\)\)/);
+  assert.match(source, /orderHomeProducts\(/);
+  assert.match(source, /data-home-category-rail/);
+  assert.match(source, /rail\.scrollLeft = 0/);
+  assert.match(source, /overscrollBehaviorX: 'none'/);
+  assert.match(source, /direction: 'ltr'/);
+});
