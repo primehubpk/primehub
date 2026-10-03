@@ -5,11 +5,6 @@ import { useRouter } from 'next/navigation';
 import { pakistanNowWeekday, WEEKDAY_ORDER } from '@/lib/weeklyDealUtils';
 import type { WeeklyDeal } from '@/lib/types';
 
-type IdleWindow = Window & {
-  requestIdleCallback?: (callback: () => void, options?: { timeout?: number }) => number;
-  cancelIdleCallback?: (handle: number) => void;
-};
-
 export default function WeeklyDealNavigationWarmup({ weeklyDeals }: { weeklyDeals?: WeeklyDeal[] }) {
   const router = useRouter();
 
@@ -34,23 +29,7 @@ export default function WeeklyDealNavigationWarmup({ weeklyDeals }: { weeklyDeal
     // Warm its App Router payload immediately so the click does not wait on route code/RSC.
     router.prefetch(hrefs[0]);
 
-    // Warm the next two visible weekly routes only when the browser is idle. This keeps
-    // the homepage light on 4G while making adjacent weekly-deal taps much faster.
-    const browser = window as IdleWindow;
-    let idleId: number | null = null;
-    let fallbackTimer: number | null = null;
-    const warmAdjacent = () => hrefs.slice(1, 3).forEach((href) => router.prefetch(href));
 
-    if (browser.requestIdleCallback) {
-      idleId = browser.requestIdleCallback(warmAdjacent, { timeout: 1800 });
-    } else {
-      fallbackTimer = window.setTimeout(warmAdjacent, 900);
-    }
-
-    return () => {
-      if (idleId != null) browser.cancelIdleCallback?.(idleId);
-      if (fallbackTimer != null) window.clearTimeout(fallbackTimer);
-    };
   }, [router, weeklyDeals]);
 
   return null;

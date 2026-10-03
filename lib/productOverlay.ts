@@ -84,7 +84,7 @@ function cancelScrollRestore() {
   pendingScrollY = null;
 }
 
-function armSwallow() {
+function armSwallow(fallback?: () => void) {
   swallowNextPop = true;
   if (typeof window === 'undefined') return;
   window.clearTimeout(swallowTimer);
@@ -92,6 +92,7 @@ function armSwallow() {
   // real back tap is not eaten.
   swallowTimer = window.setTimeout(() => {
     swallowNextPop = false;
+    fallback?.();
   }, 600);
 }
 
@@ -261,6 +262,7 @@ export function closeProductOverlayNow() {
   const scrollY = previous?.scrollY ?? currentScrollY();
   frame = null;
   background = null;
+  const hadHistory = overlayHistory;
   overlayHistory = false;
   emit();
   if (!previous || typeof window === 'undefined') {
@@ -268,10 +270,19 @@ export function closeProductOverlayNow() {
     unlockScrollRestoration();
     return;
   }
-  // Restore the address bar without history.back(). A real tap's history.back()
-  // races Next.js: the product route stays on screen, and the next New Arrivals
-  // arrow is swallowed too. The list underneath never unmounted.
-  clearSwallow();
+  if (hadHistory) {
+    // Remove the one entry created on open. Replacing it with the list URL
+    // accumulated duplicate list entries and made repeated Back taps seem stuck.
+    pendingScrollY = scrollY;
+    armSwallow(() => {
+      if (window.location.pathname.startsWith('/product/')) rawReplaceState(previous.state, previous.url);
+      pendingScrollY = null;
+      unlockScrollRestoration();
+    });
+    window.history.back();
+    rememberScroll(scrollY);
+    return;
+  }
   rawReplaceState(previous.state, previous.url);
   rememberScroll(scrollY);
   unlockScrollRestoration();
@@ -332,4 +343,5 @@ export function installProductOverlayHistoryListener() {
   if (popListenerInstalled || typeof window === 'undefined') return;
   popListenerInstalled = true;
   window.addEventListener('popstate', onOverlayPopState, true);
+  window.addEventListener('ph-home-top', cancelScrollRestore);
 }

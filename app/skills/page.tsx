@@ -2,7 +2,7 @@ import { Suspense } from 'react';
 import SkillsShowcase from '@/components/SkillsShowcase';
 import { getPrimeSkillsSnapshot } from '@/lib/publicCatalogServer';
 
-export const revalidate = 600;
+export const revalidate = 3600;
 
 function SkillsLoadingState() {
   return (

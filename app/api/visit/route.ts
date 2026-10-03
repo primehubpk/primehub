@@ -1,5 +1,7 @@
 ﻿import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
+import { visitorRequestAllowed } from "@/lib/visitorPolicy";
+import { verifyPrimeHubAdminRequest } from "@/lib/adminSession";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -44,6 +46,16 @@ function pakistanDayKey() {
 export async function POST(request: Request) {
   try {
     const body = await request.json().catch(() => null);
+
+    const allowed = visitorRequestAllowed({
+      environment: process.env.VERCEL_ENV,
+      hostname: new URL(request.url).hostname,
+      origin: request.headers.get('origin'),
+      userAgent: request.headers.get('user-agent') || '',
+      engaged: body?.engaged === true,
+      admin: Boolean(await verifyPrimeHubAdminRequest(request)),
+    });
+    if (!allowed) return NextResponse.json({ success: true, ignored: true });
 
     const rawDeviceId = String(body?.deviceId || "").trim();
     const rawSource = String(body?.source || "")

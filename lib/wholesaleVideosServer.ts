@@ -224,7 +224,7 @@ export async function getWholesaleVideosSnapshot() {
 export const getCachedWholesaleVideosSnapshot = unstable_cache(
   getWholesaleVideosSnapshot,
   ['primehub-wholesale-videos-v1'],
-  { revalidate: 600, tags: ['storefront-settings', 'wholesale-videos'] },
+  { revalidate: 3600, tags: ['storefront-settings', 'wholesale-videos'] },
 );
 
 export async function saveWholesaleVideosSupabasePrimary(values: unknown) {

@@ -22,7 +22,7 @@ type VisitorData = {
 };
 
 const LABELS: Record<string, string> = {
-  direct: "Direct",
+  direct: "Direct / no referral",
   google: "Google",
   tiktok: "TikTok",
   facebook: "Facebook",
@@ -122,13 +122,12 @@ export default function VisitorStats() {
             <p className="text-[9px] font-black uppercase tracking-[0.18em] text-[#0F6A5F]">
               Website Visitors
             </p>
-            <h2 className="text-lg font-black">Daily Unique Devices</h2>
+            <h2 className="text-lg font-black">Daily Unique Browsers</h2>
           </div>
         </div>
 
         <p className="mt-2 text-[10px] leading-4 text-black/45">
-          Same browser/device counts only once per Pakistan day, even after guest,
-          admin or reseller login.
+          One browser counts once per Pakistan day. New visits require interaction; known bots, preview/local tests and signed-in admins are excluded. Direct means no identifiable referral. Older totals used page loads. Clearing storage or using another browser can count again.
         </p>
 
         {error ? (

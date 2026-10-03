@@ -7,7 +7,7 @@ import { compactPublicCatalogSnapshot, getPublicCatalogSnapshot, getStorefrontSe
 import type { SiteSettings } from '@/lib/types';
 import type { Product, Category } from '@/components/shop/ShopTypes';
 
-export const revalidate = 300;
+export const revalidate = 3600;
 
 function humanizeCategory(value: string) {
   return decodeURIComponent(value || '')

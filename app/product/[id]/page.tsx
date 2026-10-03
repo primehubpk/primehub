@@ -4,7 +4,7 @@ import { getPublicProductSnapshot } from '@/lib/publicCatalogServer';
 
 // Direct visits use this cached server snapshot. In-app opens paint from the
 // catalog already on screen and do not request the product again.
-export const revalidate = 600;
+export const revalidate = 3600;
 
 export default async function ProductDetailPage(
   props: {

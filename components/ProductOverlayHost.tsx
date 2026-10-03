@@ -144,11 +144,8 @@ export default function ProductOverlayHost() {
       if (typeof href !== 'string' || !href.startsWith('/')) return;
       const target = new URL(href, window.location.origin);
       const wanted = `${target.pathname}${target.search}`;
-      router.push(`${wanted}${target.hash}`);
-      window.setTimeout(() => {
-        const now = `${window.location.pathname}${window.location.search}`;
-        if (now !== wanted) window.location.assign(`${wanted}${target.hash}`);
-      }, 2500);
+      router.replace(`${wanted}${target.hash}`, { scroll: target.pathname !== '/' });
+
     };
     document.addEventListener('click', handleStorefrontClick, true);
     window.addEventListener('ph-overlay-navigate', onNavigate);
