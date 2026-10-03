@@ -6,7 +6,7 @@ import { compactPublicCatalogSnapshot, getPublicCatalogSnapshot, getStorefrontSe
 import type { SiteSettings } from '@/lib/types';
 import type { Product, Category } from '@/components/shop/ShopTypes';
 
-export const revalidate = 600;
+export const revalidate = 3600;
 
 export default async function BigDealPage() {
   const [catalogResult, settingsResult] = await Promise.allSettled([

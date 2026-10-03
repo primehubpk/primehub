@@ -23,7 +23,8 @@
       "cursor/customer-back-home-3680": false,
       "cursor/sale-back-images-3680": false,
       "fix/storefront-image-recovery-oct02": false,
-      "fix/storefront-image-delivery-oct02": false
+      "fix/storefront-image-delivery-oct02": false,
+      "fix/navigation-usage-visitors-oct03": false
     }
   }
 }

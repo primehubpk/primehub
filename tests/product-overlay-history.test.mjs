@@ -25,7 +25,8 @@ test('product open adds one history step and back restores the same page', async
         entries[index] = { state, url };
       },
       back() {
-        throw new Error('history.back should not run while closing the product');
+        index -= 1;
+        popListeners.forEach(listener => listener({ stopImmediatePropagation() {} }));
       },
     },
     location: {
@@ -81,6 +82,11 @@ test('product open adds one history step and back restores the same page', async
   assert.equal(entries[index].url, '/shop?q=bangles');
   assert.equal(window.scrollY, 640);
   assert.equal(entries.length, 2);
+  assert.equal(index, 0, "Back consumes the overlay entry instead of duplicating the list");
+  overlay.openProductOverlay({ id: "ring-3", href: "/product/ring-3", bigDeal: false, product: null });
+  overlay.closeProductOverlayNow();
+  assert.equal(index, 0);
+  assert.equal(entries.length, 2, "Repeated product opens do not grow history");
 });
 
 test('a weekly deal page asks to go home in one step', async () => {

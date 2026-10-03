@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
+import { visitorTrafficSource } from "@/lib/visitorPolicy";
 
 const DEVICE_KEY = "primehub-device-id-v1";
 const VISIT_DAY_KEY = "primehub-counted-day-v1";
@@ -57,117 +58,112 @@ function attemptIsFresh(day: string) {
   );
 }
 
-function trafficSource() {
-  const params = new URLSearchParams(window.location.search);
-
-  const utm = String(params.get("utm_source") || "").toLowerCase();
-  const referrer = String(document.referrer || "").toLowerCase();
-  const value = `${utm} ${referrer}`;
-
-  if (value.includes("tiktok")) return "tiktok";
-  if (value.includes("instagram")) return "instagram";
-  if (value.includes("facebook") || value.includes("fb.com")) return "facebook";
-  if (value.includes("whatsapp") || value.includes("wa.me")) return "whatsapp";
-  if (value.includes("youtube") || value.includes("youtu.be")) return "youtube";
-  if (value.includes("google")) return "google";
-
-  if (!utm && !referrer) return "direct";
-
-  return "other";
-}
-
 export default function VisitorTracker() {
   useEffect(() => {
+    if (process.env.NODE_ENV !== 'production' || navigator.webdriver ||
+        !['primehubmall.com', 'www.primehubmall.com'].includes(location.hostname)) return;
     let unsubscribe = () => {};
+    let started = false;
+    const source = visitorTrafficSource(location.search, document.referrer, location.origin);
+    const start = (event: Event) => {
+      if (started || !event.isTrusted || document.visibilityState !== 'visible' || location.pathname.startsWith('/admin')) return;
+      started = true;
 
-    try {
-      const day = pakistanDayKey();
-      const deviceId = getDeviceId();
-      const source = trafficSource();
+      try {
+        const day = pakistanDayKey();
+        const deviceId = getDeviceId();
 
-      const sendVisit = async (member?: {
-        uid: string;
-        email?: string | null;
-        name?: string | null;
-      }) => {
-        const response = await fetch("/api/visit", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          credentials: "same-origin",
-          keepalive: true,
-          cache: "no-store",
-          body: JSON.stringify({
-            deviceId,
-            source,
-            memberUid: member?.uid || "",
-            memberEmail: member?.email || "",
-            memberName: member?.name || "",
-          }),
-        });
 
-        if (!response.ok) {
-          throw new Error("Visitor count request failed.");
-        }
-
-        return response.json().catch(() => ({
-          success: true,
-          memberLinked: false,
-        }));
-      };
-
-      if (
-        window.localStorage.getItem(VISIT_DAY_KEY) !== day &&
-        !attemptIsFresh(day)
-      ) {
-        window.localStorage.setItem(
-          ATTEMPT_KEY,
-          `${day}|${Date.now()}`,
-        );
-
-        void sendVisit()
-          .then(() => {
-            window.localStorage.setItem(VISIT_DAY_KEY, day);
-            window.localStorage.removeItem(ATTEMPT_KEY);
-          })
-          .catch(() => {
-            try {
-              window.localStorage.removeItem(ATTEMPT_KEY);
-            } catch {}
+        const sendVisit = async (member?: {
+          uid: string;
+          email?: string | null;
+          name?: string | null;
+        }) => {
+          const response = await fetch("/api/visit", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            credentials: "same-origin",
+            keepalive: true,
+            cache: "no-store",
+            body: JSON.stringify({
+              deviceId,
+              engaged: true,
+              source,
+              memberUid: member?.uid || "",
+              memberEmail: member?.email || "",
+              memberName: member?.name || "",
+            }),
           });
-      }
 
-      unsubscribe = onAuthStateChanged(auth, (user) => {
-        if (!user) return;
+          if (!response.ok) {
+            throw new Error("Visitor count request failed.");
+          }
 
-        const memberKey = `${day}|${user.uid}`;
+          return response.json().catch(() => ({
+            success: true,
+            memberLinked: false,
+          }));
+        };
 
         if (
-          window.localStorage.getItem(MEMBER_LINK_KEY) ===
-          memberKey
+          window.localStorage.getItem(VISIT_DAY_KEY) !== day &&
+          !attemptIsFresh(day)
         ) {
-          return;
+          window.localStorage.setItem(
+            ATTEMPT_KEY,
+            `${day}|${Date.now()}`,
+          );
+
+          void sendVisit()
+            .then(() => {
+              window.localStorage.setItem(VISIT_DAY_KEY, day);
+              window.localStorage.removeItem(ATTEMPT_KEY);
+            })
+            .catch(() => {
+              try {
+                window.localStorage.removeItem(ATTEMPT_KEY);
+              } catch {}
+            });
         }
 
-        void sendVisit({
-          uid: user.uid,
-          email: user.email,
-          name: user.displayName,
-        })
-          .then((result) => {
-            if (result?.success) {
-              window.localStorage.setItem(
-                MEMBER_LINK_KEY,
-                memberKey,
-              );
-            }
-          })
-          .catch(() => {});
-      });
-    } catch {}
+        unsubscribe = onAuthStateChanged(auth, (user) => {
+          if (!user) return;
 
-    return () => unsubscribe();
+          const memberKey = `${day}|${user.uid}`;
+
+          if (
+            window.localStorage.getItem(MEMBER_LINK_KEY) ===
+            memberKey
+          ) {
+            return;
+          }
+
+          void sendVisit({
+            uid: user.uid,
+            email: user.email,
+            name: user.displayName,
+          })
+            .then((result) => {
+              if (result?.success) {
+                window.localStorage.setItem(
+                  MEMBER_LINK_KEY,
+                  memberKey,
+                );
+              }
+            })
+            .catch(() => {});
+        });
+      } catch {}
+
+    };
+    const events = ['pointerdown', 'keydown', 'touchstart', 'wheel'];
+    events.forEach(type => window.addEventListener(type, start, { passive: true }));
+    return () => {
+      events.forEach(type => window.removeEventListener(type, start));
+      unsubscribe();
+    };
   }, []);
 
   return null;

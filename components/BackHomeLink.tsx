@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useRef, type MouseEvent, PointerEvent, ReactNode } from 'react';
+import { type MouseEvent, ReactNode } from 'react';
+import { scrollHomeToTop } from '@/lib/homeKeep';
 import { requestStorefrontHome } from '@/lib/productOverlay';
 
 type Props = {
@@ -17,45 +18,27 @@ function plainPointer(event: { button: number; metaKey: boolean; ctrlKey: boolea
 
 export default function BackHomeLink({ className, children, ariaLabel }: Props) {
   const router = useRouter();
-  const handledRef = useRef(false);
 
   const goHome = () => {
     const action = requestStorefrontHome();
     if (action === 'scroll-top') {
-      window.scrollTo(0, 0);
+      scrollHomeToTop();
       return;
     }
     if (action === 'overlay-home' || action === 'pushed-home') return;
     const target = '/';
-    router.push(target);
-    // A short fallback used to reload the whole homepage, which fetched every
-    // picture again. Only leave the client router if it truly never started.
-    window.setTimeout(() => {
-      if (window.location.pathname !== '/') window.location.assign(target);
-    }, 2500);
-  };
+    router.push(target, { scroll: false });
 
-  const onPointerDown = (event: PointerEvent<HTMLAnchorElement>) => {
-    if (!plainPointer(event)) return;
-    event.preventDefault();
-    event.stopPropagation();
-    handledRef.current = true;
-    goHome();
   };
 
   const onClick = (event: MouseEvent<HTMLAnchorElement>) => {
-    if (handledRef.current) {
-      handledRef.current = false;
-      event.preventDefault();
-      return;
-    }
     if (event.defaultPrevented || !plainPointer(event)) return;
     event.preventDefault();
     goHome();
   };
 
   return (
-    <Link href="/" prefetch={false} className={className} aria-label={ariaLabel} onPointerDown={onPointerDown} onClick={onClick}>
+    <Link href="/" prefetch={false} className={className} aria-label={ariaLabel} onClick={onClick}>
       {children}
     </Link>
   );

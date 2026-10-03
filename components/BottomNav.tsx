@@ -6,6 +6,8 @@ import { useEffect, useState } from 'react';
 import { GraduationCap, Home, Package, ShoppingBag, Users } from 'lucide-react';
 import { isProductOverlayOpen, storefrontClickClaimed } from '@/lib/productOverlay';
 
+import { scrollHomeToTop } from '@/lib/homeKeep';
+
 const RESELLER_DASHBOARD = '/reseller/dashboard';
 
 const NAV_ITEMS = [
@@ -106,8 +108,8 @@ export default function BottomNav() {
                 if (key === 'home' && pathname === '/') {
                   event.preventDefault();
                   setPendingHref(null);
-                  if (window.location.hash) window.history.replaceState(null, '', '/');
-                  window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+                  if (window.location.hash) window.history.replaceState(window.history.state, '', '/');
+                  scrollHomeToTop();
                   return;
                 }
 

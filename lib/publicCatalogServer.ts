@@ -9,10 +9,11 @@ const SETTINGS_RETRY_DELAYS_MS = [0];
 const PUBLIC_PRIMARY_TIMEOUT_MS = 8000;
 // Admin/product writes explicitly invalidate the public-catalog tag, so a longer
 // fallback TTL cuts repeated Supabase egress without delaying normal updates.
-const CATALOG_READ_CACHE = { revalidate: 600, tags: ['public-catalog'], timeoutMs: PUBLIC_PRIMARY_TIMEOUT_MS };
-const PRODUCT_READ_CACHE = { revalidate: 600, tags: ['public-products'], timeoutMs: PUBLIC_PRIMARY_TIMEOUT_MS };
-const SETTINGS_READ_CACHE = { revalidate: 600, tags: ['storefront-settings'], timeoutMs: PUBLIC_PRIMARY_TIMEOUT_MS };
-const SKILLS_READ_CACHE = { revalidate: 600, tags: ['prime-skills', 'storefront-settings'], timeoutMs: PUBLIC_PRIMARY_TIMEOUT_MS };
+// Cache the normalized result once, not both the upstream fetch and its wrapper.
+const CATALOG_READ_CACHE = { cache: 'no-store' as const, timeoutMs: PUBLIC_PRIMARY_TIMEOUT_MS };
+const PRODUCT_READ_CACHE = { cache: 'no-store' as const, timeoutMs: PUBLIC_PRIMARY_TIMEOUT_MS };
+const SETTINGS_READ_CACHE = { cache: 'no-store' as const, timeoutMs: PUBLIC_PRIMARY_TIMEOUT_MS };
+const SKILLS_READ_CACHE = { cache: 'no-store' as const, timeoutMs: PUBLIC_PRIMARY_TIMEOUT_MS };
 
 function supabaseServiceConfig() {
   const url = String(process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '').replace(/\/+$/, '');
@@ -35,7 +36,7 @@ export async function getPublicRewardGiftsSnapshot() {
   params.set('limit', '100');
   const response = await fetch(`${url}/rest/v1/reward_gifts?${params.toString()}`, {
     headers: { apikey: key, Authorization: `Bearer ${key}` },
-    next: { revalidate: 600, tags: ['rewards'] },
+    next: { revalidate: 3600, tags: ['rewards'] },
     signal: AbortSignal.timeout(PUBLIC_PRIMARY_TIMEOUT_MS),
   });
   if (!response.ok) throw new Error(`Supabase reward gifts read failed ${response.status}`);
@@ -75,7 +76,7 @@ async function loadPublicCatalog() {
 export const getPublicCatalogSnapshot = unstable_cache(
   loadPublicCatalog,
   ['primehub-public-catalog-dual-v8'],
-  { revalidate: 600, tags: ['public-catalog'] },
+  { revalidate: 3600, tags: ['public-catalog'] },
 );
 
 export const getPublicCategoriesSnapshot = unstable_cache(
@@ -84,7 +85,7 @@ export const getPublicCategoriesSnapshot = unstable_cache(
     return result;
   }),
   ['primehub-public-categories-v1'],
-  { revalidate: 600, tags: ['public-catalog'] },
+  { revalidate: 3600, tags: ['public-catalog'] },
 );
 
 const CATALOG_SEED_HEAVY_FIELDS = new Set([
@@ -143,7 +144,7 @@ async function loadPublicProduct(productId: string) {
 export const getPublicProductSnapshot = unstable_cache(
   loadPublicProduct,
   ['primehub-public-product-dual-v2'],
-  { revalidate: 600, tags: ['public-products'] },
+  { revalidate: 3600, tags: ['public-products'] },
 );
 
 export async function getFreshPublicProductSnapshot(productId: string) {
@@ -168,11 +169,11 @@ async function loadStorefrontSettingsResult() {
 export const getStorefrontSettingsResultSnapshot = unstable_cache(
   loadStorefrontSettingsResult,
   ['primehub-storefront-settings-dual-v5'],
-  { revalidate: 600, tags: ['storefront-settings'] },
+  { revalidate: 3600, tags: ['storefront-settings'] },
 );
 
 // The app-wide settings provider refreshes while a customer keeps a tab open.
-// Share one ten-minute server snapshot so those refreshes do not repeat Supabase
+// Share one hourly server snapshot so those refreshes do not repeat Supabase
 // and Firebase recovery reads for every browser tab.
 async function loadPublicStorefrontSettingsDocumentsSnapshot() {
   const result = await getStorefrontSettingsResultSnapshot();
@@ -180,11 +181,7 @@ async function loadPublicStorefrontSettingsDocumentsSnapshot() {
   return { ...result.documents, main };
 }
 
-export const getPublicStorefrontSettingsDocumentsSnapshot = unstable_cache(
-  loadPublicStorefrontSettingsDocumentsSnapshot,
-  ['primehub-public-storefront-settings-documents-v1'],
-  { revalidate: 600, tags: ['storefront-settings', 'wholesale-videos'] },
-);
+export const getPublicStorefrontSettingsDocumentsSnapshot = loadPublicStorefrontSettingsDocumentsSnapshot;
 
 export async function getStorefrontSettingsSnapshot() {
   const result = await getStorefrontSettingsResultSnapshot();
@@ -207,7 +204,7 @@ async function loadRewardSettings() {
 export const getRewardSettingsSnapshot = unstable_cache(
   loadRewardSettings,
   ['primehub-home-reward-settings-dual-v2'],
-  { revalidate: 60, tags: ['storefront-settings', 'rewards'] },
+  { revalidate: 3600, tags: ['storefront-settings', 'rewards'] },
 );
 
 async function mergeFreshStorefrontSettings(
@@ -257,5 +254,5 @@ async function loadPrimeSkills() {
 export const getPrimeSkillsSnapshot = unstable_cache(
   loadPrimeSkills,
   ['primehub-prime-skills-dual-v5'],
-  { revalidate: 600, tags: ['prime-skills'] },
+  { revalidate: 3600, tags: ['prime-skills'] },
 );

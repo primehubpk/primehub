@@ -77,7 +77,7 @@ async function readFirebaseBigDealCandidates() {
 const getCachedFirebaseBigDealCandidates = unstable_cache(
   readFirebaseBigDealCandidates,
   ['primehub-storefront-big-deal-dedicated-recovery-v1'],
-  { revalidate: 600, tags: ['storefront-settings'] },
+  { revalidate: 3600, tags: ['storefront-settings'] },
 );
 
 async function getFirebaseBigDealCandidates(_cacheOptions?: DualReadCacheOptions) {

@@ -36,39 +36,24 @@ type Props = {
 
 function ProductBackButton() {
   const router = useRouter();
-  const handledRef = useRef(false);
   const goBack = () => {
-    if (isProductOverlayOpen()) closeProductOverlayNow();
+    if (isProductOverlayOpen()) { closeProductOverlayNow(); return; }
     // Overlay close puts the shop URL back in this same tap. A real product
     // page, or a restore that did not stick, still has to leave. Client
     // navigation keeps the pictures; a full reload is only the stuck fallback.
     if (!window.location.pathname.startsWith('/product/')) return;
-    const here = `${window.location.pathname}${window.location.search}`;
     const saved = readReturnPath();
     clearReturnPath();
     const destination = saved && saved.startsWith('/') && !saved.startsWith('/product/') ? saved : '/';
-    router.push(destination);
-    window.setTimeout(() => {
-      const now = `${window.location.pathname}${window.location.search}`;
-      if (now === here) window.location.replace(destination);
-    }, 450);
+    router.replace(destination, { scroll: false });
+
   };
   return (
     <button
       type="button"
       className="flex h-11 w-11 touch-manipulation items-center justify-center rounded-full bg-white shadow-sm"
       aria-label="Go back"
-      onPointerDown={(event) => {
-        if (event.button !== 0) return;
-        event.preventDefault();
-        handledRef.current = true;
-        goBack();
-      }}
       onClick={() => {
-        if (handledRef.current) {
-          handledRef.current = false;
-          return;
-        }
         goBack();
       }}
     >
