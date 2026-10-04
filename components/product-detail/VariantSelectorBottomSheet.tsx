@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Bot, Minus, Plus, ShoppingCart, X, Zap } from 'lucide-react';
 import type { ProductVariantRow, ProductVariantSelection } from '@/lib/types';
 import { normalizeProductVariants, type VariantModalProduct } from '@/lib/cartStore';
@@ -270,7 +271,9 @@ export default function VariantSelectorBottomSheet({
     );
   }
 
-  return (
+  if (typeof document === 'undefined') return null;
+
+  return createPortal(
     <div
       className="fixed inset-0 z-[90] flex items-end justify-center bg-black/45 backdrop-blur-sm transition-opacity duration-300"
       role="dialog"
@@ -421,6 +424,7 @@ export default function VariantSelectorBottomSheet({
           {mode === 'buy' ? 'Buy Now / Proceed to Checkout' : 'Add to Cart'}
         </button>
       </section>
-    </div>
+    </div>,
+    document.body,
   );
 }
