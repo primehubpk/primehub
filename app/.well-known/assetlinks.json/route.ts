@@ -1,0 +1,21 @@
+const ASSET_LINKS = [
+  {
+    relation: ['delegate_permission/common.handle_all_urls'],
+    target: {
+      namespace: 'android_app',
+      package_name: 'com.primehubmall.app',
+      sha256_cert_fingerprints: [
+        'C4:6E:0D:2A:E6:E6:F0:C8:11:FB:2B:A4:1B:48:5E:16:96:B6:86:6C:53:9F:CA:71:B7:74:B8:80:78:C4:7F:E3',
+      ],
+    },
+  },
+];
+
+export function GET() {
+  return Response.json(ASSET_LINKS, {
+    headers: {
+      'Content-Type': 'application/json',
+      'Cache-Control': 'public, max-age=3600',
+    },
+  });
+}

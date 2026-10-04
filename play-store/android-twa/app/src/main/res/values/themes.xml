@@ -1,0 +1,11 @@
+<resources>
+    <style name="Theme.PrimeHub" parent="@android:style/Theme.DeviceDefault.Light.NoActionBar">
+        <item name="android:windowBackground">@color/backgroundColor</item>
+        <item name="android:statusBarColor">@color/colorPrimary</item>
+        <item name="android:navigationBarColor">@color/navigationColor</item>
+    </style>
+
+    <style name="Theme.PrimeHub.Launcher" parent="Theme.PrimeHub">
+        <item name="android:windowBackground">@color/backgroundColor</item>
+    </style>
+</resources>

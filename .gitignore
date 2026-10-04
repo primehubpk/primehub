@@ -23,3 +23,15 @@
 *.tsbuildinfo
 next-env.d.ts
 .env*
+
+# Android / Play Store signing (never commit keys)
+play-store/android-twa/local.properties
+play-store/android-twa/.gradle/
+play-store/android-twa/build/
+play-store/android-twa/app/build/
+play-store/android-twa/*.jks
+play-store/android-twa/*.p12
+play-store/android-twa/*.keystore
+*.jks
+*.p12
+*.keystore
