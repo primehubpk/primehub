@@ -410,7 +410,7 @@ export default function ProductGridRewards({
     }
 
     const currentPrice = effectivePrice(currentProduct);
-    addItem({
+    if (!await addItem({
       id: currentProduct.id,
       productId: currentProduct.id,
       category: String(currentProduct.category || ""),
@@ -419,7 +419,7 @@ export default function ProductGridRewards({
       originalPrice: original(currentProduct) || currentPrice,
       image: img,
       imageUrl: img,
-    });
+    })) return;
     trackTikTokEvent("AddToCart", {
       contents: [makeTikTokContent({ id: currentProduct.id, name: title(currentProduct), category: currentProduct.category, price: currentPrice, quantity: 1 })],
       value: currentPrice,

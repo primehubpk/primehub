@@ -167,6 +167,7 @@ export function useShopCatalog(initialCategory?: string, initialQuery = '', init
 
   const addProduct = async (product: Product) => {
     let currentProduct = product;
+    let verifiedProduct: Product | undefined;
 
     try {
       const response = await fetch(
@@ -177,6 +178,7 @@ export function useShopCatalog(initialCategory?: string, initialQuery = '', init
         const data = await response.json();
         if (data?.product && String(data.product.id || '') === String(product.id)) {
           currentProduct = data.product as Product;
+          verifiedProduct = currentProduct;
           setProducts((current) => current.map((item) => item.id === currentProduct.id ? currentProduct : item));
         }
       }
@@ -187,7 +189,7 @@ export function useShopCatalog(initialCategory?: string, initialQuery = '', init
     const image = imageOf(currentProduct) || imageOf(product);
     if (productHasVariants(currentProduct) && openVariantModal({ ...currentProduct, image, imageUrl: image }, 'cart')) return;
     const currentPrice = priceOf(currentProduct);
-    addItem({
+    if (!await addItem({
       id: currentProduct.id,
       productId: currentProduct.id,
       category: String(currentProduct.category || ''),
@@ -196,7 +198,7 @@ export function useShopCatalog(initialCategory?: string, initialQuery = '', init
       originalPrice: originalOf(currentProduct) || currentPrice,
       image,
       imageUrl: image,
-    });
+    }, 1, verifiedProduct)) return;
     trackTikTokEvent('AddToCart', {
       contents: [
         makeTikTokContent({

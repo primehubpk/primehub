@@ -1,5 +1,8 @@
 'use client';
 
+import { useCartStore } from '@/lib/cartStore';
+import dynamic from 'next/dynamic';
+import { rememberShoppingReturnPath } from '@/lib/shoppingReturn';
 import { useEffect, useSyncExternalStore } from 'react';
 import { useRouter } from 'next/navigation';
 import ProductDetailPageClient from '@/components/product-detail/ProductDetailPageClient';
@@ -20,6 +23,9 @@ import {
   subscribeProductOverlay,
   type ProductOverlayProduct,
 } from '@/lib/productOverlay';
+
+const CheckoutPage = dynamic(() => import('@/app/checkout/page'));
+const CartPage = dynamic(() => import('@/app/cart/page'));
 
 function isPlainLeftClick(event: MouseEvent) {
   if (event.defaultPrevented || event.button !== 0) return false;
@@ -98,6 +104,10 @@ function handleStorefrontClick(event: MouseEvent) {
     return;
   }
 
+  if (url.pathname === '/cart' || url.pathname === '/checkout') {
+    rememberShoppingReturnPath();
+    useCartStore.getState().closeDrawer();
+  }
   if (!isProductOverlayOpen()) return;
   if (url.pathname === '/' && !url.search) {
     event.preventDefault();
@@ -159,7 +169,8 @@ export default function ProductOverlayHost() {
   if (!frame) return null;
 
   return (
-    <div data-ph-product-overlay="" className="fixed inset-0 z-[35] overflow-y-auto overscroll-contain bg-[#F4F4F1]">
+    <>
+    <div data-ph-product-overlay="" hidden={Boolean(snapshot.commercePath)} className="fixed inset-0 z-[35] overflow-y-auto overscroll-contain bg-[#F4F4F1]">
       <ProductDetailPageClient
         key={`${frame.id}:${frame.bigDeal ? 'big' : 'regular'}`}
         initialProduct={frame.product as never}
@@ -167,5 +178,9 @@ export default function ProductOverlayHost() {
         bigDeal={frame.bigDeal}
       />
     </div>
+    {snapshot.commercePath && <div key={snapshot.commercePath} data-ph-commerce-overlay="" className="fixed inset-0 z-[36] overflow-y-auto overscroll-contain bg-[#F4F4F1]">
+      {snapshot.commercePath === '/checkout' ? <CheckoutPage /> : <CartPage />}
+    </div>}
+    </>
   );
 }

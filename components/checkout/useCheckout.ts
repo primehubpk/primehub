@@ -1,7 +1,8 @@
 'use client';
 import { fetchPublicStorefront } from '@/lib/storefrontClient';
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
-import { BASE_DELIVERY_CHARGE } from '@/lib/deliveryCharges';
+import { useSettings } from '@/lib/useSettings';
+import { calculateDeliveryCharge, BASE_DELIVERY_CHARGE } from '@/lib/deliveryCharges';
 import { auth } from '@/lib/firebase';
 import { useCartStore } from '@/lib/cartStore';
 import { makeTikTokContent, trackTikTokEvent } from '@/lib/tiktokPixel';
@@ -46,12 +47,13 @@ function rememberReviewOrder(orderId: string, productIds: string[]) { try { cons
 function rememberOrderProgress(orderId: string, wholesaleItems = 0) { try { const raw = window.localStorage.getItem(ORDER_PROGRESS_KEY); const existing = raw ? JSON.parse(raw) : []; const entries = Array.isArray(existing) ? existing : []; const next = [{ orderId, createdAt: new Date().toISOString(), wholesale: Number(wholesaleItems || 0) > 0 }, ...entries.filter((entry: any) => entry?.orderId !== orderId)].slice(0, 100); window.localStorage.setItem(ORDER_PROGRESS_KEY, JSON.stringify(next)); window.dispatchEvent(new Event('primehub:reseller-progress')); } catch {} }
 
 export function useCheckout() {
+  const { settings } = useSettings();
   const items = useCartStore((state: any) => state.items || state.cart || []), clearCart = useCartStore((state: any) => state.clearCart);
   const [customer, setCustomer] = useState<Customer>({ name: '', phone: '', email: '', address: '', city: '', notes: '' });
   const [placing, setPlacing] = useState(false), [orderId, setOrderId] = useState(''), [error, setError] = useState('');
   const [reviewProductIds, setReviewProductIds] = useState<string[]>([]);
-  const [deliveryCharge, setDeliveryCharge] = useState(BASE_DELIVERY_CHARGE);
-  const [rewardLabel, setRewardLabel] = useState('');
+  const [quotedDelivery, setDeliveryCharge] = useState<{ key: string; charge: number } | null>(null);
+  const [quotedRewardLabel, setRewardLabel] = useState('');
   const [selfCollect, setSelfCollect] = useState(false);
   const [wholesaleItems, setWholesaleItems] = useState(0);
   const [tierDiscount, setTierDiscount] = useState(0), [tierDiscountPercent, setTierDiscountPercent] = useState(0), [resellerTier, setResellerTier] = useState('');
@@ -59,6 +61,10 @@ export function useCheckout() {
   const totalItems = useMemo(() => items.reduce((sum: number, item: any) => sum + Number(item.quantity || item.qty || 1), 0), [items]);
   const subtotal = useMemo(() => items.reduce((sum: number, item: any) => sum + priceOf(item) * Number(item.quantity || item.qty || 1), 0), [items]);
   const discountedSubtotal = Math.max(0, subtotal - tierDiscount);
+  const deliveryKey = JSON.stringify([items, selfCollect, settings.freeDelivery]);
+  const localDelivery = calculateDeliveryCharge(items, settings.freeDelivery);
+  const deliveryCharge = selfCollect ? 0 : quotedDelivery?.key === deliveryKey ? quotedDelivery.charge : localDelivery.deliveryCharge;
+  const rewardLabel = selfCollect ? '' : quotedDelivery?.key === deliveryKey ? quotedRewardLabel : localDelivery.freeDelivery ? 'Free delivery unlocked' : '';
   const total = discountedSubtotal + deliveryCharge;
   useEffect(() => {
     if (checkoutTracked.current || !items.length || subtotal <= 0) return;
@@ -72,11 +78,11 @@ export function useCheckout() {
     checkoutTracked.current = true;
   }, [items, subtotal]);
   useEffect(() => {
-    if (!items.length) { setDeliveryCharge(BASE_DELIVERY_CHARGE); setWholesaleItems(0); setRewardLabel(''); return; }
+    if (!items.length) { setDeliveryCharge(null); setWholesaleItems(0); setRewardLabel(''); return; }
     let cancelled = false;
-    getAuthoritativeQuote(items, selfCollect).then(quote => { if (!cancelled) { setDeliveryCharge(Number(quote.deliveryCharge ?? BASE_DELIVERY_CHARGE)); setWholesaleItems(Number(quote.wholesaleItems || 0)); setTierDiscount(Number(quote.tierDiscount || 0)); setTierDiscountPercent(Number(quote.tierDiscountPercent || 0)); setResellerTier(String(quote.resellerTier || '')); setRewardLabel(String(quote.rewardLabel || '')); } }).catch(() => undefined);
+    getAuthoritativeQuote(items, selfCollect).then(quote => { if (!cancelled) { setError(''); setDeliveryCharge({ key: deliveryKey, charge: Number(quote.deliveryCharge ?? BASE_DELIVERY_CHARGE) }); setWholesaleItems(Number(quote.wholesaleItems || 0)); setTierDiscount(Number(quote.tierDiscount || 0)); setTierDiscountPercent(Number(quote.tierDiscountPercent || 0)); setResellerTier(String(quote.resellerTier || '')); setRewardLabel(String(quote.rewardLabel || '')); } }).catch(caught => { if (!cancelled) setError(caught instanceof Error ? caught.message : 'Unable to verify your cart.'); });
     return () => { cancelled = true; };
-  }, [items, selfCollect]);
+  }, [items, selfCollect, deliveryKey]);
   const update = (key: keyof Customer, value: string) => setCustomer(previous => ({ ...previous, [key]: value }));
   const placeOrder = async (event: FormEvent) => { event.preventDefault(); setError(''); if (!items.length) return setError('Your cart is empty. Please add a product first.'); if (!customer.name.trim() || !customer.phone.trim() || (!selfCollect && (!customer.address.trim() || !customer.city.trim()))) return setError(selfCollect ? 'Please fill your name and phone.' : 'Please fill your name, phone, address and city.'); setPlacing(true); try { const response = await fetch('/api/orders', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(await authHeader()) }, body: JSON.stringify({ customer, items, selfCollect, guestId: guestId() }) }); const data = await response.json(); if (!response.ok) throw new Error(data.error || 'Order save nahi ho saka.'); const productIds = Array.isArray(data.items) ? data.items.map((item: any) => String(item.productId || item.id || '')).filter(Boolean) : items.map((item: any) => String(item.productId || item.id || '')).filter(Boolean); const completedItems = Array.isArray(data.items) && data.items.length ? data.items : items; const completedContents = tikTokContents(completedItems, items); if (completedContents.length) { trackTikTokEvent('PlaceAnOrder', { contents: completedContents as any, value: Number(data.total ?? total), currency: 'PKR' }); } setReviewProductIds(productIds); rememberReviewOrder(data.orderId, productIds); rememberOrderProgress(data.orderId, Number(data.wholesaleItems || wholesaleItems || 0)); setOrderId(data.orderId); clearCart(); } catch (caught) { console.error(caught); setError(caught instanceof Error ? caught.message : 'Order save nahi ho saka. Please try again.'); } finally { setPlacing(false); } };
   const whatsappOrder = async () => { if (!items.length) return; setError(''); try { const [quote, adminNumber] = await Promise.all([getAuthoritativeQuote(items, selfCollect), getAdminWhatsAppNumber()]); const user = auth.currentUser; let resellerCode = '', requestId = ''; if (user) { const token = await user.getIdToken(); const track = await fetch('/api/reseller/whatsapp-order', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ customer, items: quote.items, subtotal: quote.subtotal, deliveryCharge: quote.deliveryCharge, total: quote.total, selfCollect }) }); const trackData = await track.json(); if (track.ok) { resellerCode = String(trackData.resellerCode || ''); requestId = String(trackData.requestId || ''); } else if (track.status !== 401) throw new Error(trackData.error || 'Unable to create WhatsApp reseller request.'); }
@@ -84,7 +90,7 @@ export function useCheckout() {
     const tracking = resellerCode ? ['', '*RESELLER ORDER*', `Reseller Code: ${resellerCode}`, `Request ID: ${requestId}`] : [];
     const wholesaleLine = Number(quote.wholesaleItems || 0) ? `Wholesale item surcharge (${quote.wholesaleItems} × Rs. 30): Rs. ${Number(quote.wholesaleSurcharge || 0).toLocaleString()}` : '';
     const rewardLine = quote.rewardLabel ? `*${quote.rewardLabel}*` : '';
-    const text = ['*Order from PrimeHub*', '', ...lines, '', '*Customer Details:*', `Name: ${customer.name || '-'}`, `Phone: ${customer.phone || '-'}`, `Address: ${customer.address || '-'}`, `City: ${customer.city || '-'}`, '', `Subtotal: Rs. ${Number(quote.subtotal).toLocaleString()}`, rewardLine, `Base delivery: Rs. ${Number(quote.baseDelivery || 350).toLocaleString()}`, wholesaleLine, `*Grand Total: Rs. ${Number(quote.total).toLocaleString()}*`, ...tracking].filter(Boolean).join('\n');
+    const text = ['*Order from PrimeHub*', '', ...lines, '', '*Customer Details:*', `Name: ${customer.name || '-'}`, `Phone: ${customer.phone || '-'}`, `Address: ${customer.address || '-'}`, `City: ${customer.city || '-'}`, '', `Subtotal: Rs. ${Number(quote.subtotal).toLocaleString()}`, rewardLine, `Base delivery: Rs. ${Number(quote.baseDelivery ?? 350).toLocaleString()}`, wholesaleLine, `*Grand Total: Rs. ${Number(quote.total).toLocaleString()}*`, ...tracking].filter(Boolean).join('\n');
     window.open(`https://wa.me/${adminNumber}?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
   } catch (caught) { console.error(caught); setError(caught instanceof Error ? caught.message : 'Unable to prepare WhatsApp order.'); } };
   return { items, customer, placing, orderId, reviewProductIds, error, totalItems, subtotal: discountedSubtotal, rawSubtotal: subtotal, tierDiscount, tierDiscountPercent, resellerTier, rewardLabel, deliveryCharge, wholesaleItems, total, selfCollect, setSelfCollect, update, placeOrder, whatsappOrder };
