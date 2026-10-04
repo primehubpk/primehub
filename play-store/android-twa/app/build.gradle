@@ -1,0 +1,56 @@
+plugins {
+    id 'com.android.application'
+}
+
+def envFile = { name -> System.getenv(name) ?: '' }
+
+android {
+    namespace 'com.primehubmall.app'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId "com.primehubmall.app"
+        minSdk 21
+        targetSdk 35
+        versionCode 1
+        versionName "1.0.0"
+    }
+
+    signingConfigs {
+        release {
+            def storePath = envFile('PRIMEHUB_STORE_FILE')
+            if (storePath) {
+                storeFile file(storePath)
+                storePassword envFile('PRIMEHUB_STORE_PASSWORD')
+                keyAlias envFile('PRIMEHUB_KEY_ALIAS')
+                keyPassword envFile('PRIMEHUB_KEY_PASSWORD')
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            shrinkResources false
+            if (envFile('PRIMEHUB_STORE_FILE')) {
+                signingConfig signingConfigs.release
+            }
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+configurations.all {
+    resolutionStrategy {
+        force 'androidx.browser:browser:1.8.0'
+    }
+}
+
+dependencies {
+    implementation 'com.google.androidbrowserhelper:androidbrowserhelper:2.6.2'
+    implementation 'androidx.browser:browser:1.8.0'
+}
