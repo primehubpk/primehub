@@ -6,7 +6,11 @@ App wrapper: Trusted Web Activity (same live website, no second backend)
 
 ## Files you need
 
-Download `PrimeHub-PlayStore-Upload.zip` from this Cursor chat. It contains:
+Download the zip from GitHub (this is the working link):
+
+https://github.com/primehubpk/primehub/raw/main/play-store/PrimeHub-PlayStore-Upload.zip
+
+It contains:
 
 - `app-release.aab` — upload this in Play Console
 - `keystore/primehub-upload.p12` — keep this forever
