@@ -2,7 +2,7 @@
 
 Android wrapper for https://www.primehubmall.com  
 Application ID: `com.primehubmall.app`  
-minSdk 24 · targetSdk 36 · versionCode 2
+minSdk 24 · targetSdk 36 · versionCode 3
 
 ## Build a Play Store bundle
 
