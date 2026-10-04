@@ -1,5 +1,8 @@
 'use client';
 
+import { useRef } from 'react';
+import { useRouter } from 'next/navigation';
+import { navigateFromProductOverlay } from '@/lib/productOverlay';
 import {
   normalizeProductVariants,
   useCartStore,
@@ -29,12 +32,16 @@ function imageOf(product?: GlobalProduct | null | any): string {
 }
 
 export default function GlobalVariantSelector() {
+  const router = useRouter();
+  const confirming = useRef(false);
+  const error = useCartStore(state => state.cartError);
+  const clearError = useCartStore(state => state.clearCartError);
   const product = useCartStore((state) => state.variantModalProduct) as GlobalProduct | null;
   const mode = useCartStore((state) => state.variantModalMode);
   const close = useCartStore((state) => state.closeVariantModal);
   const addItem = useCartStore((state) => state.addItem);
 
-  if (!product || !mode) return null;
+  if (!product || !mode) return error ? <div role="alert" className="fixed bottom-24 left-4 right-4 z-[160] rounded-xl bg-white p-4 text-sm text-red-700 shadow-xl">{error}<button type="button" onClick={clearError} className="ml-3 font-bold">Dismiss</button></div> : null;
 
   const normalized = normalizeProductVariants(product);
   const rows = normalized.rows;
@@ -52,8 +59,9 @@ export default function GlobalVariantSelector() {
   );
   const title = product.title || product.name || 'PrimeHub Deal';
 
-  function confirm(selection: ProductVariantSelection, quantity: number) {
-    if (!product) return;
+  async function confirm(selection: ProductVariantSelection, quantity: number) {
+    if (!product || confirming.current) return;
+    confirming.current = true;
 
     const selected = rows.find(
       (row) =>
@@ -78,8 +86,7 @@ export default function GlobalVariantSelector() {
       .join('|');
     const id = `${product.id}:${variantIdentity}`;
 
-    for (let index = 0; index < quantity; index += 1) {
-      addItem({
+    const added = await addItem({
         id,
         productId: product.id,
         category: String(product.category || ''),
@@ -89,8 +96,9 @@ export default function GlobalVariantSelector() {
         image,
         imageUrl: image,
         variant: selection,
-      });
-    }
+      }, quantity);
+    confirming.current = false;
+    if (!added) return;
 
     trackTikTokEvent('AddToCart', {
       contents: [
@@ -108,11 +116,14 @@ export default function GlobalVariantSelector() {
 
     close();
     if (mode === 'buy') {
-      window.location.href = '/checkout';
+      useCartStore.getState().closeDrawer();
+      if (!navigateFromProductOverlay('/checkout')) router.push('/checkout');
     }
   }
 
   return (
+    <>
+    {error && <div role="alert" className="fixed left-4 right-4 top-4 z-[160] rounded-xl bg-white p-4 text-sm text-red-700 shadow-xl">{error}<button type="button" onClick={clearError} className="ml-3 font-bold">Dismiss</button></div>}
     <VariantSelectorBottomSheet
       product={product}
       rows={rows}
@@ -124,5 +135,6 @@ export default function GlobalVariantSelector() {
       onClose={close}
       onConfirm={confirm}
     />
+    </>
   );
 }

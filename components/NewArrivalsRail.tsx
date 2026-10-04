@@ -68,11 +68,11 @@ export default function NewArrivalsRail({
     ? newest.slice(0, homeVisibleCount)
     : newest;
 
-  const addProduct = (product: Product) => {
+  const addProduct = async (product: Product) => {
     const image = imageOf(product);
     if (productHasVariants(product) && openVariantModal({ ...product, image, imageUrl: image }, 'cart')) return;
     const currentPrice = priceOf(product);
-    addItem({
+    if (!await addItem({
       id: product.id,
       productId: product.id,
       category: String(product.category || ''),
@@ -81,7 +81,7 @@ export default function NewArrivalsRail({
       originalPrice: originalOf(product) || currentPrice,
       image,
       imageUrl: image,
-    });
+    })) return;
     trackTikTokEvent('AddToCart', {
       contents: [makeTikTokContent({ id: product.id, name: titleOf(product), category: product.category, price: currentPrice, quantity: 1 })],
       value: currentPrice,

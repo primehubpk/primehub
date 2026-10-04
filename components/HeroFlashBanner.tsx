@@ -171,7 +171,7 @@ export default function HeroFlashBanner({ initialProducts = [], liveUpdates = tr
     return [...DAYS.slice(todayIndex), ...DAYS.slice(0, todayIndex)];
   }, [todayKey]);
 
-  function addDealToCart(deal: NonNullable<typeof weeklyDeals>[number]) {
+  async function addDealToCart(deal: NonNullable<typeof weeklyDeals>[number]) {
     const product = products[deal.productId];
     const { price, regular: normalPrice, comparison, live: isLive } = weeklyCartPrice(deal, product);
     if (!deal.productId || price <= 0 || Number((product as ProductDealFields | undefined)?.stock ?? 1) <= 0) return;
@@ -186,7 +186,7 @@ export default function HeroFlashBanner({ initialProducts = [], liveUpdates = tr
       imageUrl: image,
     } as Product;
     if (hasProductVariants(productWithDealPrice) && openVariantModal(productWithDealPrice, "cart")) return;
-    addItem({
+    if (!await addItem({
       id: deal.productId,
       productId: deal.productId,
       category: String(product?.category || ""),
@@ -196,7 +196,7 @@ export default function HeroFlashBanner({ initialProducts = [], liveUpdates = tr
       image,
       imageUrl: image,
       dealDay: isLive ? deal.day : undefined,
-    });
+    })) return;
     trackTikTokEvent("AddToCart", {
       contents: [makeTikTokContent({ id: deal.productId, name: productWithDealPrice.title || deal.title, category: product?.category, price, quantity: 1 })],
       value: price,
@@ -204,7 +204,7 @@ export default function HeroFlashBanner({ initialProducts = [], liveUpdates = tr
     });
   }
 
-  function addBigDealToCart() {
+  async function addBigDealToCart() {
     if (!bigDeal?.active || !activeBigSlot?.productId) return;
     const now = Date.now();
     const start = bigDeal.startAt ? new Date(bigDeal.startAt).getTime() : 0;
@@ -219,7 +219,7 @@ export default function HeroFlashBanner({ initialProducts = [], liveUpdates = tr
     const image = normalizeImageUrl(activeBigSlot.imageUrl || productData?.imageUrl || "");
     const productWithDealPrice = { ...product, id: activeBigSlot.productId, title: activeBigSlot.title, price: currentPrice, originalPrice: normalPrice, image, imageUrl: image } as Product;
     if (hasProductVariants(productWithDealPrice) && openVariantModal(productWithDealPrice, "cart")) return;
-    addItem({ id: activeBigSlot.productId, productId: activeBigSlot.productId, category: String(product?.category || ""), name: productWithDealPrice.title, price: currentPrice, originalPrice: productWithDealPrice.originalPrice || currentPrice, image, imageUrl: image });
+    if (!await addItem({ id: activeBigSlot.productId, productId: activeBigSlot.productId, category: String(product?.category || ""), name: productWithDealPrice.title, price: currentPrice, originalPrice: productWithDealPrice.originalPrice || currentPrice, image, imageUrl: image })) return;
     trackTikTokEvent("AddToCart", {
       contents: [makeTikTokContent({ id: activeBigSlot.productId, name: productWithDealPrice.title, category: product?.category, price: currentPrice, quantity: 1 })],
       value: currentPrice,

@@ -40,7 +40,7 @@ test('home Add to Cart checks the fresh product before deciding variants or stoc
 
 test('variant UI only opens for real saved rows and missing stock safely defaults to 30', () => {
   const shopTypes = read('components/shop/ShopTypes.ts');
-  const cartStore = read('lib/cartStore.ts');
+  const cartStore = read('lib/productVariants.ts');
 
   assert.match(shopTypes, /return variantRowsOf\(p\)\.some/);
   assert.doesNotMatch(shopTypes, /p\.hasVariants === true \|\|/);

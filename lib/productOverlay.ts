@@ -20,11 +20,13 @@ type BackgroundEntry = {
 
 type OverlaySnapshot = {
   frame: ProductOverlayFrame | null;
+  commercePath: string | null;
 };
 
 const listeners = new Set<() => void>();
 let frame: ProductOverlayFrame | null = null;
 let background: BackgroundEntry | null = null;
+let commercePaths: string[] = [];
 let popListenerInstalled = false;
 let swallowNextPop = false;
 let overlayHistory = false;
@@ -153,11 +155,11 @@ function rawReplaceState(data: unknown, url: string) {
   replace.call(window.history, data, '', url);
 }
 
-const serverSnapshot: OverlaySnapshot = { frame: null };
-let clientSnapshot: OverlaySnapshot = { frame: null };
+const serverSnapshot: OverlaySnapshot = { frame: null, commercePath: null };
+let clientSnapshot: OverlaySnapshot = { frame: null, commercePath: null };
 
 function emit() {
-  clientSnapshot = { frame };
+  clientSnapshot = { frame, commercePath: commercePaths.at(-1) || null };
   listeners.forEach((listener) => listener());
 }
 
@@ -228,6 +230,10 @@ export function productBackAction(input: {
 export function openProductOverlay(next: ProductOverlayFrame) {
   if (typeof window === 'undefined') return;
   installProductOverlayHistoryListener();
+  if (commercePaths.length) {
+    navigateFromProductOverlay(next.href);
+    return;
+  }
   if (!background) {
     lockScrollRestoration();
     const scrollY = currentScrollY();
@@ -248,6 +254,7 @@ export function openProductOverlay(next: ProductOverlayFrame) {
 }
 
 export function closeProductOverlayFromPop() {
+  commercePaths = [];
   frame = null;
   background = null;
   overlayHistory = false;
@@ -262,6 +269,8 @@ export function closeProductOverlayNow() {
   const scrollY = previous?.scrollY ?? currentScrollY();
   frame = null;
   background = null;
+  const historySteps = commercePaths.length + 1;
+  commercePaths = [];
   const hadHistory = overlayHistory;
   overlayHistory = false;
   emit();
@@ -279,7 +288,8 @@ export function closeProductOverlayNow() {
       pendingScrollY = null;
       unlockScrollRestoration();
     });
-    window.history.back();
+    if (historySteps > 1) window.history.go(-historySteps);
+    else window.history.back();
     rememberScroll(scrollY);
     return;
   }
@@ -290,6 +300,15 @@ export function closeProductOverlayNow() {
 
 export function navigateFromProductOverlay(href: string) {
   if (!frame || typeof window === 'undefined') return false;
+  if (href === '/cart' || href === '/checkout') {
+    if (commercePaths.at(-1) !== href) {
+      commercePaths.push(href);
+      rawPushState({ __phCommercePaths: [...commercePaths] }, href);
+      emit();
+    }
+    return true;
+  }
+  commercePaths = [];
   cancelScrollRestore();
   const previous = background;
   frame = null;
@@ -327,7 +346,34 @@ export function requestStorefrontHome(): 'overlay-home' | 'pushed-home' | 'route
   return 'router-home';
 }
 
+export function returnFromCommerceOverlay() {
+  if (!frame || !commercePaths.length || typeof window === 'undefined') return false;
+  window.history.go(-commercePaths.length);
+  return true;
+}
+
 function onOverlayPopState(event: PopStateEvent) {
+  if (frame && (commercePaths.length || event.state?.__phCommercePaths)) {
+    const path = `${window.location.pathname}${window.location.search}`;
+    event.stopImmediatePropagation();
+    if (path === frame.href) {
+      commercePaths = [];
+      emit();
+      return;
+    }
+    const storedPaths = event.state?.__phCommercePaths;
+    if (Array.isArray(storedPaths) && storedPaths.every(value => value === '/cart' || value === '/checkout') && storedPaths.at(-1) === path) {
+      commercePaths = storedPaths;
+      emit();
+      return;
+    }
+    const index = commercePaths.lastIndexOf(path);
+    if (index >= 0) {
+      commercePaths = commercePaths.slice(0, index + 1);
+      emit();
+      return;
+    }
+  }
   if (!frame && !swallowNextPop) return;
   event.stopImmediatePropagation();
   const swallowing = swallowNextPop;
