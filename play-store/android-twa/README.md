@@ -1,7 +1,8 @@
 # PrimeHub Trusted Web Activity
 
 Android wrapper for https://www.primehubmall.com  
-Application ID: `com.primehubmall.app`
+Application ID: `com.primehubmall.app`  
+minSdk 24 · targetSdk 36 · versionCode 2
 
 ## Build a Play Store bundle
 
