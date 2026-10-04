@@ -185,6 +185,7 @@ export function HomeProductCard({
     if (!cardHasPrice) return;
 
     let currentProduct = product;
+    let verifiedProduct: Product | undefined;
     try {
       const response = await fetch(
         `/api/storefront/read?type=product&id=${encodeURIComponent(product.id)}`,
@@ -194,6 +195,7 @@ export function HomeProductCard({
         const data = await response.json();
         if (data?.product && String(data.product.id || "") === String(product.id)) {
           currentProduct = data.product as Product;
+          verifiedProduct = currentProduct;
         }
       }
     } catch (error) {
@@ -227,7 +229,7 @@ export function HomeProductCard({
       return;
     }
 
-    addItem({
+    if (!await addItem({
       id: currentProduct.id,
       productId: currentProduct.id,
       category: String(currentProduct.category || ""),
@@ -237,7 +239,7 @@ export function HomeProductCard({
       image: currentSrc,
       imageUrl: currentSrc,
       dealDay: currentProduct.dealDay,
-    });
+    }, 1, verifiedProduct)) return;
     setUnavailable(false);
     setAdded(true);
   }

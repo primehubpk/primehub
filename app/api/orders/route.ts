@@ -1,3 +1,4 @@
+import { normalizeProductVariants } from '@/lib/productVariants';
 import { NextResponse } from 'next/server';
 import { calculateDeliveryCharge } from '@/lib/deliveryCharges';
 import { getDualProduct, getDualStorefrontSettings } from '@/lib/dualReadServer';
@@ -30,8 +31,18 @@ function cleanSalarOrderContext(value: unknown): SalarOrderContext | null {
 function pakistanWeekday(): Weekday { const day = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Karachi', weekday: 'long' }).format(new Date()).toLowerCase(); return (WEEKDAYS.includes(day as Weekday) ? day : 'sunday') as Weekday; }
 function numberValue(value: unknown) { const parsed = Number(value); return Number.isFinite(parsed) ? parsed : 0; }
 function cleanGuestId(value: unknown) { const id = String(value || '').trim(); return /^g_[a-zA-Z0-9]{12,80}$/.test(id) ? id : ''; }
-function variantValue(row: any, key: 'color' | 'size') { const direct = row?.[key] ?? row?.[`variant${key[0].toUpperCase()}${key.slice(1)}`]; if (typeof direct === 'string' || typeof direct === 'number') return String(direct).trim().toLowerCase(); if (row?.options && typeof row.options === 'object') { const value = row.options[key]; if (typeof value === 'string' || typeof value === 'number') return String(value).trim().toLowerCase(); } return ''; }
-function findVariant(product: any, item: IncomingItem) { const rows = [...(Array.isArray(product.variantMatrix) ? product.variantMatrix : []), ...(Array.isArray(product.variants) ? product.variants : [])]; if (!rows.length) return null; const variant = item.variant || {}; const wantedColor = variant.color ? String(variant.color).trim().toLowerCase() : ''; const wantedSize = variant.size ? String(variant.size).trim().toLowerCase() : ''; return rows.find((row: any) => (!wantedColor || variantValue(row, 'color') === wantedColor) && (!wantedSize || variantValue(row, 'size') === wantedSize)) || rows[0]; }
+function findVariant(product: any, item: IncomingItem) {
+  const variants = normalizeProductVariants(product);
+  if (!variants.hasVariants) return null;
+  const selection = item.variant;
+  if (!selection) throw new Error(`Please choose the size/color for ${product.title || 'this product'} before ordering.`);
+  const normalize = (value: unknown) => String(value || '').trim().toLowerCase();
+  const selected = variants.rows.find(row =>
+    (!row.color || normalize(row.color) === normalize(selection.color)) &&
+    (!row.size || normalize(row.size) === normalize(selection.size)));
+  if (!selected) throw new Error('The selected size/color is no longer available. Please choose again.');
+  return selected;
+}
 
 async function buildAuthoritativeItems(items: IncomingItem[]) {
   const currentDay = pakistanWeekday();
@@ -47,7 +58,7 @@ async function buildAuthoritativeItems(items: IncomingItem[]) {
   const liveDeal = weeklyDeals.find((deal: any) => deal?.day === currentDay && deal?.active !== false && typeof deal?.productId === 'string' && numberValue(deal?.dealPrice) > 0);
   const products = new Map(productResults.filter(result => result.product).map(result => [String(result.product!.id), result.product]));
 
-  return items.map(item => {
+  const resolvedItems = items.map(item => {
     const productId = String(item.productId || item.id || '');
     const product: any = products.get(productId);
     if (!product) throw new Error(`Product ${productId} is no longer available.`);
@@ -63,6 +74,7 @@ async function buildAuthoritativeItems(items: IncomingItem[]) {
     const quantity = Math.max(1, Math.min(50, Math.floor(numberValue(item.quantity ?? item.qty ?? 1))));
     return { productId, title: String(product.title || product.name || item.title || item.name || 'Product'), price, originalPrice: numberValue(product.originalPrice) > regularPrice ? numberValue(product.originalPrice) : regularPrice, quantity, image: String(variant?.imageUrl || product.imageUrl || product.image || item.imageUrl || item.image || ''), variant: item.variant || null, weeklyDealDay: isLiveDealItem ? currentDay : null, isWholesale: isWholesaleProduct(product), category: product.category || '', categoryId: product.categoryId || '' };
   });
+  return { items: resolvedItems, settings };
 }
 
 async function decodedUser(request: Request) { const header = request.headers.get('authorization') || ''; if (!header.startsWith('Bearer ')) return null; try { return await getAdminAuth().verifyIdToken(header.slice(7)); } catch { return null; } }
@@ -154,14 +166,15 @@ export async function POST(request: Request) {
   try {
     const body = await request.json(); const rawItems = Array.isArray(body?.items) ? body.items as IncomingItem[] : []; const quoteOnly = body?.mode === 'quote'; const selfCollect = body?.selfCollect === true;
     if (!rawItems.length || rawItems.length > 50) return NextResponse.json({ error: 'Your cart is empty or contains too many items.' }, { status: 400 });
-    const items = await buildAuthoritativeItems(rawItems); const totalItems = items.reduce((sum, item) => sum + item.quantity, 0); const rawSubtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    const { items, settings } = await buildAuthoritativeItems(rawItems); const totalItems = items.reduce((sum, item) => sum + item.quantity, 0); const rawSubtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
     const [reseller, user] = await Promise.all([optionalReseller(request), decodedUser(request)]);
     const tierDiscountPercent = reseller?.discountPercent || 0; const tierDiscount = Math.round(rawSubtotal * tierDiscountPercent / 100); const subtotal = Math.max(0, rawSubtotal - tierDiscount);
-    const rewardWallet = user ? await readRewardWallet(user.uid) : {}; const freeDeliveryReward = !selfCollect && Number(rewardWallet.freeDeliveryCredits || 0) > 0;
-    const calculatedDelivery = selfCollect ? { baseDelivery: 0, wholesaleItems: 0, wholesaleSurcharge: 0, deliveryCharge: 0 } : calculateDeliveryCharge(items);
+    const calculatedDelivery = selfCollect ? { freeDelivery: false, baseDelivery: 0, wholesaleItems: 0, wholesaleSurcharge: 0, deliveryCharge: 0 } : calculateDeliveryCharge(items, settings.freeDelivery);
+    const rewardWallet = user && calculatedDelivery.deliveryCharge > 0 ? await readRewardWallet(user.uid) : {};
+    const freeDeliveryReward = !selfCollect && calculatedDelivery.deliveryCharge > 0 && Number(rewardWallet.freeDeliveryCredits || 0) > 0;
     const delivery = freeDeliveryReward ? { ...calculatedDelivery, deliveryCharge: 0 } : calculatedDelivery;
     const total = subtotal + delivery.deliveryCharge;
-    const quote = { items, rawSubtotal, tierDiscount, tierDiscountPercent, resellerTier: reseller?.tierName || '', subtotal, totalItems, ...delivery, total, selfCollect, fulfillment: selfCollect ? 'self_collect' : 'delivery', freeDeliveryReward, rewardLabel: freeDeliveryReward ? 'Spin & Win Reward — Free Delivery' : '' };
+    const quote = { items, rawSubtotal, tierDiscount, tierDiscountPercent, resellerTier: reseller?.tierName || '', subtotal, totalItems, ...delivery, total, selfCollect, fulfillment: selfCollect ? 'self_collect' : 'delivery', freeDeliveryReward, rewardLabel: freeDeliveryReward ? 'Spin & Win Reward — Free Delivery' : calculatedDelivery.freeDelivery ? 'Free delivery unlocked' : '' };
     if (quoteOnly) return NextResponse.json(quote);
 
     const customer = body?.customer as Customer | undefined;

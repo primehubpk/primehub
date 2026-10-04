@@ -1,5 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { loadProductForPurchase } from '@/lib/purchaseProduct';
+import { availableStockOf } from '@/components/shop/ShopTypes';
 import { normalizeProductVariants, useCartStore } from '@/lib/cartStore';
 import { useSettings } from '@/lib/useSettings';
 import { WEEKDAY_LABELS, WEEKDAY_ORDER, countdownParts, dealTiming } from '@/lib/weeklyDealUtils';
@@ -81,6 +83,9 @@ export function useProductDetail(options?: {
   const id = String(options?.productId || params?.id || '');
   const { settings } = useSettings();
   const addItem = useCartStore((state) => state.addItem);
+  const purchaseBusy = useRef(false);
+  const [checkingProduct, setCheckingProduct] = useState(false);
+  const [purchaseError, setPurchaseError] = useState('');
   const bigDealRequested = options?.bigDeal === true;
 
   const cachedAtStart = seedProduct(id, options?.initialProduct);
@@ -157,7 +162,7 @@ export function useProductDetail(options?: {
 
   const regularPrice = product ? regularPriceOf(product) : 0;
   const productOriginal = product ? originalPriceOf(product) : 0;
-  const stock = Number(product?.stock ?? product?.quantity ?? product?.inventory ?? 10);
+  const stock = product ? availableStockOf(product) : 0;
   const rating = Number(product?.rating || 0);
   const reviews = Number(product?.reviews || 0);
   const normalizedVariants = useMemo(
@@ -280,8 +285,12 @@ export function useProductDetail(options?: {
     : '—';
   const hasVariants = normalizedVariants.hasVariants;
 
-  const addResolved = (selection: ProductVariantSelection | undefined, qty: number) => {
-    if (!product || currentPrice <= 0 || stock === 0) return;
+  const addResolved = async (selection: ProductVariantSelection | undefined, qty: number, source = product) => {
+    if (!source) return false;
+    const product = source;
+    const variantRows = normalizeProductVariants(product).rows;
+    const stock = availableStockOf(product);
+    if (stock <= 0) { setPurchaseError('This product is out of stock.'); return false; }
     const row =
       selection && variantRows.length
         ? variantRows.find(
@@ -291,13 +300,13 @@ export function useProductDetail(options?: {
           )
         : undefined;
     const selectedStock = row ? Number(row.stock ?? 0) : stock;
-    if (selectedStock <= 0) return;
+    if (selectedStock <= 0) { setPurchaseError('This option is out of stock.'); return false; }
     const price =
       activeDealPrice && activeDealPrice > 0
         ? activeDealPrice
         : liveDeal
           ? currentPrice
-          : Number(row?.price ?? currentPrice) || currentPrice;
+          : Number(row?.price ?? product.price) || Number(product.price);
     const image = String(row?.imageUrl || images[0] || product.imageUrl || product.image || '');
     const cartItem = {
       id:
@@ -319,7 +328,7 @@ export function useProductDetail(options?: {
       variant: selection,
     };
     const addedQuantity = Math.min(qty, selectedStock);
-    for (let index = 0; index < addedQuantity; index += 1) addItem(cartItem);
+    if (!await addItem(cartItem, addedQuantity, product)) return false;
     trackTikTokEvent('AddToCart', {
       contents: [
         makeTikTokContent({
@@ -335,45 +344,53 @@ export function useProductDetail(options?: {
     });
     setAdded(true);
     window.setTimeout(() => setAdded(false), 1200);
+    return true;
   };
 
-  const addProduct = () => {
-    if (hasVariants) {
-      setVariantMode('cart');
-      setVariantModalOpen(true);
-      return;
+  const purchase = async (mode: 'cart' | 'buy') => {
+    if (purchaseBusy.current || !product) return;
+    purchaseBusy.current = true;
+    setCheckingProduct(true);
+    setPurchaseError('');
+    try {
+      const fresh = await loadProductForPurchase(id) as Product;
+      setProduct(fresh);
+      if (normalizeProductVariants(fresh).hasVariants) {
+        setVariantMode(mode);
+        setVariantModalOpen(true);
+        return;
+      }
+      if (await addResolved(undefined, quantity, fresh) && mode === 'buy') {
+        useCartStore.getState().closeDrawer();
+        if (!navigateFromProductOverlay('/checkout')) router.push('/checkout');
+      }
+    } catch (error) {
+      setPurchaseError(error instanceof Error ? error.message : 'Unable to check options. Please try again.');
+    } finally {
+      purchaseBusy.current = false;
+      setCheckingProduct(false);
     }
-    addResolved(undefined, quantity);
   };
-
-  const orderNow = () => {
-    if (hasVariants) {
-      setVariantMode('buy');
-      setVariantModalOpen(true);
-      return;
-    }
-    if (!product || currentPrice <= 0 || stock === 0) return;
-    addResolved(undefined, quantity);
-    if (!navigateFromProductOverlay('/checkout')) router.push('/checkout');
-  };
-
-  const openVariantSelector = (mode: 'cart' | 'buy') => {
-    if (!hasVariants) {
-      if (mode === 'buy') orderNow();
-      else addProduct();
-      return;
-    }
-    setVariantMode(mode);
-    setVariantModalOpen(true);
-  };
-
+  const addProduct = () => { void purchase('cart'); };
+  const orderNow = () => { void purchase('buy'); };
+  const openVariantSelector = (mode: 'cart' | 'buy') => { void purchase(mode); };
   const closeVariantSelector = () => setVariantModalOpen(false);
-
-  const confirmVariant = (selection: ProductVariantSelection, qty: number) => {
-    setVariantSelection(selection);
-    setVariantModalOpen(false);
-    addResolved(selection, qty);
-    if (variantMode === 'buy' && !navigateFromProductOverlay('/checkout')) router.push('/checkout');
+  const confirmVariant = async (selection: ProductVariantSelection, qty: number) => {
+    if (purchaseBusy.current) return;
+    purchaseBusy.current = true;
+    try {
+      const fresh = await loadProductForPurchase(id) as Product;
+      setProduct(fresh);
+      if (!await addResolved(selection, qty, fresh)) return;
+      setVariantSelection(selection);
+      setVariantModalOpen(false);
+      if (variantMode === 'buy') {
+        useCartStore.getState().closeDrawer();
+        if (!navigateFromProductOverlay('/checkout')) router.push('/checkout');
+      }
+    } catch (error) {
+      setPurchaseError(error instanceof Error ? error.message : 'Unable to check options. Please try again.');
+    } finally { purchaseBusy.current = false; }
   };
 
   const buyWhatsApp = () => {
@@ -404,6 +421,8 @@ export function useProductDetail(options?: {
 
   return {
     product,
+    checkingProduct,
+    purchaseError,
     weeklyProducts,
     loading,
     failed,

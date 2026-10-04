@@ -1,5 +1,8 @@
 'use client';
 
+import ShoppingBackButton from '@/components/ShoppingBackButton';
+import { useSettings } from '@/lib/useSettings';
+import { freeDeliveryPolicy } from '@/lib/deliveryCharges';
 import { useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, ShoppingBag } from 'lucide-react';
@@ -13,8 +16,10 @@ export default function CartPage() {
   const removeItem = useCartStore((s) => s.removeItem);
   const subtotal = useCartStore((s) => s.getSubtotal());
   const itemCount = useCartStore((s) => s.getCartCount());
-  const itemsToFreeDelivery = useCartStore((s) => s.getItemsToFreeDelivery());
-  const deliveryProgress = useCartStore((s) => s.getDeliveryProgress());
+  const { settings } = useSettings();
+  const policy = freeDeliveryPolicy(settings.freeDelivery);
+  const itemsToFreeDelivery = Math.max(0, policy.threshold - itemCount);
+  const deliveryProgress = Math.min(100, Math.round(itemCount / policy.threshold * 100));
   const [coupon, setCoupon] = useState('');
   const [couponMessage, setCouponMessage] = useState('');
 
@@ -53,13 +58,7 @@ export default function CartPage() {
     <main className="min-h-screen bg-[#F7F7F5] pb-28">
       <header className="sticky top-0 z-30 border-b border-black/[0.06] bg-[#F7F7F5]/95 px-4 py-3 backdrop-blur-md sm:py-4">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-3">
-          <Link
-            href="/shop"
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white shadow-sm"
-            aria-label="Back to shop"
-          >
-            <ArrowLeft size={17} />
-          </Link>
+          <ShoppingBackButton />
 
           <div className="min-w-0 text-center">
             <h1 className="text-base font-black tracking-tight text-[#14140F] sm:text-lg">My Cart</h1>
@@ -107,7 +106,7 @@ export default function CartPage() {
           </section>
 
           <aside className="space-y-4 lg:sticky lg:top-[76px]">
-            <section className="rounded-2xl border border-black/[0.06] bg-white p-4 shadow-[0_4px_18px_rgba(0,0,0,0.045)]">
+            {policy.enabled && <section className="rounded-2xl border border-black/[0.06] bg-white p-4 shadow-[0_4px_18px_rgba(0,0,0,0.045)]">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="text-[9px] font-black uppercase tracking-[0.2em] text-[#0F6A5F]">Delivery</p>
@@ -125,7 +124,7 @@ export default function CartPage() {
                   style={{ width: `${deliveryProgress}%` }}
                 />
               </div>
-            </section>
+            </section>}
 
             <CartSummary
               totalItems={itemCount}

@@ -123,3 +123,50 @@ test('a weekly deal page asks to go home in one step', async () => {
   assert.equal(overlay.isProductOverlayOpen(), false);
   assert.equal(overlay.requestStorefrontHome(), 'router-home');
 });
+
+test('checkout/cart overlay preserves the product and supports browser Back/Forward and return button', async () => {
+  const entries = [{ state: { __NA: true }, url: '/category/bangles?sort=new' }];
+  let index = 0;
+  const listeners = [];
+  const move = delta => { index += delta; listeners.forEach(fn => fn({ state: entries[index].state, stopImmediatePropagation() {} })); };
+  globalThis.window = {
+    scrollY: 800, pageYOffset: 800,
+    history: {
+      scrollRestoration: 'auto',
+      get state() { return entries[index].state; },
+      pushState(state, _title, url) { entries.splice(index + 1); entries.push({ state, url }); index++; },
+      replaceState(state, _title, url) { entries[index] = { state, url }; },
+      back() { move(-1); }, go: move,
+    },
+    location: {
+      get pathname() { return new URL(entries[index].url, 'https://primehubmall.com').pathname; },
+      get search() { return new URL(entries[index].url, 'https://primehubmall.com').search; },
+      hash: '', origin: 'https://primehubmall.com',
+    },
+    addEventListener(type, fn) { if (type === 'popstate') listeners.push(fn); },
+    dispatchEvent() {}, scrollTo(_x, y) { window.scrollY = y; },
+    requestAnimationFrame(fn) { fn(); }, setTimeout() { return 0; }, clearTimeout() {},
+    sessionStorage: { setItem() {} },
+  };
+  const overlay = await import('../lib/productOverlay.ts?commerce-test');
+  overlay.openProductOverlay({ id: 'bangle', href: '/product/bangle', bigDeal: false, product: { id: 'bangle' } });
+  assert.equal(overlay.navigateFromProductOverlay('/cart'), true);
+  assert.equal(overlay.navigateFromProductOverlay('/checkout'), true);
+  assert.equal(overlay.getProductOverlaySnapshot().commercePath, '/checkout');
+  assert.equal(overlay.getProductOverlaySnapshot().frame.id, 'bangle');
+  window.history.back();
+  assert.equal(overlay.getProductOverlaySnapshot().commercePath, '/cart');
+  window.history.back();
+  assert.equal(overlay.getProductOverlaySnapshot().commercePath, null);
+  assert.equal(entries[index].url, '/product/bangle');
+  window.history.go(1);
+  assert.equal(overlay.getProductOverlaySnapshot().commercePath, '/cart');
+  window.history.go(1);
+  assert.equal(overlay.getProductOverlaySnapshot().commercePath, '/checkout');
+  assert.equal(overlay.returnFromCommerceOverlay(), true);
+  assert.equal(entries[index].url, '/product/bangle');
+  assert.equal(overlay.getProductOverlaySnapshot().frame.id, 'bangle');
+  overlay.closeProductOverlayNow();
+  assert.equal(entries[index].url, '/category/bangles?sort=new');
+  assert.equal(window.scrollY, 800);
+});

@@ -1,4 +1,5 @@
 'use client';
+import { freeDeliveryPolicy } from '@/lib/deliveryCharges';
 
 import Link from 'next/link';
 import { ImageOff, Maximize2, Minus, Plus, Home, ShoppingBag, X } from 'lucide-react';
@@ -29,7 +30,7 @@ export default function CartMiniBar() {
   const [brokenImages, setBrokenImages] = useState<Record<string, boolean>>({});
   const requestedImageIds = useRef(new Set<string>());
 
-  const threshold = Math.max(1, Number(settings.freeDelivery?.itemThreshold || FALLBACK_THRESHOLD));
+  const threshold = freeDeliveryPolicy(settings.freeDelivery).threshold;
   const totalItems = useMemo(() => items.reduce((sum, item) => sum + Number(item.qty || 1), 0), [items]);
   const subtotal = useMemo(
     () => items.reduce((sum, item) => sum + Number(item.price || 0) * Number(item.qty || 1), 0),

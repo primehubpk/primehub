@@ -307,7 +307,9 @@ function ProductDetailContent({
               savingsAmount={savingsAmount}
               afterPricing={
                 <>
-                  <ProductPurchasePanel
+                  {model.purchaseError && <p role="alert" className="mt-3 text-sm text-red-700">{model.purchaseError}</p>}
+              <ProductPurchasePanel
+                checkingProduct={model.checkingProduct}
                     quantity={quantity}
                     maxQuantity={maxQuantity}
                     stock={stock}
