@@ -25,11 +25,11 @@ You already finished country + testers. Next:
 
 1. Open **Testing → Open testing → Create a new release**
 2. Upload `app-release.aab`
-3. Release name: `1.2.0`
+3. Release name: `7.0.0`
 4. Release notes example:
 
    ```
-   PrimeHub 1.2.0. Meets current Play Store SDK requirements. Shop retail and wholesale products from primehubmall.com.
+   PrimeHub 7.0.0. Meets current Play Store SDK requirements. Shop retail and wholesale products from primehubmall.com.
    ```
 
 5. Save → **Preview and confirm** → send to Google for review
