@@ -22,6 +22,9 @@ NO AAB / keystore is committed by this feature. NEVER use a new upload key.
 ## Data and safety
 - Firestore service-account-only collections: push_installations, push_delivery_log.
   No browser direct writes; lock both collections in firestore.rules (default deny).
+  Enable the Firestore TTL policy on `expiresAt` for push_delivery_log and
+  push_user_purchases to prune 90-day-old dedupe/purchase markers automatically.
+  Do not activate these settings on production until release is approved.
 - Every installation has a random Android-private install ID + secret. Its private
   SharedPreferences file is excluded from Android cloud backup and device transfer. API validates SHA-256
   secret for subsequent mutations; browser JS never sees it.

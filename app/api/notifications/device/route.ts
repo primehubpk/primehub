@@ -69,7 +69,7 @@ export async function POST(request: Request) {
       if (!exists) return reject(404);
       await doc.update({ lastOrderAt: now, updatedAt: now });
       const uid = String(previous.get('userUid') || '');
-      if (uid) await getAdminDb().collection('push_user_purchases').doc(uid + '_' + pakistanDay(new Date())).set({ purchasedAt: now }, { merge: true });
+      if (uid) await getAdminDb().collection('push_user_purchases').doc(uid + '_' + pakistanDay(new Date())).set({ purchasedAt: now, expiresAt: new Date(Date.now() + 90 * 86_400_000) }, { merge: true });
     }
     return NextResponse.json({ ok: true });
   } catch (error) {

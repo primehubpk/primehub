@@ -79,7 +79,9 @@ public class PrimeHubMessagingService extends FirebaseMessagingService {
             connection.setInstanceFollowRedirects(false);
             if (connection.getResponseCode() != 200 || connection.getContentLengthLong() > 2_000_000) return null;
             try (InputStream stream = connection.getInputStream()) {
-                return BitmapFactory.decodeStream(stream);
+                BitmapFactory.Options options = new BitmapFactory.Options();
+                options.inSampleSize = 2;
+                return BitmapFactory.decodeStream(stream, null, options);
             }
         } catch (Exception error) { Log.w("PrimeHubPush", "Image unavailable; text notification used", error); }
         finally { if (connection != null) connection.disconnect(); }

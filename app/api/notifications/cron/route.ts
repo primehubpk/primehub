@@ -70,7 +70,7 @@ export async function GET(request: Request) {
           const entry = logs.doc(logId);
           try {
             // Atomic reserve prevents cron retry / parallel invocation duplication.
-            await entry.create({ installationId: snap.id, day, slot, createdAt: now.toISOString(), status: 'reserved' });
+            await entry.create({ installationId: snap.id, day, slot, createdAt: now.toISOString(), expiresAt: new Date(now.getTime() + 90 * 86_400_000), status: 'reserved' });
           } catch { results.skipped++; continue; }
           try {
             // Check opt-out again immediately before send, to reduce races.

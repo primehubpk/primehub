@@ -209,7 +209,7 @@ export async function POST(request: Request) {
     if (user?.uid) {
       try {
         await getAdminDb().collection('push_user_purchases').doc(user.uid + '_' + pakistanDay(new Date()))
-          .set({ purchasedAt: new Date().toISOString() }, { merge: true });
+          .set({ purchasedAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 90 * 86_400_000) }, { merge: true });
       } catch (error) { console.warn('[push] purchase suppression marker unavailable'); }
     }
     return NextResponse.json({ orderId, ...quote, resellerLinked: Boolean(resellerUserId), guestTracked: Boolean(resellerGuestId) });
