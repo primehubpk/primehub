@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createHash, timingSafeEqual } from 'node:crypto';
-import { getAdminDb } from '@/lib/firebaseAdmin';
+import { getAdminAuth, getAdminDb } from '@/lib/firebaseAdmin';
 
 export const runtime = 'nodejs';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -17,7 +17,7 @@ export async function POST(request: Request) {
     const id = String(data?.installationId || '');
     const secret = String(data?.installationSecret || '');
     const action = String(data?.action || '');
-    if (!UUID.test(id) || !SECRET.test(secret) || !['register', 'view', 'purchase', 'preferences'].includes(action)) return reject(400);
+    if (!UUID.test(id) || !SECRET.test(secret) || !['register', 'view', 'purchase', 'preferences', 'identity'].includes(action)) return reject(400);
     const doc = getAdminDb().collection(collection).doc(id);
     const previous = await doc.get();
     const hash = fingerprint(secret);
@@ -36,7 +36,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true });
     }
     if (!previous.exists) return reject(404);
-    if (action === 'preferences') {
+    if (action === 'identity') {
+      const idToken = String(data?.idToken || '');
+      if (idToken.length > 4096) return reject(400);
+      let userUid = '';
+      if (idToken) {
+        try { userUid = (await getAdminAuth().verifyIdToken(idToken)).uid; } catch { return reject(401); }
+      }
+      await doc.update({ userUid, updatedAt: now });
+    } else if (action === 'preferences') {
       await doc.update({ allowed: data?.allowed === true, enabled: data?.enabled === true, updatedAt: now });
     } else if (action === 'view') {
       const path = String(data?.path || '');
@@ -59,6 +67,8 @@ export async function POST(request: Request) {
       } else exists = (await getAdminDb().collection('orders').doc(orderId).get()).exists;
       if (!exists) return reject(404);
       await doc.update({ lastOrderAt: now, updatedAt: now });
+      const uid = String(previous.get('userUid') || '');
+      if (uid) await getAdminDb().collection('push_user_purchases').doc(uid + '_' + now.slice(0, 10)).set({ purchasedAt: now }, { merge: true });
     }
     return NextResponse.json({ ok: true });
   } catch (error) {

@@ -149,6 +149,9 @@ public final class PushManager {
                                 prefs(activity).edit().putString(PENDING_ORDER, orderId).apply();
                                 sendPurchase(activity, orderId);
                             }
+                        } else if ("identity".equals(action)) {
+                            String idToken = json.optString("idToken", "");
+                            worker.execute(() -> post(activity, "identity", null, null, null, idToken));
                         } else if ("view".equals(action)) {
                             String path = json.optString("path", "");
                             if (validPath(path)) pageSeen(activity, path);
@@ -213,7 +216,7 @@ public final class PushManager {
         currentPath = path;
         if (configured && isActive(activity)) {
             // Page reads are cheap and updates are serialized after registration.
-            worker.execute(() -> post(activity, "view", null, path, null));
+            worker.execute(() -> post(activity, "view", null, path, null, null));
         }
         maybeRequestPermission(activity);
     }
@@ -252,7 +255,14 @@ public final class PushManager {
     }
 
     public static void onFreshToken(Context context, String token) {
-        if (configured && !token.isEmpty()) worker.execute(() -> post(context, "register", token, currentPath, null));
+        initialize(context);
+        if (configured && !token.isEmpty()) worker.execute(() -> {
+            if (post(context, "register", token, currentPath, null, null)) {
+                post(context, "view", null, currentPath, null, null);
+                String pending = prefs(context).getString(PENDING_ORDER, "");
+                if (!pending.isEmpty()) sendPurchase(context, pending);
+            }
+        });
     }
 
     private static void refreshToken(Context context) {
@@ -262,12 +272,12 @@ public final class PushManager {
     }
 
     private static void syncPreferences(Context context) {
-        if (configured) worker.execute(() -> post(context, "preferences", null, null, null));
+        if (configured) worker.execute(() -> post(context, "preferences", null, null, null, null));
     }
 
     private static void sendPurchase(Context context, String orderId) {
         if (configured) worker.execute(() -> {
-            if (post(context, "purchase", null, null, orderId)) {
+            if (post(context, "purchase", null, null, orderId, null)) {
                 if (orderId.equals(prefs(context).getString(PENDING_ORDER, ""))) {
                     prefs(context).edit().remove(PENDING_ORDER).apply();
                 }
@@ -275,7 +285,7 @@ public final class PushManager {
         });
     }
 
-    private static boolean post(Context context, String action, String token, String path, String orderId) {
+    private static boolean post(Context context, String action, String token, String path, String orderId, String idToken) {
         HttpURLConnection connection = null;
         try {
             JSONObject data = new JSONObject();
@@ -292,6 +302,7 @@ public final class PushManager {
             }
             if (path != null && validPath(path)) data.put("path", path);
             if (orderId != null) data.put("orderId", orderId);
+            if (idToken != null) data.put("idToken", idToken);
             connection = (HttpURLConnection) new URL(API).openConnection();
             connection.setRequestMethod("POST");
             connection.setRequestProperty("Content-Type", "application/json");

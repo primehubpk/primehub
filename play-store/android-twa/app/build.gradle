@@ -11,10 +11,10 @@ android {
     buildFeatures { buildConfig true }
 
     defaultConfig {
-        buildConfigField "String", "FIREBASE_ANDROID_APP_ID", "\\\"" + envFile("PRIMEHUB_FIREBASE_ANDROID_APP_ID") + "\\\""
-        buildConfigField "String", "FIREBASE_API_KEY", "\\\"AIzaSyA0jI5esNvMt3Sb3WVy7NQShsoWzntJxQU\\\""
-        buildConfigField "String", "FIREBASE_PROJECT_ID", "\\\"prime-hub-a02f0\\\""
-        buildConfigField "String", "FIREBASE_SENDER_ID", "\\\"987298121402\\\""
+        buildConfigField "String", "FIREBASE_ANDROID_APP_ID", '"' + envFile("PRIMEHUB_FIREBASE_ANDROID_APP_ID") + '"'
+        buildConfigField "String", "FIREBASE_API_KEY", '"AIzaSyA0jI5esNvMt3Sb3WVy7NQShsoWzntJxQU"'
+        buildConfigField "String", "FIREBASE_PROJECT_ID", '"prime-hub-a02f0"'
+        buildConfigField "String", "FIREBASE_SENDER_ID", '"987298121402"'
 
         applicationId "com.primehubmall.app"
         minSdk 24

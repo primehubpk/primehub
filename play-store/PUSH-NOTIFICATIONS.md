@@ -28,7 +28,9 @@ NO AAB / keystore is committed by this feature. NEVER use a new upload key.
 - Existing checkout acknowledges a created order before telling the native app;
   push device endpoint checks order exists before recording a purchase.
 - One message per slot per device per Pakistan calendar day; Firestore create-only
-  delivery receipts make cron retries idempotent. No content = no notification.
+  delivery receipts make cron retries idempotent. Authenticated users share a
+  per-user slot key across their installations. Purchase suppression is cross-device for
+  registered app accounts; guest purchase suppression remains device-local. No content = no notification.
 - Only previously opened devices may receive the browse follow-up.
 - Image is a real trusted HTTPS product image. No fake scarcity or stale arrivals.
 - Manual sends / unrestricted test blasts are deliberately absent.

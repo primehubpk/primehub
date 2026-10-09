@@ -47,7 +47,6 @@ public class MainActivity extends Activity {
             webView = findViewById(R.id.webview);
             splash = findViewById(R.id.splash);
             configureWebView();
-            PushManager.onResume(this);
             if (savedInstanceState != null) {
                 webView.restoreState(savedInstanceState);
                 hideSplash();
@@ -87,7 +86,7 @@ public class MainActivity extends Activity {
         settings.setJavaScriptCanOpenWindowsAutomatically(true);
         settings.setSupportMultipleWindows(true);
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
-        settings.setUserAgentString(settings.getUserAgentString() + " PrimeHubApp/9.0.0");
+        settings.setUserAgentString(settings.getUserAgentString() + " PrimeHubApp/10.0.0");
         CookieManager cookies = CookieManager.getInstance();
         cookies.setAcceptCookie(true);
         cookies.setAcceptThirdPartyCookies(webView, true);

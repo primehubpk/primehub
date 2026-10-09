@@ -61,7 +61,12 @@ export async function GET(request: Request) {
             if (results.samples.length < 8) results.samples.push({ slot, title: content.title, body: content.body, path: content.path, imageUrl: content.imageUrl || null });
             continue;
           }
-          const logId = createHash('sha256').update(snap.id + ':' + day + ':' + slot).digest('hex');
+          const userUid = String(device.userUid || '');
+          if (slot === 'browse' && userUid && (await getAdminDb().collection('push_user_purchases').doc(userUid + '_' + day).get()).exists) {
+            results.skipped++; continue;
+          }
+          const principal = userUid ? 'user:' + userUid : 'install:' + snap.id;
+          const logId = createHash('sha256').update(principal + ':' + day + ':' + slot).digest('hex');
           const entry = logs.doc(logId);
           try {
             // Atomic reserve prevents cron retry / parallel invocation duplication.
