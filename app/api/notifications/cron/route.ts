@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getMessaging } from 'firebase-admin/messaging';
-import { getApps } from 'firebase-admin/app';
+import { getAdminMessaging } from '@/lib/firebaseAdmin';
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { FieldPath } from 'firebase-admin/firestore';
 import { getAdminDb } from '@/lib/firebaseAdmin';
@@ -74,7 +73,7 @@ export async function GET(request: Request) {
             if (latest?.allowed !== true || latest?.enabled !== true || latest?.token !== device.token) {
               await entry.delete(); results.skipped++; continue;
             }
-            await getMessaging(getApps()[0] || (() => { throw new Error('Firebase Admin is not initialized'); })()).send({
+            await getAdminMessaging().send({
               token: device.token,
               data: {
                 title: content.title, body: content.body, path: content.path,

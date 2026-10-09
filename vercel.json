@@ -24,7 +24,18 @@
       "cursor/sale-back-images-3680": false,
       "fix/storefront-image-recovery-oct02": false,
       "fix/storefront-image-delivery-oct02": false,
-      "fix/navigation-usage-visitors-oct03": false
+      "fix/navigation-usage-visitors-oct03": false,
+      "cursor/daily-push-4688": false
     }
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/notifications/cron?period=morning",
+      "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/notifications/cron?period=evening",
+      "schedule": "0 17 * * *"
+    }
+  ]
 }

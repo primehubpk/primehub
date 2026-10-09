@@ -47,6 +47,7 @@ public class MainActivity extends Activity {
             webView = findViewById(R.id.webview);
             splash = findViewById(R.id.splash);
             configureWebView();
+            PushManager.onResume(this);
             if (savedInstanceState != null) {
                 webView.restoreState(savedInstanceState);
                 hideSplash();
@@ -92,6 +93,7 @@ public class MainActivity extends Activity {
         cookies.setAcceptThirdPartyCookies(webView, true);
         webView.setWebViewClient(new StoreWebViewClient());
         webView.setWebChromeClient(new StoreChromeClient());
+        PushManager.attach(this, webView);
     }
 
     private String urlFromIntent(Intent intent) {
@@ -177,6 +179,7 @@ public class MainActivity extends Activity {
             webView.onPause();
         }
         CookieManager.getInstance().flush();
+        PushManager.onPause(this);
         super.onPause();
     }
 
@@ -186,6 +189,7 @@ public class MainActivity extends Activity {
         if (webView != null) {
             webView.onResume();
         }
+        PushManager.onResume(this);
     }
 
     @Override
@@ -203,6 +207,12 @@ public class MainActivity extends Activity {
             webView.destroy();
         }
         super.onDestroy();
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == 1100) PushManager.onPermissionResult(this);
     }
 
     @Override
@@ -255,6 +265,13 @@ public class MainActivity extends Activity {
         @Override
         public void onPageFinished(WebView view, String url) {
             hideSplash();
+            PushManager.onPageFinished(MainActivity.this, view, url);
+        }
+
+        @Override
+        public void doUpdateVisitedHistory(WebView view, String url, boolean isReload) {
+            super.doUpdateVisitedHistory(view, url, isReload);
+            PushManager.onPageFinished(MainActivity.this, view, url);
         }
 
         @Override
