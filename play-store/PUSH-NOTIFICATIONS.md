@@ -10,6 +10,8 @@ NO AAB / keystore is committed by this feature. NEVER use a new upload key.
 2. Copy the *Android* app ID (looks like 1:987298121402:android:...).
    Not the web app ID! Set PRIMEHUB_FIREBASE_ANDROID_APP_ID in the local Android build environment.
    The sender ID, project ID and public web Firebase API key are referenced by Android build config.
+   Android PrimeHubApplication initializes Firebase for background FCM delivery even if
+   the WebView has not been opened in the current process.
    If missing, browsing still works and push is disabled, never broken.
 3. Rebuild signed AAB **only when release is approved**, with the EXISTING primehub-upload keystore.
    Set the same PRIMEHUB_STORE_FILE / PRIMEHUB_STORE_PASSWORD / PRIMEHUB_KEY_ALIAS /

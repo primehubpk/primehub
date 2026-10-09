@@ -97,7 +97,7 @@ export function selectDailyPush(slot: PushSlot, now: Date, installId: string, in
   if (slot === 'live') {
     const d = (Array.isArray(settings.weeklyDeals) ? settings.weeklyDeals : [])
       .find((deal: any) => deal?.active !== false && String(deal?.day).toLowerCase() === pakistanWeekday(now)
-        && deal.productId && withinRange(deal, now));
+        && deal.productId);
     const p = firstMatching(eligible, d?.productId);
     const regular = Number(d?.originalPrice || p?.price || 0);
     const price = Number(d?.dealPrice || 0);

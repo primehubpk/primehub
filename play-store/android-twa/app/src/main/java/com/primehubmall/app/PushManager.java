@@ -58,6 +58,7 @@ public final class PushManager {
     private static String previousPage = "";
     private static String currentPath = "/";
     private static Activity foreground;
+    private static String pendingIdentityToken = null;
 
     private PushManager() {}
 
@@ -151,7 +152,10 @@ public final class PushManager {
                             }
                         } else if ("identity".equals(action)) {
                             String idToken = json.optString("idToken", "");
-                            worker.execute(() -> post(activity, "identity", null, null, null, idToken));
+                            if (idToken.length() <= 4096) {
+                                pendingIdentityToken = idToken;
+                                worker.execute(() -> post(activity, "identity", null, null, null, idToken));
+                            }
                         } else if ("view".equals(action)) {
                             String path = json.optString("path", "");
                             if (validPath(path)) pageSeen(activity, path);
@@ -259,6 +263,7 @@ public final class PushManager {
         if (configured && !token.isEmpty()) worker.execute(() -> {
             if (post(context, "register", token, currentPath, null, null)) {
                 post(context, "view", null, currentPath, null, null);
+                if (pendingIdentityToken != null) post(context, "identity", null, null, null, pendingIdentityToken);
                 String pending = prefs(context).getString(PENDING_ORDER, "");
                 if (!pending.isEmpty()) sendPurchase(context, pending);
             }

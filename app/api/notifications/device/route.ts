@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { getAdminAuth, getAdminDb } from '@/lib/firebaseAdmin';
+import { pakistanDay } from '@/lib/notifications/dailyPush';
 
 export const runtime = 'nodejs';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -68,7 +69,7 @@ export async function POST(request: Request) {
       if (!exists) return reject(404);
       await doc.update({ lastOrderAt: now, updatedAt: now });
       const uid = String(previous.get('userUid') || '');
-      if (uid) await getAdminDb().collection('push_user_purchases').doc(uid + '_' + now.slice(0, 10)).set({ purchasedAt: now }, { merge: true });
+      if (uid) await getAdminDb().collection('push_user_purchases').doc(uid + '_' + pakistanDay(new Date())).set({ purchasedAt: now }, { merge: true });
     }
     return NextResponse.json({ ok: true });
   } catch (error) {

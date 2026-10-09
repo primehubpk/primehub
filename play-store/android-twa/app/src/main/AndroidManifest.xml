@@ -27,6 +27,7 @@
     </queries>
 
     <application
+        android:name=".PrimeHubApplication"
         android:allowBackup="true"
         android:enableOnBackInvokedCallback="false"
         android:icon="@mipmap/ic_launcher"
