@@ -29,6 +29,8 @@
     <application
         android:name=".PrimeHubApplication"
         android:allowBackup="true"
+        android:fullBackupContent="@xml/push_backup_rules"
+        android:dataExtractionRules="@xml/push_data_extraction_rules"
         android:enableOnBackInvokedCallback="false"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"

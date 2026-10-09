@@ -22,7 +22,8 @@ NO AAB / keystore is committed by this feature. NEVER use a new upload key.
 ## Data and safety
 - Firestore service-account-only collections: push_installations, push_delivery_log.
   No browser direct writes; lock both collections in firestore.rules (default deny).
-- Every installation has a random Android-private install ID + secret. API validates SHA-256
+- Every installation has a random Android-private install ID + secret. Its private
+  SharedPreferences file is excluded from Android cloud backup and device transfer. API validates SHA-256
   secret for subsequent mutations; browser JS never sees it.
 - Register/revoke per device. OS permission + app switch both required.
 - No browser Web Push, no tracking permission, location, SMS or contacts permissions.
@@ -32,7 +33,7 @@ NO AAB / keystore is committed by this feature. NEVER use a new upload key.
 - One message per slot per device per Pakistan calendar day; Firestore create-only
   delivery receipts make cron retries idempotent. Authenticated users share a
   per-user slot key across their installations. Purchase suppression is cross-device for
-  registered app accounts; guest purchase suppression remains device-local. No content = no notification.
+  registered app accounts (including their signed-in website orders); guest purchase suppression remains device-local. No content = no notification.
 - Only previously opened devices may receive the browse follow-up.
 - Image is a real trusted HTTPS product image. No fake scarcity or stale arrivals.
 - Manual sends / unrestricted test blasts are deliberately absent.
