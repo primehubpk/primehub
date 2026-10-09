@@ -1,8 +1,12 @@
-# PrimeHub Trusted Web Activity
+# PrimeHub Android app
 
 Android wrapper for https://www.primehubmall.com  
 Application ID: `com.primehubmall.app`  
-minSdk 24 · targetSdk 36 · versionCode 8
+minSdk 24 · targetSdk 36 · versionCode 9
+
+The Play listing icon (red shopping-bag with P) is the launcher icon. The app
+opens the live website inside the PrimeHub activity so it stays on screen
+instead of handing off to Chrome and closing.
 
 ## Build a Play Store bundle
 
