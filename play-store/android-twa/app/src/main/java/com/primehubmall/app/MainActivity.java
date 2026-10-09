@@ -8,6 +8,8 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.util.TypedValue;
+import android.view.Gravity;
 import android.view.View;
 import android.webkit.CookieManager;
 import android.webkit.ValueCallback;
@@ -17,7 +19,10 @@ import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.widget.Button;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
+import android.widget.TextView;
 
 /**
  * Real in-app activity for PrimeHubMall. The previous TWA trampoline launched Chrome
@@ -37,17 +42,21 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
-        webView = findViewById(R.id.webview);
-        splash = findViewById(R.id.splash);
-        configureWebView();
-        if (savedInstanceState != null) {
-            webView.restoreState(savedInstanceState);
-            hideSplash();
-        } else {
-            webView.loadUrl(urlFromIntent(getIntent()));
+        try {
+            setContentView(R.layout.activity_main);
+            webView = findViewById(R.id.webview);
+            splash = findViewById(R.id.splash);
+            configureWebView();
+            if (savedInstanceState != null) {
+                webView.restoreState(savedInstanceState);
+                hideSplash();
+            } else {
+                webView.loadUrl(urlFromIntent(getIntent()));
+            }
+            handler.postDelayed(this::hideSplash, SPLASH_TIMEOUT_MS);
+        } catch (Throwable error) {
+            showOpenInBrowserFallback();
         }
-        handler.postDelayed(this::hideSplash, SPLASH_TIMEOUT_MS);
     }
 
     @Override
@@ -113,11 +122,35 @@ public class MainActivity extends Activity {
     }
 
     private void hideSplash() {
-        if (splashHidden || splash == null) {
+        if (splashHidden || splash == null || isFinishing() || isDestroyed()) {
             return;
         }
         splashHidden = true;
-        splash.animate().alpha(0f).setDuration(220).withEndAction(() -> splash.setVisibility(View.GONE));
+        splash.animate().alpha(0f).setDuration(220).withEndAction(() -> {
+            if (!isDestroyed()) {
+                splash.setVisibility(View.GONE);
+            }
+        });
+    }
+
+    private void showOpenInBrowserFallback() {
+        LinearLayout layout = new LinearLayout(this);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setGravity(Gravity.CENTER);
+        int pad = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 24, getResources().getDisplayMetrics());
+        layout.setPadding(pad, pad, pad, pad);
+        layout.setBackgroundColor(0xFFE6251F);
+        TextView message = new TextView(this);
+        message.setText("PrimeHub is ready. Tap below to open the shop.");
+        message.setTextColor(0xFFFFFFFF);
+        message.setTextSize(TypedValue.COMPLEX_UNIT_SP, 18);
+        message.setGravity(Gravity.CENTER);
+        Button button = new Button(this);
+        button.setText("Open PrimeHub");
+        button.setOnClickListener(v -> openExternal(Uri.parse(HOME_URL)));
+        layout.addView(message);
+        layout.addView(button);
+        setContentView(layout);
     }
 
     private void openExternal(Uri uri) {
