@@ -9,15 +9,27 @@ NO AAB / keystore is committed by this feature. NEVER use a new upload key.
    com.primehubmall.app. Register SHA-256 Play App Signing fingerprints when needed.
 2. Copy the *Android* app ID (looks like 1:987298121402:android:...).
    Not the web app ID! Set PRIMEHUB_FIREBASE_ANDROID_APP_ID in the local Android build environment.
-   The sender ID, project ID and public web Firebase API key are referenced by Android build config.
+   The sender ID and project ID remain fixed to the existing Firebase project. Set
+   PRIMEHUB_FIREBASE_ANDROID_API_KEY using the Android client's key from
+   google-services.json (not the website key). Release bundling fails closed if
+   either Android App ID or Android API key is missing.
    Android PrimeHubApplication initializes Firebase for background FCM delivery even if
    the WebView has not been opened in the current process.
-   If missing, browsing still works and push is disabled, never broken.
+   If missing in a local debug build, browsing still works and push is disabled.
+   A versionCode 10 release AAB is blocked unless Android Firebase config and
+   existing v9 signing parameters are provided.
 3. Rebuild signed AAB **only when release is approved**, with the EXISTING primehub-upload keystore.
    Set the same PRIMEHUB_STORE_FILE / PRIMEHUB_STORE_PASSWORD / PRIMEHUB_KEY_ALIAS /
    PRIMEHUB_KEY_PASSWORD as v9. NEVER commit these secrets or an AAB.
 4. Server environment: existing FIREBASE_SERVICE_ACCOUNT_KEY and CRON_SECRET must be set.
    Firebase Admin and FCM must belong to that same Firebase project.
+
+## Build verification status
+The branch-only GitHub Actions workflow runs Node unit tests, TypeScript checks,
+and an unsigned Android debug compile. It never uploads to Play, signs a release,
+or publishes to production. Signed release bundles require the same v9 signing
+key and matching upload certificate, the Android Firebase App ID, and physical
+phone validation before a delivery artifact can be approved.
 
 ## Data and safety
 - Firestore service-account-only collections: push_installations, push_delivery_log.

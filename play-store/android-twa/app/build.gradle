@@ -12,7 +12,7 @@ android {
 
     defaultConfig {
         buildConfigField "String", "FIREBASE_ANDROID_APP_ID", '"' + envFile("PRIMEHUB_FIREBASE_ANDROID_APP_ID") + '"'
-        buildConfigField "String", "FIREBASE_API_KEY", '"AIzaSyA0jI5esNvMt3Sb3WVy7NQShsoWzntJxQU"'
+        buildConfigField "String", "FIREBASE_API_KEY", '"' + envFile("PRIMEHUB_FIREBASE_ANDROID_API_KEY") + '"'
         buildConfigField "String", "FIREBASE_PROJECT_ID", '"prime-hub-a02f0"'
         buildConfigField "String", "FIREBASE_SENDER_ID", '"987298121402"'
 
@@ -54,6 +54,27 @@ android {
     packaging {
         jniLibs {
             useLegacyPackaging false
+        }
+    }
+}
+
+// A v10 release must never silently ship without working native push or with a new signing key.
+gradle.taskGraph.whenReady { graph ->
+    if (graph.allTasks.any { it.name == 'bundleRelease' }) {
+        def appId = envFile('PRIMEHUB_FIREBASE_ANDROID_APP_ID')
+        def apiKey = envFile('PRIMEHUB_FIREBASE_ANDROID_API_KEY')
+        def storePath = envFile('PRIMEHUB_STORE_FILE')
+        if (!(appId ==~ /^1:987298121402:android:[0-9a-fA-F]+$/)) {
+            throw new GradleException('Missing valid Firebase Android App ID for com.primehubmall.app; refusing release AAB.')
+        }
+        if (!(apiKey ==~ /^AIza[A-Za-z0-9_-]{30,}$/)) {
+            throw new GradleException('Missing Firebase Android API key; refusing release AAB.')
+        }
+        if (!storePath || !file(storePath).isFile()
+            || !envFile('PRIMEHUB_STORE_PASSWORD')
+            || !envFile('PRIMEHUB_KEY_ALIAS')
+            || !envFile('PRIMEHUB_KEY_PASSWORD')) {
+            throw new GradleException('Existing v9 upload signing details are required; refusing unsigned release AAB.')
         }
     }
 }

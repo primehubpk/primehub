@@ -1,0 +1,62 @@
+name: v10 notifications verification (branch only)
+
+on:
+  push:
+    branches:
+      - cursor/daily-push-4688
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    if: github.ref == 'refs/heads/cursor/daily-push-4688'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install npm dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Daily notification logic tests
+        run: node --test tests/daily-push.test.mjs
+      - name: Next.js TypeScript checks
+        run: npx tsc --noEmit
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: android-actions/setup-android@v3
+      - name: Install Android API 36
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0" "platform-tools"
+      - name: Compile v10 Android debug APK (NOT uploaded to Play)
+        working-directory: play-store/android-twa
+        run: bash ./gradlew :app:assembleDebug --no-daemon
+      - name: Report release prerequisites (names only)
+        shell: bash
+        env:
+          APP_ID: ${{ vars.PRIMEHUB_FIREBASE_ANDROID_APP_ID }}
+          ANDROID_KEY: ${{ vars.PRIMEHUB_FIREBASE_ANDROID_API_KEY }}
+          KEYSTORE_B64: ${{ secrets.PRIMEHUB_UPLOAD_KEYSTORE_B64 }}
+          STORE_PASSWORD: ${{ secrets.PRIMEHUB_UPLOAD_KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.PRIMEHUB_UPLOAD_KEY_PASSWORD }}
+          UPLOAD_CERT: ${{ vars.PRIMEHUB_V9_UPLOAD_CERT_SHA256 }}
+        run: |
+          if [[ -n "$APP_ID" && -n "$ANDROID_KEY" && -n "$KEYSTORE_B64" && -n "$STORE_PASSWORD" && -n "$KEY_PASSWORD" && -n "$UPLOAD_CERT" ]]; then
+            echo "Signing prerequisites are present (values not printed)."
+          else
+            echo "Signed AAB NOT built: Firebase Android app config / existing v9 key / fingerprint verification not configured."
+          fi
+
+  signed-bundle:
+    # Do not build/surface a signed artifact without an explicit separate
+    # dispatch workflow AND real-device test approval. This CI only compiles debug.
+    if: false
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Never publish from verification job."
