@@ -43,7 +43,10 @@ jobs:
         working-directory: play-store/android-twa
         env:
           PRIMEHUB_PUSH_PREVIEW_ORIGIN: ${{ vars.PRIMEHUB_PUSH_PREVIEW_ORIGIN }}
-        run: bash ./gradlew :app:assembleDebug --no-daemon
+        run: |
+          python3 -m pip install --quiet --user Pillow==11.3.0
+          python3 scripts/compact_launcher_icons.py
+          bash ./gradlew :app:assembleDebug --no-daemon
       - name: Upload debug APK for staging phone tests
         uses: actions/upload-artifact@v4
         with:
