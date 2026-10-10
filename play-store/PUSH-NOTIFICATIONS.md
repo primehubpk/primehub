@@ -2,7 +2,10 @@
 
 Base: cursor/play-store-bag-icon-launch-4688 (versionCode 9 WebView; PR #178 stays draft).
 New Android app build increments versionCode 10, retains com.primehubmall.app and existing upload signing settings.
-NO AAB / keystore is committed by this feature. NEVER use a new upload key.
+NO new AAB / keystore is committed by this feature. NEVER use a new upload key.
+WARNING: A legacy repository upload ZIP appears to contain a keystore; treat that
+archive as sensitive. Protect/remove it from public access and discuss an upload
+key reset with Google Play if key material has been exposed.
 
 ## Required one-time Firebase configuration
 1. Firebase Console > Project settings > Add Android app for existing project with package
@@ -26,7 +29,7 @@ NO AAB / keystore is committed by this feature. NEVER use a new upload key.
 
 ## Build verification status
 The branch-only GitHub Actions workflow runs Node unit tests, TypeScript checks,
-and an unsigned Android debug compile. It never uploads to Play, signs a release,
+and a debug Android compile. Its debug APK is published as a 7-day CI artifact. It never uploads to Play, signs a release,
 or publishes to production. Signed release bundles require the same v9 signing
 key and matching upload certificate, the Android Firebase App ID, and physical
 phone validation before a delivery artifact can be approved.
@@ -52,6 +55,47 @@ phone validation before a delivery artifact can be approved.
 - Only previously opened devices may receive the browse follow-up.
 - Image is a real trusted HTTPS product image. No fake scarcity or stale arrivals.
 - Manual sends / unrestricted test blasts are deliberately absent.
+
+## Branch-only signed test bundle (no Play upload)
+The feature-branch [v10-signed-artifact workflow](https://github.com/primehubpk/primehub/actions/workflows/v10-signed-artifact.yml)
+reads passwords from GitHub Actions Secrets named
+`PRIMEHUB_V9_UPLOAD_STORE_PASSWORD` and `PRIMEHUB_V9_UPLOAD_KEY_PASSWORD`.
+Set them in GitHub → repository Settings → Secrets and variables → Actions →
+New repository secret. Never put passwords in workflow YAML, Git commits,
+issues, screenshots or uploaded test artifacts.
+
+When both exist, the **next push on the feature branch** triggers a guarded build:
+extract the original v9 upload keystore from the repository legacy ZIP in the
+runner only; check its SHA-256 certificate against the registered Play v9
+upload certificate; make a signed versionCode 10 AAB ZIP and a signed
+phone-test APK; verify the generated AAB certificate, and upload a 7-day
+GitHub Actions artifact. It does NOT upload to Play or merge to main.
+
+## Preview phone test before main merge
+The Android debug build can open a manually created Vercel preview instead of
+production **only** when `PRIMEHUB_PUSH_PREVIEW_ORIGIN=https://...vercel.app`
+is set in its build environment. Otherwise it opens current production website.
+In contrast, release v10 ALWAYS opens `https://www.primehubmall.com` and cannot
+be redirected by this variable. The debug app uses Android debug signing;
+it cannot be installed over an existing Play-signed v9, so use a spare
+physical phone without that package or uninstall the test copy only.
+
+Preview API registration marks installs `environment=preview`; production cron
+ignores them. The protected `GET /api/notifications/cron?period=morning&dryRun=1`
+(or `evening`) previews real selections, including purchased-user suppression,
+without sending a message. It requires CRON_SECRET on the preview environment.
+
+For one controlled real FCM notification on a PREVIEW device, POST to
+`/api/notifications/test` with `Authorization: Bearer $CRON_SECRET` and JSON
+`{"installationId":"UUID_FROM_IN_APP_SETTINGS","slot":"big"}`. Slots allowed:
+`browse`, `big`, `live`, `arrivals`. Never accepts broadcast requests, never
+sends from a production environment, and permits only one test per slot per
+preview install per Pakistan calendar day. Only actual eligible products/deals
+can be sent. The target must have both Android permission and Settings ON.
+
+A fresh Vercel preview deployment and a test phone are required; the current
+production site does NOT contain this branch-only Settings page. Verify preview
+access controls (Vercel SSO may block an unauthenticated Android WebView).
 
 ## Cron
 Vercel cron: /api/notifications/cron?period=morning at 06:00 UTC = 11:00 Asia/Karachi,
