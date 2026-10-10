@@ -21,6 +21,7 @@ const SHOP_LINKS = [
   { label: 'Categories', href: '/shop' },
   { label: 'Offers', href: '/shop?offers=1' },
   { label: 'My Account', href: '/account' },
+  { label: 'Notification Settings', href: '/settings/notifications' },
 ];
 
 const HELP_LINKS = [

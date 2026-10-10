@@ -4,16 +4,29 @@ plugins {
 
 def envFile = { name -> System.getenv(name) ?: '' }
 
+// Public Firebase Android client configuration from the registered PrimeHub Android app.
+// Env overrides remain supported for CI. These identifiers are bundled in the APK;
+// never put service-account credentials or upload signing keys here.
+def primehubFirebaseAndroidAppId = envFile('PRIMEHUB_FIREBASE_ANDROID_APP_ID') ?: '1:987298121402:android:d63a79a3506e74a192a483'
+def primehubFirebaseAndroidApiKey = envFile('PRIMEHUB_FIREBASE_ANDROID_API_KEY') ?: 'AIzaSyB6P3QBaBEz0qGba2pODQuOgVoakX-1cv4'
+
 android {
     namespace 'com.primehubmall.app'
     compileSdk 36
 
+    buildFeatures { buildConfig true }
+
     defaultConfig {
+        buildConfigField "String", "FIREBASE_ANDROID_APP_ID", '"' + primehubFirebaseAndroidAppId + '"'
+        buildConfigField "String", "FIREBASE_API_KEY", '"' + primehubFirebaseAndroidApiKey + '"'
+        buildConfigField "String", "FIREBASE_PROJECT_ID", '"prime-hub-a02f0"'
+        buildConfigField "String", "FIREBASE_SENDER_ID", '"987298121402"'
+
         applicationId "com.primehubmall.app"
         minSdk 24
         targetSdk 36
-        versionCode 8
-        versionName "8.0.0"
+        versionCode 10
+        versionName "10.0.0"
     }
 
     signingConfigs {
@@ -24,12 +37,18 @@ android {
                 storePassword envFile('PRIMEHUB_STORE_PASSWORD')
                 keyAlias envFile('PRIMEHUB_KEY_ALIAS')
                 keyPassword envFile('PRIMEHUB_KEY_PASSWORD')
+                storeType 'PKCS12'
             }
         }
     }
 
     buildTypes {
+        debug {
+            // Debug-only preview URL for tests before main merge. Release never uses it.
+            buildConfigField "String", "PREVIEW_SITE_ORIGIN", '"' + envFile("PRIMEHUB_PUSH_PREVIEW_ORIGIN") + '"'
+        }
         release {
+            buildConfigField "String", "PREVIEW_SITE_ORIGIN", '""'
             minifyEnabled false
             shrinkResources false
             if (envFile('PRIMEHUB_STORE_FILE')) {
@@ -50,13 +69,28 @@ android {
     }
 }
 
-configurations.all {
-    resolutionStrategy {
-        force 'androidx.browser:browser:1.8.0'
+// A v10 release must never silently ship without working native push or with a new signing key.
+gradle.taskGraph.whenReady { graph ->
+    if (graph.allTasks.any { it.name == 'bundleRelease' }) {
+        def appId = primehubFirebaseAndroidAppId
+        def apiKey = primehubFirebaseAndroidApiKey
+        def storePath = envFile('PRIMEHUB_STORE_FILE')
+        if (!(appId ==~ /^1:987298121402:android:[0-9a-fA-F]+$/)) {
+            throw new GradleException('Missing valid Firebase Android App ID for com.primehubmall.app; refusing release AAB.')
+        }
+        if (!(apiKey ==~ /^AIza[A-Za-z0-9_-]{30,}$/)) {
+            throw new GradleException('Missing Firebase Android API key; refusing release AAB.')
+        }
+        if (!storePath || !file(storePath).isFile()
+            || !envFile('PRIMEHUB_STORE_PASSWORD')
+            || !envFile('PRIMEHUB_KEY_ALIAS')
+            || !envFile('PRIMEHUB_KEY_PASSWORD')) {
+            throw new GradleException('Existing v9 upload signing details are required; refusing unsigned release AAB.')
+        }
     }
 }
 
 dependencies {
-    implementation 'com.google.androidbrowserhelper:androidbrowserhelper:2.6.2'
-    implementation 'androidx.browser:browser:1.8.0'
+    implementation 'com.google.firebase:firebase-messaging:24.1.1'
+    implementation 'androidx.webkit:webkit:1.14.0'
 }

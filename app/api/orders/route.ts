@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { pakistanDay } from '@/lib/notifications/dailyPush';
 import { calculateDeliveryCharge } from '@/lib/deliveryCharges';
 import { getDualProduct, getDualStorefrontSettings } from '@/lib/dualReadServer';
 import { getAdminAuth, getAdminDb } from '@/lib/firebaseAdmin';
@@ -203,6 +204,14 @@ export async function POST(request: Request) {
       if (credits > 0) { const history = [...(Array.isArray(current.history) ? current.history : []), { id: `free-delivery:${orderId}`, action: 'use', name: 'Spin & Win Reward — Free Delivery', type: 'free-delivery', status: 'used', orderId, createdAt: new Date().toISOString() }].slice(-100); await writeRewardWallet(user.uid, { ...current, freeDeliveryCredits: credits - 1, history }); }
     }
 
+    // A successful signed-in order suppresses the same-day browse reminder on all linked installs.
+    // Best effort only: a notification ledger failure must never fail checkout.
+    if (user?.uid) {
+      try {
+        await getAdminDb().collection('push_user_purchases').doc(user.uid + '_' + pakistanDay(new Date()))
+          .set({ purchasedAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 90 * 86_400_000) }, { merge: true });
+      } catch (error) { console.warn('[push] purchase suppression marker unavailable'); }
+    }
     return NextResponse.json({ orderId, ...quote, resellerLinked: Boolean(resellerUserId), guestTracked: Boolean(resellerGuestId) });
   } catch (error) {
     console.error('Secure order creation failed:', error);

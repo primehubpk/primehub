@@ -1,0 +1,101 @@
+name: PrimeHub v10 signed test artifact (never deploy)
+
+on:
+  push:
+    branches: [cursor/daily-push-4688]
+
+permissions:
+  contents: read
+
+jobs:
+  signed-test-only:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      STOREPASS: ${{ secrets.PRIMEHUB_V9_UPLOAD_STORE_PASSWORD }}
+      KEYPASS: ${{ secrets.PRIMEHUB_V9_UPLOAD_KEY_PASSWORD }}
+      V9_SHA256: C4:6E:0D:2A:E6:E6:F0:C8:11:FB:2B:A4:1B:48:5E:16:96:B6:86:6C:53:9F:CA:71:B7:74:B8:80:78:C4:7F:E3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Check signing secrets (never reveal values)
+        id: gate
+        shell: bash
+        run: |
+          if [[ -n "$STOREPASS" && -n "$KEYPASS" ]]; then
+            echo 'ready=yes' >> "$GITHUB_OUTPUT"
+          else
+            echo 'ready=no' >> "$GITHUB_OUTPUT"
+            echo 'Signed AAB paused. Configure both v9 upload password secrets in GitHub Actions settings.'
+          fi
+      - uses: actions/setup-java@v4
+        if: steps.gate.outputs.ready == 'yes'
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Confirm v9 upload certificate from old archive
+        if: steps.gate.outputs.ready == 'yes'
+        shell: bash
+        run: |
+          set -euo pipefail
+          zipfile='play-store/PrimeHub-PlayStore-Upload.zip'
+          entry="$(unzip -Z1 "$zipfile" | grep -E '(^|/)keystore/primehub-upload\.p12$' | head -n1)"
+          if [[ -z "$entry" ]]; then echo 'Original upload key missing from v9 archive' >&2; exit 1; fi
+          unzip -p "$zipfile" "$entry" > "$RUNNER_TEMP/primehub-upload.p12"
+          chmod 600 "$RUNNER_TEMP/primehub-upload.p12"
+          actual="$(keytool -list -v -storetype PKCS12 -keystore "$RUNNER_TEMP/primehub-upload.p12" -storepass:env STOREPASS -alias primehub-upload | sed -n 's/^[[:space:]]*SHA256: //p' | head -n1)"
+          if [[ -z "$actual" || "${actual//:/}" != "${V9_SHA256//:/}" ]]; then
+            echo 'REFUSING BUILD: signing fingerprint differs from Play v9.' >&2
+            exit 1
+          fi
+          echo 'Verified the same registered v9 upload certificate.'
+          echo "PRIMEHUB_STORE_FILE=$RUNNER_TEMP/primehub-upload.p12" >> "$GITHUB_ENV"
+      - name: Build signed v10 AAB and test APK
+        if: steps.gate.outputs.ready == 'yes'
+        working-directory: play-store/android-twa
+        env:
+          PRIMEHUB_STORE_PASSWORD: ${{ secrets.PRIMEHUB_V9_UPLOAD_STORE_PASSWORD }}
+          PRIMEHUB_KEY_PASSWORD: ${{ secrets.PRIMEHUB_V9_UPLOAD_KEY_PASSWORD }}
+          PRIMEHUB_KEY_ALIAS: primehub-upload
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f "${PRIMEHUB_STORE_FILE}"
+          python3 -m pip install --quiet --user Pillow==11.3.0
+          python3 scripts/compact_launcher_icons.py --preview "$RUNNER_TEMP/PrimeHub-v10-SMALL-BAG-preview.png"
+          bash ./gradlew :app:bundleRelease :app:assembleRelease --no-daemon
+      - name: Check AAB signed certificate and package test artifacts
+        if: steps.gate.outputs.ready == 'yes'
+        shell: bash
+        run: |
+          set -euo pipefail
+          aab='play-store/android-twa/app/build/outputs/bundle/release/app-release.aab'
+          apk='play-store/android-twa/app/build/outputs/apk/release/app-release.apk'
+          test -s "$aab"; test -s "$apk"
+          cert="$(keytool -printcert -jarfile "$aab" | sed -n 's/^[[:space:]]*SHA256: //p' | head -n1)"
+          if [[ -z "$cert" || "${cert//:/}" != "${V9_SHA256//:/}" ]]; then
+            echo 'STOP: generated AAB signed with wrong upload key.' >&2
+            exit 1
+          fi
+          mkdir -p "$RUNNER_TEMP/primehub-v10-output"
+          cp "$aab" "$RUNNER_TEMP/primehub-v10-output/PrimeHub-v10-app-release.aab"
+          cp "$apk" "$RUNNER_TEMP/primehub-v10-output/PrimeHub-v10-phone-test.apk"
+          (cd "$RUNNER_TEMP/primehub-v10-output" && zip -q PrimeHub-v10-signed-AAB.zip PrimeHub-v10-app-release.aab)
+          sha256sum "$aab" > "$RUNNER_TEMP/primehub-v10-output/checksum.txt"
+          echo 'Signed AAB prepared with the verified v9 key. No Play Store upload.'
+      - uses: actions/upload-artifact@v4
+        if: steps.gate.outputs.ready == 'yes'
+        with:
+          name: PrimeHub-v10-signed-test-only
+          path: |
+            ${{ runner.temp }}/primehub-v10-output/PrimeHub-v10-signed-AAB.zip
+            ${{ runner.temp }}/primehub-v10-output/PrimeHub-v10-phone-test.apk
+            ${{ runner.temp }}/primehub-v10-output/checksum.txt
+            ${{ runner.temp }}/PrimeHub-v10-SMALL-BAG-preview.png
+          retention-days: 7
+          if-no-files-found: error
+      - name: Delete temporary signing key
+        if: always()
+        shell: bash
+        run: rm -f "$RUNNER_TEMP/primehub-upload.p12"
