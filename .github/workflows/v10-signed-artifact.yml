@@ -62,6 +62,8 @@ jobs:
         run: |
           set -euo pipefail
           test -f "${PRIMEHUB_STORE_FILE}"
+          python3 -m pip install --quiet --user Pillow==11.3.0
+          python3 scripts/compact_launcher_icons.py --preview "$RUNNER_TEMP/PrimeHub-v10-SMALL-BAG-preview.png"
           bash ./gradlew :app:bundleRelease :app:assembleRelease --no-daemon
       - name: Check AAB signed certificate and package test artifacts
         if: steps.gate.outputs.ready == 'yes'
@@ -90,6 +92,7 @@ jobs:
             ${{ runner.temp }}/primehub-v10-output/PrimeHub-v10-signed-AAB.zip
             ${{ runner.temp }}/primehub-v10-output/PrimeHub-v10-phone-test.apk
             ${{ runner.temp }}/primehub-v10-output/checksum.txt
+            ${{ runner.temp }}/PrimeHub-v10-SMALL-BAG-preview.png
           retention-days: 7
           if-no-files-found: error
       - name: Delete temporary signing key
