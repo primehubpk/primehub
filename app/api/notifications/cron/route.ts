@@ -34,7 +34,8 @@ export async function GET(request: Request) {
   try {
     const [catalog, stored] = await Promise.all([getPublicCatalogSnapshot(), getStorefrontSettingsResultSnapshot()]);
     const products = catalog.products as Record<string, any>[];
-    const settings = { ...(stored.documents.general || {}), ...(stored.documents.main || {}) };
+    const documents = stored.documents as Record<string, any>;
+    const settings = { ...(documents.general || {}), ...(documents.main || {}) };
     const installs = getAdminDb().collection('push_installations');
     const logs = getAdminDb().collection('push_delivery_log');
     const now = new Date(), day = pakistanDay(now);
