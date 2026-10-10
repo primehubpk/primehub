@@ -4,6 +4,12 @@ plugins {
 
 def envFile = { name -> System.getenv(name) ?: '' }
 
+// Public Firebase Android client configuration from the registered PrimeHub Android app.
+// Env overrides remain supported for CI. These identifiers are bundled in the APK;
+// never put service-account credentials or upload signing keys here.
+def primehubFirebaseAndroidAppId = envFile('PRIMEHUB_FIREBASE_ANDROID_APP_ID') ?: '1:987298121402:android:d63a79a3506e74a192a483'
+def primehubFirebaseAndroidApiKey = envFile('PRIMEHUB_FIREBASE_ANDROID_API_KEY') ?: 'AIzaSyB6P3QBaBEz0qGba2pODQuOgVoakX-1cv4'
+
 android {
     namespace 'com.primehubmall.app'
     compileSdk 36
@@ -11,8 +17,8 @@ android {
     buildFeatures { buildConfig true }
 
     defaultConfig {
-        buildConfigField "String", "FIREBASE_ANDROID_APP_ID", '"' + envFile("PRIMEHUB_FIREBASE_ANDROID_APP_ID") + '"'
-        buildConfigField "String", "FIREBASE_API_KEY", '"' + envFile("PRIMEHUB_FIREBASE_ANDROID_API_KEY") + '"'
+        buildConfigField "String", "FIREBASE_ANDROID_APP_ID", '"' + primehubFirebaseAndroidAppId + '"'
+        buildConfigField "String", "FIREBASE_API_KEY", '"' + primehubFirebaseAndroidApiKey + '"'
         buildConfigField "String", "FIREBASE_PROJECT_ID", '"prime-hub-a02f0"'
         buildConfigField "String", "FIREBASE_SENDER_ID", '"987298121402"'
 
@@ -61,8 +67,8 @@ android {
 // A v10 release must never silently ship without working native push or with a new signing key.
 gradle.taskGraph.whenReady { graph ->
     if (graph.allTasks.any { it.name == 'bundleRelease' }) {
-        def appId = envFile('PRIMEHUB_FIREBASE_ANDROID_APP_ID')
-        def apiKey = envFile('PRIMEHUB_FIREBASE_ANDROID_API_KEY')
+        def appId = primehubFirebaseAndroidAppId
+        def apiKey = primehubFirebaseAndroidApiKey
         def storePath = envFile('PRIMEHUB_STORE_FILE')
         if (!(appId ==~ /^1:987298121402:android:[0-9a-fA-F]+$/)) {
             throw new GradleException('Missing valid Firebase Android App ID for com.primehubmall.app; refusing release AAB.')
