@@ -66,7 +66,7 @@ export function selectDailyPush(slot: PushSlot, now: Date, installId: string, in
     const bodies = viewed
       ? ['Aapki pasand ka ' + title(product) + ' phir dekhein ✨',
          title(product) + ' abhi ' + money(Number(product.price)) + ' mein!',
-         'Aapne jo dekha tha, woh yahan hai. Dekhein 🛍️']
+         'Aapne ' + title(product) + ' dekha tha — ab phir dekhein 🛍️']
       : ['PrimeHub ki pick: ' + title(product) + ' 🛍️',
          title(product) + ' — aaj kuch naya dekhein!',
          'Aapke liye select kiya: ' + title(product)];
