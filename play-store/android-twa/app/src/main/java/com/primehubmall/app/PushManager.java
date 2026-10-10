@@ -44,7 +44,7 @@ import java.util.concurrent.Executors;
  */
 public final class PushManager {
     private static final String TAG = "PrimeHubPush";
-    private static final String API = "https://www.primehubmall.com/api/notifications/device";
+    private static String apiUrl() { return MainActivity.appOrigin() + "/api/notifications/device"; }
     private static final String PREFERENCES = "primehub-push-v10";
     private static final String ID = "installation-id", SECRET = "installation-secret";
     private static final String ENABLED = "enabled", REQUESTED = "permission-requested";
@@ -129,6 +129,7 @@ public final class PushManager {
         if (bridgeReady || !WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) return;
         try {
             Set<String> origins = new HashSet<>(Arrays.asList("https://www.primehubmall.com", "https://primehubmall.com"));
+            if (BuildConfig.DEBUG) origins.add(MainActivity.appOrigin());
             WebViewCompat.addWebMessageListener(view, "PrimeHubNative", origins,
                 (webview, message, origin, isMainFrame, reply) -> {
                     if (!isMainFrame || origin == null || !origins.contains(origin.toString())) return;
@@ -173,6 +174,7 @@ public final class PushManager {
             state.put("enabled", wantsPush(context));
             state.put("allowed", osAllows(context));
             state.put("supported", configured);
+            if (BuildConfig.DEBUG) state.put("installationId", installId(context));
         } catch (Exception ignored) {}
         return state;
     }
@@ -234,6 +236,7 @@ public final class PushManager {
         try {
             Uri uri = Uri.parse(url);
             if (!"https".equals(uri.getScheme()) ||
+                !MainActivity.appOrigin().equals(uri.getScheme() + "://" + uri.getHost()) &&
                 !("www.primehubmall.com".equals(uri.getHost()) || "primehubmall.com".equals(uri.getHost()))) return;
             pageSeen(activity, uri.getPath() == null ? "/" : uri.getPath());
             // Next.js uses client-side history transitions which may not call onPageFinished.
@@ -308,7 +311,7 @@ public final class PushManager {
             if (path != null && validPath(path)) data.put("path", path);
             if (orderId != null) data.put("orderId", orderId);
             if (idToken != null) data.put("idToken", idToken);
-            connection = (HttpURLConnection) new URL(API).openConnection();
+            connection = (HttpURLConnection) new URL(apiUrl()).openConnection();
             connection.setRequestMethod("POST");
             connection.setRequestProperty("Content-Type", "application/json");
             connection.setConnectTimeout(4000);

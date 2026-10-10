@@ -41,7 +41,15 @@ jobs:
           echo "ANDROID_HOME=$SDK_ROOT" >> "$GITHUB_ENV"
       - name: Compile v10 Android debug APK (NOT uploaded to Play)
         working-directory: play-store/android-twa
+        env:
+          PRIMEHUB_PUSH_PREVIEW_ORIGIN: ${{ vars.PRIMEHUB_PUSH_PREVIEW_ORIGIN }}
         run: bash ./gradlew :app:assembleDebug --no-daemon
+      - name: Upload debug APK for staging phone tests
+        uses: actions/upload-artifact@v4
+        with:
+          name: PrimeHub-v10-debug-phone-test
+          path: play-store/android-twa/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 7
       - name: Report release prerequisites (names only)
         shell: bash
         env:

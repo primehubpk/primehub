@@ -39,7 +39,7 @@ public class PrimeHubMessagingService extends FirebaseMessagingService {
             manager.createNotificationChannel(channel);
         }
         Intent open = new Intent(this, MainActivity.class);
-        open.setData(Uri.parse("https://www.primehubmall.com" + path));
+        open.setData(Uri.parse(MainActivity.appOrigin() + path));
         open.setAction(Intent.ACTION_VIEW);
         open.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         int id = (data.getOrDefault("day", "") + data.getOrDefault("slot", "")).hashCode();

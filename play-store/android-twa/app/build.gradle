@@ -43,7 +43,12 @@ android {
     }
 
     buildTypes {
+        debug {
+            // Debug-only preview URL for tests before main merge. Release never uses it.
+            buildConfigField "String", "PREVIEW_SITE_ORIGIN", '"' + envFile("PRIMEHUB_PUSH_PREVIEW_ORIGIN") + '"'
+        }
         release {
+            buildConfigField "String", "PREVIEW_SITE_ORIGIN", '""'
             minifyEnabled false
             shrinkResources false
             if (envFile('PRIMEHUB_STORE_FILE')) {

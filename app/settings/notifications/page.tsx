@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { Bell, ArrowLeft } from 'lucide-react';
 
-type Status = { type: 'settings'; allowed: boolean; enabled: boolean; supported: boolean };
+type Status = { type: 'settings'; allowed: boolean; enabled: boolean; supported: boolean; installationId?: string };
 declare global {
   interface Window {
     PrimeHubNative?: { postMessage(message: string): void; onmessage?: ((event: { data: string }) => void) | null };
@@ -47,6 +47,7 @@ export default function NotificationSettings() {
               className="h-5 w-5 accent-[#0F6A5F]" />
           </label>
           {!state.allowed && <p className="mt-3 text-xs text-amber-800">Android has blocked notifications. Turn ON to open your phone's notification settings.</p>}
+          {state.installationId && <p className="mt-3 break-all text-xs text-black/50">Test installation ID: {state.installationId}</p>}
           {!state.supported && <p className="mt-3 text-xs text-amber-800">Push setup is not yet available on this app build.</p>}
         </> : <p className="mt-5 text-sm">Reading notification settings…</p>}
     </section>

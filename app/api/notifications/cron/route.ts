@@ -51,20 +51,22 @@ export async function GET(request: Request) {
       for (const snap of batch.docs) {
         const device = snap.data();
         results.scanned++;
-        if (device.allowed !== true || typeof device.token !== 'string' || !device.token || device.enabled !== true) {
+        if (device.allowed !== true || typeof device.token !== 'string' || !device.token || device.enabled !== true ||
+            (dryRun && process.env.VERCEL_ENV === 'preview' ? device.environment !== 'preview' : device.environment !== 'production')) {
           results.skipped++; continue;
         }
         for (const slot of slots) {
           const content = selectDailyPush(slot, now, snap.id, device, products, settings);
           if (!content) { results.skipped++; continue; }
+          const userUid = String(device.userUid || '');
+          if (slot === 'browse' && userUid &&
+              (await getAdminDb().collection('push_user_purchases').doc(userUid + '_' + day).get()).exists) {
+            results.skipped++; continue;
+          }
           results.candidates++;
           if (dryRun) {
             if (results.samples.length < 8) results.samples.push({ slot, title: content.title, body: content.body, path: content.path, imageUrl: content.imageUrl || null });
             continue;
-          }
-          const userUid = String(device.userUid || '');
-          if (slot === 'browse' && userUid && (await getAdminDb().collection('push_user_purchases').doc(userUid + '_' + day).get()).exists) {
-            results.skipped++; continue;
           }
           const principal = userUid ? 'user:' + userUid : 'install:' + snap.id;
           const logId = createHash('sha256').update(principal + ':' + day + ':' + slot).digest('hex');

@@ -30,6 +30,14 @@ import android.widget.TextView;
  */
 public class MainActivity extends Activity {
     static final String HOME_URL = "https://www.primehubmall.com/";
+    static String appOrigin() {
+        // A preview host is accepted ONLY in Android debug builds, never in the Play AAB.
+        if (BuildConfig.DEBUG) {
+            String test = BuildConfig.PREVIEW_SITE_ORIGIN;
+            if (test != null && test.matches("https://[a-zA-Z0-9-]+\\.vercel\\.app")) return test;
+        }
+        return "https://www.primehubmall.com";
+    }
     private static final int FILE_CHOOSER_REQUEST = 1001;
     private static final long SPLASH_TIMEOUT_MS = 8000;
 
@@ -102,7 +110,7 @@ public class MainActivity extends Activity {
                 return data.toString();
             }
         }
-        return HOME_URL;
+        return appOrigin() + "/";
     }
 
     private boolean isTrustedUrl(Uri uri) {
@@ -113,7 +121,8 @@ public class MainActivity extends Activity {
             return false;
         }
         String host = uri.getHost().toLowerCase();
-        return host.equals("www.primehubmall.com")
+        return (BuildConfig.DEBUG && host.equals(Uri.parse(appOrigin()).getHost()))
+                || host.equals("www.primehubmall.com")
                 || host.equals("primehubmall.com")
                 || host.endsWith(".primehubmall.com");
     }
@@ -148,7 +157,7 @@ public class MainActivity extends Activity {
         message.setGravity(Gravity.CENTER);
         Button button = new Button(this);
         button.setText("Open PrimeHub");
-        button.setOnClickListener(v -> openExternal(Uri.parse(HOME_URL)));
+        button.setOnClickListener(v -> openExternal(Uri.parse(appOrigin() + "/")));
         layout.addView(message);
         layout.addView(button);
         setContentView(layout);

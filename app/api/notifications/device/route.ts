@@ -29,7 +29,7 @@ export async function POST(request: Request) {
       if (!TOKEN.test(token)) return reject(400);
       const allowed = data?.allowed === true;
       const enabled = data?.enabled === true;
-      const payload = { token, allowed, enabled, lastOpenedAt: now, updatedAt: now };
+      const payload = { token, allowed, enabled, environment: process.env.VERCEL_ENV === "preview" ? "preview" : "production", lastOpenedAt: now, updatedAt: now };
       if (!previous.exists) {
         try { await doc.create({ ...payload, secretHash: hash, createdAt: now }); }
         catch { return reject(409); } // Never overwrite another install on a racing create.
