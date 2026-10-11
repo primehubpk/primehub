@@ -13,6 +13,9 @@ const HOME_KEEP_MS = 2 * 60_000;
 export default function StorefrontPageCache({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const isHome = pathname === '/';
+  // Do not keep a heavy Home DOM underneath detail, checkout or admin pages.
+  const isBottomTab = pathname === '/shop' || pathname === '/skills' ||
+    pathname === '/orders' || pathname === '/reseller/dashboard';
   const [savedHome, setSavedHome] = useState<ReactNode>(() => (isHome ? children : null));
   const previousPath = useRef(pathname);
   const homeWrapper = useRef<HTMLDivElement>(null);
@@ -25,9 +28,13 @@ export default function StorefrontPageCache({ children }: { children: ReactNode 
 
   useEffect(() => {
     if (isHome || savedHome === null) return;
+    if (!isBottomTab) {
+      setSavedHome(null);
+      return;
+    }
     const timer = window.setTimeout(() => setSavedHome(null), HOME_KEEP_MS);
     return () => window.clearTimeout(timer);
-  }, [isHome, savedHome]);
+  }, [isHome, isBottomTab, savedHome]);
 
   useLayoutEffect(() => {
     const last = previousPath.current;
