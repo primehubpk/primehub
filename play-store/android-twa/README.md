@@ -2,13 +2,13 @@
 
 Android wrapper for https://www.primehubmall.com  
 Application ID: `com.primehubmall.app`  
-minSdk 24 · targetSdk 36 · versionCode 10 (notification feature branch only)
+minSdk 24 · targetSdk 36 · versionCode 11 (single Play release candidate; v10 not uploaded)
 
 The Play listing icon (red shopping-bag with P) is the launcher icon. The app
 opens the live website inside the PrimeHub activity so it stays on screen
 instead of handing off to Chrome and closing.
 
-## Build a Play Store bundle (only after owner authorizes release)
+## Build a Play Store bundle (only after release prerequisites are verified)
 
 Set the matching Firebase Android App ID from Firebase Console:
 
