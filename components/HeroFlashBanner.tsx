@@ -132,7 +132,11 @@ export default function HeroFlashBanner({ initialProducts = [], liveUpdates = tr
 
   useEffect(() => {
     setNowTick(Date.now());
-    const timer = window.setInterval(() => setNowTick(Date.now()), 1000);
+    const timer = window.setInterval(() => {
+      if (window.location.pathname === '/' && document.visibilityState === 'visible') {
+        setNowTick(Date.now());
+      }
+    }, 1000);
     return () => window.clearInterval(timer);
   }, []);
 

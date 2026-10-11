@@ -228,7 +228,9 @@ export default function BigDealNextPreviewSync() {
     const startTimer = () => {
       if (timer !== null) return;
       applyDealCards();
-      timer = window.setInterval(applyDealCards, 1000);
+      timer = window.setInterval(() => {
+        if (window.location.pathname === '/' && document.visibilityState === 'visible') applyDealCards();
+      }, 1000);
     };
 
     if (typeof IntersectionObserver === "undefined") {

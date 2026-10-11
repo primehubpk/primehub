@@ -73,10 +73,18 @@ export function useKeptHomeCover() {
       check();
     }
     const capture = (force = false) => {
+      if (frame.closest('[data-ph-kept-home]') && window.location.pathname !== '/') return;
       if (leaving && !force) return;
       leaving = true;
       savedY = window.scrollY;
       savedHeight = live.offsetHeight;
+      // The parent route cache retains the real Home nodes. Do not clone a
+      // second full catalog (which doubles memory and can reload images).
+      if (frame.closest('[data-ph-kept-home]')) {
+        snapshot?.remove();
+        snapshot = null;
+        return;
+      }
       snapshot = live.cloneNode(true) as HTMLElement;
       snapshot.style.opacity = '';
       snapshot.removeAttribute('data-ph-home-live');
@@ -94,7 +102,7 @@ export function useKeptHomeCover() {
     };
     const onClick = (event: MouseEvent) => {
       const anchor = event.target instanceof Element ? event.target.closest('a[href]') : null;
-      if (!(anchor instanceof HTMLAnchorElement) || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      if (window.location.pathname !== '/' || !(anchor instanceof HTMLAnchorElement) || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
       const url = new URL(anchor.href, location.href);
       if (url.origin === location.origin && url.pathname !== '/' && !url.pathname.startsWith('/product/')) capture(true);
     };
