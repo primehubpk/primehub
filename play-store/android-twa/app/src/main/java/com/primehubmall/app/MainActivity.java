@@ -56,8 +56,11 @@ public class MainActivity extends Activity {
             splash = findViewById(R.id.splash);
             configureWebView();
             if (savedInstanceState != null) {
-                webView.restoreState(savedInstanceState);
-                hideSplash();
+                if (webView.restoreState(savedInstanceState) == null) {
+                    webView.loadUrl(urlFromIntent(getIntent()));
+                } else {
+                    hideSplash();
+                }
             } else {
                 webView.loadUrl(urlFromIntent(getIntent()));
             }
@@ -71,9 +74,12 @@ public class MainActivity extends Activity {
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         setIntent(intent);
-        String url = urlFromIntent(intent);
-        if (url != null && webView != null) {
-            webView.loadUrl(url);
+        // Reopening from the launcher must resume the existing WebView, not
+        // reload Home and all its images. Explicit verified deep links still work.
+        Uri data = intent == null ? null : intent.getData();
+        if (data != null && isTrustedUrl(data) && webView != null) {
+            String url = data.toString();
+            if (!url.equals(webView.getUrl())) webView.loadUrl(url);
         }
     }
 
@@ -94,7 +100,7 @@ public class MainActivity extends Activity {
         settings.setJavaScriptCanOpenWindowsAutomatically(true);
         settings.setSupportMultipleWindows(true);
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
-        settings.setUserAgentString(settings.getUserAgentString() + " PrimeHubApp/10.0.0");
+        settings.setUserAgentString(settings.getUserAgentString() + " PrimeHubApp/11.0.0");
         CookieManager cookies = CookieManager.getInstance();
         cookies.setAcceptCookie(true);
         cookies.setAcceptThirdPartyCookies(webView, true);
@@ -301,10 +307,15 @@ public class MainActivity extends Activity {
             try {
                 startActivityForResult(params.createIntent(), FILE_CHOOSER_REQUEST);
             } catch (Exception e) {
-                Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
-                intent.addCategory(Intent.CATEGORY_OPENABLE);
-                intent.setType("*/*");
-                startActivityForResult(Intent.createChooser(intent, "Choose file"), FILE_CHOOSER_REQUEST);
+                try {
+                    Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
+                    intent.addCategory(Intent.CATEGORY_OPENABLE);
+                    intent.setType("*/*");
+                    startActivityForResult(Intent.createChooser(intent, "Choose file"), FILE_CHOOSER_REQUEST);
+                } catch (Exception noPicker) {
+                    filePathCallback = null;
+                    callback.onReceiveValue(null);
+                }
             }
             return true;
         }
