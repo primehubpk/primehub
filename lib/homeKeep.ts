@@ -73,6 +73,7 @@ export function useKeptHomeCover() {
       check();
     }
     const capture = (force = false) => {
+      if (frame.closest('[data-ph-kept-home]') && window.location.pathname !== '/') return;
       if (leaving && !force) return;
       leaving = true;
       savedY = window.scrollY;
