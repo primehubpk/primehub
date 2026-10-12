@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { revalidateTag } from 'next/cache';
+import { publicProductCacheTag } from '@/lib/storefrontCachePolicy';
 import { getAdminDb } from '@/lib/firebaseAdmin';
 import {
   getSupabasePrimaryPayload,
@@ -35,12 +36,13 @@ function hasProductIdentity(value: Record<string, any>) {
   return String(value?.title || value?.name || '').trim().length > 0;
 }
 
-function refreshCachesForCollection(name: string) {
+function refreshCachesForCollection(name: string, id: string) {
   if (name === 'products' || name === 'categories') {
     revalidateTag('public-catalog', { expire: 0 });
     revalidateTag('salaar-catalog', 'max');
   }
-  if (name === 'products') revalidateTag('public-products', { expire: 0 });
+  if (name === 'products') revalidateTag(publicProductCacheTag(id), { expire: 0 });
+  if (name === 'categories') revalidateTag('public-categories', { expire: 0 });
   if (name === 'settings') {
     revalidateTag('storefront-settings', { expire: 0 });
     revalidateTag('prime-skills', { expire: 0 });
@@ -119,12 +121,12 @@ export async function POST(request: Request) {
 
       if (supabasePrimary) {
         const mirrorWarning = await writeSupabaseFirst(name, ref.id, data);
-        refreshCachesForCollection(name);
+        refreshCachesForCollection(name, ref.id);
         return NextResponse.json({ success: true, id: ref.id, primary: 'supabase', mirrorWarning });
       }
 
       await ref.set(data);
-      refreshCachesForCollection(name);
+      refreshCachesForCollection(name, ref.id);
       return NextResponse.json({ success: true, id: ref.id, primary: 'firebase' });
     }
 
@@ -137,12 +139,12 @@ export async function POST(request: Request) {
         if (!existing) return NextResponse.json({ error: 'Document not found.' }, { status: 404 });
         const data = { ...existing, ...patch };
         const mirrorWarning = await writeSupabaseFirst(name, id, data);
-        refreshCachesForCollection(name);
+        refreshCachesForCollection(name, id);
         return NextResponse.json({ success: true, id, primary: 'supabase', mirrorWarning });
       }
 
       await db.collection(name).doc(id).update(patch);
-      refreshCachesForCollection(name);
+      refreshCachesForCollection(name, id);
       return NextResponse.json({ success: true, id, primary: 'firebase' });
     }
 
@@ -152,12 +154,12 @@ export async function POST(request: Request) {
 
       if (supabasePrimary) {
         const mirrorWarning = await writeSupabaseFirst(name, id, data);
-        refreshCachesForCollection(name);
+        refreshCachesForCollection(name, id);
         return NextResponse.json({ success: true, id, primary: 'supabase', mirrorWarning });
       }
 
       await db.collection(name).doc(id).set(data, { merge: false });
-      refreshCachesForCollection(name);
+      refreshCachesForCollection(name, id);
       return NextResponse.json({ success: true, id, primary: 'firebase' });
     }
 
@@ -172,12 +174,12 @@ export async function POST(request: Request) {
         }
         const data = { ...(existing || {}), ...patch };
         const mirrorWarning = await writeSupabaseFirst(name, id, data);
-        refreshCachesForCollection(name);
+        refreshCachesForCollection(name, id);
         return NextResponse.json({ success: true, id, primary: 'supabase', mirrorWarning });
       }
 
       await db.collection(name).doc(id).set(patch, { merge: true });
-      refreshCachesForCollection(name);
+      refreshCachesForCollection(name, id);
       return NextResponse.json({ success: true, id, primary: 'firebase' });
     }
 
@@ -186,12 +188,12 @@ export async function POST(request: Request) {
 
       if (supabasePrimary) {
         const mirrorWarning = await deleteSupabaseFirst(name, id);
-        refreshCachesForCollection(name);
+        refreshCachesForCollection(name, id);
         return NextResponse.json({ success: true, id, primary: 'supabase', mirrorWarning });
       }
 
       await db.collection(name).doc(id).delete();
-      refreshCachesForCollection(name);
+      refreshCachesForCollection(name, id);
       return NextResponse.json({ success: true, id, primary: 'firebase' });
     }
 

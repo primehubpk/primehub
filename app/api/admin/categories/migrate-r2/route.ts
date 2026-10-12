@@ -123,6 +123,7 @@ export async function POST(request: Request) {
 
     if (migrated > 0) {
       revalidateTag('public-catalog', { expire: 0 });
+      revalidateTag('public-categories', { expire: 0 });
     }
 
     const remaining = Math.max(0, legacyDocs.length - migrated);

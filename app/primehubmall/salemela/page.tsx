@@ -3,12 +3,13 @@ import BackHomeLink from '@/components/BackHomeLink';
 import HomeCollections from '@/components/home/HomeCollections';
 import ProductNavigationSeed from '@/components/ProductNavigationSeed';
 import { SettingsProvider } from '@/lib/useSettings';
-import { getPublicCatalogSnapshot, getStorefrontSettingsSnapshot } from '@/lib/publicCatalogServer';
+import { compactPublicCatalogSnapshot, getPublicCatalogSnapshot, getStorefrontSettingsSnapshot } from '@/lib/publicCatalogServer';
 import type { SiteSettings } from '@/lib/types';
 import type { Product } from '@/components/shop/ShopTypes';
 import '@/components/home/home.css';
 
-export const revalidate = 3600;
+// Admin changes invalidate the data tags; six hours is the fallback only.
+export const revalidate = 21600;
 
 export const metadata: Metadata = {
   title: 'PrimeHubMall Sale Mela',
@@ -28,7 +29,7 @@ export default async function SaleMelaPage() {
   ]);
 
   const catalog = catalogResult.status === 'fulfilled'
-    ? catalogResult.value
+    ? compactPublicCatalogSnapshot(catalogResult.value)
     : { products: [], categories: [] };
   const initialSettings = settingsResult.status === 'fulfilled'
     ? settingsResult.value

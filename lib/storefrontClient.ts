@@ -24,7 +24,10 @@ export async function fetchPublicStorefront(type: PublicReadType): Promise<Respo
   if (!request) {
     const generation = generations.get(type) || 0;
     const refresh = refreshNext.delete(type) ? '&refresh=1' : '';
-    request = fetch(`/api/storefront/read?type=${type}${refresh}`, { cache: 'no-store', signal: AbortSignal.timeout(10_000) })
+    // Normal public reads may reuse the existing 60-second browser/CDN cache.
+    // Only an explicit post-write refresh bypasses it. Purchase reads do not
+    // use this helper and continue to request current price/stock with no-store.
+    request = fetch(`/api/storefront/read?type=${type}${refresh}`, { cache: refresh ? 'no-store' : 'default', signal: AbortSignal.timeout(10_000) })
       .then((response) => {
         if (response.ok && generation === (generations.get(type) || 0)) {
           responses.set(type, { response: response.clone(), expiresAt: Date.now() + TTL_MS });

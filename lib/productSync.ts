@@ -1,4 +1,5 @@
 import { revalidateTag } from 'next/cache';
+import { publicProductCacheTag } from '@/lib/storefrontCachePolicy';
 import { getAdminDb } from '@/lib/firebaseAdmin';
 import {
   findSupabaseProductBySlug,
@@ -106,9 +107,9 @@ export function validateProductInput(body: unknown): ProductSyncInput {
   };
 }
 
-function refreshProductCaches() {
+function refreshProductCaches(productId: string) {
   revalidateTag('public-catalog', { expire: 0 });
-  revalidateTag('public-products', { expire: 0 });
+  revalidateTag(publicProductCacheTag(productId), { expire: 0 });
   revalidateTag('salaar-catalog', 'max');
   revalidateTag('salaar-store-knowledge', 'max');
 }
@@ -180,7 +181,7 @@ export async function upsertProduct(input: ProductSyncInput): Promise<ProductSyn
 
   // Firebase remains the secondary mirror for legacy/admin compatibility.
   await mirrorProductToFirebase(productId, payload);
-  refreshProductCaches();
+  refreshProductCaches(productId);
 
   return { id: productId, slug, created };
 }

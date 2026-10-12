@@ -7,7 +7,8 @@ import { compactPublicCatalogSnapshot, getPublicCatalogSnapshot, getStorefrontSe
 import type { SiteSettings } from '@/lib/types';
 import type { Product, Category } from '@/components/shop/ShopTypes';
 
-export const revalidate = 3600;
+// Admin changes invalidate the data tags; six hours is the fallback only.
+export const revalidate = 21600;
 
 export const metadata: Metadata = {
   title: 'Shop Bangles, Jewellery, Watches & Wholesale Deals',

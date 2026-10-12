@@ -46,10 +46,11 @@ test('an admin invalidation defeats a late response from before the write', asyn
   invalidatePublicStorefront();
   let finishOld;
   let calls = 0;
-  globalThis.fetch = async url => {
+  globalThis.fetch = async (url, options) => {
     calls++;
     if (calls === 1) return new Promise(resolve => { finishOld = resolve; });
     assert.match(url, /refresh=1/);
+    assert.equal(options.cache, 'no-store');
     return Response.json({ version: 'new' });
   };
   const old = fetchPublicStorefront('settings');
@@ -59,4 +60,19 @@ test('an admin invalidation defeats a late response from before the write', asyn
   await old;
   assert.equal((await (await fetchPublicStorefront('settings')).json()).version, 'new');
   assert.equal(calls, 2);
+});
+
+test('ordinary expired public reads allow HTTP caching instead of forcing an origin refresh', async () => {
+  invalidatePublicStorefront();
+  let now = 1000;
+  Date.now = () => now;
+  const modes = [];
+  globalThis.fetch = async (_url, options) => {
+    modes.push(options.cache);
+    return Response.json({ documents: { main: {} } });
+  };
+  await fetchPublicStorefront('settings');
+  now += 60_001;
+  await fetchPublicStorefront('settings');
+  assert.deepEqual(modes, ['no-store', 'default']);
 });

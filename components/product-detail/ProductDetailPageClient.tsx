@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useEffect, useRef } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import {
   ArrowLeft,
   Heart,
@@ -106,14 +106,24 @@ export default function ProductDetailPageClient({
 }
 
 function DealAwareProductDetail({ initialProduct = null, productId }: Props) {
-  const searchParams = useSearchParams();
+  const [bigDeal, setBigDeal] = useState(false);
   return (
-    <ProductDetailContent
-      initialProduct={initialProduct}
-      productId={productId}
-      bigDeal={searchParams.get('deal') === 'big'}
-    />
+    <>
+      <Suspense fallback={null}>
+        <ProductDealQuerySync onChange={setBigDeal} />
+      </Suspense>
+      <ProductDetailContent initialProduct={initialProduct} productId={productId} bigDeal={bigDeal} />
+    </>
   );
+}
+
+function ProductDealQuerySync({ onChange }: { onChange: (value: boolean) => void }) {
+  // Only query-dependent state waits for hydration. The product photo, title
+  // and regular price can remain in the cached HTML for an immediate first paint.
+  const searchParams = useSearchParams();
+  const requested = searchParams.get('deal') === 'big';
+  useEffect(() => onChange(requested), [requested, onChange]);
+  return null;
 }
 
 function ProductDetailContent({

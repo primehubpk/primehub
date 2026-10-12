@@ -20,6 +20,7 @@ export async function POST(request: Request) {
   }
 
   revalidateTag('public-catalog', { expire: 0 });
+  revalidateTag('public-categories', { expire: 0 });
   revalidateTag('public-products', { expire: 0 });
   revalidateTag('products', 'max');
   revalidateTag('storefront-settings', { expire: 0 });

@@ -2,7 +2,8 @@ import { Suspense } from 'react';
 import SkillsShowcase from '@/components/SkillsShowcase';
 import { getPrimeSkillsSnapshot } from '@/lib/publicCatalogServer';
 
-export const revalidate = 3600;
+// Admin changes invalidate the data tags; six hours is the fallback only.
+export const revalidate = 21600;
 
 function SkillsLoadingState() {
   return (

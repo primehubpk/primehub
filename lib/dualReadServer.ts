@@ -346,7 +346,9 @@ async function supabaseProduct(id: string, options?: DualReadCacheOptions): Prom
   );
   if (!response.ok) throw new Error(`Supabase product read failed ${response.status}`);
   const rows = await response.json() as any[];
-  if (!Array.isArray(rows) || rows.length === 0) throw new Error(`Supabase product ${id} was not found.`);
+  // A successful empty query is an authoritative not-found, unlike an outage.
+  // ISR can cache the former; it must preserve its last good page on the latter.
+  if (!Array.isArray(rows) || rows.length === 0) return { product: null, source: 'supabase' };
   return { product: productFromSupabase(rows[0]), source: 'supabase' };
 }
 

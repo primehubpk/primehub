@@ -20,7 +20,8 @@ const staticRoutes = [
   '/return-policy',
 ];
 
-export const revalidate = 3600;
+// Admin changes invalidate the data tags; six hours is the fallback only.
+export const revalidate = 21600;
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || 'https://primehubmall.com').replace(/\/$/, '');

@@ -3,7 +3,8 @@ import CategoryDirectory from '@/components/CategoryDirectory';
 import { getPublicCategoriesSnapshot } from '@/lib/publicCatalogServer';
 import type { Category } from '@/lib/types';
 
-export const revalidate = 3600;
+// Admin changes invalidate the data tags; six hours is the fallback only.
+export const revalidate = 21600;
 
 export const metadata: Metadata = {
   title: 'Shop by Category',

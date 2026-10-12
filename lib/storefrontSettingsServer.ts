@@ -1,5 +1,6 @@
 import 'server-only';
 import { unstable_cache } from 'next/cache';
+import { STOREFRONT_REVALIDATE_SECONDS } from '@/lib/storefrontCachePolicy';
 import { getAdminDb } from '@/lib/firebaseAdmin';
 import { getDualStorefrontSettings, type DualReadCacheOptions } from '@/lib/dualReadServer';
 
@@ -77,7 +78,7 @@ async function readFirebaseBigDealCandidates() {
 const getCachedFirebaseBigDealCandidates = unstable_cache(
   readFirebaseBigDealCandidates,
   ['primehub-storefront-big-deal-dedicated-recovery-v1'],
-  { revalidate: 3600, tags: ['storefront-settings'] },
+  { revalidate: STOREFRONT_REVALIDATE_SECONDS, tags: ['storefront-settings'] },
 );
 
 async function getFirebaseBigDealCandidates(_cacheOptions?: DualReadCacheOptions) {

@@ -1,5 +1,6 @@
 import 'server-only';
 import { unstable_cache } from 'next/cache';
+import { STOREFRONT_REVALIDATE_SECONDS, publicProductCacheTag } from '@/lib/storefrontCachePolicy';
 import { getDualCatalog, getDualCategories, getDualProduct, getDualStorefrontSettings, getDualSkills } from '@/lib/dualReadServer';
 import { getStorefrontSettingsWithBigDealRecovery } from '@/lib/storefrontSettingsServer';
 import { getCachedWholesaleVideosSnapshot } from '@/lib/wholesaleVideosServer';
@@ -36,7 +37,7 @@ export async function getPublicRewardGiftsSnapshot() {
   params.set('limit', '100');
   const response = await fetch(`${url}/rest/v1/reward_gifts?${params.toString()}`, {
     headers: { apikey: key, Authorization: `Bearer ${key}` },
-    next: { revalidate: 3600, tags: ['rewards'] },
+    next: { revalidate: STOREFRONT_REVALIDATE_SECONDS, tags: ['rewards'] },
     signal: AbortSignal.timeout(PUBLIC_PRIMARY_TIMEOUT_MS),
   });
   if (!response.ok) throw new Error(`Supabase reward gifts read failed ${response.status}`);
@@ -76,7 +77,7 @@ async function loadPublicCatalog() {
 export const getPublicCatalogSnapshot = unstable_cache(
   loadPublicCatalog,
   ['primehub-public-catalog-dual-v8'],
-  { revalidate: 3600, tags: ['public-catalog'] },
+  { revalidate: STOREFRONT_REVALIDATE_SECONDS, tags: ['public-catalog'] },
 );
 
 export const getPublicCategoriesSnapshot = unstable_cache(
@@ -84,8 +85,8 @@ export const getPublicCategoriesSnapshot = unstable_cache(
     if (result.source === 'empty') throw new Error('Public categories unavailable.');
     return result;
   }),
-  ['primehub-public-categories-v1'],
-  { revalidate: 3600, tags: ['public-catalog'] },
+  ['primehub-public-categories-v2'],
+  { revalidate: STOREFRONT_REVALIDATE_SECONDS, tags: ['public-categories'] },
 );
 
 const CATALOG_SEED_HEAVY_FIELDS = new Set([
@@ -138,14 +139,25 @@ export async function getFreshPublicCatalogSnapshot() {
 async function loadPublicProduct(productId: string) {
   const id = String(productId || '').trim();
   if (!id) return { product: null, source: 'empty' as const };
-  return getDualProduct(id, PRODUCT_READ_CACHE);
+  const result = await getDualProduct(id, PRODUCT_READ_CACHE);
+  // An upstream outage must not replace a last-good cached product with null.
+  if (result.source === 'empty') throw new Error('Public product unavailable.');
+  return result;
 }
 
-export const getPublicProductSnapshot = unstable_cache(
-  loadPublicProduct,
-  ['primehub-public-product-dual-v2'],
-  { revalidate: 3600, tags: ['public-products'] },
-);
+export async function getPublicProductSnapshot(productId: string) {
+  const id = String(productId || '').trim();
+  if (!id) return { product: null, source: 'empty' as const };
+  return unstable_cache(
+    () => loadPublicProduct(id),
+    ['primehub-public-product-dual-v3', id],
+    {
+      revalidate: STOREFRONT_REVALIDATE_SECONDS,
+      // Keep the roll-up tag for the explicitly requested full catalog refresh.
+      tags: ['public-products', publicProductCacheTag(id)],
+    },
+  )();
+}
 
 export async function getFreshPublicProductSnapshot(productId: string) {
   const id = String(productId || '').trim();
@@ -169,11 +181,11 @@ async function loadStorefrontSettingsResult() {
 export const getStorefrontSettingsResultSnapshot = unstable_cache(
   loadStorefrontSettingsResult,
   ['primehub-storefront-settings-dual-v5'],
-  { revalidate: 3600, tags: ['storefront-settings'] },
+  { revalidate: STOREFRONT_REVALIDATE_SECONDS, tags: ['storefront-settings'] },
 );
 
 // The app-wide settings provider refreshes while a customer keeps a tab open.
-// Share one hourly server snapshot so those refreshes do not repeat Supabase
+// Share one tagged server snapshot so those refreshes do not repeat Supabase
 // and Firebase recovery reads for every browser tab.
 async function loadPublicStorefrontSettingsDocumentsSnapshot() {
   const result = await getStorefrontSettingsResultSnapshot();
@@ -204,7 +216,7 @@ async function loadRewardSettings() {
 export const getRewardSettingsSnapshot = unstable_cache(
   loadRewardSettings,
   ['primehub-home-reward-settings-dual-v2'],
-  { revalidate: 3600, tags: ['storefront-settings', 'rewards'] },
+  { revalidate: STOREFRONT_REVALIDATE_SECONDS, tags: ['storefront-settings', 'rewards'] },
 );
 
 async function mergeFreshStorefrontSettings(
@@ -254,5 +266,5 @@ async function loadPrimeSkills() {
 export const getPrimeSkillsSnapshot = unstable_cache(
   loadPrimeSkills,
   ['primehub-prime-skills-dual-v5'],
-  { revalidate: 3600, tags: ['prime-skills'] },
+  { revalidate: STOREFRONT_REVALIDATE_SECONDS, tags: ['prime-skills'] },
 );
