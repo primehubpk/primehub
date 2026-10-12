@@ -3,7 +3,8 @@ import { getProviderCredentials } from '@/lib/salar/credentialStore';
 import { normalizeProviderSelection, providerDefinitions, type ProviderSelection } from '@/lib/salar/providerConfig';
 
 import { revalidateTag, unstable_cache } from 'next/cache';
-import { getFreshPublicCatalogSnapshot, getFreshStorefrontSettingsSnapshot } from '@/lib/publicCatalogServer';
+import { getFreshStorefrontSettingsSnapshot } from '@/lib/publicCatalogServer';
+import { getDualFeedCatalog } from '@/lib/dualReadServer';
 import { getSupabasePrimaryPayload, mapDocumentToSupabase, supabasePrimaryUpsert } from '@/lib/dualWriteServer';
 
 export type SalarChatMessage = {
@@ -40,6 +41,7 @@ export type SalarImageInput = {
 };
 
 export type SalarCatalogue = {
+  detailVersion?: 2;
   updatedAt: string;
   source: string;
   products: Array<Record<string, any>>;
@@ -111,6 +113,8 @@ function safePublicImageUrl(value: unknown) {
 function productImageUrls(product: any) {
   const values: unknown[] = [
     ...safeArray(product?.images, 60),
+    ...safeArray(product?.variantMatrix ?? product?.variants, 120).map((row: any) => row?.imageUrl),
+    ...safeArray(product?.variantColors, 30).map((row: any) => row?.imageUrl),
     product?.imageUrl,
     product?.image,
   ];
@@ -129,6 +133,8 @@ function compactProduct(product: any): Record<string, any> {
     title: cleanText(product?.title ?? product?.name, 300),
     name: cleanText(product?.name ?? product?.title, 300),
     slug: cleanText(product?.slug, 300),
+    createdAt: product?.createdAt,
+    updatedAt: product?.updatedAt,
     description: cleanText(product?.description, 1800),
     category: cleanText(product?.category, 300),
     categoryId: cleanText(product?.categoryId, 200),
@@ -159,6 +165,7 @@ function compactProduct(product: any): Record<string, any> {
     variantMatrix: safeArray(product?.variantMatrix ?? product?.variants, 120).map((row: any) => ({
       label: cleanText(row?.label || row?.name || row?.variant || row?.option, 180),
       color: cleanText(row?.color, 100),
+      imageUrl: safePublicImageUrl(row?.imageUrl),
       size: cleanText(row?.size, 100),
       stock: finiteNumber(row?.stock ?? row?.quantity ?? row?.qty),
       price: finiteNumber(row?.price),
@@ -320,14 +327,37 @@ function normalizeState(payload: Record<string, any> | null): SalarState {
   };
 }
 
+async function readCompleteCatalogue() {
+  const result = await getDualFeedCatalog({ cache: 'no-store', timeoutMs: 8000 });
+  if (result.source === 'empty' || !result.products.length) throw new Error('Salar catalogue is not ready.');
+  const timestamp = (value: any) => {
+    const milliseconds = typeof value === 'object' && value?.seconds != null ? value.seconds * 1000 : Date.parse(String(value || ''));
+    return Number.isFinite(milliseconds) ? milliseconds : 0;
+  };
+  return {
+    ...result,
+    products: result.products.filter((product: any) => product?.active !== false && product?.published !== false)
+      .sort((a: any, b: any) => timestamp(b.createdAt) - timestamp(a.createdAt)).map(compactProduct),
+    categories: result.categories.filter((category: any) => category?.active !== false).map(compactCategory),
+  };
+}
+
 async function readSalarStateFromDatabase() {
   const payload = await getSupabasePrimaryPayload('settings', SALAR_SETTINGS_ID);
-  return normalizeState(payload);
+  const state = normalizeState(payload);
+  // Older saved snapshots came from the card-only storefront projection and
+  // silently lost every variant/description. Repair on the cached server read,
+  // not by making one product request per chat or changing the public payload.
+  if (state.catalogue && state.catalogue.detailVersion !== 2) {
+    const complete = await readCompleteCatalogue();
+    state.catalogue = { ...state.catalogue, ...complete, detailVersion: 2, updatedAt: new Date().toISOString() };
+  }
+  return state;
 }
 
 const readCachedSalarState = unstable_cache(
   readSalarStateFromDatabase,
-  ['primehub-salar-state-v1'],
+  ['primehub-salar-state-v2'],
   { revalidate: 3600, tags: [SALAR_STATE_TAG] },
 );
 
@@ -358,7 +388,7 @@ export async function saveSalarSettings(input: { enabled?: unknown; instructions
 
 export async function refreshSalarCatalogue(origin: string) {
   const [catalogueResult, storefront, pages] = await Promise.all([
-    getFreshPublicCatalogSnapshot(),
+    readCompleteCatalogue(),
     getFreshStorefrontSettingsSnapshot().catch((error) => {
       console.warn('Salar storefront settings refresh failed', error);
       return {} as Record<string, unknown>;
@@ -366,15 +396,11 @@ export async function refreshSalarCatalogue(origin: string) {
     crawlWebsite(origin),
   ]);
 
-  const products = catalogueResult.products
-    .filter((product: any) => product?.active !== false && product?.published !== false)
-    .map(compactProduct);
-  const categories = catalogueResult.categories
-    .filter((category: any) => category?.active !== false)
-    .map(compactCategory);
+  const { products, categories } = catalogueResult;
   const safeStorefront = publicStorefrontValue(storefront);
 
   const catalogue: SalarCatalogue = {
+    detailVersion: 2,
     updatedAt: new Date().toISOString(),
     source: catalogueResult.source,
     products,
@@ -385,7 +411,7 @@ export async function refreshSalarCatalogue(origin: string) {
       : {},
   };
 
-  const current = await readSalarStateFromDatabase();
+  const current = normalizeState(await getSupabasePrimaryPayload('settings', SALAR_SETTINGS_ID));
   const next: SalarState = {
     ...current,
     updatedAt: catalogue.updatedAt,

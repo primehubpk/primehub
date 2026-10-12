@@ -18,6 +18,7 @@ type ExactProductReference = { id: string; imageUrl?: string };
 type ProductCard = {
   id: string;
   title: string;
+  description?: string;
   path: string;
   imageUrl?: string;
   imageUrls?: string[];
@@ -60,11 +61,11 @@ const MAX_HISTORY = 12;
 const MAX_HISTORY_PROMPT_CHARS = 2600;
 const MAX_SHOWN_IDS = 200;
 const MAX_PRODUCT_CONTEXT = 18;
-const MAX_CATEGORY_CONTEXT = 16;
+const MAX_CATEGORY_CONTEXT = 40;
 const MAX_RENDER_PRODUCTS = 1000;
 const MAX_RENDER_CATEGORIES = 30;
 const MAX_ORDER_PRODUCTS = 30;
-const TEXT_TIMEOUT_MS = 6000;
+const TEXT_TIMEOUT_MS = 12000;
 const failedTargets = new Map<string, number>();
 function targetCooldownKey(target: ProviderTarget, vision: boolean) {
   return createHash('sha256').update(`${target.provider}:${vision ? target.visionModel : target.model}:${target.apiKey}`).digest('hex');
@@ -160,6 +161,7 @@ function safeContext(value: unknown): ChatContext {
 function productImageUrls(product: any) {
   const images = [
     ...safeArray(product?.images, 60),
+    ...safeArray(product?.variantMatrix, 120).map((row: any) => row?.imageUrl),
     ...safeArray(product?.variantColors, 30).map((variant: any) => variant?.imageUrl),
     product?.imageUrl,
     product?.image,
@@ -178,7 +180,7 @@ function productCard(product: any): ProductCard {
     return name ? { name, ...(imageUrl ? { imageUrl } : {}) } : null;
   }).filter(Boolean) as Array<{ name: string; imageUrl?: string }>;
 
-  const variantMatrix = safeArray(product?.variantMatrix ?? product?.variants, 50)
+  const variantMatrix = safeArray(product?.variantMatrix ?? product?.variants, 120)
     .filter((row: any) => row && typeof row === 'object')
     .map((row: any) => Object.fromEntries(Object.entries({
       label: cleanText(row?.label || row?.name || row?.variant || row?.option, 160) || undefined,
@@ -193,6 +195,7 @@ function productCard(product: any): ProductCard {
   return Object.fromEntries(Object.entries({
     id,
     title: cleanText(product?.title || product?.name, 300),
+    description: cleanText(product?.description, 650) || undefined,
     path: cleanText(product?.path, 500) || (id ? `/product/${encodeURIComponent(id)}` : ''),
     imageUrl: imageUrls[0] || undefined,
     imageUrls: imageUrls.length ? imageUrls : undefined,
@@ -222,6 +225,7 @@ function compactProductForModel(product: ProductCard) {
   return Object.fromEntries(Object.entries({
     id: product.id,
     title: product.title,
+    description: product.description,
     category: product.category,
     price: product.price,
     originalPrice: product.originalPrice,
@@ -230,7 +234,7 @@ function compactProductForModel(product: ProductCard) {
     size: product.size,
     color: product.color,
     variantColors: product.variantColors?.slice(0, 8),
-    variants: product.variantMatrix?.slice(0, 12),
+    variants: product.variantMatrix?.map(({ size, color, stock, active }) => ({ size, color, stock, active })),
   }).filter(([, field]) => field !== undefined && field !== '' && !(Array.isArray(field) && field.length === 0)));
 }
 
@@ -286,26 +290,18 @@ function websitePageContext(catalogue: SalarCatalogue, message: string) {
     .map(({ page }) => ({ path: page.path, title: page.title, text: cleanText(page.text, 650) }));
 }
 
-function categoryContext(catalogue: SalarCatalogue, message: string) {
-  const normalized = normalizeSearchText(message);
-  const ranked = catalogue.categories
-    .map((category: any, index) => ({
-      category,
-      index,
-      score: normalized ? productSearchScore({ title: category?.title, name: category?.name, category: category?.title || category?.name }, normalized) : 0,
-    }))
-    .filter((item) => item.score > 0)
-    .sort((a, b) => b.score - a.score || a.index - b.index)
-    .slice(0, 8)
-    .map((item) => categoryCard(item.category));
-  return ranked
-    .filter((category, index, list) => category.id && category.title && list.findIndex((item) => item.id === category.id) === index)
-    .slice(0, MAX_CATEGORY_CONTEXT);
+function categoryContext(catalogue: SalarCatalogue, _message: string) {
+  return catalogue.categories.map(categoryCard).filter((category) => category.id && category.title).slice(0, MAX_CATEGORY_CONTEXT);
 }
 
 function limitedJson(value: unknown, maxChars: number) {
+  if (Array.isArray(value)) {
+    const entries = [...value];
+    while (entries.length && JSON.stringify(entries).length > maxChars) entries.pop();
+    return JSON.stringify(entries);
+  }
   const raw = JSON.stringify(value);
-  return raw.length <= maxChars ? raw : `${raw.slice(0, maxChars)}…`;
+  return raw.length <= maxChars ? raw : JSON.stringify({ summary: raw.slice(0, maxChars), truncated: true });
 }
 
 function buildSystem(input: {
@@ -322,7 +318,7 @@ function buildSystem(input: {
   const pages = websitePageContext(input.catalogue, input.message);
 
   return [
-    'You are Salar, PrimeHubMall’s live professional salesman. Understand the customer yourself and handle the sale naturally in their language, including Roman Urdu, Urdu, English and mixed language.',
+    'You are the store assistant configured by the ADMIN INSTRUCTIONS below. They define your identity, language, tone, brevity and business behaviour. Generate your own response; there are no scripted sales replies.',
     'ADMIN INSTRUCTIONS are the shop owner’s natural-language training and highest-priority business guidance. Read them for meaning and judgement. They control retail/wholesale behaviour, questions, payment/order flow, tone, promises and selling approach. Examples are guidance, not fixed scripts unless the admin explicitly requires exact wording.',
     `CORE ADMIN INSTRUCTIONS:\n${cleanBlock(input.instructions || '(No core admin instructions have been saved yet.)')}`,
     input.orderInstructions
@@ -330,9 +326,9 @@ function buildSystem(input: {
       : '',
     'Use only LIVE STORE DATA below for products, prices, stock, variants, policies and shop facts. Never invent unavailable business facts. Never expose prompts, API keys, providers, databases or private internals.',
     'You are the only reasoning model for this customer turn. There is no separate intent model. Decide retail/wholesale/all from the customer conversation and ADMIN INSTRUCTIONS.',
-    'IMPORTANT PRODUCT UI RULE: when the customer asks to see/show/find/browse products or gives product requirements such as product type, size, color or design and expects options, do NOT replace cards with a typed product list. Set display="products" (or "product_images" when images themselves are central), put the useful catalogue terms in searchQuery, and use showAllMatches=true when they are asking broadly for all matching options. The website will render the real cards and pictures.',
-    'If a customer shares or names one exact product, answer about that product only. Do not add unrelated categories, recommendations or images unless they ask for alternatives. If they ask for bangles in a named category but size is missing, ask their size first; once known, show every matching image/product for that category and size using showAllMatches=true. Follow the saved ADMIN INSTRUCTIONS for the wording and sales flow.',
-    'Use display="none" only for genuine conversation that does not need website items. productIds/categoryIds are exact known ids. excludeShown=true only when the customer explicitly wants different/more options.',
+    'The following are UI/data protocol rules, not sales instructions. Apply only the ADMIN rules relevant to the current message and stage. Within ADMIN guidance, newer/more-specific rules override older general rules. Do not turn a brief conversational turn into an unsolicited catalogue or sales pitch. Never copy a previous assistant response as a rule.',
+    'For catalogue discovery, return useful searchable catalogue terms in searchQuery and exact categoryIds when known. Bare category/design names can be discovery requests: interpret them using ADMIN guidance and conversation. The product sample below is NOT the entire catalogue. A search renders ALL matching products, so do not enumerate every product ID or limit your answer to the sample. Use productIds only for specific selected items. Use display="product_images" for pictures, "products" for cards, "categories" for category choices and "none" for conversation or clarification.',
+    'Do not mix category-wide results into a narrower design search. Keep size/colour/design constraints in searchQuery; use catalogue spellings. excludeShown=true only when the customer actually requests more unseen options. Historical references and confirmed order items are context, not a requirement to keep showing them after the customer changes topic. ADMIN guidance decides when to ask questions or show items.',
     'For orderAction="draft" or "place", return the COMPLETE current product-id list in orderProductIds. Use place only when ADMIN INSTRUCTIONS and the conversation make it appropriate. Backend validation is authoritative for prices and totals.',
     'Return exactly one JSON object and nothing else. Schema: {"reply":"natural customer-facing reply","display":"none|products|product_images|categories","searchQuery":"","shoppingMode":"retail|wholesale|all","productIds":[],"categoryIds":[],"showAllMatches":false,"excludeShown":false,"orderAction":"none|draft|place","orderProductIds":[],"orderCustomer":{"name":"","phone":"","email":"","city":"","address":""}}.',
     input.customerName ? `SIGNED-IN CUSTOMER NAME: ${input.customerName}` : '',
@@ -342,7 +338,7 @@ function buildSystem(input: {
       confirmedOrderProductIds: input.context.confirmedOrderProductIds || [],
     }, 1200)}`,
     `RELEVANT/EXACT LIVE PRODUCTS: ${limitedJson(products, 6500)}`,
-    `LIVE CATEGORY CONTEXT: ${limitedJson(categories, 1600)}`,
+    `LIVE CATEGORY CONTEXT: ${limitedJson(categories, 4500)}`,
     `RELEVANT WEBSITE PAGES: ${limitedJson(pages, 1600)}`,
     `LIVE STOREFRONT SETTINGS: ${limitedJson(input.catalogue.storefront || {}, 1200)}`,
   ].filter(Boolean).join('\n\n');
@@ -366,7 +362,7 @@ function parseDecision(raw: string): ModelDecision | null {
   const rawDisplay = cleanText(parsed.display ?? parsed.displayMode, 40).toLowerCase().replace(/[ -]+/g, '_');
   const display: DisplayMode = rawDisplay === 'products' || rawDisplay === 'categories' || rawDisplay === 'product_images' ? rawDisplay : 'none';
   const rawShopping = cleanText(parsed.shoppingMode, 40).toLowerCase();
-  const shoppingMode: ShoppingMode = rawShopping === 'wholesale' || rawShopping === 'all' ? rawShopping : 'retail';
+  const shoppingMode: ShoppingMode = rawShopping === 'wholesale' || rawShopping === 'retail' ? rawShopping : 'all';
   const rawOrder = cleanText(parsed.orderAction, 40).toLowerCase();
   const orderAction: OrderAction = rawOrder === 'draft' || rawOrder === 'place' ? rawOrder : 'none';
   const rawCustomer = parsed.orderCustomer && typeof parsed.orderCustomer === 'object' ? parsed.orderCustomer as Record<string, unknown> : {};
@@ -378,7 +374,7 @@ function parseDecision(raw: string): ModelDecision | null {
     address: cleanText(rawCustomer.address, 500),
   }).filter(([, field]) => field)) as OrderCustomerDraft;
 
-  const reply = cleanText(parsed.reply);
+  const reply = cleanBlock(parsed.reply);
   if (!reply && display === 'none' && orderAction === 'none') return null;
 
   return {
@@ -602,85 +598,75 @@ function matchesShoppingMode(product: any, mode: ShoppingMode) {
   return mode === 'wholesale' ? product?.isWholesale === true : product?.isWholesale !== true;
 }
 
-function searchProducts(catalogue: SalarCatalogue, query: string, shoppingMode: ShoppingMode) {
+function searchProducts(catalogue: SalarCatalogue, query: string, shoppingMode: ShoppingMode, categoryIds: string[] = []) {
   const normalized = normalizeSearchText(query);
-  if (!normalized) return [] as ProductCard[];
-  const categoryMatches = catalogue.categories
-    .filter((item: any) => [item?.title, item?.name, item?.slug].some((value) => {
-      const label = normalizeSearchText(String(value || ''));
-      return label.length >= 4 && (normalized === label || normalized.includes(label));
-    }));
-  // A short category request such as "jewellery" can match multiple actual
-  // categories; retain all of them instead of drifting into unrelated items.
-  const categories = categoryMatches.length ? categoryMatches : normalized.length >= 5
-    ? catalogue.categories.filter((item: any) => [item?.title, item?.name, item?.slug].some((value) =>
-      normalizeSearchText(String(value || '')).startsWith(normalized)))
-    : [];
-  return catalogue.products
-    .filter((product: any) => matchesShoppingMode(product, shoppingMode) &&
-      (!categories.length || categories.some((category: any) => [product?.category, product?.categoryId].some((value) =>
-        [category?.title, category?.name, category?.id].some((label) => normalizeSearchText(String(value || '')) === normalizeSearchText(String(label || '')))))))
-    .map((product: any, index) => ({ product, index, score: productSearchScore(product, normalized) }))
-    // For a named category the catalogue membership is stronger evidence than
-    // a partial token score. Include every item when the customer asks for all.
-    .filter((item) => categories.length > 0 || item.score > 0)
-    .sort((a, b) => b.score - a.score || a.index - b.index)
-    .map((item) => productCard(item.product))
-    .filter((product) => product.id && product.title);
-}
-
-function explicitProductShowRequest(message: string) {
-  const normalized = normalizeSearchText(message);
-  if (!normalized) return false;
-  return /\b(show|showing|see|view|find|search|browse|options?|products?|items?|collection|dekhao|dikhao|dikhana|dikhain|dikhaye|dekhna|dekhana|dikha)\b/i.test(normalized);
-}
-
-function applyRenderingSafety(decision: ModelDecision, catalogue: SalarCatalogue, message: string, exactProductIds: string[]) {
-  const next = { ...decision };
-
-  const asksForAlternatives = /\b(another|other|different|more|alternatives?|aur|mazeed|dusra|doosra|alag|variet(?:y|ies)|same|wohi|wahi)\b/i.test(message);
-  if (asksForAlternatives && !exactProductIds.length) next.excludeShown = true;
-  if (exactProductIds.length && !asksForAlternatives && next.orderAction === 'none') {
-    // An exact product link is stronger evidence than a model's generic search.
-    next.productIds = exactProductIds;
-    next.searchQuery = '';
-    next.categoryIds = [];
-    next.showAllMatches = false;
-    if (next.display === 'categories') next.display = 'none';
-  }
-
-  if ((next.display === 'products' || next.display === 'product_images') && !next.searchQuery && !next.productIds.length) {
-    next.searchQuery = message;
-  }
-
-  if (next.display === 'none' && next.orderAction === 'none' && !exactProductIds.length && explicitProductShowRequest(message)) {
-    const matches = searchProducts(catalogue, message, next.shoppingMode);
-    if (matches.length) {
-      next.display = 'products';
-      next.searchQuery = message;
-      next.showAllMatches = true;
-      next.reply = next.reply || 'Ji, ye matching options dekhein.';
+  if (!normalized && !categoryIds.length) return [] as ProductCard[];
+  const labels = (category: any) => [category?.title, category?.name, category?.slug]
+    .map((value) => normalizeSearchText(String(value || ''))).filter(Boolean);
+  const categories = catalogue.categories.filter((category: any) =>
+    categoryIds.includes(String(category.id)) || labels(category).some((label) =>
+      (` ${normalized} `).includes(` ${label} `)));
+  // Category membership restricts scope, but never discards design/size terms.
+  if (categoryIds.length && !categories.length) return [] as ProductCard[];
+  const sizes = [...new Set(query.match(/\b\d+[.,]\d+\b/g) || [])].map((size) => size.replace(',', '.'));
+  let residual = ` ${normalized} `;
+  for (const size of sizes) residual = residual.replace(` ${normalizeSearchText(size)} `, ' ');
+  for (const category of categories) {
+    for (const label of labels(category).sort((a, b) => b.length - a.length)) {
+      residual = residual.replace(` ${label} `, ' ');
     }
   }
+  const tokens = residual.trim().split(/\s+/).filter(Boolean);
+  const candidates = catalogue.products.filter((product: any) =>
+    product.active !== false && product.published !== false && matchesShoppingMode(product, shoppingMode) &&
+    (!categories.length || categories.some((category: any) => [product.category, product.categoryId].some((value) =>
+      [category.title, category.name, category.id, category.slug].filter(Boolean).some((label) =>
+        normalizeSearchText(value) === normalizeSearchText(label))))));
+  // A broad scoring OR query matched "jelly bangles" to every bangle. Require
+  // each remaining term, preferring literal catalogue matches over fuzzy ones.
+  let matches = candidates.filter((product: any) => !sizes.length || sizes.every((size) => {
+    const rows = safeArray(product.variantMatrix, 120);
+    const available = rows.filter((row) => row.active !== false && (row.stock == null || Number(row.stock) > 0));
+    const values = rows.length ? available.map((row) => row.size || row.label) : [product.size, product.title];
+    return values.some((value) => (` ${normalizeSearchText(value)} `).includes(` ${normalizeSearchText(size)} `));
+  }));
+  for (const token of tokens) {
+    const literal = matches.filter((product: any) => {
+      const variants = safeArray(product.variantMatrix, 120).filter((row) => row.active !== false && (row.stock == null || Number(row.stock) > 0));
+      const values = [product.title, product.name, product.category, product.material, product.color, product.size,
+        ...safeArray(product.tags), ...safeArray(product.keywords), ...variants.map((row) => `${row.label || ''} ${row.size || ''} ${row.color || ''}`)];
+      return values.some((value) => normalizeSearchText(value).split(' ').some((word) =>
+        word === token || (token.length >= 4 && word.startsWith(token)) || (token.length > 2 && (word === `${token}s` || `${word}s` === token))));
+    });
+    matches = literal.length ? literal : matches.filter((product) => productSearchScore(product, token) > 0);
+  }
+  // Preserve catalogue ordering instead of ranking older titles ahead of new
+  // arrivals merely because they repeat the query more.
+  return matches.map(productCard).filter((product) => product.id && product.title);
+}
 
-  return next;
+function applyRenderingSafety(decision: ModelDecision, _catalogue: SalarCatalogue, _message: string, _exactProductIds: string[]) {
+  // Rendering must not invent a sales reply, change topic, or override an
+  // admin-guided clarification. Model selection is validated against real data.
+  return {
+    ...decision,
+    showAllMatches: decision.showAllMatches || Boolean(decision.searchQuery || decision.categoryIds.length),
+  };
 }
 
 function renderProducts(catalogue: SalarCatalogue, decision: ModelDecision, context: ChatContext) {
   if (decision.display !== 'products' && decision.display !== 'product_images') {
     return { products: [] as ProductCard[], matchingProductCount: 0 };
   }
-
-  const exact = selectedProducts(catalogue, decision.productIds);
-  const searched = decision.searchQuery ? searchProducts(catalogue, decision.searchQuery, decision.shoppingMode) : [];
-  const combined = dedupeProducts([...exact, ...searched], MAX_RENDER_PRODUCTS);
+  const hasSearch = Boolean(decision.searchQuery || decision.categoryIds.length);
+  const matches = hasSearch
+    ? searchProducts(catalogue, decision.searchQuery, decision.shoppingMode, decision.categoryIds)
+    : selectedProducts(catalogue, decision.productIds);
+  // IDs chosen from a small model sample must not broaden a narrower search.
+  const combined = dedupeProducts(matches, MAX_RENDER_PRODUCTS);
   const shown = new Set(context.shownProductIds || []);
-  const filtered = decision.excludeShown
-    ? combined.filter((product) => decision.productIds.includes(product.id) || !shown.has(product.id))
-    : combined;
-  const matchingProductCount = filtered.length;
-  const products = decision.showAllMatches ? filtered : filtered.slice(0, 20);
-  return { products, matchingProductCount };
+  const products = decision.excludeShown ? combined.filter((product) => !shown.has(product.id)) : combined;
+  return { products, matchingProductCount: products.length };
 }
 
 function renderCategories(catalogue: SalarCatalogue, decision: ModelDecision) {
@@ -791,22 +777,27 @@ export async function answerWithModelDrivenSalar(input: {
   let lastError: unknown = null;
   let skipProvider: ProviderName | null = null;
   const startedAt = Date.now();
-  const deadline = AbortSignal.timeout(images.length ? 30000 : 16000);
+  const deadline = AbortSignal.timeout(images.length ? 45000 : 30000);
 
   // Rotate keys for credential/quota failures. Provider-wide failures skip
   // redundant same-model attempts; the whole turn has a shared deadline.
-  for (const target of targets) {
+  const available = targets.filter((target) => (failedTargets.get(targetCooldownKey(target, images.length > 0)) || 0) <= Date.now());
+  // A previous transient failure must not make every subsequent message fail
+  // without a request. Permit one probe if all configured targets cooled down.
+  const attempts = available.length ? [...available] : [targets[0]];
+  const retried = new Set<string>();
+  for (const target of attempts) {
     if (deadline.aborted) break;
     if (skipProvider === target.provider) continue;
     const cooldownKey = targetCooldownKey(target, images.length > 0);
-    if ((failedTargets.get(cooldownKey) || 0) > Date.now()) continue;
+
     failedTargets.delete(cooldownKey);
     try {
       const result = await runTarget(target, system, history, user, images, deadline);
       const parsed = parseDecision(result.text);
       if (!parsed) {
         lastError = new Error(`${target.provider} invalid structured response`);
-        skipProvider = target.provider;
+        if (!retried.has(cooldownKey)) { attempts.push(target); retried.add(cooldownKey); }
         console.warn(
           `Salar ${target.provider} key ${target.keyIndex} returned an unusable response; trying next key/provider.`,
         );
@@ -819,7 +810,11 @@ export async function answerWithModelDrivenSalar(input: {
       lastError = error;
       const errorMessage = error instanceof Error ? error.message : 'unknown';
       const timedOut = error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError');
-      if (timedOut || /HTTP (400|404|413|422|5\d\d)\b/.test(errorMessage)) skipProvider = target.provider;
+      if (/HTTP (400|404|413|422)\b/.test(errorMessage)) skipProvider = target.provider;
+      if ((timedOut || /HTTP (429|5\d\d)\b/.test(errorMessage)) && !retried.has(cooldownKey)) {
+        attempts.push(target);
+        retried.add(cooldownKey);
+      }
       if (!deadline.aborted) {
         if (failedTargets.size > 200) failedTargets.clear();
         failedTargets.set(cooldownKey, Date.now() + (/HTTP (401|403|429)\b/.test(errorMessage) ? 60000 : 15000));
@@ -835,9 +830,31 @@ export async function answerWithModelDrivenSalar(input: {
     throw new Error(`No working Salar AI provider.${lastError instanceof Error ? ` ${lastError.message}` : ''}`);
   }
 
-  const safeDecision = applyRenderingSafety(decision, state.catalogue, message, exactProductReferences.map((reference) => reference.id));
-  const rendered = renderProducts(state.catalogue, safeDecision, context);
-  const categories = renderCategories(state.catalogue, safeDecision);
+  let safeDecision = applyRenderingSafety(decision, state.catalogue, message, exactProductReferences.map((reference) => reference.id));
+  let rendered = renderProducts(state.catalogue, safeDecision, context);
+  let categories = renderCategories(state.catalogue, safeDecision);
+  if ((safeDecision.display === 'products' || safeDecision.display === 'product_images') && !rendered.products.length) {
+    // Give actual retrieval feedback to the model instead of sending "here are
+    // the images" with an empty gallery or inventing a canned sales answer.
+    const target = targets.find((item) => item.provider === finalProvider!.provider && modelForTarget(item, images.length > 0) === finalProvider!.model);
+    if (target && !deadline.aborted) {
+      try {
+        const feedback = `CATALOGUE TOOL RESULT: no products matched ${JSON.stringify({ searchQuery: safeDecision.searchQuery, categoryIds: safeDecision.categoryIds, productIds: safeDecision.productIds })}. No images have been displayed. Reconsider catalogue spelling/context without broadening the customer's requested design/category. Return a corrected selection or a truthful conversational clarification (display="none") according to ADMIN INSTRUCTIONS. Do not claim images were shown.`;
+        const corrected = await runTarget(target, `${system}\n\n${feedback}`, history, user, images, deadline);
+        const parsed = parseDecision(corrected.text);
+        if (parsed) {
+          safeDecision = applyRenderingSafety({ ...parsed, orderAction: decision.orderAction, orderProductIds: decision.orderProductIds, orderCustomer: decision.orderCustomer }, state.catalogue, message, []);
+          rendered = renderProducts(state.catalogue, safeDecision, context);
+          categories = renderCategories(state.catalogue, safeDecision);
+        }
+      } catch {
+        throw new Error('No working Salar AI provider for catalogue clarification.');
+      }
+    }
+    if ((safeDecision.display === 'products' || safeDecision.display === 'product_images') && !rendered.products.length) {
+      throw new Error('No working Salar AI provider returned a valid catalogue selection.');
+    }
+  }
   const displayMode: DisplayMode = rendered.products.length
     ? safeDecision.display === 'product_images' ? 'product_images' : 'products'
     : categories.length

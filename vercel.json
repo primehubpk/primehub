@@ -26,7 +26,8 @@
       "fix/storefront-image-delivery-oct02": false,
       "fix/navigation-usage-visitors-oct03": false,
       "cursor/daily-push-4688": false,
-      "fix/vercel-isr-usage-oct11": false
+      "fix/vercel-isr-usage-oct11": false,
+      "fix/salar-admin-replies-oct12": false
     }
   },
   "crons": [

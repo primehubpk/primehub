@@ -20,6 +20,7 @@ import { compressForR2, isR2PublicUrl, r2ObjectKey, uploadWebpToR2 } from '@/lib
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
 
 const MAX_IMAGE_BYTES = 3 * 1024 * 1024;
 const BLOCK_MESSAGE = 'Aapka chat access filhaal block hai. Unblock request ke liye primehubpk1@gmail.com par contact karein.';
@@ -91,6 +92,7 @@ async function readRequest(request: Request) {
     const body = await request.json().catch(() => ({}));
     return {
       chatId: body?.chatId,
+      messageId: body?.messageId,
       message: body?.message,
       history: body?.history,
       context: body?.context,
@@ -124,6 +126,7 @@ async function readRequest(request: Request) {
 
   return {
     chatId: form.get('chatId'),
+    messageId: form.get('messageId'),
     message: form.get('message'),
     history: parseJsonField(form.get('history'), []),
     context: parseJsonField(form.get('context'), {}),
@@ -204,6 +207,7 @@ export async function POST(request: Request) {
     }
 
     const message = cleanText(input.message);
+    const messageId = cleanChatId(input.messageId);
     if (!message && !input.image && !input.mention && !input.references.length) {
       return NextResponse.json({ success: false, error: 'Please enter a message or attach an image.' }, { status: 400 });
     }
@@ -228,8 +232,20 @@ export async function POST(request: Request) {
     chat = updateCustomerMeta(chat, input);
     chat = bootstrapSalarHistory(chat, input.history);
 
-    const aiHistory = salarAiHistory(chat, 30);
-    const imageUrl = await persistCustomerImage(input.imageBuffer, input.imageName);
+    const previousMessage = messageId ? chat.messages.find((item) => item.id === messageId && item.actor === 'customer') : null;
+    const previousReply = messageId ? chat.messages.find((item) => item.id === `reply-${messageId}` && item.actor === 'salar') : null;
+    if (previousReply) {
+      return NextResponse.json({ success: true, reply: previousReply.content, products: previousReply.products || [],
+        categories: previousReply.categories || [], displayMode: previousReply.displayMode || 'none',
+        showAllMatches: previousReply.showAllMatches === true, context: chat.context,
+        salarPaused: chat.salarPaused, chat: publicChat(chat) },
+        { headers: { 'Cache-Control': 'private, no-store, max-age=0' } });
+    }
+    if (previousMessage && chat.messages.at(-1)?.id !== messageId) {
+      return NextResponse.json({ success: false, error: 'A newer message is already in this chat.' }, { status: 409 });
+    }
+    const aiHistory = salarAiHistory({ ...chat, messages: chat.messages.filter((item) => item.id !== messageId) }, 30);
+    const imageUrl = previousMessage?.imageUrl || await persistCustomerImage(input.imageBuffer, input.imageName);
     const referenceSummary = input.references.length
       ? input.references.map((product, index) => `${index + 1}. ${product.title} [product id: ${product.id}]`).join('\n')
       : '';
@@ -240,15 +256,18 @@ export async function POST(request: Request) {
         ? `${message || 'Is product ke bare mein details batain.'}\n\n[Customer is referring to this exact product from the chat: ${input.mention.title}; product id: ${input.mention.id}]`
         : message;
 
-    chat = appendSalarMessage(chat, {
-      role: 'user',
-      actor: 'customer',
-      content: userContent,
-      ...(imageUrl ? { imageUrl } : {}),
-      ...(input.mention ? { mention: input.mention } : {}),
-      ...(input.references.length ? { products: input.references } : {}),
-    });
-    chat = await saveSalarChat(chat);
+    if (!previousMessage) {
+      chat = appendSalarMessage(chat, {
+        ...(messageId ? { id: messageId } : {}),
+        role: 'user',
+        actor: 'customer',
+        content: userContent,
+        ...(imageUrl ? { imageUrl } : {}),
+        ...(input.mention ? { mention: input.mention } : {}),
+        ...(input.references.length ? { products: input.references } : {}),
+      });
+      chat = await saveSalarChat(chat);
+    }
 
     if (chat.salarPaused) {
       return NextResponse.json({
@@ -301,6 +320,7 @@ export async function POST(request: Request) {
     }
 
     chat = appendSalarMessage({ ...chat, context: result.context || chat.context }, {
+      ...(messageId ? { id: `reply-${messageId}` } : {}),
       role: 'assistant',
       actor: 'salar',
       content: String(result.reply || ''),
@@ -342,7 +362,8 @@ export async function POST(request: Request) {
       // already safely stored, while the UI gets a short customer-safe retry.
       return NextResponse.json({
         success: false,
-        error: 'Reply send nahi ho saka. Please ek dafa message dobara send karein.',
+        error: 'Salar ka connection filhaal available nahi. Aapka message save hai.',
+        retryable: true,
       }, {
         status: 503,
         headers: { 'Cache-Control': 'private, no-store, max-age=0' },
