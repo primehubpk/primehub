@@ -183,7 +183,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Customer name and phone are required for WhatsApp.' }, { status: 400 });
       }
       const proposedId = String(body?.orderRequestId || '');
-      const intentId = /^[0-9a-f]{8}-[0-9a-f-]{27,36}$/i.test(proposedId) ? proposedId : crypto.randomUUID();
+      const intentId = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(proposedId) ? proposedId : crypto.randomUUID();
       const ref = getAdminDb().collection('whatsapp_order_intents').doc(intentId);
       const row = {
         id: intentId, source: 'whatsapp', whatsappState: 'awaiting_message',
