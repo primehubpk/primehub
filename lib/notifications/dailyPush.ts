@@ -55,8 +55,12 @@ function personalized(install: PushInstall, value: string) {
   const first = userFirstName(install);
   return first ? first + ', ' + value : value;
 }
-function dealEndsToday(now: Date, explicitEnd?: unknown) {
-  const end = dateValue(explicitEnd) || Date.parse(pakistanDay(now) + 'T23:59:59+05:00');
+function dealEndsToday(now: Date, explicitEnd?: unknown, weeklyDayEndsAtMidnight = false) {
+  // Big Deal uses an explicit end timestamp. Never invent a midnight end.
+  // Weekly Deals really rotate at Karachi midnight (weeklyDealUtils.ts).
+  const end = dateValue(explicitEnd) ||
+    (weeklyDayEndsAtMidnight ? Date.parse(pakistanDay(now) + 'T23:59:59+05:00') : 0);
+  if (!end) return 0;
   const hours = (end - now.getTime()) / 3_600_000;
   return hours > 0 && hours <= 4 ? Math.max(1, Math.ceil(hours)) : 0;
 }
@@ -134,7 +138,7 @@ export function selectDailyPush(slot: PushSlot, now: Date, installId: string, in
     const n = dayVersion(now, slot, installId, 3);
     const pic = image(d.imageUrl) || productImage(p);
     if (!pic) return null;
-    const hours = dealEndsToday(now, d.endAt);
+    const hours = dealEndsToday(now, d.endAt, true);
     const saved = Math.round(regular - price);
     return {
       title: personalized(install, hours
