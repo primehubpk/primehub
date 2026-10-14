@@ -39,8 +39,10 @@ export async function manageResellerMember(userId: string, action: Action, reaso
   // Firebase Auth disables sign-in. Re-enable only for an explicitly requested unblock.
   if (action === 'delete') {
     await auth.updateUser(userId, { disabled: true });
+    await auth.revokeRefreshTokens(userId);
   } else {
     await auth.updateUser(userId, { disabled: action === 'block' });
+    if (action === 'block') await auth.revokeRefreshTokens(userId);
   }
   try {
     await ref.update({ status, updatedAt: FieldValue.serverTimestamp(), lastAdminAction: action, lastAdminReason: reason.trim() });
