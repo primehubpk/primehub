@@ -37,7 +37,7 @@ test('Only approved image CDNs are downloaded, never an arbitrary host or insecu
     'http://images.primehubmall.com/photo.png',
     'https://images.primehubmall.com.evil.test/photo.png',
     'https://127.0.0.1/admin',
-    'https://images.primehubmall.com:443/photo.jpg',
+    'https://images.primehubmall.com:444/photo.jpg',
     'data:image/png;base64,AAAA',
   ]) assert.equal(gallery.downloadableImageUrl(url), '', url);
   assert.equal(gallery.safeDownloadName('../bad/**name'), 'bad-name');
