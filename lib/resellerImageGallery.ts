@@ -1,7 +1,6 @@
 import 'server-only';
 
 import { unstable_cache } from 'next/cache';
-import { getDualFeedCatalog } from '@/lib/dualReadServer';
 import { getPublicCatalogSnapshot } from '@/lib/publicCatalogServer';
 import { normalizeImageUrl } from '@/lib/imageUrl';
 import { productMatchesCategory, slugifyCategory } from '@/lib/categoryUtils';
@@ -99,10 +98,9 @@ export function assembleGallery(products: any[], categories: any[]): GallerySnap
 
 // Catalog is loaded once per update, not once per image or thumbnail.
 async function loadGallery(): Promise<GallerySnapshot> {
-  try {
-    const source = await getDualFeedCatalog({ cache: 'no-store', timeoutMs: 8000 });
-    if (source.source !== 'empty' && source.products.length) return assembleGallery(source.products, source.categories);
-  } catch (error) { console.warn('Reseller image gallery full catalog fallback:', error); }
+  // Reuse the EXISTING public catalog cache rather than trigger another
+  // full Supabase products read. Unlike the compact feed this snapshot retains
+  // variantMatrix/variants, so every real product photo can be downloaded.
   const source = await getPublicCatalogSnapshot();
   return assembleGallery(source.products, source.categories);
 }
