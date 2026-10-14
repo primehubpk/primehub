@@ -10,26 +10,26 @@ Branch: `feature/reseller-wallet-admin-dupes-oct14`. DO NOT MERGE OR DEPLOY with
 - Firebase Auth token and active `reseller_profiles/{uid}` status are verified on every catalog/download request. Blocked/revoked sessions cannot access it.
 - The page displays active category cards, search, category image thumbnails, 36 photos/page and Load more.
 - Each photo is downloadable individually with its catalog-derived safe filename.
-- Download All sequentially offers every part of a selected category as ZIP files, 40 images per part; individual ZIP part buttons are also offered to work around mobile multiple-download blocking.
+- Selecting a category and pressing **Download All Images** once requests every original photo as an individual image file. No ZIP archives, archive buttons, extraction step or fixed-size packs. The browser may ask to allow automatic multiple downloads; websites cannot bypass that Chrome protection.
 - Images include cover, gallery and variant photos, deduplicated by URL, with no demo content.
-- ZIP downloads save into the **browser's Downloads** destination, not directly to an Android Gallery album. Large ZIPs must be extracted on mobile. Native Android WebView DownloadManager behavior must be tested separately.
+- Each original JPG/PNG/WebP file is offered individually to the **Chrome Downloads** destination (not guaranteed to appear instantly inside Android Gallery). Chrome may block additional automatic downloads until the user approves its site permission. Browsers do not disclose whether every requested file actually landed on storage; UI says requested/sent, never falsely confirms disk writes. Native Android WebView DownloadManager behavior must be tested separately.
 
 ## Performance and safety
 
 - Uses one cached full catalog snapshot (Supabase primary / Firebase fallback), invalidated by `public-catalog`; only authorized accounts can retrieve gallery metadata.
 - Listing paginated, thumbnail image requests are directly against Cloudflare R2/ImgBB, not Vercel.
-- Binary image downloads/ZIPs are **on-demand** via Vercel server, restricted to CDN hosts observed in the production catalog; no arbitrary third-party URL fetching.
-- ZIPs streamed with STORE mode (photos already compressed), 40 items maximum per pack, 9MB maximum per individual image; failed CDN files listed in `DOWNLOAD-ISSUES.txt` rather than represented as if downloaded.
-- Triggering ZIP downloads does use Vercel transfer and CPU; do not use this to preload full collections and monitor origin-transfer quota after an approved release.
+- Image downloads are **on-demand** and attempted directly from approved Cloudflare R2 / ImgBB CDNs if cross-origin browser access permits; otherwise a Firebase-authenticated Vercel image-only proxy handles the file. No arbitrary third-party URL fetching.
+- Individual images are downloaded sequentially to reduce memory usage, with a 9 MB maximum per file. Progress reports attempted image requests and errors rather than promising browser approval.
+- On Chrome devices where the CDN denies CORS, every downloaded photo uses Vercel transfer and CPU. Monitor origin-transfer quota after an approved release, and do not pre-download collections without a user gesture.
 - Existing reseller login behaviour still routes to dashboard unless `redirect=/download-images` is specifically set (allowlist avoids open redirects).
 
 ## QA before deployment
 
-- Strict GitHub Action: TypeScript, ZIP stream/CDN integrity tests, Next build.
-- Verify category `Glass bangles`: all product and variant images shown; duplicates are not repeated in ZIP.
-- Verify category `Metal bangles`: multiple packs, each downloaded and extractable, including failures summary if needed.
+- Strict GitHub Action: TypeScript, 123-image category completeness, CDN access/validation tests, Next build.
+- Verify category `Glass bangles`: one button sends every photo as an individually saved file and gallery/variant duplicates are not re-downloaded.
+- Verify category `Metal bangles`: >100 files downloadable from ONE button, Chrome multiple-download permission can be granted, filenames remain unique, failed requests are counted.
 - Verify login not authenticated, already signed in, blocked member, expired/revoked token.
-- Verify actual mobile Chrome download manager, device memory, PDF/ZIP extractor, and WhatsApp sharing of saved images. Android WebView download behavior requires physical-device verification.
+- Verify actual mobile Chrome download manager, site permission for multiple automatic downloads, device memory and WhatsApp sharing of saved images. Android WebView download behavior requires physical-device verification.
 - Check both homepage (HomeHeader) and category/shop (Header) layout at 360px, 393px, and 430px.
 - Verify original image color/design is never regenerated or altered. No production wallet balance, order, or reseller account was mutated by this feature.
 - Merge only after explicit owner approval; there is no Vercel preview while preview deploys are disabled.
