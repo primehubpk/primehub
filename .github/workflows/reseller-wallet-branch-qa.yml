@@ -25,7 +25,7 @@ jobs:
         run: npm ci
       - name: Check TypeScript
         run: npx tsc --noEmit
-      - name: Test reseller gallery, image security and ZIP integrity
+      - name: Test direct category downloads and image security
         run: node --test tests/reseller-image-gallery.test.mjs
       - name: Run existing commerce regression tests (unrelated baseline may fail)
         continue-on-error: true
