@@ -41,6 +41,37 @@ test('Shopping first then withdrawable, never double-spending money', () => {
   assert.throws(() => wallet.allocateShoppingCash(100, 100, 0), /Invalid shopping/);
 });
 
+test('Combined Rs.300 shopping plus Rs.100 withdrawal cash auto-pays the whole Rs.400 first', () => {
+  const full = JSON.parse(JSON.stringify(wallet.allocateShoppingCash(300, 100, 400)));
+  assert.deepEqual(full, { shoppingApplied: 300, withdrawableApplied: 100, amount: 400, amountDue: 0 });
+  const partial = JSON.parse(JSON.stringify(wallet.allocateShoppingCash(300, 100, 700)));
+  assert.deepEqual(partial, { shoppingApplied: 300, withdrawableApplied: 100, amount: 400, amountDue: 300 });
+  const small = JSON.parse(JSON.stringify(wallet.allocateShoppingCash(300, 100, 250)));
+  assert.deepEqual(small, { shoppingApplied: 250, withdrawableApplied: 0, amount: 250, amountDue: 0 });
+  const cashOnly = JSON.parse(JSON.stringify(wallet.allocateShoppingCash(0, 100, 90)));
+  assert.deepEqual(cashOnly, { shoppingApplied: 0, withdrawableApplied: 90, amount: 90, amountDue: 0 });
+});
+
+test('Checkout automatically uses wallet balance without checkbox or repeated wallet quote', () => {
+  const client = fs.readFileSync('components/checkout/useCheckout.ts', 'utf8');
+  const page = fs.readFileSync('app/checkout/page.tsx', 'utf8');
+  const summary = fs.readFileSync('components/checkout/CheckoutSummary.tsx', 'utf8');
+  const actions = fs.readFileSync('components/checkout/CheckoutActions.tsx', 'utf8');
+  const backend = fs.readFileSync('app/api/orders/route.ts', 'utf8');
+  assert.ok(client.includes("const useShoppingCredit = walletBalanceStatus === 'ready' && walletShoppingBalance > 0"));
+  assert.ok(client.includes('Math.min(walletShoppingBalance, total)'));
+  assert.ok(client.includes('getAuthoritativeQuote(items, selfCollect).then'));
+  assert.ok(client.includes('!walletCheckoutReady'));
+  assert.ok(client.includes('body: JSON.stringify({ customer, items, selfCollect, guestId: guestId(), useShoppingCredit'));
+  assert.ok(!client.includes('setUseShoppingCredit('));
+  assert.ok(!page.includes('type="checkbox" checked={c.useShoppingCredit}'));
+  assert.ok(page.includes('Automatically applying Rs.'));
+  assert.ok(summary.includes('Total cash wallet automatically applied'));
+  assert.ok(actions.includes('disabled={placing||!walletCheckoutReady}'));
+  assert.ok(backend.includes('createShoppingWalletOrder(user.uid, orderId'));
+  assert.ok(backend.includes('const walletShoppingBalance = (quoteOnly && useShoppingCredit && user)'));
+});
+
 const bonus = loadTS('lib/playInstallBonus.ts', {},
   { PLAY_INSTALL_BONUS_ENABLED: 'true', PLAY_BONUS_DEVICE_HMAC_SECRET: 'very-long-secret-string-that-meets-minimum', FIREBASE_SERVICE_ACCOUNT_KEY: '{}' });
 test('Hash app-scoped Android ID on server, never store IMEI or raw Android ID', () => {
