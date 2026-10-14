@@ -70,7 +70,7 @@ export async function GET(request: Request) {
   const header = request.headers.get('authorization') || '';
   if (!header.startsWith('Bearer ')) return NextResponse.json({ error: 'Authentication required.' }, { status: 401 });
   try {
-    const user = await getAdminAuth().verifyIdToken(header.slice(7));
+    const user = await getAdminAuth().verifyIdToken(header.slice(7), true);
     const url = new URL(request.url);
     const guestId = validGuestId(url.searchParams.get('guestId'));
     const today = dayKey();
