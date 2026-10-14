@@ -4,13 +4,13 @@ import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, CheckCircle2, Download, FolderDown, Images, Loader2, Search, ShieldCheck, X } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, Download, Images, Loader2, Search, ShieldCheck, X } from 'lucide-react';
 import { auth } from '@/lib/firebase';
 
-type Category = { id: string; title: string; slug: string; count: number; cover: string; packs: number };
+type Category = { id: string; title: string; slug: string; count: number; cover: string };
 type Photo = { id: string; productId: string; title: string; url: string; filename: string };
 type Listing = { categories: Category[]; images: Photo[]; total: number; nextOffset: number | null };
-const RESLLER_LOGIN_URL = '/reseller/join?redirect=%2Fdownload-images';
+const RESELLER_LOGIN_URL = '/reseller/join?redirect=%2Fdownload-images';
 
 function saveFile(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
@@ -38,13 +38,15 @@ export default function DownloadImagesPage() {
   const [error, setError] = useState('');
   const [downloadError, setDownloadError] = useState('');
   const [downloading, setDownloading] = useState('');
-  const [finishedPacks, setFinishedPacks] = useState(0);
+  const [downloadProgress, setDownloadProgress] = useState({ processed: 0, started: 0, failed: 0, total: 0 });
+  const [downloadStage, setDownloadStage] = useState<'idle' | 'listing' | 'saving'>('idle');
+  const [downloadComplete, setDownloadComplete] = useState(false);
   const requestCounter = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => onAuthStateChanged(auth, user => {
     if (!user) {
-      router.replace(RESLLER_LOGIN_URL);
+      router.replace(RESELLER_LOGIN_URL);
       return;
     }
     setUid(user.uid);
@@ -131,35 +133,59 @@ export default function DownloadImagesPage() {
     finally { setDownloading(''); abortRef.current = null; }
   }
 
-  async function downloadPack(part: number, chain = false) {
-    const category = categories.find(item => item.slug === selected);
-    if (!category) return;
-    const controller = abortRef.current || new AbortController();
-    if (!chain) {
-      abortRef.current = controller; setDownloading('pack'); setDownloadError(''); setFinishedPacks(0);
-    }
-    const filename = `PrimeHubMall-${category.slug}-part-${String(part + 1).padStart(2, '0')}.zip`;
-    try {
-      await downloadFile({ mode: 'pack', category: selected, part }, filename, controller);
-      setFinishedPacks(part + 1);
-    } finally {
-      if (!chain) { setDownloading(''); abortRef.current = null; }
-    }
-  }
-
+  // Downloads separate original image files: no archive or extraction.
+  // Chrome may require a one-time automatic-multiple-download permission.
   async function downloadAll() {
     const category = categories.find(item => item.slug === selected);
     if (!category || downloading) return;
     const controller = new AbortController();
-    abortRef.current = controller; setDownloading('all'); setFinishedPacks(0); setDownloadError('');
+    abortRef.current = controller;
+    const slug = category.slug;
+    setDownloading('all'); setDownloadStage('listing'); setDownloadComplete(false);
+    setDownloadProgress({ processed: 0, started: 0, failed: 0, total: category.count });
+    setDownloadError('');
+    let processed = 0, started = 0, failed = 0;
     try {
-      for (let part = 0; part < category.packs; part++) {
+      // Fetch the complete manifest, including the gallery pages not yet displayed.
+      const allPhotos: Photo[] = [];
+      let offset = 0, total = category.count;
+      while (!controller.signal.aborted) {
+        const listing = await apiGet(slug, offset, controller.signal);
+        const batch = Array.isArray(listing.images) ? listing.images : [];
+        allPhotos.push(...batch);
+        total = listing.total;
+        if (listing.nextOffset === null) break;
+        if (!batch.length || listing.nextOffset <= offset) throw new Error('Category photo list is incomplete. Please retry.');
+        offset = listing.nextOffset;
+      }
+      if (controller.signal.aborted) return;
+      if (total !== allPhotos.length) throw new Error('Category photo list changed during download. Please retry to get every image.');
+      setDownloadProgress({ processed, started, failed, total });
+      setDownloadStage('saving');
+      for (const photo of allPhotos) {
         if (controller.signal.aborted) break;
-        await downloadPack(part, true);
+        try {
+          await downloadFile({ mode: 'image', category: slug, imageId: photo.id }, photo.filename, controller);
+          // Chrome may block file saving despite a successful synthetic click.
+          // This counts files offered to Chrome, not confirmed disk writes.
+          started++;
+        } catch (err) {
+          if (controller.signal.aborted) break;
+          failed++;
+          console.warn('Original product image could not be requested:', photo.id, err);
+        }
+        processed++;
+        setDownloadProgress({ processed, started, failed, total });
+      }
+      if (!controller.signal.aborted) {
+        setDownloadComplete(true);
+        if (failed > 0) setDownloadError(`${failed} images could not be fetched. Please retry the missing images later and check Chrome Downloads.`);
       }
     } catch (err) {
-      if (!controller.signal.aborted) setDownloadError(err instanceof Error ? err.message : 'ZIP download failed. Try downloading the pack individually.');
-    } finally { setDownloading(''); abortRef.current = null; }
+      if (!controller.signal.aborted) setDownloadError(err instanceof Error ? err.message : 'Category download failed. Please try again.');
+    } finally {
+      setDownloading(''); setDownloadStage('idle'); abortRef.current = null;
+    }
   }
 
   const current = categories.find(item => item.slug === selected);
@@ -171,11 +197,11 @@ export default function DownloadImagesPage() {
       <div className="mx-auto max-w-6xl">
         <Link href="/" className="inline-flex items-center gap-1.5 rounded-full border border-white/20 px-3 py-2 text-[11px] font-bold text-white/80"><ArrowLeft size={14}/> PrimeHubMall</Link>
         <div className="mt-6 flex items-center gap-3">
-          <div className="rounded-2xl bg-[#FFCF68] p-3 text-[#151915]"><FolderDown size={27}/></div>
+          <div className="rounded-2xl bg-[#FFCF68] p-3 text-[#151915]"><Download size={27}/></div>
           <div><p className="text-[10px] font-black uppercase tracking-[.2em] text-[#FFCF68]">PrimeHub Reseller Club</p>
             <h1 className="mt-1 text-2xl font-black tracking-tight sm:text-3xl">Download Product Images</h1></div>
         </div>
-        <p className="mt-3 max-w-2xl text-xs leading-6 text-white/65">Browse real PrimeHubMall categories, save individual photos, or get a whole category as organised ZIP files on your mobile. No second login or new account is needed.</p>
+        <p className="mt-3 max-w-2xl text-xs leading-6 text-white/65">Browse real PrimeHubMall categories, save individual photos, or download a whole category as separate original photos on your phone. No second login or new account is needed.</p>
         <div className="mt-4 flex flex-wrap gap-2">
           <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-2 text-[10px] font-bold"><ShieldCheck size={13}/> Secure reseller access</span>
           <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-2 text-[10px] font-bold"><Images size={13}/> Original product photos</span>
@@ -184,7 +210,7 @@ export default function DownloadImagesPage() {
     </div>
     <div className="mx-auto max-w-6xl px-3 pt-5 sm:px-6">
       {loading && <div role="status" className="flex items-center gap-3 rounded-2xl bg-white p-5 text-sm text-black/60"><Loader2 className="animate-spin" size={18}/> Opening secure image catalogue…</div>}
-      {error && <div role="alert" className="mb-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-xs text-red-700">{error}<Link href={RESLLER_LOGIN_URL} className="ml-2 font-black underline">Reseller sign in</Link></div>}
+      {error && <div role="alert" className="mb-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-xs text-red-700">{error}<Link href={RESELLER_LOGIN_URL} className="ml-2 font-black underline">Reseller sign in</Link></div>}
       {!loading && categories.length > 0 && <>
         <div className="rounded-[24px] bg-white p-4 shadow-sm">
           <div className="flex items-center justify-between gap-3"><div><p className="text-[10px] font-black uppercase tracking-widest text-[#0F6A5F]">Choose Collection</p><h2 className="mt-1 text-xl font-black">All Categories</h2></div><span className="rounded-full bg-[#F1F5F2] px-3 py-2 text-xs font-bold text-[#0F6A5F]">{categories.length} categories</span></div>
@@ -201,19 +227,18 @@ export default function DownloadImagesPage() {
         {current && <section className="mt-5 rounded-[26px] bg-white p-3 shadow-sm sm:p-5" aria-label={current.title + ' downloadable images'}>
           <div className="flex flex-wrap items-start justify-between gap-3 border-b border-black/10 pb-4">
             <div><p className="text-[10px] font-black uppercase tracking-widest text-[#0F6A5F]">Selected Collection</p><h2 className="mt-1 text-xl font-black">{current.title}</h2>
-              <p className="mt-1 text-xs text-black/45">{current.count} original photos · {current.packs} ZIP {current.packs === 1 ? 'pack' : 'packs'}</p></div>
+              <p className="mt-1 text-xs text-black/45">{current.count} original photos · no ZIP</p></div>
             <button type="button" disabled={Boolean(downloading)} onClick={() => void downloadAll()} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-[#0F6A5F] px-4 py-3 text-xs font-black text-white disabled:opacity-60">
-              {downloading === 'all' ? <Loader2 size={17} className="animate-spin"/> : <FolderDown size={17}/>}
-              {downloading === 'all' ? `Saving pack ${Math.min(finishedPacks + 1, current.packs)} of ${current.packs}…` : 'Download All Images'}
+              {downloading === 'all' ? <Loader2 size={17} className="animate-spin"/> : <Download size={17}/>}
+              {downloading === 'all' ? (downloadStage === 'listing' ? 'Checking photos…' : `Saving ${downloadProgress.processed}/${downloadProgress.total}…`) : 'Download All Images'}
             </button>
           </div>
-          {current.packs > 1 && <div className="mt-4 rounded-2xl bg-[#F6F6F2] p-3">
-            <p className="text-[10px] leading-5 text-black/55">Large collections come as smaller ZIP packs to protect mobile memory. Download All starts each pack; your browser may ask you to allow multiple downloads. You can also save any pack separately.</p>
-            <div className="mt-3 flex flex-wrap gap-2">{Array.from({ length: current.packs }, (_, index) => <button key={index} type="button" disabled={Boolean(downloading)} onClick={() => { void downloadPack(index).catch(err => setDownloadError(err instanceof Error ? err.message : 'Pack download failed.')); }} className="rounded-xl border border-[#0F6A5F]/20 bg-white px-3 py-2 text-[10px] font-black text-[#0F6A5F] disabled:opacity-50">ZIP {index + 1}/{current.packs} <Download className="ml-1 inline" size={12}/></button>)}</div>
-          </div>}
+          <div className="mt-4 rounded-2xl bg-[#F6F6F2] p-3 text-[11px] leading-5 text-black/60">
+            <b className="text-[#0F6A5F]">One tap downloads every photo separately.</b> Choose a category and tap Download All once. Chrome puts the original JPG/PNG/WebP photos in Downloads. The first time Chrome may ask <b>Allow multiple downloads?</b> — choose <b>Allow</b>. Websites cannot override this Chrome security permission.
+          </div>
           {downloadError && <div role="alert" className="mt-3 rounded-xl bg-red-50 p-3 text-xs text-red-700">{downloadError}</div>}
-          {downloading && <div role="status" className="mt-3 flex items-center justify-between rounded-xl bg-[#E7F6F1] p-3 text-[10px] font-bold text-[#0F6A5F]"><span>Preparing original images… Keep this page open.</span><button type="button" onClick={() => abortRef.current?.abort()} className="inline-flex items-center gap-1 text-red-700"><X size={14}/> Cancel</button></div>}
-          {finishedPacks > 0 && !downloading && <p role="status" className="mt-3 flex items-center gap-1.5 text-[10px] font-bold text-[#0F6A5F]"><CheckCircle2 size={15}/> Your browser was sent {finishedPacks} ZIP {finishedPacks === 1 ? 'file' : 'files'}. Check Downloads on your phone.</p>}
+          {downloading && <div role="status" className="mt-3 flex items-center justify-between gap-2 rounded-xl bg-[#E7F6F1] p-3 text-[10px] font-bold text-[#0F6A5F]"><span>{downloading === 'all' ? (downloadStage === 'listing' ? 'Finding every photo…' : `Sent ${downloadProgress.started}/${downloadProgress.total} images to Chrome · ${downloadProgress.failed} failed. Keep this tab open.`) : 'Saving photo…'}</span><button type="button" onClick={() => abortRef.current?.abort()} className="inline-flex items-center gap-1 text-red-700"><X size={14}/> Cancel</button></div>}
+          {downloadComplete && !downloading && <p role="status" className="mt-3 flex items-start gap-1.5 rounded-xl bg-[#E7F6F1] p-3 text-[11px] font-bold text-[#0F6A5F]"><CheckCircle2 size={15} className="shrink-0"/> Sent ${downloadProgress.started} separate image download requests to Chrome. ${downloadProgress.failed ? `${downloadProgress.failed} photos were unavailable.` : ''} Check Chrome Downloads to confirm the photos actually saved; Chrome may block some until multiple downloads are allowed.</p>}
           <label className="mt-4 flex items-center gap-2 rounded-xl border border-black/10 px-3 py-2.5"><Search size={16} className="text-black/40"/><input type="search" value={photoSearch} onChange={event => setPhotoSearch(event.target.value)} className="w-full bg-transparent text-xs outline-none" placeholder="Find a product in loaded images"/></label>
           <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
             {visiblePhotos.map(photo => <article key={photo.id} className="overflow-hidden rounded-2xl border border-black/10 bg-[#FAFAF8]">
@@ -228,7 +253,7 @@ export default function DownloadImagesPage() {
           {loadingImages && <p role="status" className="mt-5 flex items-center justify-center gap-2 text-xs text-black/45"><Loader2 size={15} className="animate-spin"/> Loading photos…</p>}
           {nextOffset !== null && <div className="mt-5 flex flex-col items-center gap-2">
             <button type="button" disabled={loadingImages} onClick={() => void loadMore()} className="rounded-xl bg-[#14140F] px-6 py-3 text-xs font-bold text-white disabled:opacity-50">Load more images ({photos.length}/{total})</button>
-            <span className="text-[10px] text-black/40">Download All includes every image, even ones not yet loaded on screen.</span>
+            <span className="text-[10px] text-black/40">Download All saves every photo separately, even those not yet displayed.</span>
           </div>}
           {!loadingImages && total === 0 && <p className="py-6 text-center text-xs text-black/50">No downloadable images in this collection yet.</p>}
         </section>}
