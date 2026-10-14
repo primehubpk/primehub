@@ -54,6 +54,11 @@ export async function creditResellerWallet(input: {
 
   // The Firestore transaction is authoritative. Mirror the profile for Supabase-first admin reads.
   // If the mirror fails, the existing dual-write outbox records it for recovery.
-  await mirrorResellerFirestoreDoc('reseller_profiles', userId);
-  return result;
+  let mirrorDeferred = false;
+  try { await mirrorResellerFirestoreDoc('reseller_profiles', userId); }
+  catch (error) {
+    mirrorDeferred = true;
+    console.error('Credit saved in Firestore, Supabase mirror pending:', error);
+  }
+  return { ...result, mirrorDeferred };
 }
