@@ -38,3 +38,36 @@ jobs:
         run: npm run build
         env:
           CI: 'true'
+
+  android-debug:
+    name: Compile Android v12 debug (no Play upload)
+    needs: wallet-checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Ensure Android SDK API 36
+        run: |
+          SDK_ROOT="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          if [[ ! -f "$SDK_ROOT/platforms/android-36/android.jar" ]]; then
+            yes | "$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0"
+          fi
+          echo "ANDROID_HOME=$SDK_ROOT" >> "$GITHUB_ENV"
+      - name: Build unsigned debug APK, never a release AAB
+        working-directory: play-store/android-twa
+        run: |
+          python3 -m pip install --quiet --user Pillow==11.3.0
+          python3 scripts/compact_launcher_icons.py
+          bash ./gradlew :app:assembleDebug --no-daemon
+      - name: Save staging APK for optional physical-device test
+        uses: actions/upload-artifact@v4
+        with:
+          name: PrimeHub-v12-play-bonus-debug-qa
+          path: play-store/android-twa/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 5
