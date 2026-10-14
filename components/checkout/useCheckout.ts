@@ -64,7 +64,11 @@ export function useCheckout() {
   const [tierDiscount, setTierDiscount] = useState(0), [tierDiscountPercent, setTierDiscountPercent] = useState(0), [resellerTier, setResellerTier] = useState('');
   const checkoutTracked = useRef(false);
   const [checkoutAuthUid, setCheckoutAuthUid] = useState('');
-  useEffect(() => onAuthStateChanged(auth, user => setCheckoutAuthUid(user?.uid || '')), []);
+  const [checkoutAuthReady, setCheckoutAuthReady] = useState(false);
+  useEffect(() => onAuthStateChanged(auth, user => {
+    setCheckoutAuthUid(user?.uid || '');
+    setCheckoutAuthReady(true);
+  }), []);
 
   // Exactly one lightweight balance read when the signed-in account changes.
   // Cart edits, delivery switches and normal quote recalculations never refetch it.
@@ -116,11 +120,12 @@ export function useCheckout() {
     checkoutTracked.current = true;
   }, [items, subtotal]);
   useEffect(() => {
+    if (!checkoutAuthReady) return; // avoid duplicate Supabase price quotes before Firebase resolves login
     if (!items.length) { setDeliveryCharge(BASE_DELIVERY_CHARGE); setWholesaleItems(0); setRewardLabel(''); return; }
     let cancelled = false;
     getAuthoritativeQuote(items, selfCollect, useShoppingCredit).then(quote => { if (!cancelled) { if (useShoppingCredit) setWalletShoppingBalance(Number(quote.walletShoppingBalance || 0)); setWalletShoppingApplied(Number(quote.walletShoppingApplied || 0)); setDeliveryCharge(Number(quote.deliveryCharge ?? BASE_DELIVERY_CHARGE)); setWholesaleItems(Number(quote.wholesaleItems || 0)); setTierDiscount(Number(quote.tierDiscount || 0)); setTierDiscountPercent(Number(quote.tierDiscountPercent || 0)); setResellerTier(String(quote.resellerTier || '')); setRewardLabel(String(quote.rewardLabel || '')); } }).catch(() => undefined);
     return () => { cancelled = true; };
-  }, [items, selfCollect, useShoppingCredit, checkoutAuthUid]);
+  }, [items, selfCollect, useShoppingCredit, checkoutAuthUid, checkoutAuthReady]);
   const update = (key: keyof Customer, value: string) => setCustomer(previous => ({ ...previous, [key]: value }));
   const placeOrder = async (event: FormEvent) => { event.preventDefault(); setError(''); if (!items.length) return setError('Your cart is empty. Please add a product first.'); if (!customer.name.trim() || !customer.phone.trim() || (!selfCollect && (!customer.address.trim() || !customer.city.trim()))) return setError(selfCollect ? 'Please fill your name and phone.' : 'Please fill your name, phone, address and city.'); setPlacing(true); try { const response = await fetch('/api/orders', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(await authHeader()) }, body: JSON.stringify({ customer, items, selfCollect, guestId: guestId(), useShoppingCredit, ...(useShoppingCredit ? { orderRequestId: (walletRequestId.current ||= crypto.randomUUID()) } : {}) }) }); const data = await response.json(); if (!response.ok) throw new Error(data.error || 'Order save nahi ho saka.'); const productIds = Array.isArray(data.items) ? data.items.map((item: any) => String(item.productId || item.id || '')).filter(Boolean) : items.map((item: any) => String(item.productId || item.id || '')).filter(Boolean); const completedItems = Array.isArray(data.items) && data.items.length ? data.items : items; const completedContents = tikTokContents(completedItems, items); if (completedContents.length) { trackTikTokEvent('PlaceAnOrder', { contents: completedContents as any, value: Number(data.total ?? total), currency: 'PKR' }); } setReviewProductIds(productIds); rememberReviewOrder(data.orderId, productIds); rememberOrderProgress(data.orderId, Number(data.wholesaleItems || wholesaleItems || 0)); setWalletPaidReceipt(Number(data.walletShoppingApplied || 0)); setAmountDueReceipt(Number(data.amountDue ?? data.total ?? 0)); setOrderId(data.orderId); walletRequestId.current = ''; try { window.PrimeHubNative?.postMessage(JSON.stringify({ action: 'purchase', orderId: data.orderId })); } catch {} clearCart(); } catch (caught) { console.error(caught); setError(caught instanceof Error ? caught.message : 'Order save nahi ho saka. Please try again.'); } finally { setPlacing(false); } };
   const whatsappOrder = async () => { if (!items.length) return; setError(''); if (useShoppingCredit) { setError('Shopping wallet credits work with Place Order only. Uncheck Shopping Wallet if you prefer WhatsApp ordering.'); return; } try { const [quote, adminNumber] = await Promise.all([getAuthoritativeQuote(items, selfCollect), getAdminWhatsAppNumber()]); const user = auth.currentUser; let resellerCode = '', requestId = ''; if (user) { const token = await user.getIdToken(); const track = await fetch('/api/reseller/whatsapp-order', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ customer, items: quote.items, subtotal: quote.subtotal, deliveryCharge: quote.deliveryCharge, total: quote.total, selfCollect }) }); const trackData = await track.json(); if (track.ok) { resellerCode = String(trackData.resellerCode || ''); requestId = String(trackData.requestId || ''); } else if (track.status !== 401) throw new Error(trackData.error || 'Unable to create WhatsApp reseller request.'); }
