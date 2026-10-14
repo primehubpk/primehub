@@ -6,8 +6,8 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 
 /** Shared email/password Firebase session; never create another login provider.
- * Native bonus is checked only on app launch/sign-in, never on homepage render,
- * product scroll, checkout, or chat. Reward is shown ONLY after verified credit.
+ * Welcome bonus is checked only after existing app login, never on product scroll
+ * or chat. Popup appears ONLY after the server actually credits wallet cash.
  */
 export default function NativePushIdentity() {
   const [congratulations, setCongratulations] = useState(false);
@@ -28,7 +28,7 @@ export default function NativePushIdentity() {
         const user = auth.currentUser;
         if (!user || user.uid !== userId) return;
         try {
-          if (localStorage.getItem('primehub_verified_app_bonus_' + userId) === 'credited' || localStorage.getItem('primehub_app_bonus_device_claimed') === '1') return;
+          if (localStorage.getItem('primehub_app_bonus_account_' + userId) || localStorage.getItem('primehub_app_bonus_device_claimed') === '1') return;
         } catch {}
         try {
           const response = await fetch('/api/reseller/play-install-bonus', { cache: 'no-store' });
@@ -51,10 +51,23 @@ export default function NativePushIdentity() {
     }
     window.addEventListener('primehub:reseller-profile-ready', profileReady);
     const onBonus = (event: Event) => {
-      const detail = (event as CustomEvent<{ success?: boolean }>).detail;
-      if (!detail?.success) { requestedUid = ''; return; }
+      const detail = (event as CustomEvent<{
+        success?: boolean; alreadyClaimed?: boolean; reason?: string;
+      }>).detail;
       if (!currentUid.current) return;
-      try { localStorage.setItem('primehub_verified_app_bonus_' + currentUid.current, 'credited'); localStorage.setItem('primehub_app_bonus_device_claimed', '1'); } catch {}
+      if (detail?.alreadyClaimed) {
+        // Do not display fake congratulations for an already used reward.
+        try {
+          if (detail.reason === 'device') localStorage.setItem('primehub_app_bonus_device_claimed', '1');
+          if (detail.reason === 'account') localStorage.setItem('primehub_app_bonus_account_' + currentUid.current, 'already-claimed');
+        } catch {}
+        return;
+      }
+      if (!detail?.success) { requestedUid = ''; return; }
+      try {
+        localStorage.setItem('primehub_app_bonus_account_' + currentUid.current, 'credited');
+        localStorage.setItem('primehub_app_bonus_device_claimed', '1');
+      } catch {}
       setDismissed(false);
       setCongratulations(true);
       window.dispatchEvent(new CustomEvent('primehub:wallet-updated'));
@@ -87,7 +100,7 @@ export default function NativePushIdentity() {
       <button type="button" onClick={() => { setDismissed(true); setCongratulations(false); }} aria-label="Close bonus congratulations" className="absolute right-3 top-3 rounded-full bg-[#F4F4F1] px-3 py-2 text-sm font-black">✕</button>
       <p className="text-[11px] font-black uppercase tracking-[.18em] text-[#0F6A5F]">🎉 Congratulations!</p>
       <h2 className="mt-2 text-2xl font-black">You got Rs. 100!</h2>
-      <p className="mt-2 text-xs leading-5 text-black/60">Your verified PrimeHub Play Store bonus has been added to your <b>Withdrawal Balance</b>. You can also spend it shopping. Minimum cash withdrawal is Rs. 500.</p>
+      <p className="mt-2 text-xs leading-5 text-black/60">Your PrimeHub app welcome bonus has been added to your <b>Withdrawal Balance</b>. You can also spend it shopping. Minimum cash withdrawal is Rs. 500.</p>
       <Link href="/reseller/wallet" onClick={() => setDismissed(true)} className="mt-4 inline-flex rounded-xl bg-[#0F6A5F] px-5 py-3 text-xs font-black text-white">View My Wallet →</Link>
     </div>
   );
