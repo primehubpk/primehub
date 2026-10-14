@@ -20,7 +20,7 @@ function saveFile(blob: Blob, filename: string) {
   document.body.append(link);
   link.click();
   link.remove();
-  window.setTimeout(() => URL.revokeObjectURL(url), 12_000);
+  window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
 export default function DownloadImagesPage() {
@@ -43,7 +43,7 @@ export default function DownloadImagesPage() {
   const [downloadComplete, setDownloadComplete] = useState(false);
   const requestCounter = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
-  const directCdnCors = useRef<boolean | null>(null);
+  const cdnCorsBlocked = useRef(new Set<string>());
 
   useEffect(() => onAuthStateChanged(auth, user => {
     if (!user) {
@@ -53,12 +53,13 @@ export default function DownloadImagesPage() {
     setUid(user.uid);
   }), [router]);
 
-  const apiGet = useCallback(async (slug = '', offset = 0, signal?: AbortSignal): Promise<Listing> => {
+  const apiGet = useCallback(async (slug = '', offset = 0, signal?: AbortSignal, all = false): Promise<Listing> => {
     const user = auth.currentUser;
     if (!user) throw new Error('Please sign in with your existing reseller account.');
     const query = new URLSearchParams();
     if (slug) query.set('category', slug);
     query.set('offset', String(offset));
+    if (all) query.set('all', '1');
     const response = await fetch(`/api/reseller/image-gallery?${query.toString()}`, {
       headers: { Authorization: `Bearer ${await user.getIdToken()}` },
       cache: 'no-store',
@@ -109,50 +110,44 @@ export default function DownloadImagesPage() {
     finally { setLoadingImages(false); }
   }
 
-  async function downloadFile(body: Record<string, unknown>, filename: string, controller: AbortController, photo?: Photo) {
-    const user = auth.currentUser;
-    if (!user) throw new Error('Please sign in again.');
-
-    // Images are already public on Cloudflare R2 / ImgBB; try a browser CORS
-    // download once. If supported, subsequent photos bypass Vercel origin egress.
-    // If the CDN does not allow CORS, use the protected same-origin image proxy.
-    if (photo?.url && directCdnCors.current !== false) {
-      try {
-        const uri = new URL(photo.url);
-        if (uri.protocol !== 'https:' || uri.port ||
-          !['images.primehubmall.com', 'i.ibb.co'].includes(uri.hostname)) {
-          throw new Error('Unsupported photo CDN');
-        }
-        const direct = await fetch(uri.toString(), { signal: controller.signal, mode: 'cors', redirect: 'error' });
-        const contentType = direct.headers.get('content-type') || '';
-        const contentLength = Number(direct.headers.get('content-length') || 0);
-        if (!direct.ok || !contentType.startsWith('image/') || contentLength > 9 * 1024 * 1024) {
-          throw new Error('CDN image cannot be downloaded directly');
-        }
-        const blob = await direct.blob();
-        if (blob.size === 0 || blob.size > 9 * 1024 * 1024) throw new Error('Image exceeds download size limit');
-        directCdnCors.current = true;
-        saveFile(blob, filename);
-        return;
-      } catch (error) {
-        if (controller.signal.aborted) throw error;
-        // First-party CORS is optional; fallback is always secured by Firebase Auth.
-        directCdnCors.current = false;
-      }
+  /** One image => one GET directly from its original CDN (Cloudflare R2 preferred).
+   * There is intentionally NO Vercel binary proxy, even on CDN/CORS failures.
+   * The R2 bucket must allow CORS GET from the PrimeHubMall web origins.
+   */
+  async function downloadFile(photo: Photo, controller: AbortController) {
+    if (!auth.currentUser) throw new Error('Please sign in with your Reseller Club account.');
+    const uri = new URL(photo.url);
+    if (uri.protocol !== 'https:' || uri.port || uri.username || uri.password ||
+      !['images.primehubmall.com', 'pub-157b90419bf04016bdea666e4cbce181.r2.dev', 'i.ibb.co'].includes(uri.hostname)) {
+      throw new Error('This photo is not on an approved image CDN.');
     }
-
-    const response = await fetch('/api/reseller/image-download', {
-      method: 'POST', signal: controller.signal, credentials: 'same-origin',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${await user.getIdToken()}` },
-      body: JSON.stringify(body),
-    });
-    if (!response.ok) {
-      const data = await response.json().catch(() => null);
-      throw new Error(data?.error || 'Download failed. Please try again.');
+    if (cdnCorsBlocked.current.has(uri.hostname)) {
+      throw new Error(`CORS_NOT_ALLOWED:${uri.hostname}`);
     }
+    let response: Response;
+    try {
+      response = await fetch(uri.toString(), {
+        method: 'GET', mode: 'cors', credentials: 'omit', redirect: 'error',
+        cache: 'default', signal: controller.signal,
+      });
+    } catch (error) {
+      if (controller.signal.aborted) throw error;
+      cdnCorsBlocked.current.add(uri.hostname);
+      // Distinguish browser/CORS/network failure; never silently route R2 through Vercel.
+      throw new Error(`CORS_NOT_ALLOWED:${uri.hostname}`);
+    }
+    if (!response.ok) throw new Error(`Photo unavailable (HTTP ${response.status})`);
+    const type = response.headers.get('content-type') || '';
+    if (!type.toLowerCase().startsWith('image/')) throw new Error('Original image CDN returned a non-image file.');
+    const maxImageBytes = 12 * 1024 * 1024;
+    if (Number(response.headers.get('content-length') || 0) > maxImageBytes) {
+      await response.body?.cancel();
+      throw new Error('Photo is larger than the 12 MB mobile download limit.');
+    }
+    // Only one photo blob is in memory at a time; immediately free its object URL.
     const blob = await response.blob();
-    if (!blob.size || blob.size > 9 * 1024 * 1024) throw new Error('Image could not be safely downloaded.');
-    saveFile(blob, filename);
+    if (!blob.size || blob.size > maxImageBytes) throw new Error('Photo could not be saved safely (12 MB limit).');
+    saveFile(blob, photo.filename);
   }
 
   async function saveOne(photo: Photo) {
@@ -160,8 +155,10 @@ export default function DownloadImagesPage() {
     const controller = new AbortController();
     abortRef.current = controller;
     setDownloading(photo.id); setDownloadError('');
-    try { await downloadFile({ mode: 'image', category: selected, imageId: photo.id }, photo.filename, controller, photo); }
-    catch (err) { setDownloadError(err instanceof Error ? err.message : 'Image download failed.'); }
+    try { await downloadFile(photo, controller); }
+    catch (err) { const message = err instanceof Error ? err.message : 'Photo download failed.';
+      setDownloadError(message.startsWith('CORS_NOT_ALLOWED:') ? 'Direct CDN downloading is not permitted for this photo host. Cloudflare R2 CORS GET must allow this website; there is no Vercel fallback.' : message);
+    }
     finally { setDownloading(''); abortRef.current = null; }
   }
 
@@ -178,18 +175,11 @@ export default function DownloadImagesPage() {
     setDownloadError('');
     let processed = 0, started = 0, failed = 0;
     try {
-      // Fetch the complete manifest, including the gallery pages not yet displayed.
-      const allPhotos: Photo[] = [];
-      let offset = 0, total = category.count;
-      while (!controller.signal.aborted) {
-        const listing = await apiGet(slug, offset, controller.signal);
-        const batch = Array.isArray(listing.images) ? listing.images : [];
-        allPhotos.push(...batch);
-        total = listing.total;
-        if (listing.nextOffset === null) break;
-        if (!batch.length || listing.nextOffset <= offset) throw new Error('Category photo list is incomplete. Please retry.');
-        offset = listing.nextOffset;
-      }
+      // Fetch every photo's URL in ONE authenticated metadata request to Vercel.
+      // All binary images are subsequently read DIRECTLY from Cloudflare/ImgBB.
+      const listing = await apiGet(slug, 0, controller.signal, true);
+      const allPhotos = listing.images;
+      const total = listing.total;
       if (controller.signal.aborted) return;
       if (total !== allPhotos.length) throw new Error('Category photo list changed during download. Please retry to get every image.');
       setDownloadProgress({ processed, started, failed, total });
@@ -197,24 +187,29 @@ export default function DownloadImagesPage() {
       for (const photo of allPhotos) {
         if (controller.signal.aborted) break;
         try {
-          await downloadFile({ mode: 'image', category: slug, imageId: photo.id }, photo.filename, controller, photo);
+          await downloadFile(photo, controller);
           // Chrome may block file saving despite a successful synthetic click.
           // This counts files offered to Chrome, not confirmed disk writes.
           started++;
         } catch (err) {
           if (controller.signal.aborted) break;
           failed++;
-          console.warn('Original product image could not be requested:', photo.id, err);
+          if (process.env.NODE_ENV !== 'production') console.warn('Direct CDN photo download failed:', photo.id, err);
         }
         processed++;
         setDownloadProgress({ processed, started, failed, total });
       }
       if (!controller.signal.aborted) {
         setDownloadComplete(true);
-        if (failed > 0) setDownloadError(`${failed} images could not be fetched. Please retry the missing images later and check Chrome Downloads.`);
+        if (failed > 0) {
+          const blocked = [...cdnCorsBlocked.current];
+          setDownloadError(blocked.length
+            ? `Direct CDN image downloads are blocked for ${blocked.join(', ')}. Configure Cloudflare R2/legacy CDN CORS GET for this website; no images were sent through Vercel. Check Chrome Downloads for files already requested.`
+            : `${failed} photos could not be fetched directly from the image CDN. Check Chrome Downloads for files already requested.`);
+        }
       }
     } catch (err) {
-      if (!controller.signal.aborted) setDownloadError(err instanceof Error ? err.message : 'Category download failed. Please try again.');
+      if (!controller.signal.aborted) setDownloadError(err instanceof Error ? err.message : 'Category metadata unavailable. Please try again.');
     } finally {
       setDownloading(''); setDownloadStage('idle'); abortRef.current = null;
     }
@@ -266,7 +261,7 @@ export default function DownloadImagesPage() {
             </button>
           </div>
           <div className="mt-4 rounded-2xl bg-[#F6F6F2] p-3 text-[11px] leading-5 text-black/60">
-            <b className="text-[#0F6A5F]">Tap a category to download all its photos.</b> Tap any category once to start saving its photos automatically. Chrome puts the original JPG/PNG/WebP photos in Downloads. The first time Chrome may ask <b>Allow multiple downloads?</b> — choose <b>Allow</b>. Websites cannot override this Chrome security permission.
+            <b className="text-[#0F6A5F]">Tap a category to download all its photos.</b> Tap any category once to start saving its photos automatically. Photos load directly from Cloudflare R2 (legacy photos directly from their CDN), never through Vercel. Chrome puts original JPG/PNG/WebP photos in Downloads. The first time Chrome may ask <b>Allow multiple downloads?</b> — choose <b>Allow</b>. Websites cannot override this Chrome security permission.
           </div>
           {downloadError && <div role="alert" className="mt-3 rounded-xl bg-red-50 p-3 text-xs text-red-700">{downloadError}</div>}
           {downloading && <div role="status" className="mt-3 flex items-center justify-between gap-2 rounded-xl bg-[#E7F6F1] p-3 text-[10px] font-bold text-[#0F6A5F]"><span>{downloading === 'all' ? (downloadStage === 'listing' ? 'Finding every photo…' : `Sent ${downloadProgress.started}/${downloadProgress.total} images to Chrome · ${downloadProgress.failed} failed. Keep this tab open.`) : 'Saving photo…'}</span><button type="button" onClick={() => abortRef.current?.abort()} className="inline-flex items-center gap-1 text-red-700"><X size={14}/> Cancel</button></div>}
