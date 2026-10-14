@@ -87,7 +87,8 @@ service cloud.firestore {
         && request.resource.data.tierId == 'starter'
         && request.resource.data.monthlyOrders == 0
         && request.resource.data.walletAvailable == 0
-        && request.resource.data.walletPending == 0;
+        && request.resource.data.walletPending == 0
+        && (!('walletShopping' in request.resource.data) || request.resource.data.walletShopping == 0);
       allow read: if isAdmin() || (signedIn() && request.auth.uid == userId);
       allow update, delete: if isAdmin();
     }
