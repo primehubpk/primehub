@@ -24,8 +24,7 @@ let legacyOrdersCache: Array<Record<string, any>> = [];
 let legacyOrdersCacheAt = 0;
 
 function isAuthorized(request: Request) {
-  const cookie = request.headers.get('cookie') || '';
-  return cookie.split(';').some((part) => part.trim() === `${ADMIN_COOKIE}=true`);
+  return authorizedWalletAdmin(request);
 }
 
 function supabaseConfig() {
@@ -230,6 +229,9 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   if (!isAuthorized(request)) {
     return NextResponse.json({ error: 'Authentication required.' }, { status: 401 });
+  }
+  if (request.headers.get('origin') !== new URL(request.url).origin) {
+    return NextResponse.json({ error: 'Origin mismatch.' }, { status: 403 });
   }
 
   try {
