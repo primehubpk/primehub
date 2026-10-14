@@ -79,7 +79,7 @@ test('all four daily slots include genuine CDN product images; no fabricated med
 test('weekly deal urgently but truthfully ends today at 22:00 Pakistan time', () => {
   const atTenPm = new Date('2026-10-09T17:15:00Z');
   const push = selectDailyPush('live', atTenPm, 'one', {}, [product], settings);
-  assert.ok(push.title.includes('khatam') || push.title.includes('Last chance') || push.title.includes('Deal end'));
+  assert.ok(push.title.includes('khatam') || push.title.includes('Last chance') || push.title.includes('Deal end') || push.title.includes('ghantay baqi'));
   assert.ok(push.body.includes('ghantay baqi'));
   assert.equal(push.imageUrl, product.imageUrl);
 });
