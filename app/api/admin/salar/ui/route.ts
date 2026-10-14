@@ -20,6 +20,7 @@ export async function GET(request: Request) {
 
 export async function PUT(request: Request) {
   if (!authorized(request)) return NextResponse.json({ success: false, error: 'Authentication required.' }, { status: 401 });
+  if (request.headers.get('origin') !== new URL(request.url).origin) return NextResponse.json({ error: 'Origin mismatch.' }, { status: 403 });
   try {
     const body = await request.json().catch(() => ({}));
     const ui = await saveSalarUiSettings({ iconUrl: body?.iconUrl, whatsappContacts: body?.whatsappContacts });
