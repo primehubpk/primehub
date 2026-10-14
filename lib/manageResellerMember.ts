@@ -58,12 +58,13 @@ export async function manageResellerMember(userId: string, action: Action, reaso
     }
     throw error;
   }
+  let authRemovalPending = false;
   if (action === 'delete') {
     // Auth identity is deleted; reseller and event records are retained for compliance and reconciliation.
     try { await auth.deleteUser(userId); }
-    catch (error) { console.error('Member disabled and archived, Firebase Auth delete requires retry:', error); }
+    catch (error) { authRemovalPending = true; console.error('Member disabled and archived, Firebase Auth delete requires retry:', error); }
   }
   try { await mirrorResellerFirestoreDoc('reseller_profiles', userId); }
   catch (error) { console.error('Reseller status mirror will need retry:', error); }
-  return { action, status };
+  return { action, status, authRemovalPending };
 }
