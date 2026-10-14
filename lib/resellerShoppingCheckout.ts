@@ -114,7 +114,7 @@ export async function refundShoppingWalletOrder(orderId: string) {
     const profileRef = db.collection('reseller_profiles').doc(userId);
     const walletRef = db.collection('reseller_shopping_wallets').doc(userId);
     const [profile, wallet] = await Promise.all([tx.get(profileRef), tx.get(walletRef)]);
-    if (!profile.exists || !wallet.exists) throw new Error('Reseller wallet owner not found.');
+    if (!profile.exists) throw new Error('Reseller wallet owner not found.');
     const shopping = Number(wallet.data()?.balance || 0);
     const withdrawable = Number(profile.data()?.walletAvailable || 0);
     const shoppingRefund = Number(spend.data()?.shoppingApplied ?? amount);
@@ -124,7 +124,10 @@ export async function refundShoppingWalletOrder(orderId: string) {
       throw new Error('Wallet refund ledger is inconsistent.');
     }
     const updated = { ...oldOrder, status: 'cancelled', walletPaymentStatus: 'refunded', updatedAt: new Date().toISOString() };
-    if (shoppingRefund > 0) tx.update(walletRef, { balance: shopping + shoppingRefund, updatedAt: FieldValue.serverTimestamp() });
+    if (shoppingRefund > 0) {
+      if (!wallet.exists) throw new Error('Shopping balance record is missing; manual refund review required.');
+      tx.update(walletRef, { balance: shopping + shoppingRefund, updatedAt: FieldValue.serverTimestamp() });
+    }
     tx.update(profileRef, {
       walletShopping: shopping + shoppingRefund,
       walletAvailable: withdrawable + withdrawRefund,
