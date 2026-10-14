@@ -63,7 +63,6 @@ export default function ResellerJoinPage() {
         const credential = await createResellerAccount(email, password);
         try {
           await createResellerProfile(credential.user.uid, credential.user.email || email.trim());
-        window.dispatchEvent(new Event('primehub:reseller-profile-ready'));
           window.dispatchEvent(new Event('primehub:reseller-profile-ready'));
         } catch (profileError) {
           const profileCode = profileError instanceof Error ? String(profileError.message).split(':')[0] : '';
@@ -78,6 +77,7 @@ export default function ResellerJoinPage() {
       } else {
         const credential = await signInReseller(email, password, rememberMe);
         await createResellerProfile(credential.user.uid, credential.user.email || email.trim());
+        window.dispatchEvent(new Event('primehub:reseller-profile-ready'));
         // A successful reseller sign-in should take the member straight to the dashboard.
         // Do not leave a success message or secondary dashboard button on the sign-in page.
         router.replace(resellerDestination());
