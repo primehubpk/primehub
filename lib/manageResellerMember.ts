@@ -21,15 +21,17 @@ export async function manageResellerMember(userId: string, action: Action, reaso
     // Destructive account deletion never destroys reward, withdrawal or financial audit history.
     const [shopping, pendingWithdrawal, pendingReward, claims, rewards] = await Promise.all([
       db.collection('reseller_shopping_wallets').doc(userId).get(),
-      db.collection('reseller_withdrawals').where('userId','==',userId).where('status','in',['pending','approved']).limit(1).get(),
-      db.collection('reseller_reward_ledger').where('userId','==',userId).where('status','==','pending').limit(1).get(),
-      db.collection('reseller_task_claims').where('userId','==',userId).where('status','==','pending').limit(1).get(),
+      db.collection('reseller_withdrawals').where('userId','==',userId).get(),
+      db.collection('reseller_reward_ledger').where('userId','==',userId).get(),
+      db.collection('reseller_task_claims').where('userId','==',userId).get(),
       getSupabasePrimaryPayload('user_rewards',userId),
     ]);
     const firebaseRewards = await db.collection('user_rewards').doc(userId).get();
     const livePoints = Math.max(Number(rewards?.points || 0), Number(firebaseRewards.data()?.points || 0));
     if ([Number(current.walletAvailable || 0),Number(current.walletPending || 0),Number(shopping.data()?.balance || 0),Number(current.pointsBalance || 0),livePoints].some(n => !Number.isFinite(n) || n !== 0) ||
-      !pendingWithdrawal.empty || !pendingReward.empty || !claims.empty) {
+      pendingWithdrawal.docs.some(doc => ['pending','approved'].includes(String(doc.data().status))) ||
+      pendingReward.docs.some(doc => doc.data().status === 'pending') ||
+      claims.docs.some(doc => doc.data().status === 'pending')) {
       throw new Error('Account has money, points, or pending claims. Settle these first; Block is available without deleting history.');
     }
   }
