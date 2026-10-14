@@ -92,7 +92,6 @@ gradle.taskGraph.whenReady { graph ->
 
 dependencies {
     implementation 'com.google.firebase:firebase-messaging:24.1.1'
-    implementation 'com.google.android.play:integrity:1.6.0'
     implementation 'androidx.webkit:webkit:1.14.0'
     // Replace transitive Fragment 1.1.0 flagged by Play Console for v11.
     implementation 'androidx.fragment:fragment:1.9.1'
