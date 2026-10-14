@@ -4,6 +4,16 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { getAdminDb } from '@/lib/firebaseAdmin';
 import { mirrorResellerFirestoreDoc } from '@/lib/resellerDualMirror';
 
+export function allocateShoppingCash(shopping: number, withdrawable: number, total: number) {
+  if (![shopping, withdrawable, total, shopping + withdrawable].every(n => Number.isSafeInteger(n) && n >= 0) || total <= 0) {
+    throw new Error('Invalid shopping cash allocation.');
+  }
+  const shoppingApplied = Math.min(shopping, total);
+  const withdrawableApplied = Math.min(withdrawable, total - shoppingApplied);
+  return { shoppingApplied, withdrawableApplied, amount: shoppingApplied + withdrawableApplied,
+    amountDue: total - shoppingApplied - withdrawableApplied };
+}
+
 export function walletOrderFingerprint(data: Record<string, any>) {
   return createHash('sha256').update(JSON.stringify({
     customer: data.customer, items: data.items, subtotal: data.subtotal,
@@ -56,10 +66,8 @@ export async function createShoppingWalletOrder(userId: string, orderId: string,
     if (shopping + withdrawable <= 0) throw new Error('There is no cash available to spend.');
     // First use restricted shopping cash. Only then spend withdrawable rewards.
     // Both balances are decremented atomically with the actual order creation.
-    const shoppingApplied = Math.min(shopping, orderData.total);
-    const withdrawableApplied = Math.min(withdrawable, orderData.total - shoppingApplied);
-    const amount = shoppingApplied + withdrawableApplied;
-    const amountDue = orderData.total - amount;
+    const { shoppingApplied, withdrawableApplied, amount, amountDue } =
+      allocateShoppingCash(shopping, withdrawable, orderData.total);
     const savedOrder = {
       ...orderData, resellerUserId: userId, walletFingerprint: fingerprint,
       walletShoppingApplied: amount, walletShoppingOnlyApplied: shoppingApplied,
