@@ -128,11 +128,7 @@ export default function PrimeFamilyDashboard({
   const [rewardGifts, setRewardGifts] = useState<RewardGift[]>([]);
   const [rewardProducts, setRewardProducts] = useState<Record<string, RewardProduct>>({});
   const [rewardBusy, setRewardBusy] = useState(false);
-  const [playBonusCapable, setPlayBonusCapable] = useState(false);
-  const [playBonusBusy, setPlayBonusBusy] = useState(false);
-  const [playBonusMessage, setPlayBonusMessage] = useState('');
   const [playBonusClaimed, setPlayBonusClaimed] = useState(false);
-
   const [rewardMessage, setRewardMessage] = useState('');
   const [voucherImages, setVoucherImages] = useState<Record<string, string>>(
     () => seededSettings.resellerVoucherImages || {},
@@ -144,41 +140,20 @@ export default function PrimeFamilyDashboard({
   );
 
   useEffect(() => {
-    // No API call or native SDK initialization on home/shop. Only shows the button
-    // in a genuine v12+ Play Store WebView that supports its native attestation.
-    setPlayBonusCapable(Boolean(window.PrimeHubNative) && /PrimeHubApp\/(?:12|1[3-9]|[2-9]\d)\./.test(navigator.userAgent));
-    const handleBonus = (event: Event) => {
-      const detail = (event as CustomEvent<{ success?: boolean; message?: string }>).detail;
-      setPlayBonusBusy(false);
+    const onBonus = (event: Event) => {
+      const detail = (event as CustomEvent<{ success?: boolean }>).detail;
       if (detail?.success) setPlayBonusClaimed(true);
-      setPlayBonusMessage(String(detail?.message || (detail?.success ? 'Cash bonus added.' : 'Could not verify this installation.')));
     };
-    window.addEventListener('primehub:play-bonus-result', handleBonus);
-    return () => window.removeEventListener('primehub:play-bonus-result', handleBonus);
+    window.addEventListener('primehub:play-bonus-result', onBonus);
+    return () => window.removeEventListener('primehub:play-bonus-result', onBonus);
   }, []);
-
-  async function requestPlayBonus() {
-    if (!memberUser || !playBonusCapable || playBonusBusy) return;
-    setPlayBonusBusy(true);
-    setPlayBonusMessage('');
-    try {
-      const token = await memberUser.getIdToken();
-      window.PrimeHubNative?.postMessage(JSON.stringify({ action: 'playBonus', idToken: token }));
-      // Google Play may take a few seconds; do not hang the UI forever if the
-      // app is backgrounded or Play Services becomes unavailable.
-      window.setTimeout(() => setPlayBonusBusy(false), 90_000);
-    } catch {
-      setPlayBonusBusy(false);
-      setPlayBonusMessage('Sign in again to verify your Play Store installation.');
-    }
-  }
 
   useEffect(() => {
     let stopProfile: (() => void) | undefined;
     const stopAuth = onAuthStateChanged(auth, user => {
       stopProfile?.();
       setMemberUser(user);
-      try { setPlayBonusClaimed(Boolean(user && localStorage.getItem('primehub_verified_app_bonus_' + user.uid) === 'credited')); }
+      try { setPlayBonusClaimed(Boolean(user && localStorage.getItem('primehub_app_bonus_account_' + user.uid) === 'credited')); }
       catch { setPlayBonusClaimed(false); }
 
       if (!user) {
@@ -584,12 +559,8 @@ export default function PrimeFamilyDashboard({
                 </div>
                 <div className="mt-3 rounded-2xl border border-[#0E7C6F]/15 bg-white p-3">
                   <p className="text-[10px] font-extrabold uppercase tracking-wider text-[#0E7C6F]">Play Store App Bonus · Rs. 100</p>
-                  <p className="mt-1 text-[10px] leading-5 text-[#6B6A62]">One-time cash reward for a verified Google Play installation, once per device and account. Bonus joins Withdrawal Balance. Minimum withdrawal remains Rs. 500.</p>
-                  {playBonusClaimed ? <p className="mt-2 text-[10px] font-black text-[#0E7C6F]">✓ Rs. 100 bonus already credited to withdrawal cash wallet.</p>
-                    : memberUser && playBonusCapable
-                    ? <button type="button" onClick={() => void requestPlayBonus()} disabled={playBonusBusy} className="mt-2 rounded-xl bg-[#0E7C6F] px-4 py-2.5 text-[10px] font-extrabold text-white disabled:opacity-50">{playBonusBusy ? 'Verifying with Google Play…' : 'Verify & Claim Rs. 100'}</button>
-                    : <p className="mt-2 text-[10px] font-bold text-[#0E7C6F]">Available after release in the updated PrimeHub Play Store app. Website visitors cannot claim this bonus.</p>}
-                  {playBonusMessage && <p role="status" className="mt-2 text-[10px] leading-5 text-[#6B6A62]">{playBonusMessage}</p>}
+                  <p className="mt-1 text-[10px] leading-5 text-[#6B6A62]">One-time welcome cash for PrimeHub app users. No Claim button or additional login: it applies automatically after regular email/password sign-in, when the offer is active. Minimum withdrawal stays Rs. 500.</p>
+                  {playBonusClaimed && <p className="mt-2 text-[10px] font-black text-[#0E7C6F]">✓ Rs. 100 has been credited to your Withdrawal Balance.</p>}
                 </div>
                 <Link href="/reseller/wallet" className="mt-3 block w-full rounded-xl bg-[#14140F] px-3 py-3 text-center text-xs font-extrabold text-white">Request withdrawal</Link>
               </section>
