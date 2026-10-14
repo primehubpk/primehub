@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Camera,
+  Download,
   Gift,
   Menu,
   ReceiptText,
@@ -89,6 +90,10 @@ export default function HomeHeader({ categories = [] }: { categories?: Category[
             <Link href="/orders" prefetch={false}>
               <ReceiptText />
               <span>My Orders</span>
+            </Link>
+            <Link href="/download-images" prefetch={false} aria-label="Download all product images">
+              <Download />
+              <span>Images</span>
             </Link>
             <Link href="/shop" prefetch={false}>
               <ShoppingBag />
@@ -177,6 +182,7 @@ export default function HomeHeader({ categories = [] }: { categories?: Category[
             ["New Arrivals", "/new-arrivals"],
             ["Sale Mela", "/primehubmall/salemela"],
             ["Reseller Club", "/reseller"],
+            ["Download Product Images", "/download-images"],
             ["Prime Skills", "/skills"],
             ["Shop", "/shop"],
           ].map(([label, href]) => (
