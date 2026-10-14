@@ -174,6 +174,43 @@ export async function POST(request: Request) {
     const quote = { items, rawSubtotal, tierDiscount, tierDiscountPercent, resellerTier: reseller?.tierName || '', subtotal, totalItems, ...delivery, total, selfCollect, fulfillment: selfCollect ? 'self_collect' : 'delivery', freeDeliveryReward, rewardLabel: freeDeliveryReward ? 'Spin & Win Reward — Free Delivery' : '', walletShoppingBalance, walletShoppingApplied, amountDue };
     if (quoteOnly) return NextResponse.json(quote);
 
+    // A WhatsApp handoff is NOT a placed order. Record complete, server-verified
+    // customer/items/prices in a separate review queue before opening WhatsApp.
+    // Only the admin can promote it to a real order after checking the message.
+    if (body?.mode === 'whatsapp_intent') {
+      const customer = body?.customer as Customer | undefined;
+      if (!customer?.name?.trim() || !customer?.phone?.trim()) {
+        return NextResponse.json({ error: 'Customer name and phone are required for WhatsApp.' }, { status: 400 });
+      }
+      const proposedId = String(body?.orderRequestId || '');
+      const intentId = /^[0-9a-f]{8}-[0-9a-f-]{27,36}$/i.test(proposedId) ? proposedId : crypto.randomUUID();
+      const ref = getAdminDb().collection('whatsapp_order_intents').doc(intentId);
+      const row = {
+        id: intentId, source: 'whatsapp', whatsappState: 'awaiting_message',
+        status: 'awaiting_confirmation', isRealOrder: false,
+        customer: {
+          name: customer.name.trim().slice(0, 120),
+          phone: customer.phone.trim().slice(0, 40),
+          email: String(customer.email || '').trim().slice(0, 140),
+          city: String(customer.city || '').trim().slice(0, 120),
+          address: selfCollect ? 'PrimeHub Shop Pickup' : String(customer.address || '').trim().slice(0, 500),
+          notes: String(customer.notes || '').trim().slice(0, 1000),
+        },
+        ...quote, walletShoppingBalance: 0, walletShoppingApplied: 0, amountDue: total,
+        ...(reseller?.userId ? { resellerUserId: reseller.userId } : {}),
+        guestId: cleanGuestId(body?.guestId), createdAt: new Date().toISOString(),
+      };
+      try {
+        await ref.create(row);
+      } catch (error) {
+        const existing = await ref.get();
+        if (!existing.exists || existing.data()?.customer?.phone !== row.customer.phone ||
+            existing.data()?.status !== 'awaiting_confirmation') throw error;
+      }
+      return NextResponse.json({ ...quote, requestId: intentId, whatsappState: 'awaiting_message',
+        notice: 'WhatsApp order request saved for admin review, not confirmed until the customer sends the message.' });
+    }
+
     const customer = body?.customer as Customer | undefined;
     if (!customer?.name?.trim() || !customer?.phone?.trim() || (!selfCollect && (!customer?.address?.trim() || !customer?.city?.trim()))) return NextResponse.json({ error: selfCollect ? 'Name and phone are required.' : 'Name, phone, address and city are required.' }, { status: 400 });
 
