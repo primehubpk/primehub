@@ -145,7 +145,7 @@ export default function PrimeFamilyDashboard({
   useEffect(() => {
     // No API call or native SDK initialization on home/shop. Only shows the button
     // in a genuine v12+ Play Store WebView that supports its native attestation.
-    setPlayBonusCapable(Boolean(window.PrimeHubNative) && /PrimeHubApp\\/(?:12|1[3-9]|[2-9]\\d)\\./.test(navigator.userAgent));
+    setPlayBonusCapable(Boolean(window.PrimeHubNative) && /PrimeHubApp\/(?:12|1[3-9]|[2-9]\d)\./.test(navigator.userAgent));
     const handleBonus = (event: Event) => {
       const detail = (event as CustomEvent<{ success?: boolean; message?: string }>).detail;
       setPlayBonusBusy(false);
