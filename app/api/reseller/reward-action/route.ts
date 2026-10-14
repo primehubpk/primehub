@@ -7,7 +7,7 @@ export const runtime = 'nodejs';
 
 const SUPABASE_REWARD_TIMEOUT_MS = 3500;
 
-type HistoryEntry = { id: string; action: 'spin' | 'checkin'; name: string; type: string; status: 'claimed' | 'completed'; createdAt: string; source: 'account' };
+type HistoryEntry = { id: string; action: 'spin' | 'checkin'; name: string; type: string; status: 'claimed' | 'completed'; createdAt: string; source: 'account'; pointsAwarded?: number };
 type VoucherReward = { id: string; code: string; amount: number; name: string; createdAt: string };
 type ProductReward = { id: string; productId: string; name: string; imageUrl?: string; status: 'pending'; createdAt: string };
 type Wallet = { points?: number; streak?: number; lastCheckIn?: string; lastSpin?: string; coupons?: string[]; vouchers?: VoucherReward[]; freeProducts?: ProductReward[]; freeDeliveryCredits?: number; history?: HistoryEntry[] };
@@ -33,7 +33,7 @@ function applySpin(current: Wallet, prize: Prize, today: string): Wallet {
   const rewardId = crypto.randomUUID();
   const voucherReward: VoucherReward | null = prize.type === 'coupon' ? { id: rewardId, code: voucher, amount: Math.max(0, Number(prize.voucherAmount || 0)), name: prize.name, createdAt: now } : null;
   const productReward: ProductReward | null = prize.type === 'product' ? { id: rewardId, productId: String(prize.productId || ''), name: prize.name, imageUrl: prize.imageUrl, status: 'pending', createdAt: now } : null;
-  const history: HistoryEntry = { id: rewardId, action: 'spin', name: prize.name, type: prize.type, status: 'claimed', createdAt: now, source: 'account' };
+  const history: HistoryEntry = { id: rewardId, action: 'spin', name: prize.name, type: prize.type, status: 'claimed', createdAt: now, source: 'account', pointsAwarded: points };
   return { ...current, points: Number(current.points || 0) + points, lastSpin: today, coupons: voucher ? [...(current.coupons || []), voucher] : (current.coupons || []), vouchers: voucherReward ? [...(current.vouchers || []), voucherReward] : (current.vouchers || []), freeProducts: productReward ? [...(current.freeProducts || []), productReward] : (current.freeProducts || []), freeDeliveryCredits: Number(current.freeDeliveryCredits || 0) + (prize.type === 'free-delivery' ? 1 : 0), history: appendHistory(current, history) };
 }
 function applyCheckin(current: Wallet, settings: any, today: string): Wallet {
@@ -42,7 +42,7 @@ function applyCheckin(current: Wallet, settings: any, today: string): Wallet {
   const streak = current.lastCheckIn === yesterday ? Math.min(7, Math.max(1, Number(current.streak || 0)) + 1) : 1;
   const rewards = Array.isArray(settings.checkInRewards) ? settings.checkInRewards : [10, 15, 20, 25, 30, 50, 100];
   const points = Math.max(0, Number(rewards[streak - 1] ?? 10));
-  const history: HistoryEntry = { id: crypto.randomUUID(), action: 'checkin', name: `Day ${streak} check-in`, type: 'points', status: 'completed', createdAt: new Date().toISOString(), source: 'account' };
+  const history: HistoryEntry = { id: crypto.randomUUID(), action: 'checkin', name: `Day ${streak} check-in`, type: 'points', status: 'completed', createdAt: new Date().toISOString(), source: 'account', pointsAwarded: points };
   return { ...current, points: Number(current.points || 0) + points, streak, lastCheckIn: today, history: appendHistory(current, history) };
 }
 
