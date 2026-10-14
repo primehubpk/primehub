@@ -74,13 +74,16 @@ jobs:
           fi
           echo "ANDROID_HOME=$SDK_ROOT" >> "$GITHUB_ENV"
 
-      - name: Verify AndroidX Fragment 1.9.1 resolves (no outdated 1.1.0)
+      - name: Verify AndroidX Fragment 1.9.1 and Activity 1.13.0 resolve
         if: steps.keys.outputs.ready == 'true'
         working-directory: play-store/android-twa
         run: |
+          set -euo pipefail
           bash ./gradlew :app:dependencyInsight --dependency androidx.fragment:fragment --configuration releaseRuntimeClasspath --no-daemon > "$RUNNER_TEMP/fragment-resolved.txt"
           grep -q 'androidx.fragment:fragment:1.9.1' "$RUNNER_TEMP/fragment-resolved.txt"
-          echo "Fragment 1.9.1 confirmed."
+          bash ./gradlew :app:dependencyInsight --dependency androidx.activity:activity --configuration releaseRuntimeClasspath --no-daemon > "$RUNNER_TEMP/activity-resolved.txt"
+          grep -q 'androidx.activity:activity:1.13.0' "$RUNNER_TEMP/activity-resolved.txt"
+          echo "Fragment 1.9.1 and Activity 1.13.0 verified; neither old 1.1.0 remains as the selected dependency."
 
       - name: Build signed v12 AAB and Android test APK
         if: steps.keys.outputs.ready == 'true'
@@ -127,7 +130,7 @@ jobs:
           APK: optional direct phone testing; Play-installed apps may reject sideload updates.
           This archive contains NO keystore, key password, or other signing secrets.
           Features: automatic Rs.100 Play-installed welcome bonus (server rollout gated), notifications
-          with real images and rotating hooks, safe exit confirmation, AndroidX Fragment upgrade.
+          with real images and rotating hooks, safe exit confirmation, AndroidX Fragment 1.9.1 and Activity 1.13.0.
           NO Play Integrity setup is needed. Awarding is one per existing email/password account and app-scoped Android ID (client metadata can be spoofed). Activate cash only after updated website backend is deployed and this signed v12 app is live.
           No Play Console upload was performed by this workflow.
           EOF
