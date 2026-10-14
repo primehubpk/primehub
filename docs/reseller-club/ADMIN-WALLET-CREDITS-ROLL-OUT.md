@@ -56,3 +56,13 @@ Do not interpret passing static CI as proof that real transaction flows were tes
 - Before rollout, verify fresh admin login with newly configured **ADMIN_PASSWORD**, an inactive blocked reseller cannot log in, unblocked member can sign in, no funds or points are lost, Delete of a financial account is rejected, and the intended test account is the only identity affected.
 - Test Salar: number A OFF means only B visible; both OFF means no contact tiles; edit number B and verify WhatsApp URL matches new E.164 number. Icon and Salar instructions must remain unchanged.
 - GitHub Actions TypeScript/build checks verify compilation but cannot prove production Firebase Auth/Firestore transaction paths or mobile UI. Do not claim live financial integration tested unless explicitly run in an isolated emulator/test project.
+
+## Automatic full-wallet shopping at checkout (14 Oct 2026)
+
+- Withdrawal cash and shopping-only cash are **two separate ledgers**, but the shopper sees one **Total Cash for Shopping = walletShopping + walletAvailable**. Points and pending withdrawals are excluded.
+- A signed-in customer's wallet balance is checked **once when checkout opens**, and automatically applied to the price (no checkbox or manual action). Normal price/delivery quote changes do not re-query the wallet.
+- Firestore's idempotent order transaction deducts **restricted shopping-only cash first**, then the remaining amount from withdrawable cash. Each source is recorded separately for a full or partial cancellation refund; no source is double-counted.
+- Example: Rs.300 shopping-only + Rs.100 withdrawable = Rs.400 total cash. Order of Rs.700 uses **all Rs.400**, and only Rs.300 remains payable on delivery. Order of Rs.250 uses Rs.250 restricted shopping cash and preserves Rs.150 overall cash.
+- If checking a signed-in account's wallet fails, checkout shows a clear error and **does not silently charge the full amount**. Guests with no account can proceed using normal COD.
+- Checkout summary, confirmation and Admin Orders use the combined amount, and Whatsapp ordering remains separate: Whatsapp orders do not debit the wallet.
+- **The existing Play Store listing is retained.** An optional Rs.100 *verified Play installation bonus* needs the next Android version (same application ID, new versionCode), not a new app/listing. The bonus remains **OFF** until Play Integrity, license, and device tests pass; wallet UI and checkout website changes do not require a new Android binary when the existing app is a live WebView.
