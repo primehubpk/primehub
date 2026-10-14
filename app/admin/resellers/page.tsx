@@ -76,6 +76,7 @@ export default function AdminResellersPage() {
   const [busy, setBusy] = useState('');
   const [search, setSearch] = useState('');
   const [selectedMember, setSelectedMember] = useState<any | null>(null);
+  const [showDeleted, setShowDeleted] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -114,12 +115,35 @@ export default function AdminResellersPage() {
     }
   }
 
+  async function changeMember(profile: any, action: 'block' | 'unblock' | 'delete') {
+    const uid = String(profile.userId || profile.id || '');
+    if (!uid || busy) return;
+    const label = String(profile.email || uid);
+    if (action === 'delete') {
+      const typed = window.prompt(`Delete ${label}? Financial history will be preserved. Accounts with nonzero points/funds cannot be deleted. Type DELETE ${uid.slice(-6)}:`);
+      if (typed !== `DELETE ${uid.slice(-6)}`) return;
+    } else if (!window.confirm(`${action.toUpperCase()} ${label} (UID ${uid})?`)) return;
+    const reason = window.prompt('Reason for this action (audit log):');
+    if (!reason?.trim()) return;
+    setBusy(`${uid}:${action}`); setError('');
+    try {
+      const response = await fetch('/api/admin/reseller-members', {
+        method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, userId: uid, reason: reason.trim() }),
+      });
+      const result = await response.json().catch(() => null);
+      if (!response.ok || !result?.ok) throw new Error(result?.error || 'Account update failed.');
+      setSelectedMember(null);
+      await load();
+    } catch (err) { setError(err instanceof Error ? err.message : 'Account update failed.'); }
+    finally { setBusy(''); }
+  }
   const profiles = Array.isArray(data.profiles) ? data.profiles : [];
   const filteredProfiles = useMemo(() => {
     const term = search.trim().toLowerCase();
-    if (!term) return profiles;
-    return profiles.filter((profile: any) => [profile.displayName, profile.email, profile.id, profile.tierId, profile.status].filter(Boolean).join(' ').toLowerCase().includes(term));
-  }, [profiles, search]);
+    return profiles.filter((profile: any) => (showDeleted || profile.status !== 'deleted') &&
+      (!term || [profile.displayName, profile.email, profile.id, profile.tierId, profile.status].filter(Boolean).join(' ').toLowerCase().includes(term)));
+  }, [profiles, search, showDeleted]);
 
   const stats = data.stats || {};
   const totalPoints = Number(stats.totalPoints || profiles.reduce((sum: number, profile: any) => sum + Number(profile.pointsBalance || 0), 0));
@@ -130,6 +154,20 @@ export default function AdminResellersPage() {
     const userId = String(selectedMember.id || selectedMember.userId || '');
     const rows: ActivityItem[] = [];
 
+    for (const [index, reward] of (Array.isArray(selectedMember.rewardHistory) ? selectedMember.rewardHistory : []).entries()) {
+      const action = String(reward.action || '');
+      const legacyAmount = reward.pointsAwarded === undefined && reward.points === undefined;
+      const awarded = Number(reward.pointsAwarded ?? reward.points);
+      const badge = !legacyAmount && Number.isFinite(awarded) ? (awarded > 0 ? `+${awarded} pts` : '0 pts')
+        : reward.type === 'try-again' ? 'No points' : 'Amount not recorded';
+      rows.push({
+        id: `account-reward-${reward.id || index}`, time: dateValue(reward.createdAt),
+        date: reward.createdAt, title: action === 'checkin' ? (reward.name || 'Daily check-in') :
+          action === 'spin' ? `Spin wheel · ${reward.name || 'Prize'}` : (reward.name || 'Reward history'),
+        detail: `${reward.status || 'recorded'} · ${action || reward.type || 'reward'}${legacyAmount && reward.type !== 'try-again' ? ' · Legacy record has no point amount' : ''}`,
+        badge, tone: 'bg-[#FFF3DC] text-[#8A5800]',
+      });
+    }
     for (const item of Array.isArray(data.pointHistory) ? data.pointHistory : []) {
       if (userIdOf(item) !== userId) continue;
       rows.push({
@@ -265,7 +303,8 @@ export default function AdminResellersPage() {
             <span className="rounded-full bg-[#DDF5F0] px-3 py-1.5 text-[9px] font-black text-[#0F6A5F]">{filteredProfiles.length} shown</span>
           </div>
 
-          <label className="mt-4 flex items-center gap-2 rounded-2xl bg-[#F4F4F1] px-3 py-3">
+          <label className="mt-3 flex items-center gap-2 text-[10px] font-bold text-black/55"><input type="checkbox" checked={showDeleted} onChange={event => setShowDeleted(event.target.checked)} /> Show deleted accounts for audit</label>
+           <label className="mt-4 flex items-center gap-2 rounded-2xl bg-[#F4F4F1] px-3 py-3">
             <Search size={15} className="text-black/35" />
             <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search reseller, email or tier" className="min-w-0 flex-1 bg-transparent text-xs outline-none" />
           </label>
@@ -285,7 +324,11 @@ export default function AdminResellersPage() {
                     {profile.email ? <p className="mt-1 break-all text-[9px] text-black/50">{profile.email}</p> : null}
                      <p className="mt-1 break-all text-[8px] text-black/30">UID: {profile.id}</p>
                   </div>
-                  <button type="button" onClick={() => setSelectedMember(profile)} className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-[#14140F] px-3 py-2.5 text-[9px] font-black text-white"><History size={13}/> History</button>
+                  <div className="flex shrink-0 flex-col gap-1.5">
+                    <button type="button" onClick={() => setSelectedMember(profile)} className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#14140F] px-3 py-2.5 text-[9px] font-black text-white"><History size={13}/> History</button>
+                    {profile.status !== 'deleted' && <button disabled={Boolean(busy)} type="button" onClick={() => void changeMember(profile, profile.status === 'suspended' ? 'unblock' : 'block')} className="rounded-xl border border-amber-200 px-3 py-2 text-[9px] font-black text-amber-700 disabled:opacity-50">{profile.status === 'suspended' ? 'Unblock' : 'Block'}</button>}
+                    {profile.status !== 'deleted' && <button disabled={Boolean(busy)} type="button" onClick={() => void changeMember(profile, 'delete')} className="rounded-xl bg-red-50 px-3 py-2 text-[9px] font-black text-red-700 disabled:opacity-50">Delete</button>}
+                   </div>
                 </div>
 
                 <div className="mt-4 grid grid-cols-3 gap-2">
@@ -348,7 +391,9 @@ export default function AdminResellersPage() {
             </div>
 
             <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-              <MiniStat label="Points" value={Number(selectedMember.pointsBalance || 0).toLocaleString()} strong />
+              <MiniStat label="Total Points" value={Number(selectedMember.pointsBalance || 0).toLocaleString()} strong />
+               <MiniStat label="Daily / Wheel Points" value={Number(selectedMember.loyaltyPoints || 0).toLocaleString()} strong />
+               <MiniStat label="Verified Task Points" value={Number(selectedMember.taskPoints || 0).toLocaleString()} strong />
               <MiniStat label="Month Orders" value={Number(selectedMember.monthlyOrders || 0).toLocaleString()} strong />
               <MiniStat label="Withdrawable" value={money(selectedMember.walletAvailable)} strong />
                <MiniStat label="Shopping" value={money(selectedMember.walletShopping)} strong />
@@ -365,7 +410,8 @@ export default function AdminResellersPage() {
             <div className="mt-5 flex items-center justify-between gap-3"><div><p className="text-[9px] font-black uppercase tracking-[.16em] text-[#E1352B]">Timeline</p><h3 className="mt-1 text-sm font-black">All recorded activity</h3></div><span className="rounded-full bg-[#F4F4F1] px-2.5 py-1 text-[8px] font-black text-black/40">{selectedActivity.length} events</span></div>
 
             <div className="mt-3 space-y-2">
-              {selectedActivity.length === 0 ? <Empty text="No reward, point, task, withdrawal or reseller order activity has been recorded for this member yet." /> : selectedActivity.map((item) => (
+              {Array.isArray(selectedMember.rewardHistory) && selectedMember.rewardHistory.some((entry: any) => entry.pointsAwarded === undefined && entry.points === undefined && entry.action === 'checkin') && <div className="rounded-2xl bg-amber-50 p-3 text-[10px] leading-5 text-amber-800">Older daily check-in records do not include exact awarded amounts. The current points balance is shown above but legacy awards cannot be reconstructed safely. New check-ins and spins record exact points.</div>}
+               {selectedActivity.length === 0 ? <Empty text="No reward, point, task, withdrawal or reseller order activity has been recorded for this member yet." /> : selectedActivity.map((item) => (
                 <div key={item.id} className="rounded-2xl border border-black/6 p-3">
                   <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="text-[10px] font-black">{item.title}</p><p className="mt-1 text-[9px] text-black/45">{item.detail}</p><p className="mt-1 text-[8px] font-semibold text-black/30">{prettyDate(item.date)}</p></div><span className={`shrink-0 rounded-full px-2.5 py-1 text-[8px] font-black ${item.tone}`}>{item.badge}</span></div>
                 </div>
