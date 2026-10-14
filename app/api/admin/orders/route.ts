@@ -34,6 +34,12 @@ function supabaseConfig() {
   };
 }
 
+async function listWhatsAppDrafts() {
+  const snap = await getAdminDb().collection('whatsapp_order_intents')
+    .where('status', '==', 'awaiting_confirmation').limit(100).get();
+  return snap.docs.map(doc => ({ id: doc.id, ...doc.data(), whatsappDraft: true }));
+}
+
 async function listSupabaseOrders() {
   const { url, key } = supabaseConfig();
   if (!url || !key) return [] as Array<Record<string, any>>;
@@ -171,7 +177,11 @@ export async function GET(request: Request) {
   if (!isAuthorized(request)) {
     return NextResponse.json({ error: 'Authentication required.' }, { status: 401 });
   }
-
+  // Drafts are read only when admin opens Orders; no homepage polling.
+  const whatsappDrafts = await listWhatsAppDrafts().catch(error => {
+    console.warn('WhatsApp drafts temporarily unavailable:', error);
+    return [];
+  });
   if (isSupabaseWriteConfigured()) {
     try {
       const [orders, whatsappNumber] = await Promise.all([
@@ -182,6 +192,7 @@ export async function GET(request: Request) {
       return NextResponse.json({
         success: true,
         orders: [...walletBackup, ...orders],
+        whatsappDrafts,
         whatsappNumber,
         primary: 'supabase',
         warning: null,
@@ -194,6 +205,8 @@ export async function GET(request: Request) {
         return NextResponse.json({
           success: true,
           orders: legacy.orders,
+      whatsappDrafts,
+          whatsappDrafts,
           whatsappNumber,
           primary: 'firebase-fallback',
           warning: `Supabase orders could not be loaded. Showing Firebase fallback. ${supabaseWarning}`,
@@ -252,6 +265,41 @@ export async function POST(request: Request) {
         whatsappNumber: number,
         mirrorWarning,
       });
+    }
+
+    if (action === 'confirm-whatsapp' || action === 'dismiss-whatsapp') {
+      const id = String(body?.intentId || '');
+      if (!/^[0-9a-f-]{36}$/i.test(id)) return NextResponse.json({ error: 'Invalid WhatsApp reference.' }, { status: 400 });
+      const db = getAdminDb();
+      const ref = db.collection('whatsapp_order_intents').doc(id);
+      const snap = await ref.get();
+      if (!snap.exists) return NextResponse.json({ error: 'WhatsApp request not found.' }, { status: 404 });
+      const intent = snap.data() || {};
+      if (intent.status !== 'awaiting_confirmation') return NextResponse.json({ error: 'WhatsApp request already reviewed.' }, { status: 409 });
+      if (action === 'dismiss-whatsapp') {
+        await ref.update({ status: 'dismissed', reviewedAt: new Date().toISOString() });
+        return NextResponse.json({ success: true, status: 'dismissed' });
+      }
+      // This admin action requires checking the real incoming WhatsApp message.
+      // Opening a wa.me link alone never counts an order or a reseller reward.
+      const order = {
+        ...intent, id, status: 'pending', isRealOrder: true,
+        whatsappState: 'admin_confirmed', source: 'whatsapp',
+        paymentMethod: 'cod', amountDue: Number(intent.total || 0),
+        walletShoppingApplied: 0, confirmedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      delete (order as any).whatsappDraft;
+      if (isSupabaseWriteConfigured()) {
+        await supabasePrimaryUpsert({ table: 'orders',
+          row: { ...mapOrderToSupabase(id, order), authoritative_source: 'supabase', mirror_status: 'synced', mirror_error: null } });
+        try { await db.collection('orders').doc(id).set(order, { merge: true }); }
+        catch (error) { console.warn('WhatsApp confirmed order Firebase mirror delayed:', error); }
+      } else {
+        await db.collection('orders').doc(id).set(order, { merge: true });
+      }
+      await ref.update({ status: 'confirmed', confirmedAt: order.confirmedAt, confirmedOrderId: id });
+      return NextResponse.json({ success: true, orderId: id, status: 'confirmed' });
     }
 
     if (action === 'sync-legacy') {
