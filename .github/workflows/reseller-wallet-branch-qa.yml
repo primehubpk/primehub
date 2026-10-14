@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - feature/reseller-wallet-admin-dupes-oct14
+      - fix/admin-password-settings-oct14
   workflow_dispatch:
 
 permissions:
@@ -25,6 +26,8 @@ jobs:
         run: npm ci
       - name: Check TypeScript
         run: npx tsc --noEmit
+      - name: Test secure Admin Panel password reset and old-password fallback
+        run: node --test tests/admin-password-settings.test.mjs
       - name: Test direct category downloads and image security
         run: node --test tests/reseller-image-gallery.test.mjs
       - name: Test cash splitting, app attestation and wheel anti-abuse
