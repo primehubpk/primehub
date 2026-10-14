@@ -20,7 +20,8 @@ function saveFile(blob: Blob, filename: string) {
   document.body.append(link);
   link.click();
   link.remove();
-  window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  // Release each Blob quickly; retaining hundreds of file URLs slows Android Chrome.
+  window.setTimeout(() => URL.revokeObjectURL(url), 3_000);
 }
 
 export default function DownloadImagesPage() {
@@ -191,6 +192,9 @@ export default function DownloadImagesPage() {
           // Chrome may block file saving despite a successful synthetic click.
           // This counts files offered to Chrome, not confirmed disk writes.
           started++;
+          // Give Android Chrome time to enqueue each separate download without
+          // flooding its download manager or retaining hundreds of Blobs.
+          await new Promise(resolve => setTimeout(resolve, 140));
         } catch (err) {
           if (controller.signal.aborted) break;
           failed++;
