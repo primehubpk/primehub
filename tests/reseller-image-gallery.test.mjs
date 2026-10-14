@@ -80,8 +80,9 @@ test('Download All category manifest is not capped at 40 or only the first visib
 test('No ZIP endpoints, archive buttons or pack limits remain in user-facing image download feature', () => {
   const page = fs.readFileSync('app/download-images/page.tsx', 'utf8');
   const endpoint = fs.readFileSync('app/api/reseller/image-download/route.ts', 'utf8');
-  assert.ok(page.includes('async function downloadAll()'));
+  assert.ok(page.includes('async function downloadAll(categorySlug = selected)'));
   assert.ok(page.includes('for (const photo of allPhotos)'));
+  assert.ok(page.includes('void downloadAll(category.slug)'));
   assert.ok(page.includes("mode: 'image'"));
   assert.ok(!page.includes('downloadPack('));
   assert.ok(!endpoint.includes("mode === 'pack'"));
