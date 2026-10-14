@@ -13,9 +13,10 @@ export function walletOrderFingerprint(data: Record<string, any>) {
 }
 
 export async function shoppingWalletBalance(userId: string) {
-  const snap = await getAdminDb().collection('reseller_profiles').doc(userId).get();
+  const db = getAdminDb();
+  const [snap, wallet] = await Promise.all([db.collection('reseller_profiles').doc(userId).get(), db.collection('reseller_shopping_wallets').doc(userId).get()]);
   if (!snap.exists || snap.data()?.status !== 'active') return 0;
-  const amount = Number(snap.data()?.walletShopping || 0);
+  const amount = Number(wallet.data()?.balance || 0);
   return Number.isSafeInteger(amount) && amount >= 0 ? amount : 0;
 }
 
@@ -31,9 +32,10 @@ export async function createShoppingWalletOrder(userId: string, orderId: string,
   const profileRef = db.collection('reseller_profiles').doc(userId);
   const orderRef = db.collection('orders').doc(orderId);
   const spendRef = db.collection('reseller_wallet_spends').doc(orderId);
+  const walletRef = db.collection('reseller_shopping_wallets').doc(userId);
   const fingerprint = walletOrderFingerprint(orderData);
   const result = await db.runTransaction(async tx => {
-    const [profile, order, priorSpend] = await Promise.all([tx.get(profileRef), tx.get(orderRef), tx.get(spendRef)]);
+    const [profile, order, priorSpend, wallet] = await Promise.all([tx.get(profileRef), tx.get(orderRef), tx.get(spendRef), tx.get(walletRef)]);
     if (order.exists || priorSpend.exists) {
       const old = order.data() || {};
       if (!order.exists || !priorSpend.exists || old.resellerUserId !== userId || old.walletFingerprint !== fingerprint) {
@@ -42,7 +44,7 @@ export async function createShoppingWalletOrder(userId: string, orderId: string,
       return { created: false, amount: Number(old.walletShoppingApplied || 0), amountDue: Number(old.amountDue || 0), order: old };
     }
     if (!profile.exists || profile.data()?.status !== 'active') throw new Error('Active reseller profile required to use wallet credit.');
-    const available = Number(profile.data()?.walletShopping || 0);
+    const available = Number(wallet.data()?.balance || 0);
     if (!Number.isSafeInteger(available) || available <= 0) throw new Error('Shopping wallet credit is unavailable.');
     const amount = Math.min(available, orderData.total);
     const amountDue = orderData.total - amount;
@@ -52,6 +54,7 @@ export async function createShoppingWalletOrder(userId: string, orderId: string,
       paymentMethod: amountDue === 0 ? 'shopping_wallet' : 'shopping_wallet_plus_cod',
       walletPaymentStatus: 'applied',
     };
+    tx.update(walletRef, { balance: available - amount, updatedAt: FieldValue.serverTimestamp() });
     tx.update(profileRef, { walletShopping: available - amount, updatedAt: FieldValue.serverTimestamp() });
     tx.create(orderRef, savedOrder);
     tx.create(spendRef, { id: orderId, userId, orderId, amount, type: 'shopping_order', status: 'applied', createdAt: FieldValue.serverTimestamp() });
@@ -85,11 +88,13 @@ export async function refundShoppingWalletOrder(orderId: string) {
     const amount = Number(spend.data()?.amount || 0);
     if (!userId || !Number.isSafeInteger(amount) || amount <= 0) throw new Error('Invalid wallet spend.');
     const profileRef = db.collection('reseller_profiles').doc(userId);
-    const profile = await tx.get(profileRef);
-    if (!profile.exists) throw new Error('Reseller wallet owner not found.');
-    const available = Number(profile.data()?.walletShopping || 0);
+    const walletRef = db.collection('reseller_shopping_wallets').doc(userId);
+    const [profile, wallet] = await Promise.all([tx.get(profileRef), tx.get(walletRef)]);
+    if (!profile.exists || !wallet.exists) throw new Error('Reseller wallet owner not found.');
+    const available = Number(wallet.data()?.balance || 0);
     if (!Number.isSafeInteger(available) || !Number.isSafeInteger(available + amount)) throw new Error('Invalid wallet refund balance.');
     const updated = { ...oldOrder, status: 'cancelled', walletPaymentStatus: 'refunded', updatedAt: new Date().toISOString() };
+    tx.update(walletRef, { balance: available + amount, updatedAt: FieldValue.serverTimestamp() });
     tx.update(profileRef, { walletShopping: available + amount, updatedAt: FieldValue.serverTimestamp() });
     tx.update(orderRef, { status: 'cancelled', walletPaymentStatus: 'refunded', updatedAt: FieldValue.serverTimestamp() });
     tx.update(spendRef, { status: 'refunded', refundedAt: FieldValue.serverTimestamp() });
