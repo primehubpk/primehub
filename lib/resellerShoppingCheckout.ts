@@ -64,3 +64,41 @@ export async function createShoppingWalletOrder(userId: string, orderId: string,
   }
   return result;
 }
+
+/** Refunds wallet-funded order at most once, and marks the order cancelled atomically.
+ * Never auto-refund a shipped or delivered order; those require manual investigation.
+ */
+export async function refundShoppingWalletOrder(orderId: string) {
+  const db = getAdminDb();
+  const spendRef = db.collection('reseller_wallet_spends').doc(orderId);
+  const orderRef = db.collection('orders').doc(orderId);
+  const refunded = await db.runTransaction(async tx => {
+    const [spend, order] = await Promise.all([tx.get(spendRef), tx.get(orderRef)]);
+    if (!spend.exists || !order.exists) throw new Error('Shopping wallet order not found.');
+    if (spend.data()?.status === 'refunded') return { applied: false, order: order.data() || {}, userId: String(spend.data()?.userId || '') };
+    if (spend.data()?.status !== 'applied') throw new Error('Unrecognized wallet spend state.');
+    const oldOrder = order.data() || {};
+    if (['delivered', 'shipped'].includes(String(oldOrder.status || ''))) {
+      throw new Error('Shipped/delivered wallet orders need manual refund review.');
+    }
+    const userId = String(spend.data()?.userId || '');
+    const amount = Number(spend.data()?.amount || 0);
+    if (!userId || !Number.isSafeInteger(amount) || amount <= 0) throw new Error('Invalid wallet spend.');
+    const profileRef = db.collection('reseller_profiles').doc(userId);
+    const profile = await tx.get(profileRef);
+    if (!profile.exists) throw new Error('Reseller wallet owner not found.');
+    const available = Number(profile.data()?.walletShopping || 0);
+    if (!Number.isSafeInteger(available) || !Number.isSafeInteger(available + amount)) throw new Error('Invalid wallet refund balance.');
+    const updated = { ...oldOrder, status: 'cancelled', walletPaymentStatus: 'refunded', updatedAt: new Date().toISOString() };
+    tx.update(profileRef, { walletShopping: available + amount, updatedAt: FieldValue.serverTimestamp() });
+    tx.update(orderRef, { status: 'cancelled', walletPaymentStatus: 'refunded', updatedAt: FieldValue.serverTimestamp() });
+    tx.update(spendRef, { status: 'refunded', refundedAt: FieldValue.serverTimestamp() });
+    tx.create(db.collection('reseller_wallet_refunds').doc(orderId), { id: orderId, userId, amount, orderId, type: 'order_cancellation', createdAt: FieldValue.serverTimestamp() });
+    return { applied: true, order: updated, userId };
+  });
+  if (refunded.applied) {
+    try { await mirrorResellerFirestoreDoc('reseller_profiles', refunded.userId); }
+    catch (error) { console.error('Refund mirror deferred:', error); }
+  }
+  return refunded;
+}
