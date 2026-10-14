@@ -65,6 +65,41 @@ export function useCheckout() {
   const checkoutTracked = useRef(false);
   const [checkoutAuthUid, setCheckoutAuthUid] = useState('');
   useEffect(() => onAuthStateChanged(auth, user => setCheckoutAuthUid(user?.uid || '')), []);
+
+  // Exactly one lightweight balance read when the signed-in account changes.
+  // Cart edits, delivery switches and normal quote recalculations never refetch it.
+  useEffect(() => {
+    if (!checkoutAuthUid) {
+      setWalletShoppingBalance(0);
+      setWalletShoppingApplied(0);
+      setUseShoppingCredit(false);
+      return;
+    }
+    const controller = new AbortController();
+    let active = true;
+    async function loadShoppingWallet() {
+      try {
+        const user = auth.currentUser;
+        if (!user || user.uid !== checkoutAuthUid) return;
+        const token = await user.getIdToken();
+        if (!active) return;
+        const response = await fetch('/api/reseller/shopping-wallet-balance', {
+          headers: { Authorization: `Bearer ${token}` },
+          credentials: 'same-origin',
+          cache: 'no-store',
+          signal: controller.signal,
+        });
+        if (!response.ok) return; // ordinary checkout must not fail if wallet is unavailable
+        const data = await response.json();
+        if (active) setWalletShoppingBalance(Math.max(0, Number(data.balance) || 0));
+      } catch {
+        // Wallet lookup is optional; do not delay regular orders or retry/poll.
+      }
+    }
+    void loadShoppingWallet();
+    return () => { active = false; controller.abort(); };
+  }, [checkoutAuthUid]);
+
   const totalItems = useMemo(() => items.reduce((sum: number, item: any) => sum + Number(item.quantity || item.qty || 1), 0), [items]);
   const subtotal = useMemo(() => items.reduce((sum: number, item: any) => sum + priceOf(item) * Number(item.quantity || item.qty || 1), 0), [items]);
   const discountedSubtotal = Math.max(0, subtotal - tierDiscount);
@@ -83,7 +118,7 @@ export function useCheckout() {
   useEffect(() => {
     if (!items.length) { setDeliveryCharge(BASE_DELIVERY_CHARGE); setWholesaleItems(0); setRewardLabel(''); return; }
     let cancelled = false;
-    getAuthoritativeQuote(items, selfCollect, useShoppingCredit).then(quote => { if (!cancelled) { setWalletShoppingBalance(Number(quote.walletShoppingBalance || 0)); setWalletShoppingApplied(Number(quote.walletShoppingApplied || 0)); setDeliveryCharge(Number(quote.deliveryCharge ?? BASE_DELIVERY_CHARGE)); setWholesaleItems(Number(quote.wholesaleItems || 0)); setTierDiscount(Number(quote.tierDiscount || 0)); setTierDiscountPercent(Number(quote.tierDiscountPercent || 0)); setResellerTier(String(quote.resellerTier || '')); setRewardLabel(String(quote.rewardLabel || '')); } }).catch(() => undefined);
+    getAuthoritativeQuote(items, selfCollect, useShoppingCredit).then(quote => { if (!cancelled) { if (useShoppingCredit) setWalletShoppingBalance(Number(quote.walletShoppingBalance || 0)); setWalletShoppingApplied(Number(quote.walletShoppingApplied || 0)); setDeliveryCharge(Number(quote.deliveryCharge ?? BASE_DELIVERY_CHARGE)); setWholesaleItems(Number(quote.wholesaleItems || 0)); setTierDiscount(Number(quote.tierDiscount || 0)); setTierDiscountPercent(Number(quote.tierDiscountPercent || 0)); setResellerTier(String(quote.resellerTier || '')); setRewardLabel(String(quote.rewardLabel || '')); } }).catch(() => undefined);
     return () => { cancelled = true; };
   }, [items, selfCollect, useShoppingCredit, checkoutAuthUid]);
   const update = (key: keyof Customer, value: string) => setCustomer(previous => ({ ...previous, [key]: value }));
