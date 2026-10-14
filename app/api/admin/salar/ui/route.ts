@@ -1,13 +1,11 @@
 import { NextResponse } from 'next/server';
+import { authorizedWalletAdmin } from '@/lib/walletAdminSession';
 import { getSalarUiSettings, saveSalarUiSettings } from '@/lib/salar/uiSettings';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-function authorized(request: Request) {
-  const cookie = request.headers.get('cookie') || '';
-  return cookie.split(';').some((part) => part.trim() === 'primehub_admin_auth=true');
-}
+function authorized(request: Request) { return authorizedWalletAdmin(request); }
 
 export async function GET(request: Request) {
   if (!authorized(request)) return NextResponse.json({ success: false, error: 'Authentication required.' }, { status: 401 });
@@ -24,10 +22,10 @@ export async function PUT(request: Request) {
   if (!authorized(request)) return NextResponse.json({ success: false, error: 'Authentication required.' }, { status: 401 });
   try {
     const body = await request.json().catch(() => ({}));
-    const ui = await saveSalarUiSettings({ iconUrl: body?.iconUrl });
+    const ui = await saveSalarUiSettings({ iconUrl: body?.iconUrl, whatsappContacts: body?.whatsappContacts });
     return NextResponse.json({ success: true, ui }, { headers: { 'Cache-Control': 'private, no-store, max-age=0' } });
   } catch (error) {
     console.error('Salar UI settings save failed', error);
-    return NextResponse.json({ success: false, error: 'Salar UI settings could not be saved.' }, { status: 500 });
+    return NextResponse.json({ success: false, error: error instanceof Error ? error.message : 'Salar UI settings could not be saved.' }, { status: 400 });
   }
 }
