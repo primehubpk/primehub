@@ -45,7 +45,12 @@ export default function AdminResellerCreditsPanel({ members, onCredited }: { mem
       operationId.current = '';
       setMessage(data.credited ? `Credited ${money(rupees)} to the ${purpose} wallet.` : 'Credit was already recorded; no duplicate charge.');
       setAmount(''); setReason('');
-      await Promise.all([onCredited(), refreshHistory()]);
+      try {
+        await Promise.all([onCredited(), refreshHistory()]);
+      } catch {
+        // Money was already credited. A read/refresh outage must not present it as a failed credit.
+        setError('Credit was saved successfully, but the member list/history could not refresh. Press Refresh; do not credit the same amount again.');
+      }
     } catch (e) { setError(e instanceof Error ? e.message : 'Credit failed; retry to check the same transaction.'); }
     finally { setBusy(false); }
   }
