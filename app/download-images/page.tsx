@@ -167,8 +167,8 @@ export default function DownloadImagesPage() {
 
   // Downloads separate original image files: no archive or extraction.
   // Chrome may require a one-time automatic-multiple-download permission.
-  async function downloadAll() {
-    const category = categories.find(item => item.slug === selected);
+  async function downloadAll(categorySlug = selected) {
+    const category = categories.find(item => item.slug === categorySlug);
     if (!category || downloading) return;
     const controller = new AbortController();
     abortRef.current = controller;
@@ -245,10 +245,10 @@ export default function DownloadImagesPage() {
       {error && <div role="alert" className="mb-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-xs text-red-700">{error}<Link href={RESELLER_LOGIN_URL} className="ml-2 font-black underline">Reseller sign in</Link></div>}
       {!loading && categories.length > 0 && <>
         <div className="rounded-[24px] bg-white p-4 shadow-sm">
-          <div className="flex items-center justify-between gap-3"><div><p className="text-[10px] font-black uppercase tracking-widest text-[#0F6A5F]">Choose Collection</p><h2 className="mt-1 text-xl font-black">All Categories</h2></div><span className="rounded-full bg-[#F1F5F2] px-3 py-2 text-xs font-bold text-[#0F6A5F]">{categories.length} categories</span></div>
+          <div className="flex items-center justify-between gap-3"><div><p className="text-[10px] font-black uppercase tracking-widest text-[#0F6A5F]">Choose Collection</p><h2 className="mt-1 text-xl font-black">Tap category to download all</h2></div><span className="rounded-full bg-[#F1F5F2] px-3 py-2 text-xs font-bold text-[#0F6A5F]">{categories.length} categories</span></div>
           <label className="mt-4 flex items-center gap-2 rounded-2xl border border-black/10 bg-[#F8F8F5] px-4 py-3"><Search size={17} className="text-black/45"/><input type="search" value={search} onChange={event => setSearch(event.target.value)} placeholder="Search category" className="w-full bg-transparent text-sm outline-none"/></label>
           <div className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
-            {matchingCategories.map(category => <button key={category.slug} type="button" onClick={() => { if (downloading) return; setSelected(category.slug); }} aria-pressed={selected === category.slug} className={`overflow-hidden rounded-2xl border p-1.5 text-left transition ${selected === category.slug ? 'border-[#0F6A5F] bg-[#E7F6F1] ring-2 ring-[#0F6A5F]/20' : 'border-black/10 bg-white'}`}>
+            {matchingCategories.map(category => <button key={category.slug} type="button" onClick={() => { if (downloading) return; setSelected(category.slug); void downloadAll(category.slug); }} aria-pressed={selected === category.slug} className={`overflow-hidden rounded-2xl border p-1.5 text-left transition ${selected === category.slug ? 'border-[#0F6A5F] bg-[#E7F6F1] ring-2 ring-[#0F6A5F]/20' : 'border-black/10 bg-white'}`}>
               <div className="relative aspect-square overflow-hidden rounded-xl bg-[#F4F4F1]"><img src={category.cover} loading="lazy" alt="" className="h-full w-full object-cover"/></div>
               <p className="mt-2 min-h-[28px] line-clamp-2 text-[10px] font-black leading-3.5">{category.title}</p><p className="mb-1 mt-1 text-[9px] font-semibold text-[#0F6A5F]">{category.count} photos</p>
             </button>)}
@@ -260,13 +260,13 @@ export default function DownloadImagesPage() {
           <div className="flex flex-wrap items-start justify-between gap-3 border-b border-black/10 pb-4">
             <div><p className="text-[10px] font-black uppercase tracking-widest text-[#0F6A5F]">Selected Collection</p><h2 className="mt-1 text-xl font-black">{current.title}</h2>
               <p className="mt-1 text-xs text-black/45">{current.count} original photos · no ZIP</p></div>
-            <button type="button" disabled={Boolean(downloading)} onClick={() => void downloadAll()} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-[#0F6A5F] px-4 py-3 text-xs font-black text-white disabled:opacity-60">
+            <button type="button" disabled={Boolean(downloading)} onClick={() => void downloadAll(selected)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-[#0F6A5F] px-4 py-3 text-xs font-black text-white disabled:opacity-60">
               {downloading === 'all' ? <Loader2 size={17} className="animate-spin"/> : <Download size={17}/>}
               {downloading === 'all' ? (downloadStage === 'listing' ? 'Checking photos…' : `Saving ${downloadProgress.processed}/${downloadProgress.total}…`) : 'Download All Images'}
             </button>
           </div>
           <div className="mt-4 rounded-2xl bg-[#F6F6F2] p-3 text-[11px] leading-5 text-black/60">
-            <b className="text-[#0F6A5F]">One tap downloads every photo separately.</b> Choose a category and tap Download All once. Chrome puts the original JPG/PNG/WebP photos in Downloads. The first time Chrome may ask <b>Allow multiple downloads?</b> — choose <b>Allow</b>. Websites cannot override this Chrome security permission.
+            <b className="text-[#0F6A5F]">Tap a category to download all its photos.</b> Tap any category once to start saving its photos automatically. Chrome puts the original JPG/PNG/WebP photos in Downloads. The first time Chrome may ask <b>Allow multiple downloads?</b> — choose <b>Allow</b>. Websites cannot override this Chrome security permission.
           </div>
           {downloadError && <div role="alert" className="mt-3 rounded-xl bg-red-50 p-3 text-xs text-red-700">{downloadError}</div>}
           {downloading && <div role="status" className="mt-3 flex items-center justify-between gap-2 rounded-xl bg-[#E7F6F1] p-3 text-[10px] font-bold text-[#0F6A5F]"><span>{downloading === 'all' ? (downloadStage === 'listing' ? 'Finding every photo…' : `Sent ${downloadProgress.started}/${downloadProgress.total} images to Chrome · ${downloadProgress.failed} failed. Keep this tab open.`) : 'Saving photo…'}</span><button type="button" onClick={() => abortRef.current?.abort()} className="inline-flex items-center gap-1 text-red-700"><X size={14}/> Cancel</button></div>}
