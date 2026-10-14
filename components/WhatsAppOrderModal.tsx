@@ -39,7 +39,9 @@ export default function WhatsAppOrderModal({ items, onClose, onSaved }: Props) {
       const lines = quote.items.map((item: any, index: number) => `${index + 1}. ${item.title} x ${item.quantity} — Rs. ${(Number(item.price) * Number(item.quantity)).toLocaleString()}\nColor/Size: ${[item.variant?.color, item.variant?.size].filter(Boolean).join(' / ') || 'Standard'}\nImage: ${item.image || '-'}`);
       const wholesaleLine = Number(quote.wholesaleItems || 0) ? `Wholesale surcharge (${quote.wholesaleItems} × Rs. 30): Rs. ${Number(quote.wholesaleSurcharge).toLocaleString()}` : '';
       const text = ['PrimeHub Deals WhatsApp Order', `Order ID: ${quote.requestId}`, '', ...lines, '', `Customer: ${name.trim()}`, `Phone: ${phone.trim()}`, `City: ${selfCollect ? 'Lahore' : city.trim()}`, `Address: ${selfCollect ? 'PrimeHub Shop Pickup' : address.trim()}`, notes ? `Notes: ${notes.trim()}` : '', '', `Subtotal: Rs. ${Number(quote.subtotal).toLocaleString()}`, `Base delivery: Rs. ${Number(quote.baseDelivery).toLocaleString()}`, wholesaleLine, `Grand Total: Rs. ${Number(quote.total).toLocaleString()}`].filter(Boolean).join('\n');
-      window.open(`https://wa.me/${whatsappNumber}?text=${encodeURIComponent(text + '\nPlease send this message to confirm your order.')}`, '_blank', 'noopener,noreferrer');
+      const url = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(text + '\nPlease send this message to confirm your order.')}`;
+      if (/Android|iPhone|iPad/i.test(navigator.userAgent)) window.location.assign(url);
+      else window.open(url, '_blank', 'noopener,noreferrer');
       onSaved?.(); onClose();
     } catch (caught) { setError(caught instanceof Error ? caught.message : 'Your order could not be saved. Please try again.'); }
     finally { setSaving(false); }
