@@ -18,6 +18,7 @@ export async function GET() {
         settings: {
           enabled: state.enabled,
           iconUrl: ui.iconUrl,
+          whatsappContacts: ui.whatsappContacts.filter((item) => item.enabled && item.number),
         },
       },
       {
