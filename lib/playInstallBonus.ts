@@ -1,152 +1,98 @@
 import 'server-only';
-import { createHash, createHmac, createSign, randomBytes } from 'node:crypto';
+import { createHmac } from 'node:crypto';
 import { FieldValue } from 'firebase-admin/firestore';
 import { getAdminDb } from '@/lib/firebaseAdmin';
 import { mirrorResellerFirestoreDoc } from '@/lib/resellerDualMirror';
 
 export const PLAY_INSTALL_BONUS_RUPEES = 100;
-const PACKAGE = 'com.primehubmall.app';
-const ENABLED = () => process.env.PLAY_INSTALL_BONUS_ENABLED === 'true';
-const salt = () => {
-  const value = process.env.PLAY_BONUS_DEVICE_HMAC_SECRET || '';
-  if (value.length < 32) throw new Error('Play bonus anti-fraud secret is not configured.');
-  return value;
-};
+const PLAY_INSTALLER = 'com.android.vending';
+
+/** Explicit rollout switch. No Google Play Integrity API or Google OAuth needed.
+ * This is a LOW-FRICTION promotion, NOT cryptographic install attestation.
+ * Native clients report their installer; this is spoofable by modified clients.
+ */
 export function bonusIsEnabled() {
-  return ENABLED() && (process.env.PLAY_BONUS_DEVICE_HMAC_SECRET || '').length >= 32
-    && Boolean(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
+  return process.env.PLAY_INSTALL_BONUS_ENABLED === 'true' &&
+    (process.env.PLAY_BONUS_DEVICE_HMAC_SECRET || '').length >= 32;
 }
 export function deviceDigest(androidId: string) {
-  if (!/^[0-9a-f]{16}$/i.test(androidId)) throw new Error('Invalid Android app-scoped ID.');
-  // Never persist IMEI, Android ID, advertising ID, or raw device identifiers.
-  return createHmac('sha256', salt()).update('primehub-play-bonus-v1:').update(androidId.toLowerCase()).digest('hex');
+  if (!/^[0-9a-f]{16}$/i.test(androidId)) throw new Error('Invalid app-scoped Android device identifier.');
+  const key = process.env.PLAY_BONUS_DEVICE_HMAC_SECRET || '';
+  if (key.length < 32) throw new Error('Bonus configuration unavailable.');
+  // Only an HMAC is stored. Never persist raw Android ID, IMEI, MAC, or advertising ID.
+  return createHmac('sha256', key).update('primehub-play-bonus-v1:').update(androidId.toLowerCase()).digest('hex');
 }
-function blocked() { throw new Error('Play Store bonus not enabled yet; no cash has been awarded.'); }
-function accountDocument(uid: string) { return getAdminDb().collection('reseller_profiles').doc(uid); }
 
-export async function bonusChallenge(uid: string, androidId: string) {
-  if (!bonusIsEnabled()) blocked();
+export type PlayBonusResult =
+  | { credited: true; amount: number; walletAvailable: number }
+  | { credited: false; alreadyClaimed: true; reason: 'account' | 'device' };
+
+/** Firebase transaction guarantees at most one bonus per UID and submitted
+ * device identifier, even on parallel login/retry. Real balance never changes
+ * for an already-claimed account/device. Uses existing email/password identity.
+ */
+export async function claimPlayInstallBonus(
+  uid: string, email: string, androidId: string, installer: string,
+): Promise<PlayBonusResult> {
+  if (!bonusIsEnabled()) throw new Error('Play Store bonus is not enabled yet.');
+  if (installer !== PLAY_INSTALLER) throw new Error('Install PrimeHub from Google Play to receive this bonus.');
+  if (!uid || !email || !email.includes('@')) throw new Error('Sign in with your PrimeHub email and password.');
+  const hash = deviceDigest(androidId);
   const db = getAdminDb();
-  const profile = await accountDocument(uid).get();
-  if (!profile.exists || profile.data()?.status !== 'active') throw new Error('Active reseller account required.');
-  const [claimedAccount, claimedDevice] = await Promise.all([
-    db.collection('reseller_play_install_claims').doc(uid).get(),
-    db.collection('reseller_play_install_devices').doc(deviceDigest(androidId)).get(),
-  ]);
-  if (claimedAccount.exists || claimedDevice.exists) throw new Error('This user or device already received the Play Store bonus.');
-  const nonce = randomBytes(32).toString('base64url');
-  const now = Date.now();
-  await db.collection('reseller_play_bonus_challenges').doc(uid).set({
-    uid, nonce, deviceHash: deviceDigest(androidId),
-    expiresAtMs: now + 180_000, issuedAtMs: now,
-  });
-  return { nonce, expiresIn: 180 };
-}
+  const profileRef = db.collection('reseller_profiles').doc(uid);
+  const accountRef = db.collection('reseller_play_install_claims').doc(uid);
+  const deviceRef = db.collection('reseller_play_install_devices').doc(hash);
+  const auditRef = db.collection('reseller_wallet_credits').doc('play-install:' + uid);
 
-type IntegrityVerdict = {
-  requestDetails?: { requestPackageName?: string; nonce?: string; timestampMillis?: string };
-  appIntegrity?: { appRecognitionVerdict?: string; packageName?: string };
-  accountDetails?: { appLicensingVerdict?: string };
-  deviceIntegrity?: { deviceRecognitionVerdict?: string[]; deviceRecall?: { values?: { bitFirst?: boolean } } };
-};
-export function validateBonusVerdict(payload: IntegrityVerdict, nonce: string, nowMs = Date.now()) {
-  const details = payload.requestDetails || {};
-  const verdictTime = Number(details.timestampMillis || 0);
-  if (details.requestPackageName !== PACKAGE || details.nonce !== nonce ||
-    !Number.isFinite(verdictTime) || Math.abs(nowMs - verdictTime) > 180_000) {
-    throw new Error('Play Integrity challenge or app package did not match.');
-  }
-  if (payload.appIntegrity?.appRecognitionVerdict !== 'PLAY_RECOGNIZED'
-    || payload.accountDetails?.appLicensingVerdict !== 'LICENSED'
-    || !payload.deviceIntegrity?.deviceRecognitionVerdict?.includes('MEETS_DEVICE_INTEGRITY')) {
-    throw new Error('Genuine Google Play installation and device verification required.');
-  }
-  // Where Play Console device recall beta is enabled, require unused device.
-  if (payload.deviceIntegrity?.deviceRecall?.values?.bitFirst === true) {
-    throw new Error('This device was already rewarded according to Google Play.');
-  }
-}
-
-let cachedAccess: { value: string; until: number } | null = null;
-async function googleAccessToken() {
-  if (cachedAccess && Date.now() < cachedAccess.until) return cachedAccess.value;
-  const key = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY || '{}');
-  if (!key.client_email || !key.private_key) throw new Error('Google service account unavailable.');
-  const now = Math.floor(Date.now() / 1000);
-  const encode = (v: object) => Buffer.from(JSON.stringify(v)).toString('base64url');
-  const header = encode({ alg: 'RS256', typ: 'JWT' });
-  const payload = encode({
-    iss: key.client_email, scope: 'https://www.googleapis.com/auth/playintegrity',
-    aud: 'https://oauth2.googleapis.com/token', iat: now, exp: now + 3600,
-  });
-  const signer = createSign('RSA-SHA256');
-  signer.update(`${header}.${payload}`);
-  const assertion = `${header}.${payload}.${signer.sign(key.private_key).toString('base64url')}`;
-  const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer', assertion }),
-    signal: AbortSignal.timeout(8000),
-    cache: 'no-store',
-  });
-  if (!tokenResponse.ok) throw new Error('Google Play Integrity access unavailable.');
-  const result = await tokenResponse.json();
-  if (!result.access_token) throw new Error('Missing Play Integrity access token.');
-  cachedAccess = { value: result.access_token, until: Date.now() + Math.min(3000, result.expires_in || 3000) * 1000 - 30000 };
-  return cachedAccess.value;
-}
-async function googleDecodeIntegrity(integrityToken: string): Promise<IntegrityVerdict> {
-  if (!integrityToken || integrityToken.length > 16000) throw new Error('Invalid integrity token.');
-  const access = await googleAccessToken();
-  const response = await fetch(`https://playintegrity.googleapis.com/v1/${PACKAGE}:decodeIntegrityToken`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${access}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ integrity_token: integrityToken }),
-    cache: 'no-store', signal: AbortSignal.timeout(10000),
-  });
-  if (!response.ok) throw new Error('Google Play could not verify this installation.');
-  const result = await response.json();
-  if (!result.tokenPayloadExternal) throw new Error('Google Play did not provide a verified verdict.');
-  return result.tokenPayloadExternal as IntegrityVerdict;
-}
-export async function claimPlayInstallBonus(uid: string, androidId: string, integrityToken: string) {
-  if (!bonusIsEnabled()) blocked();
-  const db = getAdminDb();
-  const deviceHash = deviceDigest(androidId);
-  const challengeRef = db.collection('reseller_play_bonus_challenges').doc(uid);
-  const challenge = await challengeRef.get();
-  const nowMs = Date.now();
-  if (!challenge.exists || challenge.data()?.deviceHash !== deviceHash ||
-    Number(challenge.data()?.expiresAtMs || 0) < nowMs) throw new Error('Play Store verification expired. Please retry.');
-  const nonce = String(challenge.data()?.nonce || '');
-  const verified = await googleDecodeIntegrity(integrityToken);
-  validateBonusVerdict(verified, nonce, nowMs);
-  const profileRef = accountDocument(uid);
-  const userRef = db.collection('reseller_play_install_claims').doc(uid);
-  const deviceRef = db.collection('reseller_play_install_devices').doc(deviceHash);
-  const entryRef = db.collection('reseller_wallet_credits').doc(`play-install:${uid}`);
   const outcome = await db.runTransaction(async tx => {
-    const [freshChallenge, userClaim, deviceClaim, profile] = await Promise.all([
-      tx.get(challengeRef), tx.get(userRef), tx.get(deviceRef), tx.get(profileRef),
+    const [profile, accountClaim, deviceClaim, audit] = await Promise.all([
+      tx.get(profileRef), tx.get(accountRef), tx.get(deviceRef), tx.get(auditRef),
     ]);
-    if (!freshChallenge.exists || freshChallenge.data()?.nonce !== nonce ||
-      freshChallenge.data()?.deviceHash !== deviceHash || Number(freshChallenge.data()?.expiresAtMs || 0) < Date.now()) {
-      throw new Error('Bonus verification expired or was already used.');
+    // The ledger also prevents repayment if account marker was manually removed.
+    if (accountClaim.exists || audit.exists) return { credited: false, alreadyClaimed: true, reason: 'account' } as const;
+    if (deviceClaim.exists) return { credited: false, alreadyClaimed: true, reason: 'device' } as const;
+    const current = profile.data();
+    if (profile.exists && current?.status !== 'active') throw new Error('Your account is not active.');
+    const available = Number(current?.walletAvailable ?? 0);
+    if (!Number.isSafeInteger(available) || available < 0 ||
+      !Number.isSafeInteger(available + PLAY_INSTALL_BONUS_RUPEES)) throw new Error('Invalid cash wallet balance.');
+
+    if (!profile.exists) {
+      // Reuse the existing reseller profile/wallet for an already-signed-in
+      // email/password account. No separate signup or new auth provider.
+      tx.create(profileRef, {
+        userId: uid, email, displayName: '', status: 'active', tierId: 'starter',
+        monthlyOrders: 0, walletAvailable: PLAY_INSTALL_BONUS_RUPEES,
+        walletPending: 0, walletShopping: 0,
+        createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp(),
+      });
+    } else {
+      tx.update(profileRef, {
+        walletAvailable: available + PLAY_INSTALL_BONUS_RUPEES,
+        updatedAt: FieldValue.serverTimestamp(),
+      });
     }
-    if (userClaim.exists || deviceClaim.exists) throw new Error('This user or device already received the Play Store bonus.');
-    if (!profile.exists || profile.data()?.status !== 'active') throw new Error('Active reseller account required.');
-    const available = Number(profile.data()?.walletAvailable || 0);
-    if (!Number.isSafeInteger(available) || !Number.isSafeInteger(available + PLAY_INSTALL_BONUS_RUPEES)) {
-      throw new Error('Invalid cash wallet balance.');
-    }
-    tx.update(profileRef, { walletAvailable: available + PLAY_INSTALL_BONUS_RUPEES, updatedAt: FieldValue.serverTimestamp() });
-    tx.create(userRef, { uid, amount: PLAY_INSTALL_BONUS_RUPEES, createdAt: FieldValue.serverTimestamp() });
-    tx.create(deviceRef, { uid, amount: PLAY_INSTALL_BONUS_RUPEES, createdAt: FieldValue.serverTimestamp() });
-    tx.create(entryRef, { userId: uid, amount: PLAY_INSTALL_BONUS_RUPEES, type: 'play_install_bonus', purpose: 'withdrawable', reason: 'Verified Google Play app install', createdAt: FieldValue.serverTimestamp() });
-    tx.delete(challengeRef);
-    return { credited: true, amount: PLAY_INSTALL_BONUS_RUPEES, walletAvailable: available + PLAY_INSTALL_BONUS_RUPEES };
+    const record = { uid, amount: PLAY_INSTALL_BONUS_RUPEES, createdAt: FieldValue.serverTimestamp() };
+    tx.create(accountRef, record);
+    tx.create(deviceRef, record);
+    tx.create(auditRef, {
+      userId: uid, amount: PLAY_INSTALL_BONUS_RUPEES,
+      type: 'play_install_bonus', purpose: 'withdrawable',
+      reason: 'PrimeHub Google Play app welcome reward (one time)',
+      createdAt: FieldValue.serverTimestamp(),
+    });
+    return {
+      credited: true, amount: PLAY_INSTALL_BONUS_RUPEES,
+      walletAvailable: available + PLAY_INSTALL_BONUS_RUPEES,
+    } as const;
   });
-  try { await mirrorResellerFirestoreDoc('reseller_profiles', uid); }
-  catch (error) { console.warn('Verified bonus saved; Supabase reporting mirror deferred:', error); }
+
+  if (outcome.credited) {
+    try { await mirrorResellerFirestoreDoc('reseller_profiles', uid); }
+    catch (error) {
+      // Firestore is authoritative. Mirror failure must never trigger another cash award.
+      console.warn('Play bonus credited; Supabase reporting mirror delayed:', error);
+    }
+  }
   return outcome;
 }
