@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getAdminDb } from '@/lib/firebaseAdmin';
+import { authorizedWalletAdmin } from '@/lib/walletAdminSession';
+import { refundShoppingWalletOrder } from '@/lib/resellerShoppingCheckout';
 import {
   getSupabasePrimaryPayload,
   isSupabaseWriteConfigured,
@@ -123,6 +125,17 @@ async function saveOrderWhatsappNumber(number: string) {
   return null;
 }
 
+async function walletOrdersNotYetMirrored(known: Array<Record<string, any>>) {
+  try {
+    const snap = await getAdminDb().collection('orders').where('paymentMethod', 'in', ['shopping_wallet', 'shopping_wallet_plus_cod']).limit(100).get();
+    const ids = new Set(known.map(order => String(order.id)));
+    return snap.docs.filter(doc => !ids.has(doc.id)).map(doc => ({ id: doc.id, ...(doc.data() || {}) }));
+  } catch (error) {
+    console.error('Wallet order backup read unavailable:', error);
+    return [] as Array<Record<string, any>>;
+  }
+}
+
 async function readLegacyFirebaseOrders() {
   const now = Date.now();
   if (legacyOrdersCache.length && now - legacyOrdersCacheAt < LEGACY_CACHE_MS) {
@@ -166,9 +179,10 @@ export async function GET(request: Request) {
         listSupabaseOrders(),
         readOrderWhatsappNumber().catch(() => ''),
       ]);
+      const walletBackup = await walletOrdersNotYetMirrored(orders);
       return NextResponse.json({
         success: true,
-        orders,
+        orders: [...walletBackup, ...orders],
         whatsappNumber,
         primary: 'supabase',
         warning: null,
@@ -286,6 +300,21 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Invalid order status.' }, { status: 400 });
       }
 
+      if (status === 'cancelled') {
+        const spend = await db.collection('reseller_wallet_spends').doc(orderId).get();
+        if (spend.exists) {
+          if (!authorizedWalletAdmin(request)) return NextResponse.json({ error: 'Wallet admin login required to refund shopping credit.' }, { status: 401 });
+          const refunded = await refundShoppingWalletOrder(orderId);
+          if (isSupabaseWriteConfigured()) {
+            const row = { ...mapOrderToSupabase(orderId, refunded.order), authoritative_source: 'firebase' };
+            try { await supabasePrimaryUpsert({ table: 'orders', row }); }
+            catch (error) { console.error('Wallet cancellation order mirror deferred:', error); try { await recordMirrorFailure('orders', orderId, 'upsert', row); } catch {} }
+          }
+          legacyOrdersCache = legacyOrdersCache.map(order => order.id === orderId ? { ...order, status: 'cancelled', walletPaymentStatus: 'refunded' } : order);
+          return NextResponse.json({ success: true, primary: 'firebase-wallet', walletRefunded: refunded.applied });
+        }
+      }
+
       if (isSupabaseWriteConfigured()) {
         let existing: Record<string, any> | null = null;
         try {
@@ -337,6 +366,11 @@ export async function POST(request: Request) {
     }
 
     if (action === 'delete') {
+      const walletSpend = await db.collection('reseller_wallet_spends').doc(orderId).get();
+      if (walletSpend.exists) {
+        if (!authorizedWalletAdmin(request)) return NextResponse.json({ error: 'Wallet admin login required.' }, { status: 401 });
+        if (walletSpend.data()?.status !== 'refunded') return NextResponse.json({ error: 'Cancel and refund shopping credit before deleting a wallet order.' }, { status: 409 });
+      }
       if (isSupabaseWriteConfigured()) {
         let existsInSupabase = false;
         try {
