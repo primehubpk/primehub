@@ -156,7 +156,7 @@ export default function DownloadImagesPage() {
   }
 
   async function saveOne(photo: Photo) {
-    if (downloading) return;
+    if (downloading || abortRef.current) return;
     const controller = new AbortController();
     abortRef.current = controller;
     setDownloading(photo.id); setDownloadError('');
@@ -169,7 +169,7 @@ export default function DownloadImagesPage() {
   // Chrome may require a one-time automatic-multiple-download permission.
   async function downloadAll(categorySlug = selected) {
     const category = categories.find(item => item.slug === categorySlug);
-    if (!category || downloading) return;
+    if (!category || downloading || abortRef.current) return;
     const controller = new AbortController();
     abortRef.current = controller;
     const slug = category.slug;
