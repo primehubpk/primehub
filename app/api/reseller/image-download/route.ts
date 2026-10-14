@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { requireActiveResellerForImages, imageAccessError } from '@/lib/resellerImageAccess';
-import { getResellerImageGallery, IMAGE_PACK_SIZE, safeDownloadName, type GalleryImage } from '@/lib/resellerImageGallery';
-import { zipReadableStream } from '@/lib/resellerZipStream';
+import { getResellerImageGallery, type GalleryImage } from '@/lib/resellerImageGallery';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -68,35 +67,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Photo cannot be downloaded right now. Please try another image.' }, { status: 502 });
       }
     }
-    if (body?.mode !== 'pack') return NextResponse.json({ error: 'Choose an image or a category ZIP pack.' }, { status: 400 });
-    const part = body?.part;
-    if (!Number.isSafeInteger(part) || part < 0 || part >= Math.ceil(images.length / IMAGE_PACK_SIZE)) {
-      return NextResponse.json({ error: 'Invalid category pack.' }, { status: 400 });
-    }
-    const selected = images.slice(part * IMAGE_PACK_SIZE, (part + 1) * IMAGE_PACK_SIZE);
-    const folder = safeDownloadName(category);
-    async function* source() {
-      const failed: string[] = [];
-      for (const image of selected) {
-        try {
-          const bytes = await imageBytes(image);
-          yield { name: `${folder}/${image.filename}`, bytes };
-        } catch {
-          failed.push(image.filename);
-        }
-      }
-      if (failed.length) yield {
-        name: `${folder}/DOWNLOAD-ISSUES.txt`,
-        bytes: new TextEncoder().encode(`These images could not be fetched from the CDN. Retry individually from PrimeHubMall:\n${failed.join('\n')}\n`),
-      };
-    }
-    const safeFilename = `PrimeHubMall-${folder}-part-${String(part + 1).padStart(2, '0')}.zip`;
-    return new Response(zipReadableStream(source()), { headers: {
-      'Content-Type': 'application/zip',
-      'Content-Disposition': `attachment; filename="${safeFilename}"`,
-      'Cache-Control': 'private, no-store',
-      'X-Content-Type-Options': 'nosniff',
-    } });
+    return NextResponse.json({ error: 'Only original individual image downloads are supported.' }, { status: 400 });
   } catch (error) {
     const { status, message } = imageAccessError(error);
     if (status === 503) console.error('Reseller image download failed:', error);
