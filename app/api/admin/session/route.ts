@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { WALLET_ADMIN_COOKIE, walletAdminCookieOptions } from '@/lib/walletAdminSession';
+import { authorizedWalletAdmin, WALLET_ADMIN_COOKIE, walletAdminCookieOptions } from '@/lib/walletAdminSession';
 import { POSTING_SESSION_COOKIE, postingSessionCookieOptions } from '@/lib/integrations/tiktokPostingSession';
 
 export const runtime = 'nodejs';
@@ -7,13 +7,8 @@ export const dynamic = 'force-dynamic';
 
 const ADMIN_COOKIE = 'primehub_admin_auth';
 
-function hasAdminCookie(request: Request) {
-  const cookie = request.headers.get('cookie') || '';
-  return cookie.split(';').some((part) => part.trim() === `${ADMIN_COOKIE}=true`);
-}
-
 export async function GET(request: Request) {
-  const authenticated = hasAdminCookie(request);
+  const authenticated = authorizedWalletAdmin(request);
   const response = NextResponse.json({ authenticated });
   response.headers.set('Cache-Control', 'no-store');
   return response;
