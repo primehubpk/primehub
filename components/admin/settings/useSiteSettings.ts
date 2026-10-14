@@ -1,9 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { EmailAuthProvider, reauthenticateWithCredential, updatePassword } from 'firebase/auth';
 import { getAdminDocument, setAdminDocument } from '../shared';
-import { auth } from '@/lib/firebase';
 import type { PriceBucket } from '@/lib/types';
 import { DEFAULT_BUCKETS, DEFAULT_SETTINGS, Settings } from './SiteSettingsTypes';
 
@@ -130,20 +128,28 @@ export default function useSiteSettings() {
 
   async function changeAdminPassword(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const user = auth.currentUser;
-    if (!user?.email) { setToast('Please sign in again before changing the password.'); return; }
-    if (newPassword.length < 8) { setToast('New password must be at least 8 characters.'); return; }
-    if (currentPassword === newPassword) { setToast('New password must be different from the current password.'); return; }
+    if (newPassword.length < 12) { setToast('New Admin Panel password must be at least 12 characters.'); return; }
+    if (currentPassword === newPassword) { setToast('Choose a different password.'); return; }
     setChangingPassword(true);
     try {
-      await reauthenticateWithCredential(user, EmailAuthProvider.credential(user.email, currentPassword));
-      await updatePassword(user, newPassword);
+      const response = await fetch('/api/admin/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentPassword, newPassword }),
+        credentials: 'same-origin',
+        cache: 'no-store',
+      });
+      const result = await response.json().catch(() => null);
+      if (!response.ok || result?.success !== true) {
+        throw new Error(String(result?.error || 'Could not change Admin Panel password.'));
+      }
       setCurrentPassword('');
       setNewPassword('');
-      setToast('Admin password changed successfully.');
+      // Server clears the old signed admin session after changing the actual
+      // Admin Panel credential, so the next login must use the new password.
+      window.location.assign('/admin');
     } catch (error) {
-      console.error(error);
-      setToast('Password change failed. Verify the current password and try again.');
+      setToast(error instanceof Error ? error.message : 'Admin password change failed.');
     } finally {
       setChangingPassword(false);
     }
