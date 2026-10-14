@@ -77,6 +77,9 @@ export default function AdminResellersPage() {
   const [search, setSearch] = useState('');
   const [selectedMember, setSelectedMember] = useState<any | null>(null);
   const [showDeleted, setShowDeleted] = useState(false);
+  const [memberAudits, setMemberAudits] = useState<any[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -115,6 +118,19 @@ export default function AdminResellersPage() {
     }
   }
 
+  async function openHistory(profile: any) {
+    setSelectedMember(profile); setMemberAudits([]); setHistoryError(''); setHistoryLoading(true);
+    try {
+      const uid = String(profile.userId || profile.id);
+      const response = await fetch(`/api/admin/reseller-history?userId=${encodeURIComponent(uid)}`, { cache: 'no-store', credentials: 'same-origin' });
+      const result = await response.json().catch(() => null);
+      if (!response.ok || result?.ok !== true) throw new Error(result?.error || 'Detailed history unavailable.');
+      setMemberAudits(Array.isArray(result.events) ? result.events : []);
+      setSelectedMember((current: any) => current && String(current.id || current.userId) === uid ?
+        { ...current, rewardHistory: Array.isArray(result.rewardHistory) ? result.rewardHistory : current.rewardHistory } : current);
+    } catch (error) { setHistoryError(error instanceof Error ? error.message : 'Some records may not be available.'); }
+    finally { setHistoryLoading(false); }
+  }
   async function changeMember(profile: any, action: 'block' | 'unblock' | 'delete') {
     const uid = String(profile.userId || profile.id || '');
     if (!uid || busy) return;
@@ -166,6 +182,23 @@ export default function AdminResellersPage() {
           action === 'spin' ? `Spin wheel · ${reward.name || 'Prize'}` : (reward.name || 'Reward history'),
         detail: `${reward.status || 'recorded'} · ${action || reward.type || 'reward'}${legacyAmount && reward.type !== 'try-again' ? ' · Legacy record has no point amount' : ''}`,
         badge, tone: 'bg-[#FFF3DC] text-[#8A5800]',
+      });
+    }
+    for (const entry of memberAudits) {
+      const source = String(entry.source || '');
+      const financial = ['reseller_wallet_credits', 'reseller_wallet_spends', 'reseller_wallet_refunds'].includes(source);
+      const purpose = String(entry.purpose || 'shopping');
+      const amount = Number(entry.amount || 0);
+      const credit = source === 'reseller_wallet_credits' || source === 'reseller_wallet_refunds';
+      rows.push({
+        id: `member-audit-${entry.id}`, time: dateValue(entry.date), date: entry.date,
+        title: source === 'reseller_wallet_credits' ? `Admin credit · ${purpose}` :
+          source === 'reseller_wallet_spends' ? 'Shopping wallet payment' :
+          source === 'reseller_wallet_refunds' ? 'Shopping wallet refund' :
+          `Account ${entry.action || 'change'}`,
+        detail: financial ? (entry.reason || entry.status || 'Wallet ledger event') : `Admin action: ${entry.action} · ${entry.reason || 'Recorded'}`,
+        badge: financial ? `${credit ? '+' : '-'}${money(amount)}` : (entry.status || entry.action || 'Account'),
+        tone: financial ? 'bg-[#DDF5F0] text-[#0F6A5F]' : 'bg-amber-50 text-amber-800',
       });
     }
     for (const item of Array.isArray(data.pointHistory) ? data.pointHistory : []) {
@@ -247,7 +280,7 @@ export default function AdminResellersPage() {
     }
 
     return rows.sort((a, b) => b.time - a.time);
-  }, [data, selectedMember]);
+  }, [data, selectedMember, memberAudits]);
 
   return (
     <main className="min-h-screen bg-[#F4F4F1] pb-24 text-[#14140F]">
@@ -325,7 +358,7 @@ export default function AdminResellersPage() {
                      <p className="mt-1 break-all text-[8px] text-black/30">UID: {profile.id}</p>
                   </div>
                   <div className="flex shrink-0 flex-col gap-1.5">
-                    <button type="button" onClick={() => setSelectedMember(profile)} className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#14140F] px-3 py-2.5 text-[9px] font-black text-white"><History size={13}/> History</button>
+                    <button type="button" onClick={() => void openHistory(profile)} className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#14140F] px-3 py-2.5 text-[9px] font-black text-white"><History size={13}/> History</button>
                     {profile.status !== 'deleted' && <button disabled={Boolean(busy)} type="button" onClick={() => void changeMember(profile, profile.status === 'suspended' ? 'unblock' : 'block')} className="rounded-xl border border-amber-200 px-3 py-2 text-[9px] font-black text-amber-700 disabled:opacity-50">{profile.status === 'suspended' ? 'Unblock' : 'Block'}</button>}
                     {profile.status !== 'deleted' && <button disabled={Boolean(busy)} type="button" onClick={() => void changeMember(profile, 'delete')} className="rounded-xl bg-red-50 px-3 py-2 text-[9px] font-black text-red-700 disabled:opacity-50">Delete</button>}
                    </div>
@@ -410,6 +443,8 @@ export default function AdminResellersPage() {
             <div className="mt-5 flex items-center justify-between gap-3"><div><p className="text-[9px] font-black uppercase tracking-[.16em] text-[#E1352B]">Timeline</p><h3 className="mt-1 text-sm font-black">All recorded activity</h3></div><span className="rounded-full bg-[#F4F4F1] px-2.5 py-1 text-[8px] font-black text-black/40">{selectedActivity.length} events</span></div>
 
             <div className="mt-3 space-y-2">
+               {historyLoading ? <p className="rounded-xl bg-[#F4F4F1] p-3 text-[10px] font-bold">Loading complete member wallet history…</p> : null}
+               {historyError ? <p role="alert" className="rounded-xl bg-amber-50 p-3 text-[10px] text-amber-800">{historyError} Existing records are still shown below.</p> : null}
               {Array.isArray(selectedMember.rewardHistory) && selectedMember.rewardHistory.some((entry: any) => entry.pointsAwarded === undefined && entry.points === undefined && entry.action === 'checkin') && <div className="rounded-2xl bg-amber-50 p-3 text-[10px] leading-5 text-amber-800">Older daily check-in records do not include exact awarded amounts. The current points balance is shown above but legacy awards cannot be reconstructed safely. New check-ins and spins record exact points.</div>}
                {selectedActivity.length === 0 ? <Empty text="No reward, point, task, withdrawal or reseller order activity has been recorded for this member yet." /> : selectedActivity.map((item) => (
                 <div key={item.id} className="rounded-2xl border border-black/6 p-3">
