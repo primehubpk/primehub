@@ -204,8 +204,11 @@ export async function POST(request: Request) {
         await ref.create(row);
       } catch (error) {
         const existing = await ref.get();
-        if (!existing.exists || existing.data()?.customer?.phone !== row.customer.phone ||
-            existing.data()?.status !== 'awaiting_confirmation') throw error;
+        const previous = existing.data();
+        if (!existing.exists || previous?.customer?.phone !== row.customer.phone ||
+            previous?.status !== 'awaiting_confirmation' ||
+            Number(previous.total) !== total ||
+            JSON.stringify(previous.items || []) !== JSON.stringify(quote.items)) throw error;
       }
       return NextResponse.json({ ...quote, requestId: intentId, whatsappState: 'awaiting_message',
         notice: 'WhatsApp order request saved for admin review, not confirmed until the customer sends the message.' });
