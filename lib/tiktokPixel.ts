@@ -1,5 +1,7 @@
 'use client';
 
+import { trackMetaStoreEvent } from './metaPixel';
+
 export type TikTokContent = {
   content_id: string;
   content_type: 'product' | 'product_group';
@@ -112,6 +114,9 @@ export function trackTikTokEvent(
   options: { eventId?: string; server?: boolean } = {},
 ) {
   const eventId = String(options.eventId || '').trim() || makeEventId(eventName);
+  // Meta cart events are emitted centrally by cartStore so every add path is
+  // covered once, including home/deal paths without a TikTok event.
+  if (eventName !== 'AddToCart') trackMetaStoreEvent(eventName, payload, eventId);
   sendTikTokEvent(eventName, payload, eventId, 6);
   if (options.server !== false) sendServerCopy(eventName, payload, eventId);
   return eventId;

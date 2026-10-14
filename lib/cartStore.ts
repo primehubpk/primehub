@@ -2,6 +2,7 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import type { ProductVariantRow, ProductVariantSelection, Weekday } from '@/lib/types';
+import { trackMetaStoreEvent } from '@/lib/metaPixel';
 
 export const FREE_DELIVERY_THRESHOLD = 5;
 
@@ -219,6 +220,11 @@ export const useCartStore = create<CartState>()(
         const resolvedImage = resolveVisibleProductImage(item);
         const normalized = { ...item, id: item.id || `${item.productId || ''}:${variantKey(item.variant)}`, image: item.image || item.imageUrl || resolvedImage, imageUrl: item.imageUrl || item.image || resolvedImage };
         set((state) => ({ items: state.items.find((current) => current.id === normalized.id) ? state.items.map((current) => current.id === normalized.id ? { ...current, ...normalized, qty: current.qty + 1 } : current) : [...state.items, { ...normalized, qty: 1 }], isDrawerOpen: true, isMiniCollapsed: false }));
+        const productId = String(item.productId || String(item.id || '').split(':')[0]).trim();
+        if (productId) trackMetaStoreEvent('AddToCart', {
+          contents: [{ content_id: productId, content_type: 'product', price: item.price, num_items: 1 }],
+          value: item.price, currency: 'PKR',
+        });
       },
       removeItem: (id) => set((state) => ({ items: state.items.filter((item) => item.id !== id) })),
       updateQty: (id, qty) => set((state) => ({ items: qty <= 0 ? state.items.filter((item) => item.id !== id) : state.items.map((item) => (item.id === id ? { ...item, qty } : item)) })),

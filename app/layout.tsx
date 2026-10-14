@@ -12,6 +12,7 @@ import ProductOverlayHost from '@/components/ProductOverlayHost';
 import CartMiniBar from '@/components/CartMiniBar';
 import PWARegister from '@/components/PWARegister';
 import VisitorTracker from '@/components/VisitorTracker';
+import MetaPixelTracker from '@/components/MetaPixelTracker';
 import NativePushIdentity from '@/components/NativePushIdentity';
 import GlobalVariantSelector from '@/components/GlobalVariantSelector';
 import AdminQuickAccess from '@/components/AdminQuickAccess';
@@ -138,6 +139,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className="font-sans antialiased pb-24">
         <VisitorTracker />
+        <MetaPixelTracker />
         <NativePushIdentity />
         <Script id="tiktok-pixel" strategy="afterInteractive">{`
 !function (w, d, t) {
