@@ -29,7 +29,6 @@ const gallery = loadTs('lib/resellerImageGallery.ts', {
   '@/lib/imageUrl': { normalizeImageUrl: url => url },
   '@/lib/categoryUtils': category,
 });
-const zip = loadTs('lib/resellerZipStream.ts');
 
 test('Only approved image CDNs are downloaded, never an arbitrary host or insecure URL', () => {
   assert.equal(gallery.downloadableImageUrl('https://images.primehubmall.com/cat/img.jpg'), 'https://images.primehubmall.com/cat/img.jpg');
@@ -63,23 +62,28 @@ test('Category gallery includes visible product galleries and variant photos, de
   assert.equal(result.byCategory['glass-bangles'][0].filename.endsWith('.jpg'), true);
 });
 
-test('ZIP writer creates valid stored entries, central directory and CRC32 without buffering full pack', async () => {
-  async function* sample() {
-    yield { name: 'glass/first.jpg', bytes: new TextEncoder().encode('abc') };
-    yield { name: 'glass/second.png', bytes: new TextEncoder().encode('xyz') };
-  }
-  const chunks = [];
-  for await (const chunk of zip.zipStoredEntries(sample())) chunks.push(chunk);
-  const data = Buffer.concat(chunks.map(chunk => Buffer.from(chunk)));
-  const local = data.indexOf(Buffer.from([0x50, 0x4b, 0x03, 0x04]));
-  const central = data.indexOf(Buffer.from([0x50, 0x4b, 0x01, 0x02]));
-  const footer = data.lastIndexOf(Buffer.from([0x50, 0x4b, 0x05, 0x06]));
-  assert.equal(local, 0);
-  assert.ok(central > local);
-  assert.ok(footer > central);
-  assert.equal(data.readUInt16LE(footer + 10), 2);
-  assert.equal(data.readUInt32LE(local + 14), 0x352441c2); // CRC32('abc')
-  assert.equal(data.readUInt32LE(local + 18), 3);
-  assert.equal(data.toString('utf8', 30, 30 + 'glass/first.jpg'.length), 'glass/first.jpg');
-  assert.equal(data.readUInt32LE(footer + 16), central);
+test('Download All category manifest is not capped at 40 or only the first visible page', () => {
+  const photos = Array.from({ length: 123 }, (_, i) => ({
+    id: 'product-' + i,
+    title: 'Glass bangles ' + i,
+    active: true,
+    category: 'Glass bangles',
+    imageUrl: 'https://images.primehubmall.com/products/glass-' + i + '.jpg',
+  }));
+  const result = gallery.assembleGallery(photos, [{ id: 'glass', title: 'Glass bangles' }]);
+  assert.equal(result.categories[0].count, 123);
+  assert.equal(result.byCategory['glass-bangles'].length, 123);
+  assert.equal(result.categories[0].packs, undefined);
+  assert.equal(new Set(result.byCategory['glass-bangles'].map(item => item.filename)).size, 123);
+});
+
+test('No ZIP endpoints, archive buttons or pack limits remain in user-facing image download feature', () => {
+  const page = fs.readFileSync('app/download-images/page.tsx', 'utf8');
+  const endpoint = fs.readFileSync('app/api/reseller/image-download/route.ts', 'utf8');
+  assert.ok(page.includes('async function downloadAll()'));
+  assert.ok(page.includes('for (const photo of allPhotos)'));
+  assert.ok(page.includes("mode: 'image'"));
+  assert.ok(!page.includes('downloadPack('));
+  assert.ok(!endpoint.includes("mode === 'pack'"));
+  assert.ok(!endpoint.includes('zipReadableStream'));
 });
