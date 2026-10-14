@@ -20,6 +20,7 @@ export async function createResellerProfile(userId: string, email: string) {
       monthlyOrders: 0,
       walletAvailable: 0,
       walletPending: 0,
+      walletShopping: 0,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
