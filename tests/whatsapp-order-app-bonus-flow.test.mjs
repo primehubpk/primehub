@@ -4,12 +4,13 @@ import { readFileSync } from 'node:fs';
 
 const file = path => readFileSync(path, 'utf8');
 
-test('Only verified Play Store credit triggers congratulations; existing email/password login reused', () => {
+test('Only actual credited Rs100 triggers automatic congratulations; email/password login reused', () => {
   const client = file('components/NativePushIdentity.tsx');
   const signin = file('app/reseller/join/page.tsx');
   const auth = file('lib/resellerAuth.ts');
   const server = file('lib/playInstallBonus.ts');
   assert.ok(client.includes("if (!detail?.success) { requestedUid = ''; return; }"));
+  assert.ok(client.includes("if (detail?.alreadyClaimed)"));
   assert.ok(client.includes('if (!currentUid.current) return;'));
   assert.match(client, /primehub:reseller-profile-ready/);
   assert.match(client, /'playBonus'/);
@@ -22,7 +23,8 @@ test('Only verified Play Store credit triggers congratulations; existing email/p
   assert.ok(auth.includes('createUserWithEmailAndPassword'));
   assert.ok(!signin.includes('signInWithPopup'));
   assert.ok(server.includes("PLAY_INSTALL_BONUS_ENABLED === 'true'"));
-  assert.ok(server.includes('validateBonusVerdict(verified, nonce'));
+  assert.ok(server.includes('claimPlayInstallBonus('));
+  assert.ok(server.includes('getAdminDb'));
 });
 
 test('Website WhatsApp is a pending request, not immediate confirmed order', () => {
