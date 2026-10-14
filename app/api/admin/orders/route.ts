@@ -35,9 +35,11 @@ function supabaseConfig() {
 }
 
 async function listWhatsAppDrafts() {
+  // Query newest requests without requiring a new composite Firestore index.
   const snap = await getAdminDb().collection('whatsapp_order_intents')
-    .where('status', '==', 'awaiting_confirmation').limit(100).get();
-  return snap.docs.map(doc => ({ id: doc.id, ...doc.data(), whatsappDraft: true }));
+    .orderBy('createdAt', 'desc').limit(150).get();
+  return snap.docs.filter(doc => doc.data()?.status === 'awaiting_confirmation')
+    .slice(0, 100).map(doc => ({ id: doc.id, ...doc.data(), whatsappDraft: true }));
 }
 
 async function listSupabaseOrders() {
