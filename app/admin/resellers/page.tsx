@@ -151,6 +151,7 @@ export default function AdminResellersPage() {
       if (!response.ok || !result?.ok) throw new Error(result?.error || 'Account update failed.');
       setSelectedMember(null);
       await load();
+      if (result.authRemovalPending) setError('Account was disabled and archived. Firebase login deletion requires an administrator retry; the account cannot sign in.');
     } catch (err) { setError(err instanceof Error ? err.message : 'Account update failed.'); }
     finally { setBusy(''); }
   }
