@@ -82,24 +82,22 @@ test('Hash app-scoped Android ID on server, never store IMEI or raw Android ID',
   assert.ok(!one.includes('a1b2c3'));
   assert.throws(() => bonus.deviceDigest('356789012345678'), /Invalid Android/); // IMEI is not acceptable
 });
-test('Play Integrity verdict must verify app package, license, device, nonce and freshness', () => {
-  const now = Date.now();
-  const valid = {
-    requestDetails: { requestPackageName: 'com.primehubmall.app', nonce: 'test-nonce', timestampMillis: String(now) },
-    appIntegrity: { appRecognitionVerdict: 'PLAY_RECOGNIZED' },
-    accountDetails: { appLicensingVerdict: 'LICENSED' },
-    deviceIntegrity: { deviceRecognitionVerdict: ['MEETS_DEVICE_INTEGRITY'] },
-  };
-  assert.doesNotThrow(() => bonus.validateBonusVerdict(valid, 'test-nonce', now));
-  for (const change of [
-    { ...valid, requestDetails: { ...valid.requestDetails, nonce: 'different' } },
-    { ...valid, requestDetails: { ...valid.requestDetails, timestampMillis: String(now - 360000) } },
-    { ...valid, requestDetails: { ...valid.requestDetails, requestPackageName: 'fake.app' } },
-    { ...valid, appIntegrity: { appRecognitionVerdict: 'UNRECOGNIZED_VERSION' } },
-    { ...valid, accountDetails: { appLicensingVerdict: 'UNLICENSED' } },
-    { ...valid, deviceIntegrity: { deviceRecognitionVerdict: [] } },
-    { ...valid, deviceIntegrity: { deviceRecognitionVerdict: ['MEETS_DEVICE_INTEGRITY'], deviceRecall: { values: { bitFirst: true } } } },
-  ]) assert.throws(() => bonus.validateBonusVerdict(change, 'test-nonce', now));
+test('Low-friction Play app bonus needs no Google Cloud or Play Integrity credentials', () => {
+  assert.equal(bonus.bonusIsEnabled(), true);
+  const server = fs.readFileSync('lib/playInstallBonus.ts', 'utf8');
+  const route = fs.readFileSync('app/api/reseller/play-install-bonus/route.ts', 'utf8');
+  const android = fs.readFileSync('play-store/android-twa/app/src/main/java/com/primehubmall/app/PlayBonusManager.java', 'utf8');
+  const gradle = fs.readFileSync('play-store/android-twa/app/build.gradle', 'utf8');
+  assert.ok(!server.includes('playintegrity.googleapis.com'));
+  assert.ok(!server.includes('FIREBASE_SERVICE_ACCOUNT_KEY'));
+  assert.ok(route.includes("body?.action !== 'claim'"));
+  assert.ok(android.includes('com.android.vending'));
+  assert.ok(!android.includes('IntegrityManagerFactory'));
+  assert.ok(!gradle.includes('com.google.android.play:integrity'));
+  assert.ok(server.includes("db.collection('reseller_play_install_claims').doc(uid)"));
+  assert.ok(server.includes("db.collection('reseller_play_install_devices').doc(hash)"));
+  assert.ok(server.includes('db.runTransaction(async tx =>'));
+  assert.ok(server.includes("type: 'play_install_bonus'"));
 });
 test('No App Bonus cash can be paid when feature is not explicitly enabled', () => {
   const off = loadTS('lib/playInstallBonus.ts');
@@ -114,14 +112,15 @@ test('Different account ids do not reset same-browser daily spin lock key', () =
   assert.notEqual(first, spin.spinKey('g_5c269824fc03462491a3f56418afc001', '2026-10-15'));
   assert.notEqual(first, spin.spinKey('g_otherbrowsernonce', '2026-10-14'));
 });
-test('No IMEI permissions in Android app; genuine-install proof only on explicit native reward claim', () => {
+test('No IMEI permissions or Integrity prompts; native app automatic welcome gift', () => {
   const manifest = fs.readFileSync('play-store/android-twa/app/src/main/AndroidManifest.xml', 'utf8');
   const bridge = fs.readFileSync('play-store/android-twa/app/src/main/java/com/primehubmall/app/PushManager.java', 'utf8');
   const manager = fs.readFileSync('play-store/android-twa/app/src/main/java/com/primehubmall/app/PlayBonusManager.java', 'utf8');
   assert.ok(!manifest.includes('READ_PHONE_STATE'));
   assert.ok(!manifest.includes('READ_PRIVILEGED_PHONE_STATE'));
   assert.ok(manager.includes('Settings.Secure.ANDROID_ID'));
-  assert.ok(manager.includes('IntegrityManagerFactory.create'));
+  assert.ok(manager.includes('com.android.vending'));
+  assert.ok(!manager.includes('IntegrityManagerFactory'));
   assert.ok(bridge.includes('"playBonus".equals(action)'));
   assert.ok(!manager.includes('TelephonyManager'));
   assert.ok(!manager.includes('getImei()'));
