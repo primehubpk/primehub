@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import AdminResellerCreditsPanel from '@/components/admin/AdminResellerCreditsPanel';
 import {
   ArrowLeft,
   Banknote,
@@ -252,6 +253,8 @@ export default function AdminResellersPage() {
           <Stat title="Wallet Liability" value={money(stats.walletLiability)} icon={WalletCards} />
         </div>
 
+        <AdminResellerCreditsPanel members={profiles} onCredited={load} />
+
         <section className="mt-4 rounded-[26px] bg-white p-4 shadow-sm sm:p-5">
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
@@ -279,7 +282,8 @@ export default function AdminResellersPage() {
                       <span className="rounded-full bg-white px-2.5 py-1 text-[8px] font-black uppercase ring-1 ring-black/5">{profile.tierId || 'starter'}</span>
                     </div>
                     <h3 className="mt-2 break-words text-sm font-black">{memberLabel(profile)}</h3>
-                    {profile.displayName && profile.email ? <p className="mt-1 break-all text-[9px] text-black/40">{profile.email}</p> : null}
+                    {profile.email ? <p className="mt-1 break-all text-[9px] text-black/50">{profile.email}</p> : null}
+                     <p className="mt-1 break-all text-[8px] text-black/30">UID: {profile.id}</p>
                   </div>
                   <button type="button" onClick={() => setSelectedMember(profile)} className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-[#14140F] px-3 py-2.5 text-[9px] font-black text-white"><History size={13}/> History</button>
                 </div>
@@ -287,13 +291,15 @@ export default function AdminResellersPage() {
                 <div className="mt-4 grid grid-cols-3 gap-2">
                   <MiniStat label="Points" value={Number(profile.pointsBalance || 0).toLocaleString()} />
                   <MiniStat label="Month Orders" value={Number(profile.monthlyOrders || 0).toLocaleString()} />
-                  <MiniStat label="Available" value={money(profile.walletAvailable)} />
+                  <MiniStat label="Withdrawable" value={money(profile.walletAvailable)} />
                 </div>
 
                 <div className="mt-3 flex items-center justify-between gap-3 rounded-xl bg-white px-3 py-2.5 text-[9px]">
-                  <span className="font-semibold text-black/40">Pending wallet</span>
+                  <span className="font-semibold text-black/40">Pending reward wallet</span>
                   <b>{money(profile.walletPending)}</b>
                 </div>
+                <div className="mt-2 flex items-center justify-between rounded-xl bg-[#DDF5F0] px-3 py-2.5 text-[10px] font-black text-[#0F6A5F]"><span>Shopping-only credit</span><b>{money(profile.walletShopping)}</b></div>
+                <button type="button" onClick={() => { document.getElementById('credit-wallet')?.scrollIntoView({ behavior: 'smooth' }); }} className="mt-2 w-full rounded-xl border border-[#0F6A5F]/20 bg-white p-2.5 text-[10px] font-black text-[#0F6A5F]">Add credit above</button>
               </article>
             ))}
           </div>
@@ -344,7 +350,8 @@ export default function AdminResellersPage() {
             <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
               <MiniStat label="Points" value={Number(selectedMember.pointsBalance || 0).toLocaleString()} strong />
               <MiniStat label="Month Orders" value={Number(selectedMember.monthlyOrders || 0).toLocaleString()} strong />
-              <MiniStat label="Available" value={money(selectedMember.walletAvailable)} strong />
+              <MiniStat label="Withdrawable" value={money(selectedMember.walletAvailable)} strong />
+               <MiniStat label="Shopping" value={money(selectedMember.walletShopping)} strong />
               <MiniStat label="Pending" value={money(selectedMember.walletPending)} strong />
             </div>
 
