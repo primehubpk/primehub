@@ -29,6 +29,8 @@ jobs:
         run: node --test tests/reseller-image-gallery.test.mjs
       - name: Test cash splitting, app attestation and wheel anti-abuse
         run: node --test tests/reseller-cash-device-rewards.test.mjs
+      - name: Test all four image notifications, personalized hooks and real countdowns
+        run: node --test tests/daily-push.test.mjs
       - name: Test WhatsApp order capture and Play bonus popup
         run: node --test tests/whatsapp-order-app-bonus-flow.test.mjs
       - name: Run existing commerce regression tests (unrelated baseline may fail)
