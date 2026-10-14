@@ -157,6 +157,10 @@ public final class PushManager {
                                 pendingIdentityToken = idToken;
                                 worker.execute(() -> post(activity, "identity", null, null, null, idToken));
                             }
+                        } else if ("playBonus".equals(action)) {
+                            // Only trusted MAIN FRAME native messages reach this listener.
+                            String idToken = json.optString("idToken", "");
+                            PlayBonusManager.claim(activity, webview, idToken);
                         } else if ("view".equals(action)) {
                             String path = json.optString("path", "");
                             if (validPath(path)) pageSeen(activity, path);

@@ -18,6 +18,7 @@ export interface ResellerProfile {
   monthlyOrders: number;
   walletAvailable: number;
   walletPending: number;
+  walletShopping?: number;
   createdAt: unknown;
   updatedAt: unknown;
 }

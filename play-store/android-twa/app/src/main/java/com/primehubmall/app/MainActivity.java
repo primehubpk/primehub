@@ -2,9 +2,11 @@ package com.primehubmall.app;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.net.Uri;
+import android.os.SystemClock;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -23,6 +25,7 @@ import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.widget.Toast;
 
 /**
  * Real in-app activity for PrimeHubMall. The previous TWA trampoline launched Chrome
@@ -45,6 +48,8 @@ public class MainActivity extends Activity {
     private ImageView splash;
     private ValueCallback<Uri[]> filePathCallback;
     private boolean splashHidden;
+    private long lastExitBackPressMs = 0;
+    private boolean exitPromptShowing = false;
     private final Handler handler = new Handler(Looper.getMainLooper());
 
     @Override
@@ -100,7 +105,7 @@ public class MainActivity extends Activity {
         settings.setJavaScriptCanOpenWindowsAutomatically(true);
         settings.setSupportMultipleWindows(true);
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
-        settings.setUserAgentString(settings.getUserAgentString() + " PrimeHubApp/11.0.0");
+        settings.setUserAgentString(settings.getUserAgentString() + " PrimeHubApp/12.0.0");
         CookieManager cookies = CookieManager.getInstance();
         cookies.setAcceptCookie(true);
         cookies.setAcceptThirdPartyCookies(webView, true);
@@ -178,13 +183,49 @@ public class MainActivity extends Activity {
         }
     }
 
+    /** At Home, don't accidentally exit or navigate back to old products.
+     * First Back is a nonblocking hint. A second Back within 2.5 seconds
+     * opens an explicit Yes/No confirmation. Other pages retain WebView history.
+     */
     @Override
     public void onBackPressed() {
-        if (webView != null && webView.canGoBack()) {
+        if (webView != null && !isHomePage(webView.getUrl()) && webView.canGoBack()) {
+            lastExitBackPressMs = 0;
             webView.goBack();
             return;
         }
-        super.onBackPressed();
+        long now = SystemClock.elapsedRealtime();
+        if (now - lastExitBackPressMs > 2500L) {
+            lastExitBackPressMs = now;
+            Toast.makeText(this, "Press Back again to exit PrimeHub", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        lastExitBackPressMs = 0;
+        if (exitPromptShowing || isFinishing() || isDestroyed()) return;
+        exitPromptShowing = true;
+        new AlertDialog.Builder(this)
+            .setTitle("Exit PrimeHub?")
+            .setMessage("Are you sure you want to exit?")
+            .setNegativeButton("No, keep shopping", (dialog, which) -> {
+                exitPromptShowing = false;
+                dialog.dismiss();
+            })
+            .setPositiveButton("Yes, exit", (dialog, which) -> {
+                exitPromptShowing = false;
+                finish();
+            })
+            .setOnCancelListener(dialog -> exitPromptShowing = false)
+            .show();
+    }
+
+    private boolean isHomePage(String rawUrl) {
+        if (rawUrl == null) return false;
+        try {
+            Uri uri = Uri.parse(rawUrl);
+            if (!isTrustedUrl(uri)) return false;
+            String path = uri.getPath();
+            return path == null || path.isEmpty() || "/".equals(path) || "/home".equals(path);
+        } catch (Exception ignored) { return false; }
     }
 
     @Override

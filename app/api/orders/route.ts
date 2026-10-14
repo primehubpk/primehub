@@ -5,6 +5,7 @@ import { getDualProduct, getDualStorefrontSettings } from '@/lib/dualReadServer'
 import { getAdminAuth, getAdminDb } from '@/lib/firebaseAdmin';
 import { isSupabaseWriteConfigured, mapOrderToSupabase, mirrorSupabaseUpsert, recordMirrorFailure, supabasePrimaryUpsert } from '@/lib/dualWriteServer';
 import { isWholesaleProduct } from '@/lib/wholesale';
+import { createShoppingWalletOrder, shoppingWalletBalance } from '@/lib/resellerShoppingCheckout';
 
 export const runtime = 'nodejs';
 const WEEKDAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const;
@@ -153,28 +154,109 @@ function publicOrderError(error: unknown) {
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json(); const rawItems = Array.isArray(body?.items) ? body.items as IncomingItem[] : []; const quoteOnly = body?.mode === 'quote'; const selfCollect = body?.selfCollect === true;
+    const body = await request.json(); const rawItems = Array.isArray(body?.items) ? body.items as IncomingItem[] : []; const quoteOnly = body?.mode === 'quote'; const selfCollect = body?.selfCollect === true; const useShoppingCredit = body?.useShoppingCredit === true;
     if (!rawItems.length || rawItems.length > 50) return NextResponse.json({ error: 'Your cart is empty or contains too many items.' }, { status: 400 });
     const items = await buildAuthoritativeItems(rawItems); const totalItems = items.reduce((sum, item) => sum + item.quantity, 0); const rawSubtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
     const [reseller, user] = await Promise.all([optionalReseller(request), decodedUser(request)]);
     const tierDiscountPercent = reseller?.discountPercent || 0; const tierDiscount = Math.round(rawSubtotal * tierDiscountPercent / 100); const subtotal = Math.max(0, rawSubtotal - tierDiscount);
-    const rewardWallet = user ? await readRewardWallet(user.uid) : {}; const freeDeliveryReward = !selfCollect && Number(rewardWallet.freeDeliveryCredits || 0) > 0;
+    const rewardWallet = user && body?.mode !== 'whatsapp_intent' ? await readRewardWallet(user.uid) : {}; const freeDeliveryReward = !selfCollect && Number(rewardWallet.freeDeliveryCredits || 0) > 0;
     const calculatedDelivery = selfCollect ? { baseDelivery: 0, wholesaleItems: 0, wholesaleSurcharge: 0, deliveryCharge: 0 } : calculateDeliveryCharge(items);
     const delivery = freeDeliveryReward ? { ...calculatedDelivery, deliveryCharge: 0 } : calculatedDelivery;
     const total = subtotal + delivery.deliveryCharge;
-    const quote = { items, rawSubtotal, tierDiscount, tierDiscountPercent, resellerTier: reseller?.tierName || '', subtotal, totalItems, ...delivery, total, selfCollect, fulfillment: selfCollect ? 'self_collect' : 'delivery', freeDeliveryReward, rewardLabel: freeDeliveryReward ? 'Spin & Win Reward — Free Delivery' : '' };
+    // A regular cart quote/order must NEVER read Firebase wallet collections.
+    // For an elected wallet quote only, show a fresh estimate. For placement the
+    // Firestore order+debit transaction obtains the authoritative balance once.
+    if (useShoppingCredit && !user) throw new Error('Sign in to your reseller account to use shopping credit.');
+    const walletShoppingBalance = (quoteOnly && useShoppingCredit && user)
+      ? await shoppingWalletBalance(user.uid) : 0;
+    const walletShoppingApplied = quoteOnly && useShoppingCredit ? Math.min(walletShoppingBalance, total) : 0;
+    const amountDue = total - walletShoppingApplied;
+    const quote = { items, rawSubtotal, tierDiscount, tierDiscountPercent, resellerTier: reseller?.tierName || '', subtotal, totalItems, ...delivery, total, selfCollect, fulfillment: selfCollect ? 'self_collect' : 'delivery', freeDeliveryReward, rewardLabel: freeDeliveryReward ? 'Spin & Win Reward — Free Delivery' : '', walletShoppingBalance, walletShoppingApplied, amountDue };
     if (quoteOnly) return NextResponse.json(quote);
+
+    // A WhatsApp handoff is NOT a placed order. Record complete, server-verified
+    // customer/items/prices in a separate review queue before opening WhatsApp.
+    // Only the admin can promote it to a real order after checking the message.
+    if (body?.mode === 'whatsapp_intent') {
+      const customer = body?.customer as Customer | undefined;
+      if (!customer?.name?.trim() || !customer?.phone?.trim()) {
+        return NextResponse.json({ error: 'Customer name and phone are required for WhatsApp.' }, { status: 400 });
+      }
+      const proposedId = String(body?.orderRequestId || '');
+      const intentId = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(proposedId) ? proposedId : crypto.randomUUID();
+      const ref = getAdminDb().collection('whatsapp_order_intents').doc(intentId);
+      const row = {
+        id: intentId, source: 'whatsapp', whatsappState: 'awaiting_message',
+        status: 'awaiting_confirmation', isRealOrder: false,
+        customer: {
+          name: customer.name.trim().slice(0, 120),
+          phone: customer.phone.trim().slice(0, 40),
+          email: String(customer.email || '').trim().slice(0, 140),
+          city: String(customer.city || '').trim().slice(0, 120),
+          address: selfCollect ? 'PrimeHub Shop Pickup' : String(customer.address || '').trim().slice(0, 500),
+          notes: String(customer.notes || '').trim().slice(0, 1000),
+        },
+        ...quote, walletShoppingBalance: 0, walletShoppingApplied: 0, amountDue: total,
+        ...(reseller?.userId ? { resellerUserId: reseller.userId } : {}),
+        guestId: cleanGuestId(body?.guestId), createdAt: new Date().toISOString(),
+      };
+      try {
+        await ref.create(row);
+      } catch (error) {
+        const existing = await ref.get();
+        const previous = existing.data();
+        if (!existing.exists || previous?.customer?.phone !== row.customer.phone ||
+            previous?.status !== 'awaiting_confirmation' ||
+            Number(previous.total) !== total ||
+            JSON.stringify(previous.items || []) !== JSON.stringify(quote.items)) throw error;
+      }
+      return NextResponse.json({ ...quote, requestId: intentId, whatsappState: 'awaiting_message',
+        notice: 'WhatsApp order request saved for admin review, not confirmed until the customer sends the message.' });
+    }
 
     const customer = body?.customer as Customer | undefined;
     if (!customer?.name?.trim() || !customer?.phone?.trim() || (!selfCollect && (!customer?.address?.trim() || !customer?.city?.trim()))) return NextResponse.json({ error: selfCollect ? 'Name and phone are required.' : 'Name, phone, address and city are required.' }, { status: 400 });
 
     const resellerUserId = reseller?.userId || '';
     const resellerGuestId = cleanGuestId(body?.guestId);
-    const orderId = crypto.randomUUID();
+    const orderId = useShoppingCredit ? String(body?.orderRequestId || '') : crypto.randomUUID();
     const salar = cleanSalarOrderContext(body?.orderContext);
     const orderData: any = { customer: { name: customer.name.trim(), phone: customer.phone.trim(), email: String(customer.email || '').trim(), address: selfCollect ? 'PrimeHub Shop Pickup' : customer.address.trim(), city: selfCollect ? 'Lahore' : customer.city.trim(), notes: String(customer.notes || '').trim() }, ...quote, idempotencyKey: `${salar ? 'salar' : 'website'}-order:${orderId}`, currency: 'PKR', status: 'pending', source: salar ? 'salar' : 'website', ...(salar ? { salar } : {}), createdAt: new Date() };
     if (resellerUserId) orderData.resellerUserId = resellerUserId;
     if (resellerGuestId) orderData.resellerGuestId = resellerGuestId;
+
+    if (useShoppingCredit && user) {
+      // Atomic source of truth: order + debit + append-only spend are one Firestore commit.
+      const saved = await createShoppingWalletOrder(user.uid, orderId, { ...orderData, resellerUserId: user.uid });
+      if (isSupabaseWriteConfigured()) {
+        const row = { ...mapOrderToSupabase(orderId, saved.order), authoritative_source: 'firebase', mirror_status: 'synced', mirror_error: null };
+        try {
+          await supabasePrimaryUpsert({ table: 'orders', row });
+        } catch (syncError) {
+          // Do not reject a successfully paid Firebase order: the user must never pay twice.
+          console.error('Shopping wallet order Supabase mirror unavailable:', syncError);
+          try { await recordMirrorFailure('orders', orderId, 'upsert', row); } catch (queueError) { console.error('Shopping wallet order retry queue unavailable:', queueError); }
+        }
+      }
+      if (user && freeDeliveryReward && saved.created) {
+        try {
+          const current = await readRewardWallet(user.uid);
+          const credits = Math.max(0, Number(current.freeDeliveryCredits || 0));
+          if (credits > 0) {
+            const history = [...(Array.isArray(current.history) ? current.history : []), { id: `free-delivery:${orderId}`, action: 'use', name: 'Spin & Win Reward — Free Delivery', type: 'free-delivery', status: 'used', orderId, createdAt: new Date().toISOString() }].slice(-100);
+            await writeRewardWallet(user.uid, { ...current, freeDeliveryCredits: credits - 1, history });
+          }
+        } catch (rewardError) { console.error('Free delivery reward on wallet order needs reconciliation:', rewardError); }
+      }
+      // Keep normal purchase-reminder suppression for customers paying with shopping credit.
+      if (saved.created) {
+        try {
+          await getAdminDb().collection('push_user_purchases').doc(user.uid + '_' + pakistanDay(new Date()))
+            .set({ purchasedAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 90 * 86_400_000) }, { merge: true });
+        } catch { console.warn('[push] wallet purchase suppression marker unavailable'); }
+      }
+      return NextResponse.json({ orderId, ...saved.order, walletShoppingApplied: saved.amount, amountDue: saved.amountDue, resellerLinked: true, guestTracked: Boolean(resellerGuestId) });
+    }
 
     const supabaseRow = mapOrderToSupabase(orderId, orderData);
     if (isSupabaseWriteConfigured()) {

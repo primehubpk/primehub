@@ -43,6 +43,7 @@ test('browse chooses the genuinely viewed product, with real low-stock only', ()
     { lastOpenedAt: '2026-10-09T05:00:00Z', lastProductId: 'p1' }, [product], settings);
   assert.ok(item);
   assert.equal(item.path, '/product/p1');
+  assert.equal(item.imageUrl, product.imageUrl);
   assert.ok(item.body.includes('Real Bangles') || item.body.includes('399'));
 });
 test('valid Big Deal has a real image and direct deep link', () => {
@@ -56,9 +57,36 @@ test('live deal only for today and valid stock', () => {
   assert.equal(selectDailyPush('live', now, 'dev1', {}, [{ ...product, stock: 0 }], settings), null);
 });
 test('new arrivals skip old products; copy rotates across local dates', () => {
-  assert.equal(selectDailyPush('arrivals', now, 'dev1', {}, [product], settings)?.path, '/new-arrivals');
+  const newArrivals = selectDailyPush('arrivals', now, 'dev1', {}, [product], settings);
+  assert.equal(newArrivals?.path, '/new-arrivals');
+  assert.equal(newArrivals?.imageUrl, product.imageUrl);
   assert.equal(selectDailyPush('arrivals', now, 'dev1', {}, [{ ...product, createdAt: '2026-09-01T00:00:00Z' }], settings), null);
   const d1 = selectDailyPush('big', now, 'dev1', {}, [product], settings);
   const d2 = selectDailyPush('big', new Date('2026-10-10T06:00:00Z'), 'dev1', {}, [product], settings);
   assert.notEqual(d1?.title, d2?.title);
+});
+
+test('all four daily slots include genuine CDN product images; no fabricated media', () => {
+  const session = { lastOpenedAt: '2026-10-09T05:20:00Z', displayName: 'Sania Kanwal' };
+  for (const slot of ['browse', 'big', 'live', 'arrivals']) {
+    const push = selectDailyPush(slot, now, 'sania-device', session, [product], settings);
+    assert.ok(push, 'missing ' + slot);
+    assert.equal(push.imageUrl, product.imageUrl);
+    assert.ok(push.title.startsWith('Sania, '), slot + ' missing known customer name');
+    assert.ok(push.body.includes('Real Bangles') || push.body.includes('Rs.'), slot);
+  }
+});
+test('weekly deal urgently but truthfully ends today at 22:00 Pakistan time', () => {
+  const atTenPm = new Date('2026-10-09T17:15:00Z');
+  const push = selectDailyPush('live', atTenPm, 'one', {}, [product], settings);
+  assert.ok(push.title.includes('khatam') || push.title.includes('Last chance') || push.title.includes('Deal end') || push.title.includes('ghantay baqi'));
+  assert.ok(push.body.includes('ghantay baqi'));
+  assert.equal(push.imageUrl, product.imageUrl);
+});
+test('never attach an unapproved host or fake display name', () => {
+  const unsafe = { ...product, imageUrl: 'https://attacker.example/not-our-image.jpg' };
+  assert.equal(selectDailyPush('browse', now, 'dev', { lastOpenedAt: now.toISOString() }, [unsafe], settings), null);
+  const p = selectDailyPush('big', now, 'dev', { displayName: 'Sania123' }, [product], settings);
+  assert.ok(p);
+  assert.equal(p.title.includes('Sania123'), false);
 });

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { authorizedWalletAdmin } from '@/lib/walletAdminSession';
 import { revalidateTag } from 'next/cache';
 import { publicProductCacheTag } from '@/lib/storefrontCachePolicy';
 import { getAdminDb } from '@/lib/firebaseAdmin';
@@ -21,10 +22,14 @@ const SUPABASE_PRIMARY_COLLECTIONS = new Set([
   'reward_gifts',
 ]);
 
-function isAuthorized(request: Request) {
-  const cookie = request.headers.get('cookie') || '';
-  return cookie.split(';').some((part) => part.trim() === 'primehub_admin_auth=true');
-}
+function isAuthorized(request: Request) { return authorizedWalletAdmin(request); }
+
+// Financial documents are mutated ONLY by their audited, transactional backend routes.
+const PROTECTED_FINANCIAL_COLLECTIONS = new Set([
+  'orders', 'reseller_profiles', 'reseller_withdrawals', 'reseller_reward_ledger',
+  'reseller_shopping_wallets', 'reseller_wallet_credits',
+  'reseller_wallet_spends', 'reseller_wallet_refunds',
+]);
 
 function normalize(name: string, value: Record<string, any>) {
   if (name !== 'categories') return value;
@@ -112,6 +117,12 @@ export async function POST(request: Request) {
     const db = getAdminDb();
 
     if (!name) return NextResponse.json({ error: 'Collection name is required.' }, { status: 400 });
+    if (request.headers.get('origin') !== new URL(request.url).origin) {
+      return NextResponse.json({ error: 'Origin mismatch.' }, { status: 403 });
+    }
+    if (PROTECTED_FINANCIAL_COLLECTIONS.has(name) && ['create', 'update', 'replace', 'set', 'delete'].includes(action)) {
+      return NextResponse.json({ error: 'Financial records must be modified through their audited, transactional endpoints.' }, { status: 403 });
+    }
 
     const supabasePrimary = SUPABASE_PRIMARY_COLLECTIONS.has(name);
 

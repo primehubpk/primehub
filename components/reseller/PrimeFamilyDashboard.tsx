@@ -82,7 +82,16 @@ const taskIcons: Record<string, ElementType> = {
   wholesale: Package,
 };
 function currentGuestId() {
-  try { return String(window.localStorage.getItem(GUEST_ID_KEY) || ''); } catch { return ''; }
+  try {
+    let id = String(window.localStorage.getItem(GUEST_ID_KEY) || '');
+    // Share one first-party browser session for anonymous & signed-in spins.
+    // This is NOT a permanent hardware ID and never uses IMEI.
+    if (!/^g_[A-Za-z0-9]{12,80}$/.test(id)) {
+      id = 'g_' + crypto.randomUUID().replace(/-/g, '');
+      window.localStorage.setItem(GUEST_ID_KEY, id);
+    }
+    return id;
+  } catch { return ''; }
 }
 
 export default function PrimeFamilyDashboard({
@@ -119,6 +128,7 @@ export default function PrimeFamilyDashboard({
   const [rewardGifts, setRewardGifts] = useState<RewardGift[]>([]);
   const [rewardProducts, setRewardProducts] = useState<Record<string, RewardProduct>>({});
   const [rewardBusy, setRewardBusy] = useState(false);
+  const [playBonusClaimed, setPlayBonusClaimed] = useState(false);
   const [rewardMessage, setRewardMessage] = useState('');
   const [voucherImages, setVoucherImages] = useState<Record<string, string>>(
     () => seededSettings.resellerVoucherImages || {},
@@ -130,10 +140,21 @@ export default function PrimeFamilyDashboard({
   );
 
   useEffect(() => {
+    const onBonus = (event: Event) => {
+      const detail = (event as CustomEvent<{ success?: boolean }>).detail;
+      if (detail?.success) setPlayBonusClaimed(true);
+    };
+    window.addEventListener('primehub:play-bonus-result', onBonus);
+    return () => window.removeEventListener('primehub:play-bonus-result', onBonus);
+  }, []);
+
+  useEffect(() => {
     let stopProfile: (() => void) | undefined;
     const stopAuth = onAuthStateChanged(auth, user => {
       stopProfile?.();
       setMemberUser(user);
+      try { setPlayBonusClaimed(Boolean(user && localStorage.getItem('primehub_app_bonus_account_' + user.uid) === 'credited')); }
+      catch { setPlayBonusClaimed(false); }
 
       if (!user) {
         setProfile(null);
@@ -266,6 +287,8 @@ export default function PrimeFamilyDashboard({
   const monthlyOrders = Number(profile?.monthlyOrders ?? 0);
   const walletAvailable = Number(profile?.walletAvailable ?? 0);
   const walletPending = Number(profile?.walletPending ?? 0);
+  const walletShopping = Number(profile?.walletShopping ?? 0);
+  const walletSpendable = walletAvailable + walletShopping;
   const sortedTiers = [...resellerTiers].sort((a,b) => a.minMonthlyOrders - b.minMonthlyOrders);
   const tier = [...sortedTiers].reverse().find(item => monthlyOrders >= item.minMonthlyOrders) || sortedTiers[0];
   const tierIndex = Math.max(0, sortedTiers.findIndex(item => item.id === tier.id));
@@ -414,7 +437,7 @@ export default function PrimeFamilyDashboard({
       <div className={`relative mx-auto max-w-[1180px] overflow-hidden bg-[#F6F1E8] ${embedded ? 'min-h-0 shadow-none' : 'min-h-screen shadow-2xl lg:my-6 lg:min-h-[calc(100vh-3rem)] lg:rounded-[32px]'}`}>
         <header className="relative bg-[linear-gradient(165deg,#16332E_0%,#0C1C19_70%)] px-4 pb-[22px] pt-3 text-white sm:px-6 lg:px-8 lg:pb-7 lg:pt-5">
           <div id="club-home" className="flex items-center justify-between gap-3"><Link href="/" className="inline-flex items-center gap-1.5 text-xs font-semibold text-white/80"><ArrowLeft size={14} /> Prime Family</Link><div className="flex items-center gap-2">{memberUser ? <><Link href="/reseller/wallet" aria-label="Reward history" className="grid h-9 w-9 place-items-center rounded-full bg-white/10 text-white"><History size={16}/></Link><a href="#club-tasks" aria-label="Notifications" className="relative grid h-9 w-9 place-items-center rounded-full bg-white/10 text-white"><Bell size={16}/><span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-[#FF9A3C] ring-2 ring-[#16332E]"/></a></> : <Link href="/reseller/join" className="rounded-full bg-[#FFCF68] px-3 py-2 text-[10px] font-extrabold text-[#14140F]">Sign In / Join</Link>}</div></div>
-          <div className="mt-4 grid gap-3 sm:grid-cols-[1.3fr_.7fr]"><div className="flex min-w-0 items-center gap-3 rounded-2xl border border-white/10 bg-white/[.07] p-3"><div className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-[#FFCF68] text-lg font-extrabold text-[#14140F]">{(profile?.displayName||profile?.email||'P').charAt(0).toUpperCase()}</div><div className="min-w-0"><p className="text-[9px] font-extrabold uppercase tracking-[.2em] text-[#FFCF68]">{memberUser ? 'Profile' : 'Guest access'}</p><h1 className="truncate text-lg font-extrabold">{profile?.displayName||profile?.email||'Prime Family Guest'}</h1><p className="truncate text-[10px] text-white/55">{profile?.email || (memberUser ? 'Member account' : 'Browse tasks & rewards — sign in to claim')}</p></div></div><div className="grid grid-cols-2 gap-2"><div className="rounded-2xl border border-white/10 bg-white/[.07] p-3"><p className="text-[8px] font-extrabold uppercase tracking-wider text-white/45">Cash Wallet</p><p className="mt-1 text-base font-extrabold">Rs. {walletAvailable.toLocaleString()}</p></div><div className="rounded-2xl border border-white/10 bg-white/[.07] p-3"><p className="text-[8px] font-extrabold uppercase tracking-wider text-white/45">Points Wallet</p><p className="mt-1 text-base font-extrabold">{Number(rewardWallet.points||0).toLocaleString()}</p></div></div></div>
+          <div className="mt-4 grid gap-3 sm:grid-cols-[1.3fr_.7fr]"><div className="flex min-w-0 items-center gap-3 rounded-2xl border border-white/10 bg-white/[.07] p-3"><div className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-[#FFCF68] text-lg font-extrabold text-[#14140F]">{(profile?.displayName||profile?.email||'P').charAt(0).toUpperCase()}</div><div className="min-w-0"><p className="text-[9px] font-extrabold uppercase tracking-[.2em] text-[#FFCF68]">{memberUser ? 'Profile' : 'Guest access'}</p><h1 className="truncate text-lg font-extrabold">{profile?.displayName||profile?.email||'Prime Family Guest'}</h1><p className="truncate text-[10px] text-white/55">{profile?.email || (memberUser ? 'Member account' : 'Browse tasks & rewards — sign in to claim')}</p></div></div><div className="grid grid-cols-2 gap-2"><div className="rounded-2xl border border-white/10 bg-white/[.07] p-3"><p className="text-[8px] font-extrabold uppercase tracking-wider text-white/45">Withdrawable</p><p className="mt-1 text-base font-extrabold">Rs. {walletAvailable.toLocaleString()}</p><p className="text-[8px] text-white/45">Shopping Rs. {walletSpendable.toLocaleString()}</p></div><div className="rounded-2xl border border-white/10 bg-white/[.07] p-3"><p className="text-[8px] font-extrabold uppercase tracking-wider text-white/45">Points Wallet</p><p className="mt-1 text-base font-extrabold">{Number(rewardWallet.points||0).toLocaleString()}</p></div></div></div>
         </header>
 
         <nav className="sticky top-0 z-30 flex gap-1.5 overflow-x-auto border-b border-black/5 bg-[#F6F1E8]/95 px-4 py-3 backdrop-blur sm:px-6 lg:justify-center lg:px-8 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -515,7 +538,30 @@ export default function PrimeFamilyDashboard({
             <>
               <section className="rounded-[18px] bg-[#FFFDF8] p-3.5 shadow-[0_8px_24px_rgba(20,20,15,.05)]">
                 <span className="text-[10px] font-extrabold uppercase tracking-[.14em] text-[#E85D04]">Reward wallet</span>
-                <div className="mt-3 grid grid-cols-2 gap-2"><div className="rounded-2xl bg-[#F1ECE3] p-3"><p className="text-[9px] font-extrabold uppercase tracking-wider text-[#6B6A62]">Cash wallet</p><h2 className="mt-1 text-2xl font-extrabold">Rs. {walletAvailable.toLocaleString()}</h2><p className="text-[10px] text-[#6B6A62]">Pending Rs. {walletPending.toLocaleString()}</p></div><div className="rounded-2xl bg-[#E7F6F3] p-3"><p className="text-[9px] font-extrabold uppercase tracking-wider text-[#0E7C6F]">Points wallet</p><h2 className="mt-1 text-2xl font-extrabold">{Number(rewardWallet.points||0).toLocaleString()}</h2><p className="text-[10px] text-[#0E7C6F]">Reward points</p></div></div>
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <div className="rounded-2xl bg-[#F1ECE3] p-3">
+                    <p className="text-[9px] font-extrabold uppercase tracking-wider text-[#6B6A62]">Withdrawal Balance</p>
+                    <h2 className="mt-1 text-2xl font-extrabold">Rs. {walletAvailable.toLocaleString()}</h2>
+                    <p className="text-[10px] text-[#6B6A62]">Min withdraw Rs. 500 · Pending Rs. {walletPending.toLocaleString()}</p>
+                  </div>
+                  <div className="rounded-2xl bg-[#E7F6F3] p-3">
+                    <p className="text-[9px] font-extrabold uppercase tracking-wider text-[#0E7C6F]">Points Wallet</p>
+                    <h2 className="mt-1 text-2xl font-extrabold">{Number(rewardWallet.points||0).toLocaleString()}</h2>
+                    <p className="text-[10px] text-[#0E7C6F]">Reward points · not cash</p>
+                  </div>
+                </div>
+                <div className="mt-2 rounded-2xl border border-[#0E7C6F]/10 bg-[#F0FAF6] p-3">
+                  <div className="flex items-end justify-between gap-2">
+                    <div><p className="text-[9px] font-extrabold uppercase tracking-wider text-[#0E7C6F]">Total Cash for Shopping</p><p className="mt-0.5 text-[10px] text-[#0E7C6F]/80">Shopping-only Rs. {walletShopping.toLocaleString()} + withdrawable Rs. {walletAvailable.toLocaleString()}</p></div>
+                    <strong className="whitespace-nowrap text-xl font-extrabold text-[#0E7C6F]">Rs. {walletSpendable.toLocaleString()}</strong>
+                  </div>
+                  <p className="mt-2 text-[10px] text-[#586D64]">On checkout, shopping credit is used first. Any remaining amount can use your withdrawable cash. Cash spent on orders is no longer available to withdraw.</p>
+                </div>
+                <div className="mt-3 rounded-2xl border border-[#0E7C6F]/15 bg-white p-3">
+                  <p className="text-[10px] font-extrabold uppercase tracking-wider text-[#0E7C6F]">Play Store App Bonus · Rs. 100</p>
+                  <p className="mt-1 text-[10px] leading-5 text-[#6B6A62]">One-time welcome cash for PrimeHub app users. No Claim button or additional login: it applies automatically after regular email/password sign-in, when the offer is active. Minimum withdrawal stays Rs. 500.</p>
+                  {playBonusClaimed && <p className="mt-2 text-[10px] font-black text-[#0E7C6F]">✓ Rs. 100 has been credited to your Withdrawal Balance.</p>}
+                </div>
                 <Link href="/reseller/wallet" className="mt-3 block w-full rounded-xl bg-[#14140F] px-3 py-3 text-center text-xs font-extrabold text-white">Request withdrawal</Link>
               </section>
               <section className="mt-3 rounded-[18px] bg-[#FFFDF8] p-3.5 shadow-[0_8px_24px_rgba(20,20,15,.05)]">

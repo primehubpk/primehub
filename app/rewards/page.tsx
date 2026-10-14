@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { addDoc, collection, doc, onSnapshot, query, runTransaction, serverTimestamp, where } from 'firebase/firestore';
+import { collection, doc, onSnapshot, query, where } from 'firebase/firestore';
 import {
   ArrowRight,
   CheckCircle2,
@@ -88,6 +88,9 @@ type RewardWin = {
 };
 
 const GUEST_KEY = 'phdeals-guest-rewards';
+const GUEST_ID_KEY = 'primehub_reseller_guest_id_v1';
+function browserGuestId() { try { let id = localStorage.getItem(GUEST_ID_KEY) || ''; if (!/^g_[a-zA-Z0-9]{12,80}$/.test(id)) { id = 'g_' + crypto.randomUUID().replace(/-/g, ''); localStorage.setItem(GUEST_ID_KEY, id); } return id; } catch { return ''; } }
+async function secureRewardsPost(path: string, user: User, body: Record<string, unknown>) { const token = await user.getIdToken(); const response = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token }, body: JSON.stringify(body), cache: 'no-store' }); const data = await response.json().catch(() => null); if (!response.ok) throw new Error(data?.error || 'Reward request could not be completed.'); return data; }
 const GUEST_WINS_KEY = 'phdeals-guest-reward-wins';
 const DEFAULT_TERMS = 'Points have no cash value. Required points are shown on eligible rewards. Points are deducted only after a successful redemption. Rewards are subject to stock and availability. Guests can earn rewards on this device, but login is required to redeem. Spin and check-in limits are controlled by PrimeHub. PrimeHub may change reward availability, point requirements, or reward rules.';
 const defaultSettings: RewardSettings = {
@@ -168,6 +171,7 @@ export default function RewardsPage() {
   const [spinning, setSpinning] = useState(false);
   const [rotation, setRotation] = useState(0);
   const [redeeming, setRedeeming] = useState<string | null>(null);
+  const redemptionKeys = useRef(new Map<string, string>());
 
   useEffect(() => onAuthStateChanged(auth, setUser), []);
 
@@ -276,51 +280,9 @@ export default function RewardsPage() {
       setWins(rows);
     });
 
-    async function migrateGuestData() {
-      try {
-        const rawWallet = localStorage.getItem(GUEST_KEY);
-        const guestWallet = rawWallet ? ({ ...emptyWallet, ...JSON.parse(rawWallet) } as Wallet) : emptyWallet;
-        const rawWins = localStorage.getItem(GUEST_WINS_KEY);
-        const guestWins: RewardWin[] = rawWins ? JSON.parse(rawWins) : [];
-        if (guestWins.length) {
-          for (const win of guestWins) {
-            await addDoc(collection(db, 'reward_wins'), {
-              userId: authenticatedUser.uid,
-              prizeId: win.prizeId,
-              name: win.name,
-              type: win.type,
-              points: Number(win.points || 0),
-              productId: win.productId || '',
-              voucherCode: win.voucherCode || '',
-              voucherAmount: Number(win.voucherAmount || 0),
-              imageUrl: win.imageUrl || '',
-              status: 'pending',
-              createdAt: serverTimestamp(),
-            });
-          }
-          localStorage.removeItem(GUEST_WINS_KEY);
-        }
-        const guestPoints = Math.max(0, Number(guestWallet.points || 0));
-        if (guestPoints > 0) {
-          let remaining = guestPoints;
-          while (remaining > 0) {
-            const chunk = Math.min(100, remaining);
-            await runTransaction(db, async tx => {
-              const ref = doc(db, 'user_rewards', authenticatedUser.uid);
-              const snap = await tx.get(ref);
-              const current = { ...emptyWallet, ...(snap.data() || {}) } as Wallet;
-              tx.set(ref, { ...current, points: Number(current.points) + chunk, updatedAt: serverTimestamp() }, { merge: true });
-            });
-            remaining -= chunk;
-          }
-          localStorage.removeItem(GUEST_KEY);
-        }
-      } catch {
-        // Keep guest data if migration fails; the customer can retry after reload.
-      }
-    }
-
-    migrateGuestData();
+    // Never import client-editable guest points or prizes into a real account.
+    // Server-verifiable guest rewards must go through /api/reseller/guest-reward.
+    // The old migration accepted arbitrary localStorage numbers and was unsafe.
     setReady(true);
     return () => { walletUnsub(); winsUnsub(); };
   }, [user]);
@@ -341,193 +303,102 @@ export default function RewardsPage() {
 
   async function checkIn() {
     if (wallet.lastCheckIn === dayKey() || busy) return;
-    setBusy(true);
-    setMessage('');
+    setBusy(true); setMessage('');
     try {
-      const yesterday = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Karachi' }).format(new Date(Date.now() - 86400000));
-      const streak = wallet.lastCheckIn === yesterday ? Math.min(7, Math.max(1, Number(wallet.streak || 0)) + 1) : 1;
-      const points = Math.min(100, Math.max(0, Number(settings.checkInRewards?.[streak - 1] ?? 10)));
       if (user) {
-        await runTransaction(db, async tx => {
-          const ref = doc(db, 'user_rewards', user.uid);
-          const snap = await tx.get(ref);
-          const current = { ...emptyWallet, ...(snap.data() || {}) } as Wallet;
-          if (current.lastCheckIn === dayKey()) throw new Error('Already checked in today.');
-          tx.set(ref, { ...current, points: Number(current.points) + points, streak, lastCheckIn: dayKey(), updatedAt: serverTimestamp() }, { merge: true });
+        const response = await secureRewardsPost('/api/reseller/reward-action', user, {
+          action: 'checkin', guestId: browserGuestId(),
         });
+        if (response.wallet) setWallet({ ...emptyWallet, ...response.wallet });
+        const earned = Number(response.wallet?.history?.at(-1)?.pointsAwarded || 0);
+        setMessage(`Daily check-in complete — +${earned} verified points.`);
       } else if (settings.guestMode !== false) {
-        saveGuestWallet({ ...wallet, points: Number(wallet.points) + points, streak, lastCheckIn: dayKey() });
-      } else {
-        throw new Error('Please login to use rewards.');
-      }
-      setMessage(`Day ${streak} complete — +${points} points added.`);
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Check-in failed.');
-    } finally {
-      setBusy(false);
-    }
+        // Offline guest preview points are not transferable into real rewards.
+        const streak = Math.min(7, Number(wallet.streak || 0) + 1);
+        const previewPoints = Math.min(100, Math.max(0, Number(settings.checkInRewards?.[streak - 1] ?? 10)));
+        saveGuestWallet({ ...wallet, points: Number(wallet.points || 0) + previewPoints, streak, lastCheckIn: dayKey() });
+        setMessage('Guest preview check-in saved in this browser. Sign in to earn verified points.');
+      } else throw new Error('Please sign in to claim reward points.');
+    } catch (error) { setMessage(error instanceof Error ? error.message : 'Check-in unavailable.'); }
+    finally { setBusy(false); }
   }
 
   async function spin() {
     if (wallet.lastSpin === dayKey() || spinning || busy) return;
     if (settings.guestMode === false && !user) {
-      window.location.href = '/login?redirect=/rewards';
-      return;
+      window.location.href = '/login?redirect=/rewards'; return;
     }
-    if (!activePrizes.length) {
-      setMessage('Spin prizes are not configured yet.');
-      return;
-    }
-    const prize = weighted(activePrizes);
-    if (!prize) return;
-    setBusy(true);
-    setSpinning(true);
-    setMessage('');
-    setResult(null);
-    const index = Math.max(0, activePrizes.findIndex(item => item.id === prize.id));
-    const target = 360 * 6 + (360 - (index * slice + slice / 2));
-    setRotation(current => current + target);
-
+    if (!activePrizes.length) { setMessage('Spin prizes are not configured yet.'); return; }
+    setBusy(true); setSpinning(true); setMessage(''); setResult(null);
     try {
-      const points = prize.type === 'points' ? Math.min(100, Math.max(0, Number(prize.points || 0))) : 0;
-      const voucherCode = (prize.type === 'coupon' || prize.type === 'free-delivery')
-        ? (prize.voucherCode?.trim() || `PH-${Math.random().toString(36).slice(2, 8).toUpperCase()}`)
-        : '';
-      const win: RewardWin = {
-        id: `guest-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-        prizeId: prize.id,
-        name: prize.name,
-        type: prize.type,
-        points,
-        productId: prize.productId || '',
-        voucherCode,
-        voucherAmount: Number(prize.voucherAmount || 0),
-        imageUrl: prize.imageUrl || '',
-        status: 'pending',
-      };
-
+      const guestId = browserGuestId();
+      let reply: any;
       if (user) {
-        await runTransaction(db, async tx => {
-          const ref = doc(db, 'user_rewards', user.uid);
-          const snap = await tx.get(ref);
-          const current = { ...emptyWallet, ...(snap.data() || {}) } as Wallet;
-          if (current.lastSpin === dayKey()) throw new Error('Come back tomorrow for your next spin.');
-          tx.set(ref, {
-            ...current,
-            points: Number(current.points) + points,
-            lastSpin: dayKey(),
-            coupons: voucherCode ? [...(current.coupons || []), voucherCode] : (current.coupons || []),
-            updatedAt: serverTimestamp(),
-          }, { merge: true });
-          if (prize.type !== 'points' && prize.type !== 'try-again') {
-            tx.set(doc(collection(db, 'reward_wins')), { ...win, userId: user.uid, createdAt: serverTimestamp() });
-          }
+        reply = await secureRewardsPost('/api/reseller/reward-action', user, {
+          action: 'spin', guestId, legacyRewardsPage: true,
         });
+        if (reply.wallet) setWallet({ ...emptyWallet, ...reply.wallet });
       } else {
-        const nextWallet = { ...wallet, points: Number(wallet.points) + points, lastSpin: dayKey(), coupons: voucherCode ? [...(wallet.coupons || []), voucherCode] : (wallet.coupons || []) };
-        saveGuestWallet(nextWallet);
-        if (prize.type !== 'points' && prize.type !== 'try-again') saveGuestWins([...wins, win]);
+        const response = await fetch('/api/reseller/guest-reward', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'spin', guestId }), cache: 'no-store',
+        });
+        reply = await response.json().catch(() => null);
+        if (!response.ok) throw new Error(reply?.error || 'Guest spin unavailable.');
       }
-
+      const prize = reply?.prize as Prize | undefined;
+      if (!prize) throw new Error('Spin result is unavailable.');
+      const index = Math.max(0, activePrizes.findIndex(item => item.id === prize.id));
+      const target = 360 * 6 + (360 - (index * slice + slice / 2));
+      setRotation(current => current + target);
+      if (!user) {
+        // Guest prizes are server-side and require sign-in via guest claim API.
+        const preview = { ...wallet, lastSpin: dayKey() };
+        saveGuestWallet(preview);
+        if (prize.type !== 'points' && prize.type !== 'try-again') {
+          const local = { id: 'guest-' + Date.now(), prizeId: prize.id, name: prize.name,
+            type: prize.type, points: Number(prize.points || 0), productId: prize.productId || '',
+            voucherCode: prize.voucherCode || '', voucherAmount: Number(prize.voucherAmount || 0),
+            imageUrl: prize.imageUrl || '', status: 'pending' as const };
+          saveGuestWins([...wins, local]);
+        }
+      }
       window.setTimeout(() => {
-        setSpinning(false);
-        setBusy(false);
-        setResult(prize);
-        setMessage(prize.type === 'try-again' ? 'Better luck tomorrow — your next spin is waiting.' : `🎉 ${prize.name} won!`);
+        setSpinning(false); setBusy(false); setResult(prize);
+        setMessage(prize.type === 'try-again' ? 'Better luck tomorrow — come back next day!' :
+          user ? `🎉 ${prize.name} won!` : `🎉 ${prize.name}! Sign in to claim verified rewards.`);
       }, 1900);
     } catch (error) {
-      setSpinning(false);
-      setBusy(false);
+      setSpinning(false); setBusy(false);
       setMessage(error instanceof Error ? error.message : 'Spin failed.');
     }
   }
 
   async function redeemWin(win: RewardWin) {
-    if (!user) {
-      window.location.href = '/login?redirect=/rewards#wins';
-      return;
-    }
+    if (!user) { window.location.href = '/login?redirect=/rewards#wins'; return; }
     if (win.status === 'redeemed') return;
-    setRedeeming(win.id);
-    setMessage('');
+    setRedeeming(win.id); setMessage('');
     try {
-      await runTransaction(db, async tx => {
-        const winRef = doc(db, 'reward_wins', win.id);
-        const winSnap = await tx.get(winRef);
-        if (!winSnap.exists()) throw new Error('This reward is no longer available.');
-        const current = winSnap.data() as RewardWin;
-        if (current.status === 'redeemed') throw new Error('This reward was already claimed.');
-        const redemptionRef = doc(collection(db, 'reward_redemptions'));
-        tx.set(redemptionRef, {
-          userId: user.uid,
-          giftId: `wheel:${current.prizeId}`,
-          wheelWinId: win.id,
-          pointsCost: 0,
-          rewardType: current.type,
-          rewardName: current.name,
-          productId: current.productId || '',
-          voucherCode: current.voucherCode || '',
-          voucherAmount: Number(current.voucherAmount || 0),
-          status: 'pending',
-          fulfillment: 'reward',
-          freeDelivery: current.type === 'free-delivery' || current.type === 'product',
-          deliveryFee: 0,
-          createdAt: serverTimestamp(),
-        });
-        tx.update(winRef, { status: 'redeemed', redeemedAt: serverTimestamp() });
-      });
+      await secureRewardsPost('/api/rewards/secure-redeem', user, { action: 'win', winId: win.id });
       setMessage('Reward claimed! Admin will process your reward fulfilment.');
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Could not redeem reward.');
-    } finally {
-      setRedeeming(null);
-    }
+    } catch (error) { setMessage(error instanceof Error ? error.message : 'Could not redeem reward.'); }
+    finally { setRedeeming(null); }
   }
 
   async function redeemGift(gift: RewardGift) {
-    if (!user) {
-      window.location.href = '/login?redirect=/rewards#redeem-rewards';
-      return;
-    }
-    if (wallet.points < gift.pointsCost) {
-      setMessage(`You need ${gift.pointsCost - wallet.points} more points.`);
-      return;
-    }
-    if (Number(gift.stock ?? 1) < 1) {
-      setMessage('This reward is out of stock.');
-      return;
-    }
-    setRedeeming(gift.id);
-    setMessage('');
+    if (!user) { window.location.href = '/login?redirect=/rewards#redeem-rewards'; return; }
+    if (wallet.points < gift.pointsCost) { setMessage('Insufficient points for this gift.'); return; }
+    setRedeeming(gift.id); setMessage('');
     try {
-      await runTransaction(db, async tx => {
-        const walletRef = doc(db, 'user_rewards', user.uid);
-        const redemptionRef = doc(collection(db, 'reward_redemptions'));
-        const snap = await tx.get(walletRef);
-        const current = { ...emptyWallet, ...(snap.data() || {}) } as Wallet;
-        if (Number(current.points) < gift.pointsCost) throw new Error(`You need ${gift.pointsCost - Number(current.points)} more points.`);
-        tx.set(walletRef, { ...current, points: Number(current.points) - gift.pointsCost, updatedAt: serverTimestamp() }, { merge: true });
-        tx.set(redemptionRef, {
-          userId: user.uid,
-          giftId: gift.id,
-          productId: gift.productId || '',
-          pointsCost: gift.pointsCost,
-          status: 'pending',
-          fulfillment: 'reward',
-          freeDelivery: true,
-          deliveryFee: 0,
-          createdAt: serverTimestamp(),
-          rewardType: 'points-store',
-          rewardName: gift.title || 'Reward Gift',
-        });
+      let requestId = redemptionKeys.current.get(gift.id);
+      if (!requestId) { requestId = crypto.randomUUID(); redemptionKeys.current.set(gift.id, requestId); }
+      await secureRewardsPost('/api/rewards/secure-redeem', user, {
+        action: 'gift', giftId: gift.id, requestId,
       });
-      setWallet(current => ({ ...current, points: Number(current.points) - gift.pointsCost }));
-      setMessage('Reward claimed! Points deducted and FREE DELIVERY is included.');
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Redemption failed. Please try again.');
-    } finally {
-      setRedeeming(null);
-    }
+      redemptionKeys.current.delete(gift.id);
+      setMessage('Reward claimed! Points deducted by the server. FREE DELIVERY included.');
+    } catch (error) { setMessage(error instanceof Error ? error.message : 'Redemption failed.'); }
+    finally { setRedeeming(null); }
   }
 
   if (!ready) return <main className="min-h-screen bg-[#F4F4F1]" />;

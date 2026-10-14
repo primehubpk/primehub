@@ -40,11 +40,23 @@ export async function POST(request: Request) {
     if (action === 'identity') {
       const idToken = String(data?.idToken || '');
       if (idToken.length > 4096) return reject(400);
-      let userUid = '';
+      let userUid = '', displayName = '';
       if (idToken) {
-        try { userUid = (await getAdminAuth().verifyIdToken(idToken)).uid; } catch { return reject(401); }
+        try {
+          const decoded = await getAdminAuth().verifyIdToken(idToken);
+          userUid = decoded.uid;
+          // Only one additional profile read on account login, NEVER per cron send.
+          // We do not manufacture a first name from email or device metadata.
+          if (userUid === String(previous.get('userUid') || '') && previous.get('displayName')) {
+            displayName = String(previous.get('displayName') || '').slice(0, 60);
+          } else {
+            const profile = await getAdminDb().collection('reseller_profiles').doc(userUid).get();
+            const saved = profile.data() || {};
+            displayName = String(saved.displayName || saved.name || decoded.name || '').trim().slice(0, 60);
+          }
+        } catch { return reject(401); }
       }
-      await doc.update({ userUid, updatedAt: now });
+      await doc.update({ userUid, displayName, updatedAt: now });
     } else if (action === 'preferences') {
       await doc.update({ allowed: data?.allowed === true, enabled: data?.enabled === true, updatedAt: now });
     } else if (action === 'view') {

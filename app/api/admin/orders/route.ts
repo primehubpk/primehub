@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getAdminDb } from '@/lib/firebaseAdmin';
+import { authorizedWalletAdmin } from '@/lib/walletAdminSession';
+import { refundShoppingWalletOrder } from '@/lib/resellerShoppingCheckout';
 import {
   getSupabasePrimaryPayload,
   isSupabaseWriteConfigured,
@@ -22,8 +24,7 @@ let legacyOrdersCache: Array<Record<string, any>> = [];
 let legacyOrdersCacheAt = 0;
 
 function isAuthorized(request: Request) {
-  const cookie = request.headers.get('cookie') || '';
-  return cookie.split(';').some((part) => part.trim() === `${ADMIN_COOKIE}=true`);
+  return authorizedWalletAdmin(request);
 }
 
 function supabaseConfig() {
@@ -31,6 +32,14 @@ function supabaseConfig() {
     url: String(process.env.SUPABASE_URL || '').replace(/\/+$/, ''),
     key: String(process.env.SUPABASE_SERVICE_ROLE_KEY || ''),
   };
+}
+
+async function listWhatsAppDrafts() {
+  // Query newest requests without requiring a new composite Firestore index.
+  const snap = await getAdminDb().collection('whatsapp_order_intents')
+    .orderBy('createdAt', 'desc').limit(150).get();
+  return snap.docs.filter(doc => doc.data()?.status === 'awaiting_confirmation')
+    .slice(0, 100).map(doc => ({ id: doc.id, ...doc.data(), whatsappDraft: true }));
 }
 
 async function listSupabaseOrders() {
@@ -123,6 +132,17 @@ async function saveOrderWhatsappNumber(number: string) {
   return null;
 }
 
+async function walletOrdersNotYetMirrored(known: Array<Record<string, any>>) {
+  try {
+    const snap = await getAdminDb().collection('orders').where('paymentMethod', 'in', ['shopping_wallet', 'shopping_wallet_plus_cod']).limit(100).get();
+    const ids = new Set(known.map(order => String(order.id)));
+    return snap.docs.filter(doc => !ids.has(doc.id)).map(doc => ({ id: doc.id, ...(doc.data() || {}) }));
+  } catch (error) {
+    console.error('Wallet order backup read unavailable:', error);
+    return [] as Array<Record<string, any>>;
+  }
+}
+
 async function readLegacyFirebaseOrders() {
   const now = Date.now();
   if (legacyOrdersCache.length && now - legacyOrdersCacheAt < LEGACY_CACHE_MS) {
@@ -159,16 +179,22 @@ export async function GET(request: Request) {
   if (!isAuthorized(request)) {
     return NextResponse.json({ error: 'Authentication required.' }, { status: 401 });
   }
-
+  // Drafts are read only when admin opens Orders; no homepage polling.
+  const whatsappDrafts = await listWhatsAppDrafts().catch(error => {
+    console.warn('WhatsApp drafts temporarily unavailable:', error);
+    return [];
+  });
   if (isSupabaseWriteConfigured()) {
     try {
       const [orders, whatsappNumber] = await Promise.all([
         listSupabaseOrders(),
         readOrderWhatsappNumber().catch(() => ''),
       ]);
+      const walletBackup = await walletOrdersNotYetMirrored(orders);
       return NextResponse.json({
         success: true,
-        orders,
+        orders: [...walletBackup, ...orders],
+        whatsappDrafts,
         whatsappNumber,
         primary: 'supabase',
         warning: null,
@@ -181,6 +207,7 @@ export async function GET(request: Request) {
         return NextResponse.json({
           success: true,
           orders: legacy.orders,
+          whatsappDrafts,
           whatsappNumber,
           primary: 'firebase-fallback',
           warning: `Supabase orders could not be loaded. Showing Firebase fallback. ${supabaseWarning}`,
@@ -201,6 +228,7 @@ export async function GET(request: Request) {
     return NextResponse.json({
       success: true,
       orders: legacy.orders,
+      whatsappDrafts,
       whatsappNumber,
       primary: 'firebase',
       warning: 'Supabase order storage is not configured on this deployment.',
@@ -216,6 +244,9 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   if (!isAuthorized(request)) {
     return NextResponse.json({ error: 'Authentication required.' }, { status: 401 });
+  }
+  if (request.headers.get('origin') !== new URL(request.url).origin) {
+    return NextResponse.json({ error: 'Origin mismatch.' }, { status: 403 });
   }
 
   try {
@@ -236,6 +267,99 @@ export async function POST(request: Request) {
         whatsappNumber: number,
         mirrorWarning,
       });
+    }
+
+    if (action === 'record-whatsapp') {
+      // For chats started directly in WhatsApp, which wa.me cannot report to us.
+      // Admin enters what was actually agreed in the conversation.
+      const customer = body?.customer || {};
+      const name = String(customer.name || '').trim().slice(0, 120);
+      const phone = String(customer.phone || '').trim().slice(0, 40);
+      const city = String(customer.city || '').trim().slice(0, 120);
+      const address = String(customer.address || '').trim().slice(0, 500);
+      const selfCollect = body?.selfCollect === true;
+      if (!name || phone.replace(/\D/g, '').length < 9 || (!selfCollect && (!city || !address))) {
+        return NextResponse.json({ error: 'Customer name, valid phone, city and address are required.' }, { status: 400 });
+      }
+      const raw = Array.isArray(body?.items) ? body.items : [];
+      if (!raw.length || raw.length > 30) return NextResponse.json({ error: 'Add 1 to 30 real products.' }, { status: 400 });
+      const items: Array<Record<string, unknown>> = [];
+      let subtotal = 0, totalItems = 0;
+      for (const item of raw) {
+        const title = String(item?.title || '').trim().slice(0, 150);
+        const qty = Number(item?.quantity);
+        const price = Number(item?.price);
+        if (!title || !Number.isSafeInteger(qty) || qty < 1 || qty > 100 ||
+          !Number.isSafeInteger(price) || price <= 0 || price > 1_000_000 ||
+          !Number.isSafeInteger(subtotal + qty * price)) {
+          return NextResponse.json({ error: 'Enter valid product names, quantities and prices.' }, { status: 400 });
+        }
+        subtotal += price * qty; totalItems += qty;
+        const image = String(item?.image || '').trim();
+        items.push({
+          title, quantity: qty, price, image: /^https:\/\//.test(image) ? image.slice(0, 1500) : '',
+          variant: { color: String(item?.color || '').slice(0, 60), size: String(item?.size || '').slice(0, 40) },
+        });
+      }
+      const charge = selfCollect ? 0 : Number(body?.deliveryCharge);
+      if (!Number.isSafeInteger(charge) || charge < 0 || charge > 10000) {
+        return NextResponse.json({ error: 'Invalid delivery charge.' }, { status: 400 });
+      }
+      const id = crypto.randomUUID();
+      const order = {
+        id, customer: { name, phone, city: selfCollect ? 'Lahore' : city,
+          address: selfCollect ? 'PrimeHub Shop Pickup' : address,
+          notes: String(customer.notes || '').slice(0, 1000) },
+        items, totalItems, subtotal, rawSubtotal: subtotal, deliveryCharge: charge,
+        baseDelivery: charge, total: subtotal + charge, amountDue: subtotal + charge,
+        currency: 'PKR', status: 'pending', source: 'whatsapp_manual',
+        whatsappState: 'manually_recorded', adminVerified: true, selfCollect,
+        fulfillment: selfCollect ? 'self_collect' : 'delivery',
+        createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+      };
+      const db = getAdminDb();
+      if (isSupabaseWriteConfigured()) {
+        await supabasePrimaryUpsert({ table: 'orders',
+          row: { ...mapOrderToSupabase(id, order), authoritative_source: 'supabase', mirror_status: 'synced', mirror_error: null } });
+        try { await db.collection('orders').doc(id).set(order); }
+        catch (error) { console.warn('Manual WhatsApp order Firebase mirror deferred:', error); }
+      } else await db.collection('orders').doc(id).set(order);
+      return NextResponse.json({ success: true, orderId: id });
+    }
+
+    if (action === 'confirm-whatsapp' || action === 'dismiss-whatsapp') {
+      const id = String(body?.intentId || '');
+      if (!/^[0-9a-f-]{36}$/i.test(id)) return NextResponse.json({ error: 'Invalid WhatsApp reference.' }, { status: 400 });
+      const db = getAdminDb();
+      const ref = db.collection('whatsapp_order_intents').doc(id);
+      const snap = await ref.get();
+      if (!snap.exists) return NextResponse.json({ error: 'WhatsApp request not found.' }, { status: 404 });
+      const intent = snap.data() || {};
+      if (intent.status !== 'awaiting_confirmation') return NextResponse.json({ error: 'WhatsApp request already reviewed.' }, { status: 409 });
+      if (action === 'dismiss-whatsapp') {
+        await ref.update({ status: 'dismissed', reviewedAt: new Date().toISOString() });
+        return NextResponse.json({ success: true, status: 'dismissed' });
+      }
+      // This admin action requires checking the real incoming WhatsApp message.
+      // Opening a wa.me link alone never counts an order or a reseller reward.
+      const order = {
+        ...intent, id, status: 'pending', isRealOrder: true,
+        whatsappState: 'admin_confirmed', source: 'whatsapp',
+        paymentMethod: 'cod', amountDue: Number(intent.total || 0),
+        walletShoppingApplied: 0, confirmedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      delete (order as any).whatsappDraft;
+      if (isSupabaseWriteConfigured()) {
+        await supabasePrimaryUpsert({ table: 'orders',
+          row: { ...mapOrderToSupabase(id, order), authoritative_source: 'supabase', mirror_status: 'synced', mirror_error: null } });
+        try { await db.collection('orders').doc(id).set(order, { merge: true }); }
+        catch (error) { console.warn('WhatsApp confirmed order Firebase mirror delayed:', error); }
+      } else {
+        await db.collection('orders').doc(id).set(order, { merge: true });
+      }
+      await ref.update({ status: 'confirmed', confirmedAt: order.confirmedAt, confirmedOrderId: id });
+      return NextResponse.json({ success: true, orderId: id, status: 'confirmed' });
     }
 
     if (action === 'sync-legacy') {
@@ -284,6 +408,21 @@ export async function POST(request: Request) {
       const status = String(body?.status || '').toLowerCase();
       if (!ORDER_STATUSES.has(status)) {
         return NextResponse.json({ error: 'Invalid order status.' }, { status: 400 });
+      }
+
+      if (status === 'cancelled') {
+        const spend = await db.collection('reseller_wallet_spends').doc(orderId).get();
+        if (spend.exists) {
+          if (!authorizedWalletAdmin(request)) return NextResponse.json({ error: 'Wallet admin login required to refund shopping credit.' }, { status: 401 });
+          const refunded = await refundShoppingWalletOrder(orderId);
+          if (isSupabaseWriteConfigured()) {
+            const row = { ...mapOrderToSupabase(orderId, refunded.order), authoritative_source: 'firebase' };
+            try { await supabasePrimaryUpsert({ table: 'orders', row }); }
+            catch (error) { console.error('Wallet cancellation order mirror deferred:', error); try { await recordMirrorFailure('orders', orderId, 'upsert', row); } catch {} }
+          }
+          legacyOrdersCache = legacyOrdersCache.map(order => order.id === orderId ? { ...order, status: 'cancelled', walletPaymentStatus: 'refunded' } : order);
+          return NextResponse.json({ success: true, primary: 'firebase-wallet', walletRefunded: refunded.applied });
+        }
       }
 
       if (isSupabaseWriteConfigured()) {
@@ -337,6 +476,11 @@ export async function POST(request: Request) {
     }
 
     if (action === 'delete') {
+      const walletSpend = await db.collection('reseller_wallet_spends').doc(orderId).get();
+      if (walletSpend.exists) {
+        if (!authorizedWalletAdmin(request)) return NextResponse.json({ error: 'Wallet admin login required.' }, { status: 401 });
+        if (walletSpend.data()?.status !== 'refunded') return NextResponse.json({ error: 'Cancel and refund shopping credit before deleting a wallet order.' }, { status: 409 });
+      }
       if (isSupabaseWriteConfigured()) {
         let existsInSupabase = false;
         try {

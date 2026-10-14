@@ -17,6 +17,7 @@ import com.google.firebase.messaging.FirebaseMessagingService;
 import com.google.firebase.messaging.RemoteMessage;
 
 import java.io.InputStream;
+import java.io.ByteArrayOutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.Map;
@@ -74,14 +75,35 @@ public class PrimeHubMessagingService extends FirebaseMessagingService {
             if (!("images.primehubmall.com".equals(host) || "i.ibb.co".equals(host)
                   || "www.primehubmall.com".equals(host))) return null;
             connection = (HttpURLConnection) new URL(value).openConnection();
-            connection.setConnectTimeout(2500);
-            connection.setReadTimeout(2500);
+            connection.setConnectTimeout(4000);
+            connection.setReadTimeout(4000);
             connection.setInstanceFollowRedirects(false);
             if (connection.getResponseCode() != 200 || connection.getContentLengthLong() > 2_000_000) return null;
-            try (InputStream stream = connection.getInputStream()) {
-                BitmapFactory.Options options = new BitmapFactory.Options();
-                options.inSampleSize = 2;
-                return BitmapFactory.decodeStream(stream, null, options);
+            String mime = connection.getContentType();
+            if (mime == null || !mime.toLowerCase().startsWith("image/")) return null;
+            // Stream in small chunks: Content-Length may be absent. Cap bytes to
+            // 2MB and downsample to ~1024px to avoid bitmap-related OOM/crashes.
+            try (InputStream stream = connection.getInputStream();
+                 ByteArrayOutputStream output = new ByteArrayOutputStream(64 * 1024)) {
+                byte[] chunk = new byte[16 * 1024];
+                int total = 0, read;
+                while ((read = stream.read(chunk)) != -1) {
+                    total += read;
+                    if (total > 2_000_000) return null;
+                    output.write(chunk, 0, read);
+                }
+                byte[] encoded = output.toByteArray();
+                if (encoded.length < 20) return null;
+                BitmapFactory.Options bounds = new BitmapFactory.Options();
+                bounds.inJustDecodeBounds = true;
+                BitmapFactory.decodeByteArray(encoded, 0, encoded.length, bounds);
+                if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null;
+                BitmapFactory.Options opts = new BitmapFactory.Options();
+                opts.inPreferredConfig = Bitmap.Config.RGB_565;
+                int sample = 1;
+                while (bounds.outWidth / sample > 1024 || bounds.outHeight / sample > 1024) sample *= 2;
+                opts.inSampleSize = sample;
+                return BitmapFactory.decodeByteArray(encoded, 0, encoded.length, opts);
             }
         } catch (Exception error) { Log.w("PrimeHubPush", "Image unavailable; text notification used", error); }
         finally { if (connection != null) connection.disconnect(); }

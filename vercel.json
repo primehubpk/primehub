@@ -4,31 +4,7 @@
     "PRIMEHUB_DATA_READ_MODE": "supabase-primary"
   },
   "git": {
-    "deploymentEnabled": {
-      "fix/primehubmall-egress-performance": false,
-      "fix/weekly-deal-original-price": true,
-      "feature/home-nav-instant-active-fix": false,
-      "fix/mobile-nav-performance-audit": true,
-      "fix/bottom-nav-performance": true,
-      "fix/instant-home-shop-navigation-phase1": true,
-      "fix/bottom-nav-instant-phase-1": true,
-      "fix/homepage-refresh-phase-1": false,
-      "fix/category-continuous-sections": false,
-      "fix/salar-home-catalog-sep27": true,
-      "fix/home-rails-deals-usage-sep29": false,
-      "fix/home-sale-mela-layout-shuffle-oct02": false,
-      "fix/home-commerce-youtube-ratio-oct02": false,
-      "fix/home-return-navigation-oct02": false,
-      "cursor/product-back-keep-place-3680": false,
-      "cursor/customer-back-home-3680": false,
-      "cursor/sale-back-images-3680": false,
-      "fix/storefront-image-recovery-oct02": false,
-      "fix/storefront-image-delivery-oct02": false,
-      "fix/navigation-usage-visitors-oct03": false,
-      "cursor/daily-push-4688": false,
-      "fix/vercel-isr-usage-oct11": false,
-      "fix/salar-admin-replies-oct12": false
-    }
+    "deploymentEnabled": false
   },
   "crons": [
     {

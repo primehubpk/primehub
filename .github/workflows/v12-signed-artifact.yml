@@ -1,0 +1,158 @@
+name: PrimeHub v12 signed Play Store bundle (manual branch build only)
+
+on:
+  push:
+    branches:
+      - feature/reseller-wallet-admin-dupes-oct14
+    paths:
+      - '.github/workflows/v12-signed-artifact.yml'
+      - 'play-store/android-twa/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-v12:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      STOREPASS: ${{ secrets.PRIMEHUB_V9_UPLOAD_STORE_PASSWORD }}
+      KEYPASS: ${{ secrets.PRIMEHUB_V9_UPLOAD_KEY_PASSWORD }}
+      EXPECTED_CERT: C4:6E:0D:2A:E6:E6:F0:C8:11:FB:2B:A4:1B:48:5E:16:96:B6:86:6C:53:9F:CA:71:B7:74:B8:80:78:C4:7F:E3
+      EXPECTED_SHA1: 38:86:33:08:4E:B9:F1:DA:34:99:43:BA:E2:6D:9B:D5:B6:C0:49:90
+    steps:
+      - name: Checkout existing app branch (never main)
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Gate on previously configured encrypted signing secrets
+        id: keys
+        shell: bash
+        run: |
+          if [[ -n "$STOREPASS" && -n "$KEYPASS" ]]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Signed bundle unavailable: existing encrypted v9 upload-key secrets are missing. Do not generate a new key."
+          fi
+
+      - name: Setup Java 21
+        if: steps.keys.outputs.ready == 'true'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Verify existing ORIGINAL Play upload key certificate
+        if: steps.keys.outputs.ready == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive='play-store/PrimeHub-PlayStore-Upload.zip'
+          entry="$(unzip -Z1 "$archive" | grep -E '(^|/)keystore/primehub-upload\.p12$' | head -1)"
+          if [[ -z "$entry" ]]; then echo "::error::Original keystore not found"; exit 1; fi
+          unzip -p "$archive" "$entry" > "$RUNNER_TEMP/primehub-upload.p12"
+          chmod 600 "$RUNNER_TEMP/primehub-upload.p12"
+          certificate="$(keytool -list -v -storetype PKCS12 -keystore "$RUNNER_TEMP/primehub-upload.p12" -storepass:env STOREPASS -alias primehub-upload)"
+          actual="$(printf '%s\n' "$certificate" | sed -n 's/^[[:space:]]*SHA256: //p' | head -1)"
+          sha1="$(printf '%s\n' "$certificate" | sed -n 's/^[[:space:]]*SHA1: //p' | head -1)"
+          if [[ -z "$actual" || "${actual//:/}" != "${EXPECTED_CERT//:/}" || "${sha1//:/}" != "${EXPECTED_SHA1//:/}" ]]; then
+            echo "::error::Refusing to build: upload certificate differs from the registered Play Store key."
+            exit 1
+          fi
+          echo "Verified existing Play Store upload certificate (SHA-256 and SHA-1)."
+          echo "PRIMEHUB_STORE_FILE=$RUNNER_TEMP/primehub-upload.p12" >> "$GITHUB_ENV"
+
+      - name: Prepare Android SDK 36
+        if: steps.keys.outputs.ready == 'true'
+        run: |
+          SDK_ROOT="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          if [[ ! -f "$SDK_ROOT/platforms/android-36/android.jar" ]]; then
+            yes | "$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0"
+          fi
+          echo "ANDROID_HOME=$SDK_ROOT" >> "$GITHUB_ENV"
+
+      - name: Verify AndroidX Fragment 1.9.1 and Activity 1.13.0 resolve
+        if: steps.keys.outputs.ready == 'true'
+        working-directory: play-store/android-twa
+        run: |
+          set -euo pipefail
+          bash ./gradlew :app:dependencyInsight --dependency androidx.fragment:fragment --configuration releaseRuntimeClasspath --no-daemon > "$RUNNER_TEMP/fragment-resolved.txt"
+          grep -q 'androidx.fragment:fragment:1.9.1' "$RUNNER_TEMP/fragment-resolved.txt"
+          bash ./gradlew :app:dependencyInsight --dependency androidx.activity:activity --configuration releaseRuntimeClasspath --no-daemon > "$RUNNER_TEMP/activity-resolved.txt"
+          grep -q 'androidx.activity:activity:1.13.0' "$RUNNER_TEMP/activity-resolved.txt"
+          echo "Fragment 1.9.1 and Activity 1.13.0 verified; neither old 1.1.0 remains as the selected dependency."
+
+      - name: Build signed v12 AAB and Android test APK
+        if: steps.keys.outputs.ready == 'true'
+        working-directory: play-store/android-twa
+        env:
+          PRIMEHUB_STORE_PASSWORD: ${{ secrets.PRIMEHUB_V9_UPLOAD_STORE_PASSWORD }}
+          PRIMEHUB_KEY_PASSWORD: ${{ secrets.PRIMEHUB_V9_UPLOAD_KEY_PASSWORD }}
+          PRIMEHUB_KEY_ALIAS: primehub-upload
+        run: |
+          set -euo pipefail
+          python3 -m pip install --quiet --user Pillow==11.3.0
+          python3 scripts/compact_launcher_icons.py
+          bash ./gradlew :app:bundleRelease :app:assembleRelease --no-daemon
+
+      - name: Verify bundle and APK package, version, SDK, signature
+        if: steps.keys.outputs.ready == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          aab='play-store/android-twa/app/build/outputs/bundle/release/app-release.aab'
+          apk='play-store/android-twa/app/build/outputs/apk/release/app-release.apk'
+          test -s "$aab"; test -s "$apk"
+          aab_sha="$(keytool -printcert -jarfile "$aab" | sed -n 's/^[[:space:]]*SHA256: //p' | head -1)"
+          if [[ -z "$aab_sha" || "${aab_sha//:/}" != "${EXPECTED_CERT//:/}" ]]; then echo "::error::AAB certificate mismatch"; exit 1; fi
+          aapt="${ANDROID_HOME}/build-tools/36.0.0/aapt"
+          if [[ ! -x "$aapt" ]]; then aapt="$(find "$ANDROID_HOME/build-tools" -name aapt -type f | sort -V | tail -1)"; fi
+          package="$("$aapt" dump badging "$apk" | grep '^package:')"
+          echo "$package" | grep -q "name='com.primehubmall.app'"
+          echo "$package" | grep -q "versionCode='12'"
+          echo "$package" | grep -q "versionName='12.0.0'"
+          target="$("$aapt" dump badging "$apk" | grep '^targetSdkVersion:')"
+          echo "$target" | grep -q "'36'"
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$apk" > "$RUNNER_TEMP/apk-signature.txt"
+          grep -q "C4:6E:0D:2A:E6:E6:F0:C8:11:FB:2B:A4:1B:48:5E:16:96:B6:86:6C:53:9F:CA:71:B7:74:B8:80:78:C4:7F:E3" "$RUNNER_TEMP/apk-signature.txt" || \
+            grep -qi "c46e0d2ae6e6f0c811fb2ba41b485e1696b6866c539fca71b774b88078c47fe3" "$RUNNER_TEMP/apk-signature.txt" || \
+            { echo "::error::APK certificate mismatch"; exit 1; }
+          mkdir -p "$RUNNER_TEMP/primehub-v12-output"
+          cp "$aab" "$RUNNER_TEMP/primehub-v12-output/PrimeHub-v12-Play-Upload.aab"
+          cp "$apk" "$RUNNER_TEMP/primehub-v12-output/PrimeHub-v12-Phone-Test.apk"
+          cat > "$RUNNER_TEMP/primehub-v12-output/README-IMPORTANT.txt" <<'EOF'
+          PrimeHub v12 / com.primehubmall.app / versionCode 12 / targetSdk 36.
+          Signed with the SAME verified PrimeHub Play Store upload certificate.
+          AAB: upload to the EXISTING PrimeHub Google Play listing when approved.
+          APK: optional direct phone testing; Play-installed apps may reject sideload updates.
+          This archive contains NO keystore, key password, or other signing secrets.
+          Features: automatic Rs.100 Play-installed welcome bonus (server rollout gated), notifications
+          with real images and rotating hooks, safe exit confirmation, AndroidX Fragment 1.9.1 and Activity 1.13.0.
+          NO Play Integrity setup is needed. Awarding is one per existing email/password account and app-scoped Android ID (client metadata can be spoofed). Activate cash only after updated website backend is deployed and this signed v12 app is live.
+          No Play Console upload was performed by this workflow.
+          EOF
+          sha256sum "$aab" "$apk" > "$RUNNER_TEMP/primehub-v12-output/SHA256SUMS.txt"
+          (cd "$RUNNER_TEMP/primehub-v12-output" && zip -q PrimeHub-v12-Signed-PlayStore.zip PrimeHub-v12-Play-Upload.aab PrimeHub-v12-Phone-Test.apk README-IMPORTANT.txt SHA256SUMS.txt)
+          echo "Signed v12 upload AAB, test APK and ZIP ready. Play production unchanged."
+
+      - name: Upload ZIP and AAB for owner only
+        if: steps.keys.outputs.ready == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: PrimeHub-v12-signed-Play-Store
+          path: |
+            ${{ runner.temp }}/primehub-v12-output/PrimeHub-v12-Signed-PlayStore.zip
+            ${{ runner.temp }}/primehub-v12-output/PrimeHub-v12-Play-Upload.aab
+            ${{ runner.temp }}/primehub-v12-output/PrimeHub-v12-Phone-Test.apk
+            ${{ runner.temp }}/primehub-v12-output/README-IMPORTANT.txt
+            ${{ runner.temp }}/primehub-v12-output/SHA256SUMS.txt
+          retention-days: 7
+          if-no-files-found: error
+
+      - name: Delete temporary signing key (always)
+        if: always()
+        shell: bash
+        run: rm -f "$RUNNER_TEMP/primehub-upload.p12"

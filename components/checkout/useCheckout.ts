@@ -3,6 +3,7 @@ import { fetchPublicStorefront } from '@/lib/storefrontClient';
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { BASE_DELIVERY_CHARGE } from '@/lib/deliveryCharges';
 import { auth } from '@/lib/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
 import { useCartStore } from '@/lib/cartStore';
 import { makeTikTokContent, trackTikTokEvent } from '@/lib/tiktokPixel';
 import type { Customer } from './CheckoutTypes';
@@ -28,8 +29,8 @@ function tikTokContents(rows: any[], fallbackRows: any[] = rows) {
     .filter(Boolean);
 }
 async function authHeader(): Promise<Record<string, string>> { const user = auth.currentUser; if (!user) return {}; try { return { Authorization: `Bearer ${await user.getIdToken()}` }; } catch { return {}; } }
-export async function getAuthoritativeQuote(items: any[], selfCollect = false) {
-  const response = await fetch('/api/orders', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(await authHeader()) }, body: JSON.stringify({ mode: 'quote', items, selfCollect }) });
+export async function getAuthoritativeQuote(items: any[], selfCollect = false, useShoppingCredit = false) {
+  const response = await fetch('/api/orders', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(await authHeader()) }, body: JSON.stringify({ mode: 'quote', items, selfCollect, useShoppingCredit }) });
   const data = await response.json();
   if (!response.ok) throw new Error(data.error || 'Unable to verify current prices.');
   return data;
@@ -50,16 +51,75 @@ export function useCheckout() {
   const [customer, setCustomer] = useState<Customer>({ name: '', phone: '', email: '', address: '', city: '', notes: '' });
   const [placing, setPlacing] = useState(false), [orderId, setOrderId] = useState(''), [error, setError] = useState('');
   const [reviewProductIds, setReviewProductIds] = useState<string[]>([]);
+  const [walletPaidReceipt, setWalletPaidReceipt] = useState(0);
+  const [amountDueReceipt, setAmountDueReceipt] = useState(0);
   const [deliveryCharge, setDeliveryCharge] = useState(BASE_DELIVERY_CHARGE);
   const [rewardLabel, setRewardLabel] = useState('');
+  const [walletShoppingBalance, setWalletShoppingBalance] = useState(0);
+  const [walletBalanceStatus, setWalletBalanceStatus] = useState<'loading' | 'ready' | 'unavailable'>('loading');
+  const walletRequestId = useRef('');
+  const whatsappRequestId = useRef('');
   const [selfCollect, setSelfCollect] = useState(false);
   const [wholesaleItems, setWholesaleItems] = useState(0);
   const [tierDiscount, setTierDiscount] = useState(0), [tierDiscountPercent, setTierDiscountPercent] = useState(0), [resellerTier, setResellerTier] = useState('');
   const checkoutTracked = useRef(false);
+  const [checkoutAuthUid, setCheckoutAuthUid] = useState('');
+  const [checkoutAuthReady, setCheckoutAuthReady] = useState(false);
+  useEffect(() => onAuthStateChanged(auth, user => {
+    setCheckoutAuthUid(user?.uid || '');
+    setCheckoutAuthReady(true);
+  }), []);
+
+  // Exactly one lightweight balance read when the signed-in account changes.
+  // Cart edits, delivery switches and normal quote recalculations never refetch it.
+  useEffect(() => {
+    if (!checkoutAuthUid) {
+      setWalletShoppingBalance(0);
+      setWalletBalanceStatus('ready');
+      return;
+    }
+    setWalletShoppingBalance(0);
+    setWalletBalanceStatus('loading');
+    const controller = new AbortController();
+    let active = true;
+    async function loadShoppingWallet() {
+      try {
+        const user = auth.currentUser;
+        if (!user || user.uid !== checkoutAuthUid) return;
+        const token = await user.getIdToken();
+        if (!active) return;
+        const response = await fetch('/api/reseller/shopping-wallet-balance', {
+          headers: { Authorization: `Bearer ${token}` },
+          credentials: 'same-origin',
+          cache: 'no-store',
+          signal: controller.signal,
+        });
+        if (!response.ok) throw new Error('Wallet balance temporarily unavailable.');
+        const data = await response.json();
+        const balance = Number(data.balance);
+        if (!Number.isSafeInteger(balance) || balance < 0) throw new Error('Invalid wallet balance.');
+        if (active) { setWalletShoppingBalance(balance); setWalletBalanceStatus('ready'); }
+      } catch {
+        // Fail closed for authenticated wallet customers: do not silently charge
+        // the full COD when they expect their balance to be applied automatically.
+        if (active) { setWalletShoppingBalance(0); setWalletBalanceStatus('unavailable'); }
+      }
+    }
+    void loadShoppingWallet();
+    return () => { active = false; controller.abort(); };
+  }, [checkoutAuthUid]);
+
   const totalItems = useMemo(() => items.reduce((sum: number, item: any) => sum + Number(item.quantity || item.qty || 1), 0), [items]);
   const subtotal = useMemo(() => items.reduce((sum: number, item: any) => sum + priceOf(item) * Number(item.quantity || item.qty || 1), 0), [items]);
   const discountedSubtotal = Math.max(0, subtotal - tierDiscount);
   const total = discountedSubtotal + deliveryCharge;
+  // One wallet read per signed-in checkout, not one read per cart/price change.
+  // Server recalculates and debits the real balances atomically at order placement.
+  const useShoppingCredit = walletBalanceStatus === 'ready' && walletShoppingBalance > 0;
+  const walletShoppingApplied = useShoppingCredit ? Math.min(walletShoppingBalance, total) : 0;
+  const amountDue = Math.max(0, total - walletShoppingApplied);
+  const walletCheckoutReady = checkoutAuthReady &&
+    (!checkoutAuthUid || walletBalanceStatus === 'ready');
   useEffect(() => {
     if (checkoutTracked.current || !items.length || subtotal <= 0) return;
     const contents = tikTokContents(items);
@@ -72,20 +132,57 @@ export function useCheckout() {
     checkoutTracked.current = true;
   }, [items, subtotal]);
   useEffect(() => {
+    if (!checkoutAuthReady) return; // avoid duplicate Supabase price quotes before Firebase resolves login
     if (!items.length) { setDeliveryCharge(BASE_DELIVERY_CHARGE); setWholesaleItems(0); setRewardLabel(''); return; }
     let cancelled = false;
     getAuthoritativeQuote(items, selfCollect).then(quote => { if (!cancelled) { setDeliveryCharge(Number(quote.deliveryCharge ?? BASE_DELIVERY_CHARGE)); setWholesaleItems(Number(quote.wholesaleItems || 0)); setTierDiscount(Number(quote.tierDiscount || 0)); setTierDiscountPercent(Number(quote.tierDiscountPercent || 0)); setResellerTier(String(quote.resellerTier || '')); setRewardLabel(String(quote.rewardLabel || '')); } }).catch(() => undefined);
     return () => { cancelled = true; };
-  }, [items, selfCollect]);
+  }, [items, selfCollect, checkoutAuthUid, checkoutAuthReady]);
   const update = (key: keyof Customer, value: string) => setCustomer(previous => ({ ...previous, [key]: value }));
-  const placeOrder = async (event: FormEvent) => { event.preventDefault(); setError(''); if (!items.length) return setError('Your cart is empty. Please add a product first.'); if (!customer.name.trim() || !customer.phone.trim() || (!selfCollect && (!customer.address.trim() || !customer.city.trim()))) return setError(selfCollect ? 'Please fill your name and phone.' : 'Please fill your name, phone, address and city.'); setPlacing(true); try { const response = await fetch('/api/orders', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(await authHeader()) }, body: JSON.stringify({ customer, items, selfCollect, guestId: guestId() }) }); const data = await response.json(); if (!response.ok) throw new Error(data.error || 'Order save nahi ho saka.'); const productIds = Array.isArray(data.items) ? data.items.map((item: any) => String(item.productId || item.id || '')).filter(Boolean) : items.map((item: any) => String(item.productId || item.id || '')).filter(Boolean); const completedItems = Array.isArray(data.items) && data.items.length ? data.items : items; const completedContents = tikTokContents(completedItems, items); if (completedContents.length) { trackTikTokEvent('PlaceAnOrder', { contents: completedContents as any, value: Number(data.total ?? total), currency: 'PKR' }); } setReviewProductIds(productIds); rememberReviewOrder(data.orderId, productIds); rememberOrderProgress(data.orderId, Number(data.wholesaleItems || wholesaleItems || 0)); setOrderId(data.orderId); try { window.PrimeHubNative?.postMessage(JSON.stringify({ action: 'purchase', orderId: data.orderId })); } catch {} clearCart(); } catch (caught) { console.error(caught); setError(caught instanceof Error ? caught.message : 'Order save nahi ho saka. Please try again.'); } finally { setPlacing(false); } };
-  const whatsappOrder = async () => { if (!items.length) return; setError(''); try { const [quote, adminNumber] = await Promise.all([getAuthoritativeQuote(items, selfCollect), getAdminWhatsAppNumber()]); const user = auth.currentUser; let resellerCode = '', requestId = ''; if (user) { const token = await user.getIdToken(); const track = await fetch('/api/reseller/whatsapp-order', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ customer, items: quote.items, subtotal: quote.subtotal, deliveryCharge: quote.deliveryCharge, total: quote.total, selfCollect }) }); const trackData = await track.json(); if (track.ok) { resellerCode = String(trackData.resellerCode || ''); requestId = String(trackData.requestId || ''); } else if (track.status !== 401) throw new Error(trackData.error || 'Unable to create WhatsApp reseller request.'); }
-    const lines = quote.items.map((validated: any, index: number) => [`${index + 1}. ${validated.title} x ${validated.quantity}`, `- ${variantText(validated.variant)}`, `- Price: Rs. ${Number(validated.price).toLocaleString()}`, `- Image: ${validated.image || 'N/A'}`].join('\n'));
-    const tracking = resellerCode ? ['', '*RESELLER ORDER*', `Reseller Code: ${resellerCode}`, `Request ID: ${requestId}`] : [];
-    const wholesaleLine = Number(quote.wholesaleItems || 0) ? `Wholesale item surcharge (${quote.wholesaleItems} × Rs. 30): Rs. ${Number(quote.wholesaleSurcharge || 0).toLocaleString()}` : '';
-    const rewardLine = quote.rewardLabel ? `*${quote.rewardLabel}*` : '';
-    const text = ['*Order from PrimeHub*', '', ...lines, '', '*Customer Details:*', `Name: ${customer.name || '-'}`, `Phone: ${customer.phone || '-'}`, `Address: ${customer.address || '-'}`, `City: ${customer.city || '-'}`, '', `Subtotal: Rs. ${Number(quote.subtotal).toLocaleString()}`, rewardLine, `Base delivery: Rs. ${Number(quote.baseDelivery || 350).toLocaleString()}`, wholesaleLine, `*Grand Total: Rs. ${Number(quote.total).toLocaleString()}*`, ...tracking].filter(Boolean).join('\n');
-    window.open(`https://wa.me/${adminNumber}?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
-  } catch (caught) { console.error(caught); setError(caught instanceof Error ? caught.message : 'Unable to prepare WhatsApp order.'); } };
-  return { items, customer, placing, orderId, reviewProductIds, error, totalItems, subtotal: discountedSubtotal, rawSubtotal: subtotal, tierDiscount, tierDiscountPercent, resellerTier, rewardLabel, deliveryCharge, wholesaleItems, total, selfCollect, setSelfCollect, update, placeOrder, whatsappOrder };
+  const placeOrder = async (event: FormEvent) => { event.preventDefault(); setError(''); if (!walletCheckoutReady) return setError(walletBalanceStatus === 'unavailable' ? 'Your wallet balance could not be verified. Please refresh this page before ordering so all available cash can be applied.' : 'Checking wallet balance. Please wait a moment.'); if (!items.length) return setError('Your cart is empty. Please add a product first.'); if (!customer.name.trim() || !customer.phone.trim() || (!selfCollect && (!customer.address.trim() || !customer.city.trim()))) return setError(selfCollect ? 'Please fill your name and phone.' : 'Please fill your name, phone, address and city.'); setPlacing(true); try { const response = await fetch('/api/orders', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(await authHeader()) }, body: JSON.stringify({ customer, items, selfCollect, guestId: guestId(), useShoppingCredit, ...(useShoppingCredit ? { orderRequestId: (walletRequestId.current ||= crypto.randomUUID()) } : {}) }) }); const data = await response.json(); if (!response.ok) throw new Error(data.error || 'Order save nahi ho saka.'); const productIds = Array.isArray(data.items) ? data.items.map((item: any) => String(item.productId || item.id || '')).filter(Boolean) : items.map((item: any) => String(item.productId || item.id || '')).filter(Boolean); const completedItems = Array.isArray(data.items) && data.items.length ? data.items : items; const completedContents = tikTokContents(completedItems, items); if (completedContents.length) { trackTikTokEvent('PlaceAnOrder', { contents: completedContents as any, value: Number(data.total ?? total), currency: 'PKR' }); } setReviewProductIds(productIds); rememberReviewOrder(data.orderId, productIds); rememberOrderProgress(data.orderId, Number(data.wholesaleItems || wholesaleItems || 0)); setWalletPaidReceipt(Number(data.walletShoppingApplied || 0)); setAmountDueReceipt(Number(data.amountDue ?? data.total ?? 0)); setOrderId(data.orderId); walletRequestId.current = ''; try { window.PrimeHubNative?.postMessage(JSON.stringify({ action: 'purchase', orderId: data.orderId })); } catch {} clearCart(); } catch (caught) { console.error(caught); setError(caught instanceof Error ? caught.message : 'Order save nahi ho saka. Please try again.'); } finally { setPlacing(false); } };
+  const whatsappOrder = async () => {
+    if (!items.length) return;
+    setError('');
+    if (!customer.name.trim() || !customer.phone.trim() || (!selfCollect && (!customer.address.trim() || !customer.city.trim()))) {
+      setError('Please enter your name, phone, city and delivery address first.'); return;
+    }
+    if (useShoppingCredit && !window.confirm('WhatsApp order requests do not use wallet cash. Continue as a cash-on-delivery request instead? To use all wallet funds automatically, choose Place Order.')) return;
+    try {
+      const headers = { 'Content-Type': 'application/json', ...(await authHeader()) };
+      const [quoteResponse, adminNumber] = await Promise.all([
+        fetch('/api/orders', { method: 'POST', headers,
+          body: JSON.stringify({ mode: 'whatsapp_intent', items, customer, selfCollect, guestId: guestId(), orderRequestId: (whatsappRequestId.current ||= crypto.randomUUID()) }),
+        }), getAdminWhatsAppNumber(),
+      ]);
+      const quote = await quoteResponse.json().catch(() => null);
+      if (!quoteResponse.ok || !quote?.requestId) throw new Error(quote?.error || 'Unable to save WhatsApp request.');
+      const lines = quote.items.map((validated: any, index: number) => [
+        `${index + 1}. ${validated.title} x${validated.quantity}`,
+        variantText(validated.variant),
+        `Rs. ${Number(validated.price).toLocaleString()} each`,
+        `Photo: ${validated.image || '-'}`,
+      ].join('\n'));
+      const text = [
+        '*PrimeHubMall WhatsApp Order Request*',
+        `Reference: ${quote.requestId}`, '',
+        ...lines, '',
+        `Customer: ${customer.name.trim()}`, `Phone: ${customer.phone.trim()}`,
+        `City: ${customer.city.trim()}`,
+        `Address: ${selfCollect ? 'PrimeHub Shop Pickup' : customer.address.trim()}`,
+        customer.notes ? `Notes: ${customer.notes}` : '',
+        `Subtotal: Rs. ${Number(quote.subtotal || 0).toLocaleString()}`,
+        `Delivery: Rs. ${Number(quote.deliveryCharge || 0).toLocaleString()}`,
+        `Total: Rs. ${Number(quote.total || 0).toLocaleString()}`,
+        '', 'Please send this message to confirm your order.',
+      ].filter(Boolean).join('\n');
+      const url = `https://wa.me/${adminNumber}?text=${encodeURIComponent(text)}`;
+      if (/Android|iPhone|iPad/i.test(navigator.userAgent)) window.location.assign(url);
+      else window.open(url, '_blank', 'noopener,noreferrer');
+      // A prepared WhatsApp link is just a draft. The admin checks the actual
+      // incoming message before promoting it to an order or rewarding reseller.
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Could not prepare your WhatsApp order.');
+    }
+  };
+  return { items, customer, placing, orderId, reviewProductIds, error, walletPaidReceipt, amountDueReceipt, walletShoppingBalance, walletShoppingApplied, useShoppingCredit, walletBalanceStatus, walletCheckoutReady, amountDue, totalItems, subtotal: discountedSubtotal, rawSubtotal: subtotal, tierDiscount, tierDiscountPercent, resellerTier, rewardLabel, deliveryCharge, wholesaleItems, total, selfCollect, setSelfCollect, update, placeOrder, whatsappOrder };
 }

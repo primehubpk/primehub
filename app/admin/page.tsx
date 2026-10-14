@@ -56,6 +56,7 @@ function AdminPanel() {
 
   function openSection(tab: AdminTab) {
     if (tab === 'dashboard') return;
+    if (tab === 'wallet-credits') { router.push('/admin/resellers#credit-wallet'); return; }
     if (tab === 'resellers' || tab === 'reseller-tasks' || tab === 'rewards') {
       router.push('/admin/reseller-tasks');
       return;

@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { auth } from '@/lib/firebase';
 import { type Order } from './shared';
+import ManualWhatsAppOrderForm from './ManualWhatsAppOrderForm';
 
 const ORDER_STATUSES = ['pending', 'processing', 'shipped', 'delivered', 'cancelled'] as const;
 type OrderStatus = (typeof ORDER_STATUSES)[number];
@@ -30,6 +31,7 @@ type ActionMessage = {
 type OrdersResponse = {
   success: true;
   orders: Order[];
+  whatsappDrafts?: Order[];
   whatsappNumber?: string;
   primary?: string;
   warning?: string | null;
@@ -138,7 +140,9 @@ function customerWhatsappUrl(order: Order) {
   const customer = order.customer || {};
   const phone = whatsappPhone(customer.phone);
   const items = itemsFor(order).map((item) => `${item.title || 'Item'} x${item.quantity || 1}`).join(', ');
-  const message = `Hi ${customer.name || 'there'}, this is PrimeHub Deals regarding your order #${order.id.slice(-6)} (Rs ${money(order.total)}): ${items}. Current status: ${normalizedStatus(order.status)}.`;
+  const paid = Number(order.walletShoppingApplied || 0);
+  const payment = paid > 0 ? ` Order total Rs ${money(order.total)}, shopping wallet paid Rs ${money(paid)}, remaining to collect Rs ${money(order.amountDue ?? (Number(order.total || 0) - paid))}.` : ` Order total Rs ${money(order.total)}.`;
+  const message = `Hi ${customer.name || 'there'}, this is PrimeHub Deals regarding your order #${order.id.slice(-6)}: ${items}.${payment} Current status: ${normalizedStatus(order.status)}.`;
   return phone ? `https://wa.me/${phone}?text=${encodeURIComponent(message)}` : '';
 }
 
@@ -239,6 +243,10 @@ function orderForwardMessage(order: Order) {
   if (wholesaleSurcharge > 0) lines.push(`Wholesale delivery surcharge: Rs. ${money(wholesaleSurcharge)}`);
   lines.push(`Delivery: Rs. ${money(deliveryCharge)}`);
   lines.push(`*TOTAL: Rs. ${money(order.total)}*`);
+  if (Number(order.walletShoppingApplied || 0) > 0) {
+    lines.push(`Shopping wallet already paid: Rs. ${money(order.walletShoppingApplied)}`);
+    lines.push(`*REMAINING TO COLLECT: Rs. ${money(order.amountDue ?? (Number(order.total || 0) - Number(order.walletShoppingApplied || 0)))}*`);
+  }
 
   const totalItems = Number(order.totalItems || 0);
   if (totalItems > 0) lines.push(`Total items: ${totalItems}`);
@@ -283,7 +291,8 @@ async function adminOrderAction(action: 'status' | 'delete', orderId: string, st
 
 export default function OrdersManager() {
   const [orders, setOrders] = useState<Order[]>([]);
-  const [statusFilter, setStatusFilter] = useState<'all' | OrderStatus>('all');
+  const [whatsappDrafts, setWhatsappDrafts] = useState<Order[]>([]);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'whatsapp_drafts' | OrderStatus>('all');
   const [search, setSearch] = useState('');
   const [addressOrder, setAddressOrder] = useState<Order | null>(null);
   const [deleteOrder, setDeleteOrder] = useState<Order | null>(null);
@@ -304,6 +313,7 @@ export default function OrdersManager() {
       .then((data) => {
         if (!active) return;
         setOrders(Array.isArray(data.orders) ? data.orders : []);
+        setWhatsappDrafts(Array.isArray(data.whatsappDrafts) ? data.whatsappDrafts : []);
         const number = textValue(data.whatsappNumber);
         setWhatsappNumber(number);
         setSavedWhatsappNumber(number);
@@ -322,9 +332,9 @@ export default function OrdersManager() {
 
   const filteredOrders = useMemo(() => {
     const term = search.trim().toLowerCase();
-    return [...orders]
+    return [...(statusFilter === 'whatsapp_drafts' ? whatsappDrafts : orders)]
       .filter((order) => {
-        const statusMatches = statusFilter === 'all' || normalizedStatus(order.status) === statusFilter;
+        const statusMatches = statusFilter === 'all' || statusFilter === 'whatsapp_drafts' || normalizedStatus(order.status) === statusFilter;
         const searchable = [
           order.id,
           order.customer?.name,
@@ -340,7 +350,7 @@ export default function OrdersManager() {
         return statusMatches && (!term || searchable.includes(term));
       })
       .sort((a, b) => orderTime(b.createdAt) - orderTime(a.createdAt));
-  }, [orders, search, statusFilter]);
+  }, [orders, whatsappDrafts, search, statusFilter]);
 
   async function reloadOrders() {
     if (loadingOrders) return;
@@ -349,6 +359,7 @@ export default function OrdersManager() {
     try {
       const data = await fetchAdminOrders();
       setOrders(Array.isArray(data.orders) ? data.orders : []);
+      setWhatsappDrafts(Array.isArray(data.whatsappDrafts) ? data.whatsappDrafts : []);
       const number = textValue(data.whatsappNumber);
       setWhatsappNumber(number);
       setSavedWhatsappNumber(number);
@@ -358,6 +369,35 @@ export default function OrdersManager() {
     } finally {
       setLoadingOrders(false);
     }
+  }
+
+  async function reviewWhatsappDraft(id: string, action: 'confirm-whatsapp' | 'dismiss-whatsapp') {
+    if (updatingOrderId) return;
+    const confirmText = action === 'confirm-whatsapp'
+      ? 'Have you actually RECEIVED the customer WhatsApp message and verified these order details? Opening WhatsApp alone is not confirmation.'
+      : 'Dismiss this unconfirmed WhatsApp request?';
+    if (!window.confirm(confirmText)) return;
+    setUpdatingOrderId(id);
+    setActionMessage(null);
+    try {
+      const response = await fetch('/api/admin/orders', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, intentId: id }),
+      });
+      const data = await response.json().catch(() => null);
+      if (!response.ok || !data?.success) throw new Error(data?.error || 'Could not review WhatsApp request.');
+      setWhatsappDrafts(previous => previous.filter(row => row.id !== id));
+      if (action === 'confirm-whatsapp') {
+        const refreshed = await fetchAdminOrders();
+        setOrders(refreshed.orders || []);
+      }
+      setActionMessage({ kind: 'success', text: action === 'confirm-whatsapp'
+        ? 'WhatsApp message verified and real order added. It is now in All Orders.'
+        : 'Unconfirmed WhatsApp draft dismissed.' });
+    } catch (error) {
+      setActionMessage({ kind: 'error', text: error instanceof Error ? error.message : 'WhatsApp review failed.' });
+    } finally { setUpdatingOrderId(null); }
   }
 
   async function updateStatus(orderId: string, status: OrderStatus) {
@@ -519,6 +559,8 @@ export default function OrdersManager() {
         )}
       </div>
 
+      <ManualWhatsAppOrderForm onSaved={reloadOrders} />
+
       {rewardMessage && (
         <p className="mt-3 rounded-2xl bg-[#DDF5F0] p-3 text-xs font-bold text-[#0F6A5F]">{rewardMessage}</p>
       )}
@@ -544,14 +586,14 @@ export default function OrdersManager() {
           />
         </label>
         <div className="mt-3 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {(['all', ...ORDER_STATUSES] as const).map((status) => (
+          {(['all', 'whatsapp_drafts', ...ORDER_STATUSES] as const).map((status) => (
             <button
               key={status}
               type="button"
               onClick={() => setStatusFilter(status)}
               className={`shrink-0 rounded-full px-3 py-2 text-[10px] font-black capitalize transition ${statusFilter === status ? 'bg-[#14140F] text-white' : 'bg-black/5 text-black/55'}`}
             >
-              {status === 'all' ? 'All Orders' : status}
+              {status === 'all' ? 'All Orders' : status === 'whatsapp_drafts' ? `WhatsApp Requests (${whatsappDrafts.length})` : status}
             </button>
           ))}
         </div>
@@ -559,7 +601,7 @@ export default function OrdersManager() {
 
       <div className="mt-4 space-y-4">
         {filteredOrders.map((order) => {
-          const row = order as Order & { resellerUserId?: string; resellerRewardStatus?: string };
+          const row = order as Order & { resellerUserId?: string; resellerRewardStatus?: string; whatsappDraft?: boolean };
           const status = normalizedStatus(order.status);
           const items = itemsFor(order);
           const name = customerValue(order, 'name') || 'Customer';
@@ -578,8 +620,10 @@ export default function OrdersManager() {
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className={`inline-flex rounded-full px-2.5 py-1 text-[9px] font-black capitalize ring-1 ring-inset ${STATUS_STYLES[status]}`}>
-                        {status}
+                        {row.whatsappDraft ? 'Awaiting WhatsApp confirmation' : status}
                       </span>
+                      {row.whatsappDraft && <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[9px] font-black text-amber-800">WHATSAPP REQUEST · NOT YET CONFIRMED</span>}
+                      {!row.whatsappDraft && String(row.source || '').toLowerCase().includes('whatsapp') && <span className="rounded-full bg-green-50 px-2.5 py-1 text-[9px] font-black text-green-700">WHATSAPP ORDER</span>}
                       {row.resellerUserId && (
                         <span className="inline-flex rounded-full bg-[#DDF5F0] px-2.5 py-1 text-[9px] font-black text-[#0F6A5F]">RESELLER</span>
                       )}
@@ -672,11 +716,20 @@ export default function OrdersManager() {
                       <div className="flex justify-between gap-3 text-black/50"><span>Subtotal</span><span className="font-bold">Rs {money(order.subtotal)}</span></div>
                       <div className="flex justify-between gap-3 text-black/50"><span>Delivery</span><span className="font-bold">Rs {money(deliveryCharge)}</span></div>
                       <div className="flex justify-between gap-3 border-t border-black/8 pt-2.5 text-sm font-black"><span>Total</span><span>Rs {money(order.total)}</span></div>
+                       {Number(order.walletShoppingApplied || 0) > 0 && <><div className="flex justify-between gap-3 font-bold text-[#0F6A5F]"><span>Shopping wallet already paid</span><span>- Rs {money(order.walletShoppingApplied)}</span></div><div className="flex justify-between gap-3 rounded-lg bg-[#DDF5F0] p-2 font-black text-[#0F6A5F]"><span>Remaining to collect</span><span>Rs {money(order.amountDue ?? (Number(order.total || 0) - Number(order.walletShoppingApplied || 0)))}</span></div></>}
                     </div>
                   </div>
                 </div>
 
-                <div className="mt-4 grid gap-3 border-t border-black/8 pt-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+                {row.whatsappDraft ? (
+                  <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3">
+                    <p className="text-[11px] font-bold leading-5 text-amber-900">Customer opened a WhatsApp order request. This is a draft, NOT a confirmed purchase. Check your actual WhatsApp conversation before approving. No revenue or reseller reward has been counted.</p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button type="button" disabled={Boolean(updatingOrderId)} onClick={() => void reviewWhatsappDraft(order.id, 'confirm-whatsapp')} className="rounded-xl bg-[#0F6A5F] px-4 py-3 text-[11px] font-black text-white disabled:opacity-50">✓ Message Received · Create Order</button>
+                      <button type="button" disabled={Boolean(updatingOrderId)} onClick={() => void reviewWhatsappDraft(order.id, 'dismiss-whatsapp')} className="rounded-xl border border-rose-200 bg-white px-4 py-3 text-[11px] font-black text-rose-600 disabled:opacity-50">Dismiss Request</button>
+                    </div>
+                  </div>
+                ) : <div className="mt-4 grid gap-3 border-t border-black/8 pt-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
                   <div className="grid gap-3 sm:grid-cols-2">
                     <label className="block">
                       <span className="mb-1.5 block text-[9px] font-black uppercase tracking-[0.14em] text-black/35">Order status</span>
@@ -737,7 +790,7 @@ export default function OrdersManager() {
                       <Trash2 size={15} /> Delete
                     </button>
                   </div>
-                </div>
+                </div>}
               </div>
             </article>
           );
