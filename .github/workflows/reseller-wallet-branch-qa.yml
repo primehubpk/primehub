@@ -5,6 +5,7 @@ on:
     branches:
       - feature/reseller-wallet-admin-dupes-oct14
       - fix/admin-password-settings-oct14
+      - fix/restore-original-admin-login-no-vercel
   workflow_dispatch:
 
 permissions:
