@@ -313,7 +313,6 @@ export default function OrdersManager() {
       .then((data) => {
         if (!active) return;
         setOrders(Array.isArray(data.orders) ? data.orders : []);
-      setWhatsappDrafts(Array.isArray(data.whatsappDrafts) ? data.whatsappDrafts : []);
         setWhatsappDrafts(Array.isArray(data.whatsappDrafts) ? data.whatsappDrafts : []);
         const number = textValue(data.whatsappNumber);
         setWhatsappNumber(number);
@@ -360,6 +359,7 @@ export default function OrdersManager() {
     try {
       const data = await fetchAdminOrders();
       setOrders(Array.isArray(data.orders) ? data.orders : []);
+      setWhatsappDrafts(Array.isArray(data.whatsappDrafts) ? data.whatsappDrafts : []);
       const number = textValue(data.whatsappNumber);
       setWhatsappNumber(number);
       setSavedWhatsappNumber(number);
