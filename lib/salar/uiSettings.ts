@@ -79,6 +79,6 @@ export async function saveSalarUiSettings(input: { iconUrl?: unknown; whatsappCo
   const row = mapDocumentToSupabase('settings', SETTINGS_ID, next, 'supabase');
   if (!row) throw new Error('Could not build Salar UI settings row.');
   await supabasePrimaryUpsert({ table: 'settings', row });
-  revalidateTag(SETTINGS_TAG, 'max');
+  revalidateTag(SETTINGS_TAG, { expire: 0 });
   return next;
 }
