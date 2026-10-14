@@ -77,14 +77,33 @@ test('Download All category manifest is not capped at 40 or only the first visib
   assert.equal(new Set(result.byCategory['glass-bangles'].map(item => item.filename)).size, 123);
 });
 
-test('No ZIP endpoints, archive buttons or pack limits remain in user-facing image download feature', () => {
+test('No ZIP or Vercel binary proxy in direct category photo download path', () => {
   const page = fs.readFileSync('app/download-images/page.tsx', 'utf8');
-  const endpoint = fs.readFileSync('app/api/reseller/image-download/route.ts', 'utf8');
+  const endpoint = fs.readFileSync('app/api/reseller/image-gallery/route.ts', 'utf8');
   assert.ok(page.includes('async function downloadAll(categorySlug = selected)'));
-  assert.ok(page.includes('for (const photo of allPhotos)'));
   assert.ok(page.includes('void downloadAll(category.slug)'));
-  assert.ok(page.includes("mode: 'image'"));
+  assert.ok(page.includes('for (const photo of allPhotos)'));
+  assert.ok(page.includes('await downloadFile(photo, controller)'));
+  assert.ok(page.includes("mode: 'cors'"));
+  assert.ok(page.includes("credentials: 'omit'"));
+  assert.ok(page.includes("getIdToken()"));
+  assert.ok(!page.includes("'/api/reseller/image-download'"));
+  assert.ok(!fs.existsSync('app/api/reseller/image-download/route.ts'));
   assert.ok(!page.includes('downloadPack('));
-  assert.ok(!endpoint.includes("mode === 'pack'"));
+  assert.ok(endpoint.includes("params.get('all') === '1'"));
+  assert.ok(endpoint.includes("images: all ? images : images.slice"));
   assert.ok(!endpoint.includes('zipReadableStream'));
+});
+
+test('Wallet quote skips all shopping wallet Firestore reads until customer opts in', () => {
+  const orders = fs.readFileSync('app/api/orders/route.ts', 'utf8');
+  const checkout = fs.readFileSync('components/checkout/useCheckout.ts', 'utf8');
+  const balance = fs.readFileSync('app/api/reseller/shopping-wallet-balance/route.ts', 'utf8');
+  assert.ok(orders.includes('const walletShoppingBalance = (quoteOnly && useShoppingCredit && user)'));
+  assert.ok(!orders.includes('if (user) {\\n      try { walletShoppingBalance = await shoppingWalletBalance'));
+  assert.ok(checkout.includes("fetch('/api/reseller/shopping-wallet-balance'"));
+  assert.ok(checkout.includes('}, [checkoutAuthUid]);'));
+  assert.ok(checkout.includes("if (useShoppingCredit) setWalletShoppingBalance"));
+  assert.ok(balance.includes('verifyIdToken'));
+  assert.ok(balance.includes("Cache-Control': 'private, no-store'"));
 });
