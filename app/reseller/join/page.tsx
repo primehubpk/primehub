@@ -25,6 +25,14 @@ function authMessage(code: string, rawMessage = '') {
   }
 }
 
+function resellerDestination() {
+  if (typeof window === 'undefined') return '/reseller/dashboard';
+  // Only internal approved destinations; never accept external or protocol-relative redirects.
+  return new URLSearchParams(window.location.search).get('redirect') === '/download-images'
+    ? '/download-images'
+    : '/reseller/dashboard';
+}
+
 export default function ResellerJoinPage() {
   const router = useRouter();
   const [mode, setMode] = useState<'signup' | 'signin'>('signin');
@@ -60,13 +68,17 @@ export default function ResellerJoinPage() {
           setMessage(authMessage(profileCode, profileError instanceof Error ? profileError.message : 'Profile creation failed.'));
           return;
         }
+        if (resellerDestination() === '/download-images') {
+          router.replace('/download-images');
+          return;
+        }
         setSuccess(true); setMessage('Your PrimeHub Reseller Club account is ready.');
       } else {
         const credential = await signInReseller(email, password, rememberMe);
         await createResellerProfile(credential.user.uid, credential.user.email || email.trim());
         // A successful reseller sign-in should take the member straight to the dashboard.
         // Do not leave a success message or secondary dashboard button on the sign-in page.
-        router.replace('/reseller/dashboard');
+        router.replace(resellerDestination());
         router.refresh();
         return;
       }
