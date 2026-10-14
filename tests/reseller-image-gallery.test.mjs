@@ -95,7 +95,7 @@ test('No ZIP or Vercel binary proxy in direct category photo download path', () 
   assert.ok(!endpoint.includes('zipReadableStream'));
 });
 
-test('Wallet quote skips all shopping wallet Firestore reads until customer opts in', () => {
+test('Wallet quote skips Firestore reads and automatically applies cached balance at checkout', () => {
   const orders = fs.readFileSync('app/api/orders/route.ts', 'utf8');
   const checkout = fs.readFileSync('components/checkout/useCheckout.ts', 'utf8');
   const balance = fs.readFileSync('app/api/reseller/shopping-wallet-balance/route.ts', 'utf8');
@@ -103,7 +103,9 @@ test('Wallet quote skips all shopping wallet Firestore reads until customer opts
   assert.ok(!orders.includes('if (user) {\\n      try { walletShoppingBalance = await shoppingWalletBalance'));
   assert.ok(checkout.includes("fetch('/api/reseller/shopping-wallet-balance'"));
   assert.ok(checkout.includes('}, [checkoutAuthUid]);'));
-  assert.ok(checkout.includes("if (useShoppingCredit) setWalletShoppingBalance"));
+  assert.ok(checkout.includes("getAuthoritativeQuote(items, selfCollect).then"));
+  assert.ok(checkout.includes("walletBalanceStatus === 'ready' && walletShoppingBalance > 0"));
+  assert.ok(!checkout.includes("setUseShoppingCredit("));
   assert.ok(balance.includes('verifyIdToken'));
   assert.ok(balance.includes("Cache-Control': 'private, no-store'"));
 });
