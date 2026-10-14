@@ -16,8 +16,12 @@ export async function shoppingWalletBalance(userId: string) {
   const db = getAdminDb();
   const [snap, wallet] = await Promise.all([db.collection('reseller_profiles').doc(userId).get(), db.collection('reseller_shopping_wallets').doc(userId).get()]);
   if (!snap.exists || snap.data()?.status !== 'active') return 0;
-  const amount = Number(wallet.data()?.balance || 0);
-  return Number.isSafeInteger(amount) && amount >= 0 ? amount : 0;
+  const shopping = Number(wallet.data()?.balance || 0);
+  const withdrawable = Number(snap.data()?.walletAvailable || 0);
+  if (![shopping, withdrawable, shopping + withdrawable].every(value => Number.isSafeInteger(value) && value >= 0)) return 0;
+  // Cash rewards can be used for shopping OR withdrawn; shopping-only credits
+  // can ONLY be spent in the store. Do not double count either balance.
+  return shopping + withdrawable;
 }
 
 /** Creates both the order and the wallet deduction in one Firestore transaction.
@@ -44,20 +48,32 @@ export async function createShoppingWalletOrder(userId: string, orderId: string,
       return { created: false, amount: Number(old.walletShoppingApplied || 0), amountDue: Number(old.amountDue || 0), order: old };
     }
     if (!profile.exists || profile.data()?.status !== 'active') throw new Error('Active reseller profile required to use wallet credit.');
-    const available = Number(wallet.data()?.balance || 0);
-    if (!Number.isSafeInteger(available) || available <= 0) throw new Error('Shopping wallet credit is unavailable.');
-    const amount = Math.min(available, orderData.total);
+    const shopping = Number(wallet.data()?.balance || 0);
+    const withdrawable = Number(profile.data()?.walletAvailable || 0);
+    if (![shopping, withdrawable, shopping + withdrawable].every(n => Number.isSafeInteger(n) && n >= 0)) {
+      throw new Error('Invalid reseller cash wallet balances.');
+    }
+    if (shopping + withdrawable <= 0) throw new Error('There is no cash available to spend.');
+    // First use restricted shopping cash. Only then spend withdrawable rewards.
+    // Both balances are decremented atomically with the actual order creation.
+    const shoppingApplied = Math.min(shopping, orderData.total);
+    const withdrawableApplied = Math.min(withdrawable, orderData.total - shoppingApplied);
+    const amount = shoppingApplied + withdrawableApplied;
     const amountDue = orderData.total - amount;
     const savedOrder = {
       ...orderData, resellerUserId: userId, walletFingerprint: fingerprint,
-      walletShoppingApplied: amount, amountDue,
+      walletShoppingApplied: amount, walletShoppingOnlyApplied: shoppingApplied,
+      walletWithdrawalApplied: withdrawableApplied, amountDue,
       paymentMethod: amountDue === 0 ? 'shopping_wallet' : 'shopping_wallet_plus_cod',
       walletPaymentStatus: 'applied',
     };
-    tx.update(walletRef, { balance: available - amount, updatedAt: FieldValue.serverTimestamp() });
-    tx.update(profileRef, { walletShopping: available - amount, updatedAt: FieldValue.serverTimestamp() });
+    if (shoppingApplied > 0) tx.update(walletRef, { balance: shopping - shoppingApplied, updatedAt: FieldValue.serverTimestamp() });
+    tx.update(profileRef, {
+      walletShopping: shopping - shoppingApplied, walletAvailable: withdrawable - withdrawableApplied,
+      updatedAt: FieldValue.serverTimestamp(),
+    });
     tx.create(orderRef, savedOrder);
-    tx.create(spendRef, { id: orderId, userId, orderId, amount, type: 'shopping_order', status: 'applied', createdAt: FieldValue.serverTimestamp() });
+    tx.create(spendRef, { id: orderId, userId, orderId, amount, shoppingApplied, withdrawableApplied, type: 'shopping_order', status: 'applied', createdAt: FieldValue.serverTimestamp() });
     return { created: true, amount, amountDue, order: savedOrder };
   });
   if (result.created) {
@@ -91,14 +107,24 @@ export async function refundShoppingWalletOrder(orderId: string) {
     const walletRef = db.collection('reseller_shopping_wallets').doc(userId);
     const [profile, wallet] = await Promise.all([tx.get(profileRef), tx.get(walletRef)]);
     if (!profile.exists || !wallet.exists) throw new Error('Reseller wallet owner not found.');
-    const available = Number(wallet.data()?.balance || 0);
-    if (!Number.isSafeInteger(available) || !Number.isSafeInteger(available + amount)) throw new Error('Invalid wallet refund balance.');
+    const shopping = Number(wallet.data()?.balance || 0);
+    const withdrawable = Number(profile.data()?.walletAvailable || 0);
+    const shoppingRefund = Number(spend.data()?.shoppingApplied ?? amount);
+    const withdrawRefund = Number(spend.data()?.withdrawableApplied ?? 0);
+    if (![shopping, withdrawable, shoppingRefund, withdrawRefund, shopping + shoppingRefund, withdrawable + withdrawRefund]
+      .every(n => Number.isSafeInteger(n) && n >= 0) || shoppingRefund + withdrawRefund !== amount) {
+      throw new Error('Wallet refund ledger is inconsistent.');
+    }
     const updated = { ...oldOrder, status: 'cancelled', walletPaymentStatus: 'refunded', updatedAt: new Date().toISOString() };
-    tx.update(walletRef, { balance: available + amount, updatedAt: FieldValue.serverTimestamp() });
-    tx.update(profileRef, { walletShopping: available + amount, updatedAt: FieldValue.serverTimestamp() });
+    if (shoppingRefund > 0) tx.update(walletRef, { balance: shopping + shoppingRefund, updatedAt: FieldValue.serverTimestamp() });
+    tx.update(profileRef, {
+      walletShopping: shopping + shoppingRefund,
+      walletAvailable: withdrawable + withdrawRefund,
+      updatedAt: FieldValue.serverTimestamp(),
+    });
     tx.update(orderRef, { status: 'cancelled', walletPaymentStatus: 'refunded', updatedAt: FieldValue.serverTimestamp() });
     tx.update(spendRef, { status: 'refunded', refundedAt: FieldValue.serverTimestamp() });
-    tx.create(db.collection('reseller_wallet_refunds').doc(orderId), { id: orderId, userId, amount, orderId, type: 'order_cancellation', createdAt: FieldValue.serverTimestamp() });
+    tx.create(db.collection('reseller_wallet_refunds').doc(orderId), { id: orderId, userId, amount, shoppingRefund, withdrawRefund, orderId, type: 'order_cancellation', createdAt: FieldValue.serverTimestamp() });
     return { applied: true, order: updated, userId };
   });
   if (refunded.applied) {
