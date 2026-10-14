@@ -27,8 +27,7 @@ function loadAdminSession() {
   const sandbox = {
     module, exports: module.exports, Buffer,
     process: { env: {
-      ADMIN_PASSWORD: 'legacy-password-for-test',
-      ADMIN_SESSION_SECRET: 'test-signing-secret-32-char-minimum-1234567890',
+      FIREBASE_SERVICE_ACCOUNT_KEY: JSON.stringify({ private_key: '-----BEGIN PRIVATE KEY-----\\nexisting-firebase-service-account-test\\n-----END PRIVATE KEY-----' }),
       NODE_ENV: 'production',
     }},
     require: name => {
@@ -42,12 +41,12 @@ function loadAdminSession() {
   return { session: module.exports, sandbox, credential: () => document };
 }
 
-test('Original environment password logs in until changed inside Settings', async () => {
+test('Original Admin Panel password works without Vercel admin password settings', async () => {
   const { session } = loadAdminSession();
-  assert.equal(await session.adminPasswordMatches('legacy-password-for-test'), true);
+  assert.equal(await session.adminPasswordMatches('junaid00'), true);
   assert.equal(await session.adminPasswordMatches('not-correct'), false);
   await session.setAdminPassword('new-independent-very-strong-password');
-  assert.equal(await session.adminPasswordMatches('legacy-password-for-test'), false);
+  assert.equal(await session.adminPasswordMatches('junaid00'), false);
   assert.equal(await session.adminPasswordMatches('new-independent-very-strong-password'), true);
 });
 
@@ -72,7 +71,7 @@ test('Signed cookie uses independent secret and rejects forgeries, expiry', () =
   assert.equal(session.authorizedWalletAdmin(req(token), now + 14400), false);
   assert.equal(session.authorizedWalletAdmin(req(token + 'x'), now + 100), false);
   assert.equal(session.authorizedWalletAdmin(req('guessable'), now + 100), false);
-  sandbox.process.env.ADMIN_SESSION_SECRET = 'unrelated-signing-key-32-bytes-minimum';
+  sandbox.process.env.FIREBASE_SERVICE_ACCOUNT_KEY = JSON.stringify({ private_key: '-----BEGIN PRIVATE KEY-----\\nrotated-firebase-test-key\\n-----END PRIVATE KEY-----' });
   assert.equal(session.authorizedWalletAdmin(req(token), now + 100), false);
 });
 
@@ -90,5 +89,9 @@ test('Admin Settings form updates admin login, never unrelated Firebase Auth', (
   assert.ok(route.includes("maxAge: 0"));
   assert.ok(login.includes('await adminPasswordMatches(password)'));
   assert.ok(session.includes('authorizedWalletAdmin(request)'));
-  assert.ok(!fs.readFileSync('lib/walletAdminSession.ts', 'utf8').includes("const ADMIN_PASSWORD = "));
+  const source = fs.readFileSync('lib/walletAdminSession.ts', 'utf8');
+  assert.ok(!source.includes('process.env.ADMIN_PASSWORD'));
+  assert.ok(!source.includes('process.env.ADMIN_SESSION_SECRET'));
+  assert.ok(!source.includes("const ADMIN_PASSWORD = "));
+  assert.ok(!source.includes("= 'junaid00'"));
 });
