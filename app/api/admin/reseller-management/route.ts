@@ -306,7 +306,7 @@ export async function GET(request: Request) {
     pendingWithdrawals: withdrawals.filter((w: any) => w.status === 'pending').length,
     pendingTaskClaims: claims.filter((c: any) => c.status === 'pending').length,
     socialTaskOpens: taskEvents.length,
-    walletLiability: profiles.reduce((sum: number, p: any) => sum + Number(p.walletAvailable || 0) + Number(p.walletPending || 0), 0),
+    walletLiability: profiles.reduce((sum: number, p: any) => sum + Number(p.walletAvailable || 0) + Number(p.walletPending || 0) + Number(p.walletShopping || 0), 0),
     totalRewards: ledger.reduce((sum: number, r: any) => sum + Number(r.rewardAmount || 0), 0),
     totalPoints,
     trackedMonthlyOrders: activeProfiles.reduce((sum: number, p: any) => sum + Number(p.monthlyOrders || 0), 0),
