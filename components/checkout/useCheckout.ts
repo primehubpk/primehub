@@ -176,7 +176,8 @@ export function useCheckout() {
         '', 'Please send this message to confirm your order.',
       ].filter(Boolean).join('\n');
       const url = `https://wa.me/${adminNumber}?text=${encodeURIComponent(text)}`;
-      window.open(url, '_blank', 'noopener,noreferrer');
+      if (/Android|iPhone|iPad/i.test(navigator.userAgent)) window.location.assign(url);
+      else window.open(url, '_blank', 'noopener,noreferrer');
       // A prepared WhatsApp link is just a draft. The admin checks the actual
       // incoming message before promoting it to an order or rewarding reseller.
     } catch (caught) {
