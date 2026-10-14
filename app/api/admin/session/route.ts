@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { WALLET_ADMIN_COOKIE, walletAdminCookieOptions } from '@/lib/walletAdminSession';
 import { POSTING_SESSION_COOKIE, postingSessionCookieOptions } from '@/lib/integrations/tiktokPostingSession';
 
 export const runtime = 'nodejs';
@@ -31,6 +32,7 @@ export async function DELETE(request: Request) {
     path: '/',
     maxAge: 0,
   });
+  response.cookies.set(WALLET_ADMIN_COOKIE, '', { ...walletAdminCookieOptions(), maxAge: 0 });
   response.cookies.set(POSTING_SESSION_COOKIE, '', { ...postingSessionCookieOptions(), maxAge: 0 });
   response.headers.set('Cache-Control', 'no-store');
   return response;
