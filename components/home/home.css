@@ -1147,3 +1147,22 @@
 }
 
 .home-announcement>span{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.home-announcement>svg{flex-shrink:0}
+
+/* Four compact top actions (Orders · Images · Shop · Cart), preserving home logo on small phones. */
+@media (max-width: 630px) {
+  .home-header-row { gap: 7px; }
+  .home-logo { font-size: clamp(19px, 5.4vw, 27px); }
+  .home-quick-links { gap: 3px; }
+  .home-quick-links > a,
+  .home-quick-links > button { min-width: 31px; font-size: 7px; }
+  .home-quick-links svg { width: 31px; height: 31px; padding: 5px; }
+}
+@media (max-width: 370px) {
+  .home-logo { font-size: 18px; }
+  .home-header-row > .home-icon { width: 28px; }
+  .home-header-row { gap: 4px; }
+  .home-quick-links { gap: 2px; }
+  .home-quick-links > a,
+  .home-quick-links > button { min-width: 28px; }
+  .home-quick-links svg { width: 28px; height: 28px; padding: 4px; }
+}
