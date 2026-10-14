@@ -30,6 +30,7 @@ type ActionMessage = {
 type OrdersResponse = {
   success: true;
   orders: Order[];
+  whatsappDrafts?: Order[];
   whatsappNumber?: string;
   primary?: string;
   warning?: string | null;
@@ -289,7 +290,8 @@ async function adminOrderAction(action: 'status' | 'delete', orderId: string, st
 
 export default function OrdersManager() {
   const [orders, setOrders] = useState<Order[]>([]);
-  const [statusFilter, setStatusFilter] = useState<'all' | OrderStatus>('all');
+  const [whatsappDrafts, setWhatsappDrafts] = useState<Order[]>([]);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'whatsapp_drafts' | OrderStatus>('all');
   const [search, setSearch] = useState('');
   const [addressOrder, setAddressOrder] = useState<Order | null>(null);
   const [deleteOrder, setDeleteOrder] = useState<Order | null>(null);
@@ -310,6 +312,8 @@ export default function OrdersManager() {
       .then((data) => {
         if (!active) return;
         setOrders(Array.isArray(data.orders) ? data.orders : []);
+      setWhatsappDrafts(Array.isArray(data.whatsappDrafts) ? data.whatsappDrafts : []);
+        setWhatsappDrafts(Array.isArray(data.whatsappDrafts) ? data.whatsappDrafts : []);
         const number = textValue(data.whatsappNumber);
         setWhatsappNumber(number);
         setSavedWhatsappNumber(number);
@@ -328,9 +332,9 @@ export default function OrdersManager() {
 
   const filteredOrders = useMemo(() => {
     const term = search.trim().toLowerCase();
-    return [...orders]
+    return [...(statusFilter === 'whatsapp_drafts' ? whatsappDrafts : orders)]
       .filter((order) => {
-        const statusMatches = statusFilter === 'all' || normalizedStatus(order.status) === statusFilter;
+        const statusMatches = statusFilter === 'all' || statusFilter === 'whatsapp_drafts' || normalizedStatus(order.status) === statusFilter;
         const searchable = [
           order.id,
           order.customer?.name,
@@ -346,7 +350,7 @@ export default function OrdersManager() {
         return statusMatches && (!term || searchable.includes(term));
       })
       .sort((a, b) => orderTime(b.createdAt) - orderTime(a.createdAt));
-  }, [orders, search, statusFilter]);
+  }, [orders, whatsappDrafts, search, statusFilter]);
 
   async function reloadOrders() {
     if (loadingOrders) return;
@@ -364,6 +368,35 @@ export default function OrdersManager() {
     } finally {
       setLoadingOrders(false);
     }
+  }
+
+  async function reviewWhatsappDraft(id: string, action: 'confirm-whatsapp' | 'dismiss-whatsapp') {
+    if (updatingOrderId) return;
+    const confirmText = action === 'confirm-whatsapp'
+      ? 'Have you actually RECEIVED the customer WhatsApp message and verified these order details? Opening WhatsApp alone is not confirmation.'
+      : 'Dismiss this unconfirmed WhatsApp request?';
+    if (!window.confirm(confirmText)) return;
+    setUpdatingOrderId(id);
+    setActionMessage(null);
+    try {
+      const response = await fetch('/api/admin/orders', {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, intentId: id }),
+      });
+      const data = await response.json().catch(() => null);
+      if (!response.ok || !data?.success) throw new Error(data?.error || 'Could not review WhatsApp request.');
+      setWhatsappDrafts(previous => previous.filter(row => row.id !== id));
+      if (action === 'confirm-whatsapp') {
+        const refreshed = await fetchAdminOrders();
+        setOrders(refreshed.orders || []);
+      }
+      setActionMessage({ kind: 'success', text: action === 'confirm-whatsapp'
+        ? 'WhatsApp message verified and real order added. It is now in All Orders.'
+        : 'Unconfirmed WhatsApp draft dismissed.' });
+    } catch (error) {
+      setActionMessage({ kind: 'error', text: error instanceof Error ? error.message : 'WhatsApp review failed.' });
+    } finally { setUpdatingOrderId(null); }
   }
 
   async function updateStatus(orderId: string, status: OrderStatus) {
@@ -550,14 +583,14 @@ export default function OrdersManager() {
           />
         </label>
         <div className="mt-3 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {(['all', ...ORDER_STATUSES] as const).map((status) => (
+          {(['all', 'whatsapp_drafts', ...ORDER_STATUSES] as const).map((status) => (
             <button
               key={status}
               type="button"
               onClick={() => setStatusFilter(status)}
               className={`shrink-0 rounded-full px-3 py-2 text-[10px] font-black capitalize transition ${statusFilter === status ? 'bg-[#14140F] text-white' : 'bg-black/5 text-black/55'}`}
             >
-              {status === 'all' ? 'All Orders' : status}
+              {status === 'all' ? 'All Orders' : status === 'whatsapp_drafts' ? `WhatsApp Requests (${whatsappDrafts.length})` : status}
             </button>
           ))}
         </div>
@@ -565,7 +598,7 @@ export default function OrdersManager() {
 
       <div className="mt-4 space-y-4">
         {filteredOrders.map((order) => {
-          const row = order as Order & { resellerUserId?: string; resellerRewardStatus?: string };
+          const row = order as Order & { resellerUserId?: string; resellerRewardStatus?: string; whatsappDraft?: boolean };
           const status = normalizedStatus(order.status);
           const items = itemsFor(order);
           const name = customerValue(order, 'name') || 'Customer';
@@ -586,6 +619,8 @@ export default function OrdersManager() {
                       <span className={`inline-flex rounded-full px-2.5 py-1 text-[9px] font-black capitalize ring-1 ring-inset ${STATUS_STYLES[status]}`}>
                         {status}
                       </span>
+                      {row.whatsappDraft && <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[9px] font-black text-amber-800">WHATSAPP REQUEST · NOT YET CONFIRMED</span>}
+                      {!row.whatsappDraft && String(row.source || '').toLowerCase().includes('whatsapp') && <span className="rounded-full bg-green-50 px-2.5 py-1 text-[9px] font-black text-green-700">WHATSAPP ORDER</span>}
                       {row.resellerUserId && (
                         <span className="inline-flex rounded-full bg-[#DDF5F0] px-2.5 py-1 text-[9px] font-black text-[#0F6A5F]">RESELLER</span>
                       )}
@@ -683,7 +718,15 @@ export default function OrdersManager() {
                   </div>
                 </div>
 
-                <div className="mt-4 grid gap-3 border-t border-black/8 pt-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+                {row.whatsappDraft ? (
+                  <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3">
+                    <p className="text-[11px] font-bold leading-5 text-amber-900">Customer opened a WhatsApp order request. This is a draft, NOT a confirmed purchase. Check your actual WhatsApp conversation before approving. No revenue or reseller reward has been counted.</p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button type="button" disabled={Boolean(updatingOrderId)} onClick={() => void reviewWhatsappDraft(order.id, 'confirm-whatsapp')} className="rounded-xl bg-[#0F6A5F] px-4 py-3 text-[11px] font-black text-white disabled:opacity-50">✓ Message Received · Create Order</button>
+                      <button type="button" disabled={Boolean(updatingOrderId)} onClick={() => void reviewWhatsappDraft(order.id, 'dismiss-whatsapp')} className="rounded-xl border border-rose-200 bg-white px-4 py-3 text-[11px] font-black text-rose-600 disabled:opacity-50">Dismiss Request</button>
+                    </div>
+                  </div>
+                ) : <div className="mt-4 grid gap-3 border-t border-black/8 pt-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
                   <div className="grid gap-3 sm:grid-cols-2">
                     <label className="block">
                       <span className="mb-1.5 block text-[9px] font-black uppercase tracking-[0.14em] text-black/35">Order status</span>
@@ -744,7 +787,7 @@ export default function OrdersManager() {
                       <Trash2 size={15} /> Delete
                     </button>
                   </div>
-                </div>
+                </div>}
               </div>
             </article>
           );
