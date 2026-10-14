@@ -25,8 +25,9 @@ export async function creditResellerWallet(input: {
   const db = getAdminDb();
   const profileRef = db.collection('reseller_profiles').doc(userId);
   const entryRef = db.collection('reseller_wallet_credits').doc(operationId);
+  const shoppingRef = db.collection('reseller_shopping_wallets').doc(userId);
   const result = await db.runTransaction(async tx => {
-    const [profile, existing] = await Promise.all([tx.get(profileRef), tx.get(entryRef)]);
+    const [profile, existing, shopping] = await Promise.all([tx.get(profileRef), tx.get(entryRef), tx.get(shoppingRef)]);
     if (existing.exists) {
       const old = existing.data() || {};
       if (old.userId !== userId || old.amount !== amount || old.purpose !== purpose) {
@@ -36,10 +37,13 @@ export async function creditResellerWallet(input: {
     }
     if (!profile.exists || profile.data()?.status !== 'active') throw new Error('Active reseller profile not found.');
     const key = purpose === 'shopping' ? 'walletShopping' : 'walletAvailable';
-    const prior = Number(profile.data()?.[key] || 0);
+    // The separate server-managed shopping wallet document is authoritative.
+    // Never trust a profile field that could have been supplied at account creation.
+    const prior = Number(purpose === 'shopping' ? shopping.data()?.balance || 0 : profile.data()?.[key] || 0);
     if (!Number.isSafeInteger(prior) || prior < 0 || !Number.isSafeInteger(prior + amount)) {
       throw new Error('Wallet would exceed the supported balance range.');
     }
+    if (purpose === 'shopping') tx.set(shoppingRef, { userId, balance: prior + amount, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
     tx.update(profileRef, { [key]: prior + amount, updatedAt: FieldValue.serverTimestamp() });
     tx.create(entryRef, {
       id: operationId, userId, amount, purpose, reason: reason.trim(),
