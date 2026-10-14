@@ -195,13 +195,21 @@ export default function DownloadImagesPage() {
           if (controller.signal.aborted) break;
           failed++;
           if (process.env.NODE_ENV !== 'production') console.warn('Direct CDN photo download failed:', photo.id, err);
+          // If R2 rejects cross-origin access, stop at first failure rather
+          // than issuing hundreds of doomed requests or draining phone battery.
+          if (err instanceof Error && err.message.startsWith('CORS_NOT_ALLOWED:') &&
+            (photo.url.includes('images.primehubmall.com') || photo.url.includes('.r2.dev'))) {
+            processed++;
+            setDownloadProgress({ processed, started, failed, total });
+            break;
+          }
         }
         processed++;
         setDownloadProgress({ processed, started, failed, total });
       }
       if (!controller.signal.aborted) {
         setDownloadComplete(true);
-        if (failed > 0) {
+        if (failed > 0 || processed < total) {
           const blocked = [...cdnCorsBlocked.current];
           setDownloadError(blocked.length
             ? `Direct CDN image downloads are blocked for ${blocked.join(', ')}. Configure Cloudflare R2/legacy CDN CORS GET for this website; no images were sent through Vercel. Check Chrome Downloads for files already requested.`
