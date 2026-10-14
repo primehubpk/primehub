@@ -58,6 +58,7 @@ export function useCheckout() {
   const [walletShoppingBalance, setWalletShoppingBalance] = useState(0);
   const [walletBalanceStatus, setWalletBalanceStatus] = useState<'loading' | 'ready' | 'unavailable'>('loading');
   const walletRequestId = useRef('');
+  const whatsappRequestId = useRef('');
   const [selfCollect, setSelfCollect] = useState(false);
   const [wholesaleItems, setWholesaleItems] = useState(0);
   const [tierDiscount, setTierDiscount] = useState(0), [tierDiscountPercent, setTierDiscountPercent] = useState(0), [resellerTier, setResellerTier] = useState('');
@@ -145,14 +146,12 @@ export function useCheckout() {
     if (!customer.name.trim() || !customer.phone.trim() || (!selfCollect && (!customer.address.trim() || !customer.city.trim()))) {
       setError('Please enter your name, phone, city and delivery address first.'); return;
     }
-    if (useShoppingCredit) {
-      setError('Your available cash wallet applies when you select Place Order. WhatsApp cannot deduct it; choose Place Order or sign out to request a separate WhatsApp COD order.'); return;
-    }
+    if (useShoppingCredit && !window.confirm('WhatsApp order requests do not use wallet cash. Continue as a cash-on-delivery request instead? To use all wallet funds automatically, choose Place Order.')) return;
     try {
       const headers = { 'Content-Type': 'application/json', ...(await authHeader()) };
       const [quoteResponse, adminNumber] = await Promise.all([
         fetch('/api/orders', { method: 'POST', headers,
-          body: JSON.stringify({ mode: 'whatsapp_intent', items, customer, selfCollect, guestId: guestId(), orderRequestId: (walletRequestId.current ||= crypto.randomUUID()) }),
+          body: JSON.stringify({ mode: 'whatsapp_intent', items, customer, selfCollect, guestId: guestId(), orderRequestId: (whatsappRequestId.current ||= crypto.randomUUID()) }),
         }), getAdminWhatsAppNumber(),
       ]);
       const quote = await quoteResponse.json().catch(() => null);
