@@ -44,26 +44,15 @@ service cloud.firestore {
       allow create, update, delete: if isAdmin();
     }
     match /reward_redemptions/{redemptionId} {
-      allow create: if signedIn()
-        && request.resource.data.userId == request.auth.uid
-        && request.resource.data.status == 'pending'
-        && request.resource.data.createdAt is timestamp
-        && ((request.resource.data.giftId is string && request.resource.data.pointsCost is int && request.resource.data.pointsCost > 0)
-          || (request.resource.data.wheelWinId is string && request.resource.data.pointsCost is int && request.resource.data.pointsCost == 0));
+      // Only verified server rewards can create real redemption requests.
+      // Old browser creates accepted arbitrary giftId/pointsCost without debiting points.
       allow read: if isAdmin() || (signedIn() && resource.data.userId == request.auth.uid);
-      allow update, delete: if isAdmin();
+      allow create, update, delete: if isAdmin();
     }
     match /reward_wins/{winId} {
-      allow create: if signedIn()
-        && request.resource.data.userId == request.auth.uid
-        && request.resource.data.prizeId is string
-        && request.resource.data.name is string
-        && request.resource.data.type is string
-        && request.resource.data.status == 'pending'
-        && request.resource.data.createdAt is timestamp;
+      // Spins are chosen on the backend; clients cannot mint or alter winners.
       allow read: if isAdmin() || (signedIn() && resource.data.userId == request.auth.uid);
-      allow update: if isAdmin() || (signedIn() && resource.data.userId == request.auth.uid && request.resource.data.userId == request.auth.uid && request.resource.data.status in ['pending', 'redeemed']);
-      allow delete: if isAdmin();
+      allow create, update, delete: if isAdmin();
     }
     match /user_rewards/{userId} {
       allow read: if isAdmin() || (signedIn() && request.auth.uid == userId);
