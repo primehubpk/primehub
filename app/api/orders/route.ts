@@ -212,6 +212,13 @@ export async function POST(request: Request) {
           }
         } catch (rewardError) { console.error('Free delivery reward on wallet order needs reconciliation:', rewardError); }
       }
+      // Keep normal purchase-reminder suppression for customers paying with shopping credit.
+      if (saved.created) {
+        try {
+          await getAdminDb().collection('push_user_purchases').doc(user.uid + '_' + pakistanDay(new Date()))
+            .set({ purchasedAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 90 * 86_400_000) }, { merge: true });
+        } catch { console.warn('[push] wallet purchase suppression marker unavailable'); }
+      }
       return NextResponse.json({ orderId, ...saved.order, walletShoppingApplied: saved.amount, amountDue: saved.amountDue, resellerLinked: true, guestTracked: Boolean(resellerGuestId) });
     }
 
