@@ -1,0 +1,35 @@
+name: Reseller Wallet Branch QA
+
+on:
+  push:
+    branches:
+      - feature/reseller-wallet-admin-dupes-oct14
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  wallet-checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout feature branch
+        uses: actions/checkout@v4
+      - name: Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Check TypeScript
+        run: npx tsc --noEmit
+      - name: Run existing commerce regression tests
+        run: |
+          node --test tests/home-sale-mela-cart-flow.test.mjs
+          node --test tests/weekly-cart-price.test.mjs
+      - name: Next.js build
+        run: npm run build
+        env:
+          CI: 'true'
