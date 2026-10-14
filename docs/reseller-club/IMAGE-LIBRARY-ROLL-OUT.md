@@ -10,7 +10,7 @@ Branch: `feature/reseller-wallet-admin-dupes-oct14`. DO NOT MERGE OR DEPLOY with
 - Firebase Auth token and active `reseller_profiles/{uid}` status are verified on every catalog/download request. Blocked/revoked sessions cannot access it.
 - The page displays active category cards, search, category image thumbnails, 36 photos/page and Load more.
 - Each photo is downloadable individually with its catalog-derived safe filename.
-- Selecting a category and pressing **Download All Images** once requests every original photo as an individual image file. No ZIP archives, archive buttons, extraction step or fixed-size packs. The browser may ask to allow automatic multiple downloads; websites cannot bypass that Chrome protection.
+- **One tap on a category tile** selects that category and starts downloading every original photo as a separate image file; the Download All button can be used to retry. No ZIP archives, extraction step or fixed-size packs. The browser may ask to allow automatic multiple downloads; websites cannot bypass that Chrome protection.
 - Images include cover, gallery and variant photos, deduplicated by URL, with no demo content.
 - Each original JPG/PNG/WebP file is offered individually to the **Chrome Downloads** destination (not guaranteed to appear instantly inside Android Gallery). Chrome may block additional automatic downloads until the user approves its site permission. Browsers do not disclose whether every requested file actually landed on storage; UI says requested/sent, never falsely confirms disk writes. Native Android WebView DownloadManager behavior must be tested separately.
 
