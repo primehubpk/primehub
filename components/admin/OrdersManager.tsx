@@ -620,7 +620,7 @@ export default function OrdersManager() {
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className={`inline-flex rounded-full px-2.5 py-1 text-[9px] font-black capitalize ring-1 ring-inset ${STATUS_STYLES[status]}`}>
-                        {status}
+                        {row.whatsappDraft ? 'Awaiting WhatsApp confirmation' : status}
                       </span>
                       {row.whatsappDraft && <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[9px] font-black text-amber-800">WHATSAPP REQUEST · NOT YET CONFIRMED</span>}
                       {!row.whatsappDraft && String(row.source || '').toLowerCase().includes('whatsapp') && <span className="rounded-full bg-green-50 px-2.5 py-1 text-[9px] font-black text-green-700">WHATSAPP ORDER</span>}
