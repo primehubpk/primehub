@@ -27,7 +27,7 @@ async function mirrorFirebaseWallet(uid: string, wallet: Wallet) { try { await g
 function choosePrize(prizes: Prize[]) { const active = prizes.filter(p => p.active !== false && Number(p.probability) > 0 && Number(p.stock ?? 1) > 0).slice(0, 5); const total = active.reduce((s, p) => s + Number(p.probability || 0), 0); if (!active.length || total <= 0) return null; let cursor = Math.random() * total; for (const p of active) { cursor -= Number(p.probability || 0); if (cursor <= 0) return p; } return active[active.length - 1]; }
 function isLogicalRewardError(error: unknown) { const message = error instanceof Error ? error.message : String(error); return /Already checked in today|Come back tomorrow|Spin prizes are being refreshed/i.test(message); }
 function appendHistory(current: Wallet, entry: HistoryEntry) { return [...(current.history || []), entry].slice(-100); }
-function applySpin(current: Wallet, prize: Prize, today: string): Wallet {
+function applySpin(current: Wallet, prize: Prize, today: string, legacy = false): Wallet {
   const points = prize.type === 'points' ? Math.max(0, Number(prize.points || 0)) : 0;
   const voucher = prize.type === 'coupon' ? (String(prize.voucherCode || '').trim() || `PH-${Math.random().toString(36).slice(2, 8).toUpperCase()}`) : '';
   const now = new Date().toISOString();
@@ -35,7 +35,7 @@ function applySpin(current: Wallet, prize: Prize, today: string): Wallet {
   const voucherReward: VoucherReward | null = prize.type === 'coupon' ? { id: rewardId, code: voucher, amount: Math.max(0, Number(prize.voucherAmount || 0)), name: prize.name, createdAt: now } : null;
   const productReward: ProductReward | null = prize.type === 'product' ? { id: rewardId, productId: String(prize.productId || ''), name: prize.name, imageUrl: prize.imageUrl, status: 'pending', createdAt: now } : null;
   const history: HistoryEntry = { id: rewardId, action: 'spin', name: prize.name, type: prize.type, status: 'claimed', createdAt: now, source: 'account', pointsAwarded: points };
-  return { ...current, points: Number(current.points || 0) + points, lastSpin: today, coupons: voucher ? [...(current.coupons || []), voucher] : (current.coupons || []), vouchers: voucherReward ? [...(current.vouchers || []), voucherReward] : (current.vouchers || []), freeProducts: productReward ? [...(current.freeProducts || []), productReward] : (current.freeProducts || []), freeDeliveryCredits: Number(current.freeDeliveryCredits || 0) + (prize.type === 'free-delivery' ? 1 : 0), history: appendHistory(current, history) };
+  return { ...current, points: Number(current.points || 0) + points, lastSpin: today, coupons: voucher ? [...(current.coupons || []), voucher] : (current.coupons || []), vouchers: voucherReward ? [...(current.vouchers || []), voucherReward] : (current.vouchers || []), freeProducts: !legacy && productReward ? [...(current.freeProducts || []), productReward] : (current.freeProducts || []), freeDeliveryCredits: Number(current.freeDeliveryCredits || 0) + (!legacy && prize.type === 'free-delivery' ? 1 : 0), history: appendHistory(current, history) };
 }
 function applyCheckin(current: Wallet, settings: any, today: string): Wallet {
   if (current.lastCheckIn === today) throw new Error('Already checked in today.');
@@ -47,7 +47,17 @@ function applyCheckin(current: Wallet, settings: any, today: string): Wallet {
   return { ...current, points: Number(current.points || 0) + points, streak, lastCheckIn: today, history: appendHistory(current, history) };
 }
 
-async function firebaseAction(uid: string, action: string, guestId = '') {
+function legacyWinRow(uid: string, prize: Prize, wallet: Wallet) {
+  if (['points', 'try-again'].includes(prize.type)) return null;
+  const id = String(wallet.history?.at(-1)?.id || '');
+  if (!id) throw new Error('Legacy wheel winner has no audit ID.');
+  return { id, userId: uid, prizeId: prize.id, name: prize.name, type: prize.type,
+    points: 0, productId: prize.productId || '', voucherCode: prize.voucherCode || '',
+    voucherAmount: Number(prize.voucherAmount || 0), imageUrl: prize.imageUrl || '',
+    status: 'pending', createdAt: FieldValue.serverTimestamp() };
+}
+
+async function firebaseAction(uid: string, action: string, guestId = '', legacy = false) {
   const db = getAdminDb(); const ref = db.collection('user_rewards').doc(uid); const today = dayKey();
   const settingsSnap = await db.collection('settings').doc('rewards').get(); const settings = settingsSnap.data() || {};
   const guestSnap = guestId ? await db.collection('user_rewards').doc(`guest_${guestId}`).get() : null;
@@ -60,9 +70,13 @@ async function firebaseAction(uid: string, action: string, guestId = '') {
       if (current.lastSpin === today || guest.lastSpin === today) throw new Error('Come back tomorrow for your next spin.');
       prize = choosePrize(Array.isArray(settings.spinWheelSlots) ? settings.spinWheelSlots : []);
       if (!prize) throw new Error('Spin prizes are being refreshed from Admin.');
-      result = applySpin(current, prize, today);
+      result = applySpin(current, prize, today, legacy);
     }
     tx.set(ref, { ...result, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+    if (legacy && prize) {
+      const winner = legacyWinRow(uid, prize, result);
+      if (winner) tx.create(db.collection('reward_wins').doc(winner.id), winner);
+    }
   });
   return { wallet: result, prize };
 }
@@ -111,6 +125,7 @@ export async function POST(request: Request) {
     const body = await request.json();
     const action = body?.action === 'checkin' ? 'checkin' : 'spin';
     const guestId = validGuestId(body?.guestId);
+    const legacy = body?.legacyRewardsPage === true;
     // Only spin attempts pay the small cost of an atomic anti-repeat gate.
     // All homepage loads, check-ins, and reward-state reads are unchanged.
     const finishSpin = action === 'spin' ? await reserveDailySpin(user.uid, guestId, dayKey()) : null;
@@ -134,16 +149,23 @@ export async function POST(request: Request) {
           if (current.lastSpin === today || guest.lastSpin === today) throw new Error('Come back tomorrow for your next spin.');
           prize = choosePrize(Array.isArray(settings.spinWheelSlots) ? settings.spinWheelSlots : []);
           if (!prize) throw new Error('Spin prizes are being refreshed from Admin.');
-          wallet = applySpin(current, prize, today);
+          wallet = applySpin(current, prize, today, legacy);
         }
         await writeSupabaseWallet(user.uid, wallet);
         await mirrorFirebaseWallet(user.uid, wallet);
+        if (legacy && prize) {
+          const win = legacyWinRow(user.uid, prize, wallet);
+          if (win) {
+            try { await getAdminDb().collection('reward_wins').doc(win.id).create(win); }
+            catch (error) { console.error('Legacy wheel winner ledger sync requires recovery:', error); }
+          }
+        }
         if (finishSpin) await finishSpin();
         return NextResponse.json({ ok: true, source: 'supabase', wallet, prize });
       } catch (error) {
         if (isLogicalRewardError(error)) throw error;
         console.error('Supabase reward action failed; using Firebase fallback:', error);
-        const fallback = await firebaseAction(user.uid, action, guestId);
+        const fallback = await firebaseAction(user.uid, action, guestId, legacy);
         if (finishSpin) await finishSpin();
         return NextResponse.json({ ok: true, source: 'firebase-fallback', ...fallback });
       }
