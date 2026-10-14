@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { FieldValue } from 'firebase-admin/firestore';
 import { getAdminAuth, getAdminDb } from '@/lib/firebaseAdmin';
 import { isSupabaseWriteConfigured } from '@/lib/dualWriteServer';
+import { reserveDailySpin } from '@/lib/resellerSpinGuard';
 
 export const runtime = 'nodejs';
 
@@ -50,6 +51,7 @@ export async function POST(request: Request) {
     }
 
     const today = dayKey();
+    const finishSpin = await reserveDailySpin('guest:' + guestId, guestId, today);
     const current = await readGuest(guestId);
     if (current.lastSpin === today) return NextResponse.json({ error: 'Come back tomorrow for your next spin.' }, { status: 400 });
     const settings = await rewardSettings();
@@ -60,6 +62,7 @@ export async function POST(request: Request) {
     const historyEntry: RewardHistoryEntry = { id: pendingPrizeToken, action: 'spin', prizeId: prize.id, name: prize.name, type: prize.type, status: 'pending', createdAt: now, source: 'guest' };
     const next: GuestWallet = { ...current, lastSpin: today, pendingPrize: prize, pendingPrizeToken, history: [...(current.history || []), historyEntry].slice(-100) };
     await writeGuest(guestId, next);
+    await finishSpin();
     return NextResponse.json({ ok: true, guest: true, wallet: next, prize, loginRequiredToClaim: prize.type !== 'try-again' });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : 'Guest reward action failed.' }, { status: 400 });
