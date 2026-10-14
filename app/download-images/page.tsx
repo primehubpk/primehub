@@ -20,7 +20,7 @@ function saveFile(blob: Blob, filename: string) {
   document.body.append(link);
   link.click();
   link.remove();
-  window.setTimeout(() => URL.revokeObjectURL(url), 45_000);
+  window.setTimeout(() => URL.revokeObjectURL(url), 12_000);
 }
 
 export default function DownloadImagesPage() {
@@ -43,6 +43,7 @@ export default function DownloadImagesPage() {
   const [downloadComplete, setDownloadComplete] = useState(false);
   const requestCounter = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
+  const directCdnCors = useRef<boolean | null>(null);
 
   useEffect(() => onAuthStateChanged(auth, user => {
     if (!user) {
@@ -108,9 +109,38 @@ export default function DownloadImagesPage() {
     finally { setLoadingImages(false); }
   }
 
-  async function downloadFile(body: Record<string, unknown>, filename: string, controller: AbortController) {
+  async function downloadFile(body: Record<string, unknown>, filename: string, controller: AbortController, photo?: Photo) {
     const user = auth.currentUser;
     if (!user) throw new Error('Please sign in again.');
+
+    // Images are already public on Cloudflare R2 / ImgBB; try a browser CORS
+    // download once. If supported, subsequent photos bypass Vercel origin egress.
+    // If the CDN does not allow CORS, use the protected same-origin image proxy.
+    if (photo?.url && directCdnCors.current !== false) {
+      try {
+        const uri = new URL(photo.url);
+        if (uri.protocol !== 'https:' || uri.port ||
+          !['images.primehubmall.com', 'i.ibb.co'].includes(uri.hostname)) {
+          throw new Error('Unsupported photo CDN');
+        }
+        const direct = await fetch(uri.toString(), { signal: controller.signal, mode: 'cors', redirect: 'error' });
+        const contentType = direct.headers.get('content-type') || '';
+        const contentLength = Number(direct.headers.get('content-length') || 0);
+        if (!direct.ok || !contentType.startsWith('image/') || contentLength > 9 * 1024 * 1024) {
+          throw new Error('CDN image cannot be downloaded directly');
+        }
+        const blob = await direct.blob();
+        if (blob.size === 0 || blob.size > 9 * 1024 * 1024) throw new Error('Image exceeds download size limit');
+        directCdnCors.current = true;
+        saveFile(blob, filename);
+        return;
+      } catch (error) {
+        if (controller.signal.aborted) throw error;
+        // First-party CORS is optional; fallback is always secured by Firebase Auth.
+        directCdnCors.current = false;
+      }
+    }
+
     const response = await fetch('/api/reseller/image-download', {
       method: 'POST', signal: controller.signal, credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${await user.getIdToken()}` },
@@ -120,7 +150,9 @@ export default function DownloadImagesPage() {
       const data = await response.json().catch(() => null);
       throw new Error(data?.error || 'Download failed. Please try again.');
     }
-    saveFile(await response.blob(), filename);
+    const blob = await response.blob();
+    if (!blob.size || blob.size > 9 * 1024 * 1024) throw new Error('Image could not be safely downloaded.');
+    saveFile(blob, filename);
   }
 
   async function saveOne(photo: Photo) {
@@ -128,7 +160,7 @@ export default function DownloadImagesPage() {
     const controller = new AbortController();
     abortRef.current = controller;
     setDownloading(photo.id); setDownloadError('');
-    try { await downloadFile({ mode: 'image', category: selected, imageId: photo.id }, photo.filename, controller); }
+    try { await downloadFile({ mode: 'image', category: selected, imageId: photo.id }, photo.filename, controller, photo); }
     catch (err) { setDownloadError(err instanceof Error ? err.message : 'Image download failed.'); }
     finally { setDownloading(''); abortRef.current = null; }
   }
@@ -165,7 +197,7 @@ export default function DownloadImagesPage() {
       for (const photo of allPhotos) {
         if (controller.signal.aborted) break;
         try {
-          await downloadFile({ mode: 'image', category: slug, imageId: photo.id }, photo.filename, controller);
+          await downloadFile({ mode: 'image', category: slug, imageId: photo.id }, photo.filename, controller, photo);
           // Chrome may block file saving despite a successful synthetic click.
           // This counts files offered to Chrome, not confirmed disk writes.
           started++;
