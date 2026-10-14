@@ -9,7 +9,8 @@ test('Only verified Play Store credit triggers congratulations; existing email/p
   const signin = file('app/reseller/join/page.tsx');
   const auth = file('lib/resellerAuth.ts');
   const server = file('lib/playInstallBonus.ts');
-  assert.match(client, /if \(!detail\?\.success \|\| !currentUid\.current\) return/);
+  assert.ok(client.includes("if (!detail?.success) { requestedUid = ''; return; }"));
+  assert.ok(client.includes('if (!currentUid.current) return;'));
   assert.match(client, /primehub:reseller-profile-ready/);
   assert.match(client, /'playBonus'/);
   assert.match(client, /Congratulations!/);
