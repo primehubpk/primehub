@@ -44,3 +44,15 @@ The admin Member cards now display email and UID so the accounts are distinguish
 10. Check Firestore rules deployment and production Vercel settings only as part of the **approved** rollout.
 
 Do not interpret passing static CI as proof that real transaction flows were tested against production.
+
+## October 14 follow-up — member controls, history, Salar contact toggles
+
+- Member cards offer History, Block/Unblock, and Delete. No production account has been blocked or deleted.
+- Block disables Firebase Auth, revokes refresh tokens, and suspends the reseller profile. Unblock reenables it. Both write a UID-scoped admin history event.
+- Delete requires exact typed UID confirmation, a reason, zero withdrawable/pending/shopping money, zero verified task/loyalty points, and no pending claims/withdrawals/rewards. It removes Firebase Auth login but retains historical ledgers and deleted account audit identity. Deleted accounts are hidden by default; Show deleted accounts restores history access. Do not delete the 260-point member.
+- History opens a per-member read including real `user_rewards.history` daily check-ins / spins, points ledger, tasks, orders, withdrawals, admin credit/spend/refund and account actions. No fabricated award values are shown.
+- Read-only production data verification for UID ending `AOi0p1`: user_rewards.points = **260**, task point ledger = **0** events/points, user_rewards.history = **7** events (four Day 1 check-ins and three Try Again spins). Older entries lack exact `pointsAwarded`; therefore the exact historical composition of the 260 points cannot be reconstructed honestly. New reward-action entries save explicit `pointsAwarded`.
+- Admin > Salar: two WhatsApp number fields and separate ON/OFF switches. Changes persist in Supabase `settings/salar_ui`. Salar public status sends only enabled numbers; opening widget renders links from saved settings. Changes invalidate settings cache.
+- Before rollout, verify fresh admin login with newly configured **ADMIN_PASSWORD**, an inactive blocked reseller cannot log in, unblocked member can sign in, no funds or points are lost, Delete of a financial account is rejected, and the intended test account is the only identity affected.
+- Test Salar: number A OFF means only B visible; both OFF means no contact tiles; edit number B and verify WhatsApp URL matches new E.164 number. Icon and Salar instructions must remain unchanged.
+- GitHub Actions TypeScript/build checks verify compilation but cannot prove production Firebase Auth/Firestore transaction paths or mobile UI. Do not claim live financial integration tested unless explicitly run in an isolated emulator/test project.
