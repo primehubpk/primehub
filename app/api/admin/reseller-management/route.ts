@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { authorizedWalletAdmin } from '@/lib/walletAdminSession';
 import { getAdminAuth, getAdminDb } from '@/lib/firebaseAdmin';
 import { reviewResellerTaskClaim, reviewResellerWithdrawal } from '@/lib/resellerServer';
 import { mirrorResellerDocAndProfile, mirrorResellerFirestoreDoc } from '@/lib/resellerDualMirror';
@@ -6,13 +7,10 @@ import { mirrorResellerDocAndProfile, mirrorResellerFirestoreDoc } from '@/lib/r
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const ADMIN_COOKIE = 'primehub_admin_auth';
-
 type Row = Record<string, any>;
 
 function isAuthorized(request: Request) {
-  const cookie = request.headers.get('cookie') || '';
-  return cookie.split(';').some((part) => part.trim() === `${ADMIN_COOKIE}=true`);
+  return authorizedWalletAdmin(request);
 }
 
 function supabaseConfig() {
@@ -319,6 +317,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   if (!isAuthorized(request)) return NextResponse.json({ error: 'Authentication required.' }, { status: 401 });
+  if (request.headers.get('origin') !== new URL(request.url).origin) return NextResponse.json({ error: 'Origin mismatch.' }, { status: 403 });
 
   try {
     const body = await request.json();
