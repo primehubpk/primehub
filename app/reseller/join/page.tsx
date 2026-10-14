@@ -63,6 +63,8 @@ export default function ResellerJoinPage() {
         const credential = await createResellerAccount(email, password);
         try {
           await createResellerProfile(credential.user.uid, credential.user.email || email.trim());
+        window.dispatchEvent(new Event('primehub:reseller-profile-ready'));
+          window.dispatchEvent(new Event('primehub:reseller-profile-ready'));
         } catch (profileError) {
           const profileCode = profileError instanceof Error ? String(profileError.message).split(':')[0] : '';
           setMessage(authMessage(profileCode, profileError instanceof Error ? profileError.message : 'Profile creation failed.'));
