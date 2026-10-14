@@ -138,7 +138,9 @@ function customerWhatsappUrl(order: Order) {
   const customer = order.customer || {};
   const phone = whatsappPhone(customer.phone);
   const items = itemsFor(order).map((item) => `${item.title || 'Item'} x${item.quantity || 1}`).join(', ');
-  const message = `Hi ${customer.name || 'there'}, this is PrimeHub Deals regarding your order #${order.id.slice(-6)} (Rs ${money(order.total)}): ${items}. Current status: ${normalizedStatus(order.status)}.`;
+  const paid = Number(order.walletShoppingApplied || 0);
+  const payment = paid > 0 ? ` Order total Rs ${money(order.total)}, shopping wallet paid Rs ${money(paid)}, remaining to collect Rs ${money(order.amountDue ?? (Number(order.total || 0) - paid))}.` : ` Order total Rs ${money(order.total)}.`;
+  const message = `Hi ${customer.name || 'there'}, this is PrimeHub Deals regarding your order #${order.id.slice(-6)}: ${items}.${payment} Current status: ${normalizedStatus(order.status)}.`;
   return phone ? `https://wa.me/${phone}?text=${encodeURIComponent(message)}` : '';
 }
 
