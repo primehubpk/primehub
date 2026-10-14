@@ -6,14 +6,13 @@ import { getPublicCatalogSnapshot } from '@/lib/publicCatalogServer';
 import { normalizeImageUrl } from '@/lib/imageUrl';
 import { productMatchesCategory, slugifyCategory } from '@/lib/categoryUtils';
 
-export const IMAGE_PACK_SIZE = 40;
 export const IMAGE_PAGE_SIZE = 36;
 
 export type GalleryImage = {
   id: string; productId: string; title: string; url: string; filename: string;
 };
 export type GalleryCategory = {
-  id: string; title: string; slug: string; count: number; cover: string; packs: number;
+  id: string; title: string; slug: string; count: number; cover: string;
 };
 type GallerySnapshot = { categories: GalleryCategory[]; byCategory: Record<string, GalleryImage[]> };
 
@@ -93,8 +92,7 @@ export function assembleGallery(products: any[], categories: any[]): GallerySnap
     if (!images.length) continue;
     byCategory[slug] = images;
     summaries.push({ id: String(category.id || slug), title, slug, count: images.length,
-      cover: downloadableImageUrl(category.imageUrl || category.iconUrl) || images[0].url,
-      packs: Math.ceil(images.length / IMAGE_PACK_SIZE) });
+      cover: downloadableImageUrl(category.imageUrl || category.iconUrl) || images[0].url });
   }
   return { categories: summaries, byCategory };
 }
