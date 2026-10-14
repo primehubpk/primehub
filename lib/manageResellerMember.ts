@@ -45,7 +45,11 @@ export async function manageResellerMember(userId: string, action: Action, reaso
     if (action === 'block') await auth.revokeRefreshTokens(userId);
   }
   try {
-    await ref.update({ status, updatedAt: FieldValue.serverTimestamp(), lastAdminAction: action, lastAdminReason: reason.trim() });
+    const batch = db.batch();
+    batch.update(ref, { status, updatedAt: FieldValue.serverTimestamp(), lastAdminAction: action, lastAdminReason: reason.trim() });
+    const auditRef = db.collection('reseller_member_events').doc();
+    batch.create(auditRef, { id: auditRef.id, userId, action, fromStatus: current.status || 'active', toStatus: status, reason: reason.trim(), createdAt: FieldValue.serverTimestamp() });
+    await batch.commit();
   } catch (error) {
     if (action !== 'delete') {
       try { await auth.updateUser(userId, { disabled: action === 'unblock' }); } catch {}
