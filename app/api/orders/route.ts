@@ -163,7 +163,15 @@ export async function POST(request: Request) {
     const calculatedDelivery = selfCollect ? { baseDelivery: 0, wholesaleItems: 0, wholesaleSurcharge: 0, deliveryCharge: 0 } : calculateDeliveryCharge(items);
     const delivery = freeDeliveryReward ? { ...calculatedDelivery, deliveryCharge: 0 } : calculatedDelivery;
     const total = subtotal + delivery.deliveryCharge;
-    const walletShoppingBalance = user ? await shoppingWalletBalance(user.uid) : 0;
+    // A wallet read outage must not break ordinary orders when wallet payment was not selected.
+    let walletShoppingBalance = 0;
+    if (user) {
+      try { walletShoppingBalance = await shoppingWalletBalance(user.uid); }
+      catch (walletError) {
+        if (useShoppingCredit) throw walletError;
+        console.warn('Shopping wallet balance temporarily unavailable; regular checkout continues.');
+      }
+    }
     const walletShoppingApplied = useShoppingCredit ? Math.min(walletShoppingBalance, total) : 0;
     const amountDue = total - walletShoppingApplied;
     const quote = { items, rawSubtotal, tierDiscount, tierDiscountPercent, resellerTier: reseller?.tierName || '', subtotal, totalItems, ...delivery, total, selfCollect, fulfillment: selfCollect ? 'self_collect' : 'delivery', freeDeliveryReward, rewardLabel: freeDeliveryReward ? 'Spin & Win Reward — Free Delivery' : '', walletShoppingBalance, walletShoppingApplied, amountDue };
@@ -174,7 +182,7 @@ export async function POST(request: Request) {
 
     const resellerUserId = reseller?.userId || '';
     const resellerGuestId = cleanGuestId(body?.guestId);
-    if (useShoppingCredit && (!user || !walletShoppingBalance)) throw new Error('Sign in to a reseller account with shopping credit to use your wallet.');
+    if (useShoppingCredit && !user) throw new Error('Sign in to your reseller account to use shopping credit.');
     const orderId = useShoppingCredit ? String(body?.orderRequestId || '') : crypto.randomUUID();
     const salar = cleanSalarOrderContext(body?.orderContext);
     const orderData: any = { customer: { name: customer.name.trim(), phone: customer.phone.trim(), email: String(customer.email || '').trim(), address: selfCollect ? 'PrimeHub Shop Pickup' : customer.address.trim(), city: selfCollect ? 'Lahore' : customer.city.trim(), notes: String(customer.notes || '').trim() }, ...quote, idempotencyKey: `${salar ? 'salar' : 'website'}-order:${orderId}`, currency: 'PKR', status: 'pending', source: salar ? 'salar' : 'website', ...(salar ? { salar } : {}), createdAt: new Date() };
@@ -204,7 +212,7 @@ export async function POST(request: Request) {
           }
         } catch (rewardError) { console.error('Free delivery reward on wallet order needs reconciliation:', rewardError); }
       }
-      return NextResponse.json({ orderId, ...quote, walletShoppingApplied: saved.amount, amountDue: saved.amountDue, resellerLinked: true, guestTracked: Boolean(resellerGuestId) });
+      return NextResponse.json({ orderId, ...saved.order, walletShoppingApplied: saved.amount, amountDue: saved.amountDue, resellerLinked: true, guestTracked: Boolean(resellerGuestId) });
     }
 
     const supabaseRow = mapOrderToSupabase(orderId, orderData);
