@@ -239,6 +239,10 @@ function orderForwardMessage(order: Order) {
   if (wholesaleSurcharge > 0) lines.push(`Wholesale delivery surcharge: Rs. ${money(wholesaleSurcharge)}`);
   lines.push(`Delivery: Rs. ${money(deliveryCharge)}`);
   lines.push(`*TOTAL: Rs. ${money(order.total)}*`);
+  if (Number(order.walletShoppingApplied || 0) > 0) {
+    lines.push(`Shopping wallet already paid: Rs. ${money(order.walletShoppingApplied)}`);
+    lines.push(`*REMAINING TO COLLECT: Rs. ${money(order.amountDue ?? (Number(order.total || 0) - Number(order.walletShoppingApplied || 0)))}*`);
+  }
 
   const totalItems = Number(order.totalItems || 0);
   if (totalItems > 0) lines.push(`Total items: ${totalItems}`);
@@ -672,6 +676,7 @@ export default function OrdersManager() {
                       <div className="flex justify-between gap-3 text-black/50"><span>Subtotal</span><span className="font-bold">Rs {money(order.subtotal)}</span></div>
                       <div className="flex justify-between gap-3 text-black/50"><span>Delivery</span><span className="font-bold">Rs {money(deliveryCharge)}</span></div>
                       <div className="flex justify-between gap-3 border-t border-black/8 pt-2.5 text-sm font-black"><span>Total</span><span>Rs {money(order.total)}</span></div>
+                       {Number(order.walletShoppingApplied || 0) > 0 && <><div className="flex justify-between gap-3 font-bold text-[#0F6A5F]"><span>Shopping wallet already paid</span><span>- Rs {money(order.walletShoppingApplied)}</span></div><div className="flex justify-between gap-3 rounded-lg bg-[#DDF5F0] p-2 font-black text-[#0F6A5F]"><span>Remaining to collect</span><span>Rs {money(order.amountDue ?? (Number(order.total || 0) - Number(order.walletShoppingApplied || 0)))}</span></div></>}
                     </div>
                   </div>
                 </div>
