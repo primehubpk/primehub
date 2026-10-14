@@ -82,7 +82,16 @@ const taskIcons: Record<string, ElementType> = {
   wholesale: Package,
 };
 function currentGuestId() {
-  try { return String(window.localStorage.getItem(GUEST_ID_KEY) || ''); } catch { return ''; }
+  try {
+    let id = String(window.localStorage.getItem(GUEST_ID_KEY) || '');
+    // Share one first-party browser session for anonymous & signed-in spins.
+    // This is NOT a permanent hardware ID and never uses IMEI.
+    if (!/^g_[A-Za-z0-9]{12,80}$/.test(id)) {
+      id = 'g_' + crypto.randomUUID().replace(/-/g, '');
+      window.localStorage.setItem(GUEST_ID_KEY, id);
+    }
+    return id;
+  } catch { return ''; }
 }
 
 export default function PrimeFamilyDashboard({
