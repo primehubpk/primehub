@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { FieldValue } from 'firebase-admin/firestore';
 import { getAdminAuth, getAdminDb } from '@/lib/firebaseAdmin';
 import { isSupabaseWriteConfigured } from '@/lib/dualWriteServer';
+import { reserveDailySpin } from '@/lib/resellerSpinGuard';
 
 export const runtime = 'nodejs';
 
@@ -110,6 +111,9 @@ export async function POST(request: Request) {
     const body = await request.json();
     const action = body?.action === 'checkin' ? 'checkin' : 'spin';
     const guestId = validGuestId(body?.guestId);
+    // Only spin attempts pay the small cost of an atomic anti-repeat gate.
+    // All homepage loads, check-ins, and reward-state reads are unchanged.
+    const finishSpin = action === 'spin' ? await reserveDailySpin(user.uid, guestId, dayKey()) : null;
     if (isSupabaseWriteConfigured()) {
       try {
         const today = dayKey();
@@ -134,15 +138,18 @@ export async function POST(request: Request) {
         }
         await writeSupabaseWallet(user.uid, wallet);
         await mirrorFirebaseWallet(user.uid, wallet);
+        if (finishSpin) await finishSpin();
         return NextResponse.json({ ok: true, source: 'supabase', wallet, prize });
       } catch (error) {
         if (isLogicalRewardError(error)) throw error;
         console.error('Supabase reward action failed; using Firebase fallback:', error);
         const fallback = await firebaseAction(user.uid, action, guestId);
+        if (finishSpin) await finishSpin();
         return NextResponse.json({ ok: true, source: 'firebase-fallback', ...fallback });
       }
     }
     const fallback = await firebaseAction(user.uid, action, guestId);
+    if (finishSpin) await finishSpin();
     return NextResponse.json({ ok: true, source: 'firebase', ...fallback });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : 'Reward action failed.' }, { status: 400 });
