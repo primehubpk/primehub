@@ -254,6 +254,12 @@ async function adminWhatsAppNumber() {
   return '';
 }
 
+type SalarWhatsAppContact = { id: string; label: string; number: string; enabled: boolean };
+function whatsappTileHref(number: string) {
+  const digits = String(number || '').replace(/\D/g, '');
+  const canonical = /^03\d{9}$/.test(digits) ? '92' + digits.slice(1) : digits;
+  return /^923\d{9}$/.test(canonical) ? `https://wa.me/${canonical}` : '';
+}
 export default function SalarWidget() {
   const pathname = usePathname();
   const isAdminRoute = pathname?.startsWith('/admin') === true;
@@ -277,6 +283,7 @@ export default function SalarWidget() {
   const [salarPaused, setSalarPaused] = useState(false);
   const [salarEnabled, setSalarEnabled] = useState<boolean | null>(null);
   const [iconUrl, setIconUrl] = useState('');
+  const [whatsappContacts, setWhatsappContacts] = useState<SalarWhatsAppContact[]>([]);
   const [adminAuthenticated, setAdminAuthenticated] = useState(false);
   const [runtimeTrace, setRuntimeTrace] = useState<{ understanding: string; reply: string; vision: string } | null>(null);
   const [adminDrawerOpen, setAdminDrawerOpen] = useState(false);
@@ -398,6 +405,18 @@ export default function SalarWidget() {
     if (isAdminRoute) return;
     if (open) void refreshAdminSession();
   }, [isAdminRoute, open, refreshAdminSession]);
+
+  useEffect(() => {
+    if (!open || isAdminRoute) return;
+    let active = true;
+    fetch('/api/salar/status', { cache: 'no-store' })
+      .then(async response => response.ok ? response.json() : null)
+      .then(data => {
+        if (active && data?.success) setWhatsappContacts(Array.isArray(data.settings?.whatsappContacts) ? data.settings.whatsappContacts : []);
+      })
+      .catch(() => undefined);
+    return () => { active = false; };
+  }, [open, isAdminRoute]);
 
   useEffect(() => {
     if (isAdminRoute) return;
@@ -992,6 +1011,17 @@ export default function SalarWidget() {
             </div>
           </div>
 
+          {whatsappContacts.some(contact => contact.enabled !== false && whatsappTileHref(contact.number)) && (
+            <nav aria-label="Salar WhatsApp contacts" className="grid shrink-0 grid-cols-2 gap-2 border-b border-black/10 bg-white p-2.5">
+              {whatsappContacts.filter(contact => contact.enabled !== false && whatsappTileHref(contact.number)).map(contact => (
+                <a key={contact.id} href={whatsappTileHref(contact.number)} target="_blank" rel="noopener noreferrer"
+                  className="flex min-w-0 items-center gap-2 rounded-2xl border border-[#0F6A5F]/15 bg-[#EEFAF6] px-2 py-3 text-[9px] font-black text-[#0F6A5F]">
+                  <span aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#20B76C] text-[10px] text-white">WA</span>
+                  <span className="min-w-0"><span className="block truncate">{contact.label}</span><span className="mt-0.5 block text-[8px] font-semibold">{contact.number}</span></span>
+                </a>
+              ))}
+            </nav>
+          )}
           {salarPaused ? <div className="shrink-0 border-b border-[#E9C677] bg-[#FFF1D6] px-3 py-2 text-[9px] font-bold text-[#7A5100]">PrimeHub Admin is handling this chat. Salar will wait until the admin continues it.</div> : null}
           {adminAuthenticated && runtimeTrace ? <div className="shrink-0 border-b border-black/8 bg-[#F4F4F1] px-3 py-1.5 text-[8px] font-bold text-black/45">AI trace: understand {runtimeTrace.understanding || 'unavailable'}{' -> '}reply {runtimeTrace.reply || 'unavailable'}{runtimeTrace.vision ? ` -> vision ${runtimeTrace.vision}` : ''}</div> : null}
 
