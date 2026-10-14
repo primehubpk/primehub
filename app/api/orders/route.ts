@@ -163,16 +163,13 @@ export async function POST(request: Request) {
     const calculatedDelivery = selfCollect ? { baseDelivery: 0, wholesaleItems: 0, wholesaleSurcharge: 0, deliveryCharge: 0 } : calculateDeliveryCharge(items);
     const delivery = freeDeliveryReward ? { ...calculatedDelivery, deliveryCharge: 0 } : calculatedDelivery;
     const total = subtotal + delivery.deliveryCharge;
-    // A wallet read outage must not break ordinary orders when wallet payment was not selected.
-    let walletShoppingBalance = 0;
-    if (user) {
-      try { walletShoppingBalance = await shoppingWalletBalance(user.uid); }
-      catch (walletError) {
-        if (useShoppingCredit) throw walletError;
-        console.warn('Shopping wallet balance temporarily unavailable; regular checkout continues.');
-      }
-    }
-    const walletShoppingApplied = useShoppingCredit ? Math.min(walletShoppingBalance, total) : 0;
+    // A regular cart quote/order must NEVER read Firebase wallet collections.
+    // For an elected wallet quote only, show a fresh estimate. For placement the
+    // Firestore order+debit transaction obtains the authoritative balance once.
+    if (useShoppingCredit && !user) throw new Error('Sign in to your reseller account to use shopping credit.');
+    const walletShoppingBalance = (quoteOnly && useShoppingCredit && user)
+      ? await shoppingWalletBalance(user.uid) : 0;
+    const walletShoppingApplied = quoteOnly && useShoppingCredit ? Math.min(walletShoppingBalance, total) : 0;
     const amountDue = total - walletShoppingApplied;
     const quote = { items, rawSubtotal, tierDiscount, tierDiscountPercent, resellerTier: reseller?.tierName || '', subtotal, totalItems, ...delivery, total, selfCollect, fulfillment: selfCollect ? 'self_collect' : 'delivery', freeDeliveryReward, rewardLabel: freeDeliveryReward ? 'Spin & Win Reward — Free Delivery' : '', walletShoppingBalance, walletShoppingApplied, amountDue };
     if (quoteOnly) return NextResponse.json(quote);
@@ -182,7 +179,6 @@ export async function POST(request: Request) {
 
     const resellerUserId = reseller?.userId || '';
     const resellerGuestId = cleanGuestId(body?.guestId);
-    if (useShoppingCredit && !user) throw new Error('Sign in to your reseller account to use shopping credit.');
     const orderId = useShoppingCredit ? String(body?.orderRequestId || '') : crypto.randomUUID();
     const salar = cleanSalarOrderContext(body?.orderContext);
     const orderData: any = { customer: { name: customer.name.trim(), phone: customer.phone.trim(), email: String(customer.email || '').trim(), address: selfCollect ? 'PrimeHub Shop Pickup' : customer.address.trim(), city: selfCollect ? 'Lahore' : customer.city.trim(), notes: String(customer.notes || '').trim() }, ...quote, idempotencyKey: `${salar ? 'salar' : 'website'}-order:${orderId}`, currency: 'PKR', status: 'pending', source: salar ? 'salar' : 'website', ...(salar ? { salar } : {}), createdAt: new Date() };
