@@ -12,17 +12,18 @@ export async function GET(request: Request) {
     const params = new URL(request.url).searchParams;
     const category = params.get('category') || '';
     const offset = Number(params.get('offset') || 0);
+    const all = params.get('all') === '1';
     if (!Number.isSafeInteger(offset) || offset < 0) return NextResponse.json({ error: 'Invalid image page.' }, { status: 400 });
     if (category && !Object.prototype.hasOwnProperty.call(gallery.byCategory, category)) {
       return NextResponse.json({ error: 'Category no longer available.' }, { status: 404 });
     }
     const images = category ? gallery.byCategory[category] || [] : [];
     return NextResponse.json({
-      categories: gallery.categories,
+      categories: category ? [] : gallery.categories,
       category,
-      images: images.slice(offset, offset + IMAGE_PAGE_SIZE),
+      images: all ? images : images.slice(offset, offset + IMAGE_PAGE_SIZE),
       total: images.length,
-      nextOffset: offset + IMAGE_PAGE_SIZE < images.length ? offset + IMAGE_PAGE_SIZE : null,
+      nextOffset: all ? null : offset + IMAGE_PAGE_SIZE < images.length ? offset + IMAGE_PAGE_SIZE : null,
     }, { headers: { 'Cache-Control': 'private, no-store', 'Vary': 'Authorization' } });
   } catch (error) {
     const { status, message } = imageAccessError(error);
