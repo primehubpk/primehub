@@ -4,6 +4,7 @@ import SalarProviderSelector from '@/components/salar/SalarProviderSelector';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Bot, Database, ImagePlus, Maximize2, RefreshCw, Save, Trash2, X } from 'lucide-react';
 
+type WhatsAppContact = { id: 'business' | 'helpline'; label: string; number: string; enabled: boolean };
 type ProviderStatus = {
   provider: 'cloudflare' | 'groq' | 'gemini' | 'openrouter' | 'custom';
   configured: boolean;
@@ -46,6 +47,8 @@ export default function SalarControlPanel() {
   const [orderInstructions, setOrderInstructions] = useState('');
   const [enabled, setEnabled] = useState(true);
   const [iconUrl, setIconUrl] = useState('');
+  const [whatsappContacts, setWhatsappContacts] = useState<WhatsAppContact[]>([]);
+  const [savingContacts, setSavingContacts] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [savingEnabled, setSavingEnabled] = useState(false);
@@ -63,7 +66,10 @@ export default function SalarControlPanel() {
     void fetch('/api/admin/salar/ui', { credentials: 'same-origin', cache: 'no-store' })
       .then(async (response) => ({ response, result: await response.json().catch(() => null) }))
       .then(({ response, result }) => {
-        if (response.ok && result?.success) setIconUrl(String(result.ui?.iconUrl || ''));
+        if (response.ok && result?.success) {
+          setIconUrl(String(result.ui?.iconUrl || ''));
+          setWhatsappContacts(Array.isArray(result.ui?.whatsappContacts) ? result.ui.whatsappContacts : []);
+        }
       })
       .catch(() => undefined);
 
@@ -147,6 +153,21 @@ export default function SalarControlPanel() {
     setIconUrl(String(result.ui?.iconUrl || ''));
   }
 
+  async function saveContacts() {
+    setSavingContacts(true); setMessage('');
+    try {
+      const response = await fetch('/api/admin/salar/ui', {
+        method: 'PUT', credentials: 'same-origin', cache: 'no-store',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ whatsappContacts }),
+      });
+      const result = await response.json().catch(() => null);
+      if (!response.ok || !result?.success) throw new Error(result?.error || 'WhatsApp contacts could not be saved.');
+      setWhatsappContacts(result.ui.whatsappContacts);
+      setMessage('WhatsApp contact numbers and visibility saved.');
+    } catch (error) { setMessage(error instanceof Error ? error.message : 'Unable to save WhatsApp contacts.'); }
+    finally { setSavingContacts(false); }
+  }
   async function chooseIcon(file: File | undefined) {
     if (!file) return;
     if (!file.type.startsWith('image/')) {
@@ -317,7 +338,32 @@ export default function SalarControlPanel() {
         </div>
       </div>
 
-      {message ? <div className="rounded-2xl border border-black/8 bg-white px-4 py-3 text-xs font-bold text-black/60 shadow-sm">{message}</div> : null}
+      <section className="rounded-3xl bg-white p-5 shadow-sm sm:p-6">
+         <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#0F6A5F]">WhatsApp contacts inside Salar</p>
+         <h3 className="mt-1 text-base font-black">Edit business and helpline numbers</h3>
+         <p className="mt-1 text-[10px] leading-5 text-black/45">Each number has its own ON/OFF switch. OFF hides that WhatsApp card from the customer chat. Updates use saved settings.</p>
+         <div className="mt-4 grid gap-3 sm:grid-cols-2">
+           {whatsappContacts.map((contact, index) => (
+             <div key={contact.id} className="rounded-2xl border border-black/10 bg-[#FAFAF7] p-4">
+               <div className="flex items-start justify-between gap-3">
+                 <p className="text-xs font-black">{contact.label}</p>
+                 <button type="button" role="switch" aria-checked={contact.enabled} onClick={() => setWhatsappContacts(current => current.map((row, i) => i === index ? { ...row, enabled: !row.enabled } : row))}
+                   className={`rounded-full px-3 py-2 text-[10px] font-black ${contact.enabled ? 'bg-[#0F6A5F] text-white' : 'bg-black/10 text-black/45'}`}>
+                   {contact.enabled ? 'ON' : 'OFF'}
+                 </button>
+               </div>
+               <label className="mt-3 block text-[10px] font-bold text-black/50">WhatsApp number
+                 <input type="tel" value={contact.number} placeholder="03XXXXXXXXX" onChange={event => setWhatsappContacts(current => current.map((row, i) => i === index ? { ...row, number: event.target.value } : row))}
+                   className="mt-1 w-full rounded-xl border border-black/10 bg-white p-3 text-sm font-black" />
+               </label>
+             </div>
+           ))}
+         </div>
+         <button type="button" disabled={savingContacts || !whatsappContacts.length} onClick={() => void saveContacts()}
+           className="mt-4 inline-flex items-center gap-2 rounded-full bg-[#14140F] px-5 py-3 text-[11px] font-black text-white disabled:opacity-50"><Save size={14}/>{savingContacts ? 'Saving numbers…' : 'Save WhatsApp Numbers'}</button>
+       </section>
+
+       {message ? <div className="rounded-2xl border border-black/8 bg-white px-4 py-3 text-xs font-bold text-black/60 shadow-sm">{message}</div> : null}
 
       {editorSection ? (
         <div className="fixed inset-0 z-[120] flex flex-col bg-[#F7F7F3]">
