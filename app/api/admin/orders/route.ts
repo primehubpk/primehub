@@ -205,7 +205,6 @@ export async function GET(request: Request) {
         return NextResponse.json({
           success: true,
           orders: legacy.orders,
-      whatsappDrafts,
           whatsappDrafts,
           whatsappNumber,
           primary: 'firebase-fallback',
@@ -227,6 +226,7 @@ export async function GET(request: Request) {
     return NextResponse.json({
       success: true,
       orders: legacy.orders,
+      whatsappDrafts,
       whatsappNumber,
       primary: 'firebase',
       warning: 'Supabase order storage is not configured on this deployment.',
