@@ -95,4 +95,7 @@ dependencies {
     implementation 'androidx.webkit:webkit:1.14.0'
     // Replace transitive Fragment 1.1.0 flagged by Play Console for v11.
     implementation 'androidx.fragment:fragment:1.9.1'
+    // Play Console v11 warned about transitive Activity 1.1.0.
+    // Pin the latest stable AndroidX Activity, never an alpha build.
+    implementation 'androidx.activity:activity:1.13.0'
 }
