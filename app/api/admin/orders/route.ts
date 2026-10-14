@@ -267,6 +267,64 @@ export async function POST(request: Request) {
       });
     }
 
+    if (action === 'record-whatsapp') {
+      // For chats started directly in WhatsApp, which wa.me cannot report to us.
+      // Admin enters what was actually agreed in the conversation.
+      const customer = body?.customer || {};
+      const name = String(customer.name || '').trim().slice(0, 120);
+      const phone = String(customer.phone || '').trim().slice(0, 40);
+      const city = String(customer.city || '').trim().slice(0, 120);
+      const address = String(customer.address || '').trim().slice(0, 500);
+      const selfCollect = body?.selfCollect === true;
+      if (!name || phone.replace(/\D/g, '').length < 9 || (!selfCollect && (!city || !address))) {
+        return NextResponse.json({ error: 'Customer name, valid phone, city and address are required.' }, { status: 400 });
+      }
+      const raw = Array.isArray(body?.items) ? body.items : [];
+      if (!raw.length || raw.length > 30) return NextResponse.json({ error: 'Add 1 to 30 real products.' }, { status: 400 });
+      const items: Array<Record<string, unknown>> = [];
+      let subtotal = 0, totalItems = 0;
+      for (const item of raw) {
+        const title = String(item?.title || '').trim().slice(0, 150);
+        const qty = Number(item?.quantity);
+        const price = Number(item?.price);
+        if (!title || !Number.isSafeInteger(qty) || qty < 1 || qty > 100 ||
+          !Number.isSafeInteger(price) || price <= 0 || price > 1_000_000 ||
+          !Number.isSafeInteger(subtotal + qty * price)) {
+          return NextResponse.json({ error: 'Enter valid product names, quantities and prices.' }, { status: 400 });
+        }
+        subtotal += price * qty; totalItems += qty;
+        const image = String(item?.image || '').trim();
+        items.push({
+          title, quantity: qty, price, image: /^https:\/\//.test(image) ? image.slice(0, 1500) : '',
+          variant: { color: String(item?.color || '').slice(0, 60), size: String(item?.size || '').slice(0, 40) },
+        });
+      }
+      const charge = selfCollect ? 0 : Number(body?.deliveryCharge);
+      if (!Number.isSafeInteger(charge) || charge < 0 || charge > 10000) {
+        return NextResponse.json({ error: 'Invalid delivery charge.' }, { status: 400 });
+      }
+      const id = crypto.randomUUID();
+      const order = {
+        id, customer: { name, phone, city: selfCollect ? 'Lahore' : city,
+          address: selfCollect ? 'PrimeHub Shop Pickup' : address,
+          notes: String(customer.notes || '').slice(0, 1000) },
+        items, totalItems, subtotal, rawSubtotal: subtotal, deliveryCharge: charge,
+        baseDelivery: charge, total: subtotal + charge, amountDue: subtotal + charge,
+        currency: 'PKR', status: 'pending', source: 'whatsapp_manual',
+        whatsappState: 'manually_recorded', adminVerified: true, selfCollect,
+        fulfillment: selfCollect ? 'self_collect' : 'delivery',
+        createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+      };
+      const db = getAdminDb();
+      if (isSupabaseWriteConfigured()) {
+        await supabasePrimaryUpsert({ table: 'orders',
+          row: { ...mapOrderToSupabase(id, order), authoritative_source: 'supabase', mirror_status: 'synced', mirror_error: null } });
+        try { await db.collection('orders').doc(id).set(order); }
+        catch (error) { console.warn('Manual WhatsApp order Firebase mirror deferred:', error); }
+      } else await db.collection('orders').doc(id).set(order);
+      return NextResponse.json({ success: true, orderId: id });
+    }
+
     if (action === 'confirm-whatsapp' || action === 'dismiss-whatsapp') {
       const id = String(body?.intentId || '');
       if (!/^[0-9a-f-]{36}$/i.test(id)) return NextResponse.json({ error: 'Invalid WhatsApp reference.' }, { status: 400 });
