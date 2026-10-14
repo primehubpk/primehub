@@ -139,13 +139,50 @@ export function useCheckout() {
   }, [items, selfCollect, checkoutAuthUid, checkoutAuthReady]);
   const update = (key: keyof Customer, value: string) => setCustomer(previous => ({ ...previous, [key]: value }));
   const placeOrder = async (event: FormEvent) => { event.preventDefault(); setError(''); if (!walletCheckoutReady) return setError(walletBalanceStatus === 'unavailable' ? 'Your wallet balance could not be verified. Please refresh this page before ordering so all available cash can be applied.' : 'Checking wallet balance. Please wait a moment.'); if (!items.length) return setError('Your cart is empty. Please add a product first.'); if (!customer.name.trim() || !customer.phone.trim() || (!selfCollect && (!customer.address.trim() || !customer.city.trim()))) return setError(selfCollect ? 'Please fill your name and phone.' : 'Please fill your name, phone, address and city.'); setPlacing(true); try { const response = await fetch('/api/orders', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(await authHeader()) }, body: JSON.stringify({ customer, items, selfCollect, guestId: guestId(), useShoppingCredit, ...(useShoppingCredit ? { orderRequestId: (walletRequestId.current ||= crypto.randomUUID()) } : {}) }) }); const data = await response.json(); if (!response.ok) throw new Error(data.error || 'Order save nahi ho saka.'); const productIds = Array.isArray(data.items) ? data.items.map((item: any) => String(item.productId || item.id || '')).filter(Boolean) : items.map((item: any) => String(item.productId || item.id || '')).filter(Boolean); const completedItems = Array.isArray(data.items) && data.items.length ? data.items : items; const completedContents = tikTokContents(completedItems, items); if (completedContents.length) { trackTikTokEvent('PlaceAnOrder', { contents: completedContents as any, value: Number(data.total ?? total), currency: 'PKR' }); } setReviewProductIds(productIds); rememberReviewOrder(data.orderId, productIds); rememberOrderProgress(data.orderId, Number(data.wholesaleItems || wholesaleItems || 0)); setWalletPaidReceipt(Number(data.walletShoppingApplied || 0)); setAmountDueReceipt(Number(data.amountDue ?? data.total ?? 0)); setOrderId(data.orderId); walletRequestId.current = ''; try { window.PrimeHubNative?.postMessage(JSON.stringify({ action: 'purchase', orderId: data.orderId })); } catch {} clearCart(); } catch (caught) { console.error(caught); setError(caught instanceof Error ? caught.message : 'Order save nahi ho saka. Please try again.'); } finally { setPlacing(false); } };
-  const whatsappOrder = async () => { if (!items.length) return; setError(''); if (useShoppingCredit) { setError('Your cash wallet will be applied automatically when you select Place Order. WhatsApp orders cannot debit wallet cash. Please use Place Order to save your balance.'); return; } try { const [quote, adminNumber] = await Promise.all([getAuthoritativeQuote(items, selfCollect), getAdminWhatsAppNumber()]); const user = auth.currentUser; let resellerCode = '', requestId = ''; if (user) { const token = await user.getIdToken(); const track = await fetch('/api/reseller/whatsapp-order', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ customer, items: quote.items, subtotal: quote.subtotal, deliveryCharge: quote.deliveryCharge, total: quote.total, selfCollect }) }); const trackData = await track.json(); if (track.ok) { resellerCode = String(trackData.resellerCode || ''); requestId = String(trackData.requestId || ''); } else if (track.status !== 401) throw new Error(trackData.error || 'Unable to create WhatsApp reseller request.'); }
-    const lines = quote.items.map((validated: any, index: number) => [`${index + 1}. ${validated.title} x ${validated.quantity}`, `- ${variantText(validated.variant)}`, `- Price: Rs. ${Number(validated.price).toLocaleString()}`, `- Image: ${validated.image || 'N/A'}`].join('\n'));
-    const tracking = resellerCode ? ['', '*RESELLER ORDER*', `Reseller Code: ${resellerCode}`, `Request ID: ${requestId}`] : [];
-    const wholesaleLine = Number(quote.wholesaleItems || 0) ? `Wholesale item surcharge (${quote.wholesaleItems} × Rs. 30): Rs. ${Number(quote.wholesaleSurcharge || 0).toLocaleString()}` : '';
-    const rewardLine = quote.rewardLabel ? `*${quote.rewardLabel}*` : '';
-    const text = ['*Order from PrimeHub*', '', ...lines, '', '*Customer Details:*', `Name: ${customer.name || '-'}`, `Phone: ${customer.phone || '-'}`, `Address: ${customer.address || '-'}`, `City: ${customer.city || '-'}`, '', `Subtotal: Rs. ${Number(quote.subtotal).toLocaleString()}`, rewardLine, `Base delivery: Rs. ${Number(quote.baseDelivery || 350).toLocaleString()}`, wholesaleLine, `*Grand Total: Rs. ${Number(quote.total).toLocaleString()}*`, ...tracking].filter(Boolean).join('\n');
-    window.open(`https://wa.me/${adminNumber}?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
-  } catch (caught) { console.error(caught); setError(caught instanceof Error ? caught.message : 'Unable to prepare WhatsApp order.'); } };
+  const whatsappOrder = async () => {
+    if (!items.length) return;
+    setError('');
+    if (!customer.name.trim() || !customer.phone.trim() || (!selfCollect && (!customer.address.trim() || !customer.city.trim()))) {
+      setError('Please enter your name, phone, city and delivery address first.'); return;
+    }
+    if (useShoppingCredit) {
+      setError('Your available cash wallet applies when you select Place Order. WhatsApp cannot deduct it; choose Place Order or sign out to request a separate WhatsApp COD order.'); return;
+    }
+    try {
+      const headers = { 'Content-Type': 'application/json', ...(await authHeader()) };
+      const [quoteResponse, adminNumber] = await Promise.all([
+        fetch('/api/orders', { method: 'POST', headers,
+          body: JSON.stringify({ mode: 'whatsapp_intent', items, customer, selfCollect, guestId: guestId(), orderRequestId: (walletRequestId.current ||= crypto.randomUUID()) }),
+        }), getAdminWhatsAppNumber(),
+      ]);
+      const quote = await quoteResponse.json().catch(() => null);
+      if (!quoteResponse.ok || !quote?.requestId) throw new Error(quote?.error || 'Unable to save WhatsApp request.');
+      const lines = quote.items.map((validated: any, index: number) => [
+        `${index + 1}. ${validated.title} x${validated.quantity}`,
+        variantText(validated.variant),
+        `Rs. ${Number(validated.price).toLocaleString()} each`,
+        `Photo: ${validated.image || '-'}`,
+      ].join('\n'));
+      const text = [
+        '*PrimeHubMall WhatsApp Order Request*',
+        `Reference: ${quote.requestId}`, '',
+        ...lines, '',
+        `Customer: ${customer.name.trim()}`, `Phone: ${customer.phone.trim()}`,
+        `City: ${customer.city.trim()}`,
+        `Address: ${selfCollect ? 'PrimeHub Shop Pickup' : customer.address.trim()}`,
+        customer.notes ? `Notes: ${customer.notes}` : '',
+        `Subtotal: Rs. ${Number(quote.subtotal || 0).toLocaleString()}`,
+        `Delivery: Rs. ${Number(quote.deliveryCharge || 0).toLocaleString()}`,
+        `Total: Rs. ${Number(quote.total || 0).toLocaleString()}`,
+        '', 'Please send this message to confirm your order.',
+      ].filter(Boolean).join('\n');
+      const url = `https://wa.me/${adminNumber}?text=${encodeURIComponent(text)}`;
+      window.open(url, '_blank', 'noopener,noreferrer');
+      // A prepared WhatsApp link is just a draft. The admin checks the actual
+      // incoming message before promoting it to an order or rewarding reseller.
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Could not prepare your WhatsApp order.');
+    }
+  };
   return { items, customer, placing, orderId, reviewProductIds, error, walletPaidReceipt, amountDueReceipt, walletShoppingBalance, walletShoppingApplied, useShoppingCredit, walletBalanceStatus, walletCheckoutReady, amountDue, totalItems, subtotal: discountedSubtotal, rawSubtotal: subtotal, tierDiscount, tierDiscountPercent, resellerTier, rewardLabel, deliveryCharge, wholesaleItems, total, selfCollect, setSelfCollect, update, placeOrder, whatsappOrder };
 }
