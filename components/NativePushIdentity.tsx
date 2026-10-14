@@ -28,7 +28,7 @@ export default function NativePushIdentity() {
         const user = auth.currentUser;
         if (!user || user.uid !== userId) return;
         try {
-          if (localStorage.getItem('primehub_verified_app_bonus_' + userId) === 'credited') return;
+          if (localStorage.getItem('primehub_verified_app_bonus_' + userId) === 'credited' || localStorage.getItem('primehub_app_bonus_device_claimed') === '1') return;
         } catch {}
         try {
           const response = await fetch('/api/reseller/play-install-bonus', { cache: 'no-store' });
@@ -52,8 +52,9 @@ export default function NativePushIdentity() {
     window.addEventListener('primehub:reseller-profile-ready', profileReady);
     const onBonus = (event: Event) => {
       const detail = (event as CustomEvent<{ success?: boolean }>).detail;
-      if (!detail?.success || !currentUid.current) return;
-      try { localStorage.setItem('primehub_verified_app_bonus_' + currentUid.current, 'credited'); } catch {}
+      if (!detail?.success) { requestedUid = ''; return; }
+      if (!currentUid.current) return;
+      try { localStorage.setItem('primehub_verified_app_bonus_' + currentUid.current, 'credited'); localStorage.setItem('primehub_app_bonus_device_claimed', '1'); } catch {}
       setDismissed(false);
       setCongratulations(true);
       window.dispatchEvent(new CustomEvent('primehub:wallet-updated'));
@@ -70,7 +71,7 @@ export default function NativePushIdentity() {
         const idToken = user ? await user.getIdToken() : '';
         if (!cancelled) bridge.postMessage(JSON.stringify({ action: 'identity', idToken }));
       } catch { /* Push identity sync must not affect shopping or login. */ }
-      if (user) scheduleBonus(user.uid, 2100);
+      if (user) scheduleBonus(user.uid, 1200);
     });
     return () => {
       cancelled = true;
