@@ -16,9 +16,40 @@ export default function NativePushIdentity() {
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | undefined;
     let cancelled = false;
+    let requestedUid = '';
     const nativeV12 = () => Boolean(window.PrimeHubNative) &&
       /PrimeHubApp\/(?:12|1[3-9]|[2-9]\d)\./.test(navigator.userAgent);
 
+    function scheduleBonus(userId: string, waitMs: number) {
+      if (timer) clearTimeout(timer);
+      if (!userId || requestedUid === userId || !nativeV12()) return;
+      timer = setTimeout(() => { void (async () => {
+        if (cancelled || currentUid.current !== userId) return;
+        const user = auth.currentUser;
+        if (!user || user.uid !== userId) return;
+        try {
+          if (localStorage.getItem('primehub_verified_app_bonus_' + userId) === 'credited') return;
+        } catch {}
+        try {
+          const response = await fetch('/api/reseller/play-install-bonus', { cache: 'no-store' });
+          if (!response.ok) return;
+          const status = await response.json();
+          if (!status.enabled || cancelled || currentUid.current !== userId) return;
+          const idToken = await user.getIdToken();
+          if (!cancelled && currentUid.current === userId && nativeV12()) {
+            requestedUid = userId;
+            window.PrimeHubNative?.postMessage(JSON.stringify({ action: 'playBonus', idToken }));
+          }
+        } catch { /* Never interrupt shopping/authentication for a bonus. */ }
+      })(); }, waitMs);
+    }
+    function profileReady() {
+      // New signups get their verified bonus immediately AFTER their existing
+      // email/password reseller profile has been created.
+      const userId = auth.currentUser?.uid || '';
+      if (userId && currentUid.current === userId) scheduleBonus(userId, 250);
+    }
+    window.addEventListener('primehub:reseller-profile-ready', profileReady);
     const onBonus = (event: Event) => {
       const detail = (event as CustomEvent<{ success?: boolean }>).detail;
       if (!detail?.success || !currentUid.current) return;
@@ -39,33 +70,14 @@ export default function NativePushIdentity() {
         const idToken = user ? await user.getIdToken() : '';
         if (!cancelled) bridge.postMessage(JSON.stringify({ action: 'identity', idToken }));
       } catch { /* Push identity sync must not affect shopping or login. */ }
-      if (!user || !nativeV12()) return;
-      try {
-        if (localStorage.getItem('primehub_verified_app_bonus_' + user.uid) === 'credited') return;
-      } catch {}
-      // Warm-up after auth: the 2-3s popup goal applies when attestation returns
-      // promptly. Never show a fake Rs.100 credit while verification is in progress.
-      timer = setTimeout(() => {
-        void (async () => {
-          if (cancelled || currentUid.current !== user.uid) return;
-          try {
-            const response = await fetch('/api/reseller/play-install-bonus', { cache: 'no-store' });
-            if (!response.ok) return;
-            const status = await response.json();
-            if (!status.enabled || cancelled || currentUid.current !== user.uid) return;
-            const idToken = await user.getIdToken();
-            if (!cancelled && currentUid.current === user.uid && nativeV12()) {
-              window.PrimeHubNative?.postMessage(JSON.stringify({ action: 'playBonus', idToken }));
-            }
-          } catch { /* App bonus unavailable: never disrupt the store. */ }
-        })();
-      }, 1200);
+      if (user) scheduleBonus(user.uid, 2100);
     });
     return () => {
       cancelled = true;
       if (timer) clearTimeout(timer);
       unsubscribe();
       window.removeEventListener('primehub:play-bonus-result', onBonus);
+      window.removeEventListener('primehub:reseller-profile-ready', profileReady);
     };
   }, []);
   if (!congratulations || dismissed) return null;
