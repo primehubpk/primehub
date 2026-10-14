@@ -80,7 +80,7 @@ test('Hash app-scoped Android ID on server, never store IMEI or raw Android ID',
   assert.equal(one, bonus.deviceDigest('A1B2C3D4E5F60001'));
   assert.notEqual(one, bonus.deviceDigest('a1b2c3d4e5f60002'));
   assert.ok(!one.includes('a1b2c3'));
-  assert.throws(() => bonus.deviceDigest('356789012345678'), /Invalid Android/); // IMEI is not acceptable
+  assert.throws(() => bonus.deviceDigest('356789012345678'), /Invalid.*Android/); // IMEI is not acceptable
 });
 test('Low-friction Play app bonus needs no Google Cloud or Play Integrity credentials', () => {
   assert.equal(bonus.bonusIsEnabled(), true);
