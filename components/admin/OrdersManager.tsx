@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { auth } from '@/lib/firebase';
 import { type Order } from './shared';
+import ManualWhatsAppOrderForm from './ManualWhatsAppOrderForm';
 
 const ORDER_STATUSES = ['pending', 'processing', 'shipped', 'delivered', 'cancelled'] as const;
 type OrderStatus = (typeof ORDER_STATUSES)[number];
@@ -557,6 +558,8 @@ export default function OrdersManager() {
           <p className="mt-2 text-[9px] font-bold text-[#0F6A5F]">Saved: {savedWhatsappNumber}</p>
         )}
       </div>
+
+      <ManualWhatsAppOrderForm onSaved={reloadOrders} />
 
       {rewardMessage && (
         <p className="mt-3 rounded-2xl bg-[#DDF5F0] p-3 text-xs font-bold text-[#0F6A5F]">{rewardMessage}</p>
