@@ -43,7 +43,7 @@ export default function AdminResellerCreditsPanel({ members, onCredited }: { mem
       const data = await response.json().catch(() => null);
       if (!response.ok) throw new Error(data?.error || 'Credit failed.');
       operationId.current = '';
-      setMessage(data.credited ? `Credited ${money(rupees)} to the ${purpose} wallet.` : 'Credit was already recorded; no duplicate charge.');
+      setMessage((data.credited ? `Credited ${money(rupees)} to the ${purpose} wallet.` : 'Credit was already recorded; no duplicate charge.') + (data.mirrorDeferred ? ' Balance saved securely; reporting sync is pending. Do not repeat the credit.' : ''));
       setAmount(''); setReason('');
       try {
         await Promise.all([onCredited(), refreshHistory()]);
