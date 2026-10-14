@@ -5,6 +5,7 @@ import { getDualProduct, getDualStorefrontSettings } from '@/lib/dualReadServer'
 import { getAdminAuth, getAdminDb } from '@/lib/firebaseAdmin';
 import { isSupabaseWriteConfigured, mapOrderToSupabase, mirrorSupabaseUpsert, recordMirrorFailure, supabasePrimaryUpsert } from '@/lib/dualWriteServer';
 import { isWholesaleProduct } from '@/lib/wholesale';
+import { createShoppingWalletOrder, shoppingWalletBalance } from '@/lib/resellerShoppingCheckout';
 
 export const runtime = 'nodejs';
 const WEEKDAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const;
@@ -153,7 +154,7 @@ function publicOrderError(error: unknown) {
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json(); const rawItems = Array.isArray(body?.items) ? body.items as IncomingItem[] : []; const quoteOnly = body?.mode === 'quote'; const selfCollect = body?.selfCollect === true;
+    const body = await request.json(); const rawItems = Array.isArray(body?.items) ? body.items as IncomingItem[] : []; const quoteOnly = body?.mode === 'quote'; const selfCollect = body?.selfCollect === true; const useShoppingCredit = body?.useShoppingCredit === true;
     if (!rawItems.length || rawItems.length > 50) return NextResponse.json({ error: 'Your cart is empty or contains too many items.' }, { status: 400 });
     const items = await buildAuthoritativeItems(rawItems); const totalItems = items.reduce((sum, item) => sum + item.quantity, 0); const rawSubtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
     const [reseller, user] = await Promise.all([optionalReseller(request), decodedUser(request)]);
@@ -162,7 +163,10 @@ export async function POST(request: Request) {
     const calculatedDelivery = selfCollect ? { baseDelivery: 0, wholesaleItems: 0, wholesaleSurcharge: 0, deliveryCharge: 0 } : calculateDeliveryCharge(items);
     const delivery = freeDeliveryReward ? { ...calculatedDelivery, deliveryCharge: 0 } : calculatedDelivery;
     const total = subtotal + delivery.deliveryCharge;
-    const quote = { items, rawSubtotal, tierDiscount, tierDiscountPercent, resellerTier: reseller?.tierName || '', subtotal, totalItems, ...delivery, total, selfCollect, fulfillment: selfCollect ? 'self_collect' : 'delivery', freeDeliveryReward, rewardLabel: freeDeliveryReward ? 'Spin & Win Reward — Free Delivery' : '' };
+    const walletShoppingBalance = user ? await shoppingWalletBalance(user.uid) : 0;
+    const walletShoppingApplied = useShoppingCredit ? Math.min(walletShoppingBalance, total) : 0;
+    const amountDue = total - walletShoppingApplied;
+    const quote = { items, rawSubtotal, tierDiscount, tierDiscountPercent, resellerTier: reseller?.tierName || '', subtotal, totalItems, ...delivery, total, selfCollect, fulfillment: selfCollect ? 'self_collect' : 'delivery', freeDeliveryReward, rewardLabel: freeDeliveryReward ? 'Spin & Win Reward — Free Delivery' : '', walletShoppingBalance, walletShoppingApplied, amountDue };
     if (quoteOnly) return NextResponse.json(quote);
 
     const customer = body?.customer as Customer | undefined;
@@ -170,11 +174,38 @@ export async function POST(request: Request) {
 
     const resellerUserId = reseller?.userId || '';
     const resellerGuestId = cleanGuestId(body?.guestId);
-    const orderId = crypto.randomUUID();
+    if (useShoppingCredit && (!user || !walletShoppingBalance)) throw new Error('Sign in to a reseller account with shopping credit to use your wallet.');
+    const orderId = useShoppingCredit ? String(body?.orderRequestId || '') : crypto.randomUUID();
     const salar = cleanSalarOrderContext(body?.orderContext);
     const orderData: any = { customer: { name: customer.name.trim(), phone: customer.phone.trim(), email: String(customer.email || '').trim(), address: selfCollect ? 'PrimeHub Shop Pickup' : customer.address.trim(), city: selfCollect ? 'Lahore' : customer.city.trim(), notes: String(customer.notes || '').trim() }, ...quote, idempotencyKey: `${salar ? 'salar' : 'website'}-order:${orderId}`, currency: 'PKR', status: 'pending', source: salar ? 'salar' : 'website', ...(salar ? { salar } : {}), createdAt: new Date() };
     if (resellerUserId) orderData.resellerUserId = resellerUserId;
     if (resellerGuestId) orderData.resellerGuestId = resellerGuestId;
+
+    if (useShoppingCredit && user) {
+      // Atomic source of truth: order + debit + append-only spend are one Firestore commit.
+      const saved = await createShoppingWalletOrder(user.uid, orderId, { ...orderData, resellerUserId: user.uid });
+      if (isSupabaseWriteConfigured()) {
+        const row = { ...mapOrderToSupabase(orderId, saved.order), authoritative_source: 'firebase', mirror_status: 'synced', mirror_error: null };
+        try {
+          await supabasePrimaryUpsert({ table: 'orders', row });
+        } catch (syncError) {
+          // Do not reject a successfully paid Firebase order: the user must never pay twice.
+          console.error('Shopping wallet order Supabase mirror unavailable:', syncError);
+          try { await recordMirrorFailure('orders', orderId, 'upsert', row); } catch (queueError) { console.error('Shopping wallet order retry queue unavailable:', queueError); }
+        }
+      }
+      if (user && freeDeliveryReward && saved.created) {
+        try {
+          const current = await readRewardWallet(user.uid);
+          const credits = Math.max(0, Number(current.freeDeliveryCredits || 0));
+          if (credits > 0) {
+            const history = [...(Array.isArray(current.history) ? current.history : []), { id: `free-delivery:${orderId}`, action: 'use', name: 'Spin & Win Reward — Free Delivery', type: 'free-delivery', status: 'used', orderId, createdAt: new Date().toISOString() }].slice(-100);
+            await writeRewardWallet(user.uid, { ...current, freeDeliveryCredits: credits - 1, history });
+          }
+        } catch (rewardError) { console.error('Free delivery reward on wallet order needs reconciliation:', rewardError); }
+      }
+      return NextResponse.json({ orderId, ...quote, walletShoppingApplied: saved.amount, amountDue: saved.amountDue, resellerLinked: true, guestTracked: Boolean(resellerGuestId) });
+    }
 
     const supabaseRow = mapOrderToSupabase(orderId, orderData);
     if (isSupabaseWriteConfigured()) {
