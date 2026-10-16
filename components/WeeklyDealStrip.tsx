@@ -105,6 +105,7 @@ export default function WeeklyDealStrip() {
 
   return (
     <section className="px-4 py-5 md:px-6">
+      {dealError && <p role="alert" className="mb-3 rounded-xl bg-red-50 p-3 text-xs font-bold text-red-700">{dealError}</p>}
       <div className="mx-auto max-w-6xl">
         <div className="mb-3 flex items-end justify-between">
           <div>
