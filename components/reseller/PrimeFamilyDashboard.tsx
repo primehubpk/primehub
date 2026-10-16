@@ -604,36 +604,8 @@ export default function PrimeFamilyDashboard({
             </section>
           )}
 
-          {view === 'vouchers' && (
-            <>
-              <div className="mb-2.5 flex gap-1.5 overflow-x-auto pb-1">
-                {(['all', 'cash', 'gift', 'discount', 'brand'] as VoucherFilter[]).map(item => (
-                  <button
-                    key={item}
-                    type="button"
-                    onClick={() => setFilter(item)}
-                    className={`whitespace-nowrap rounded-full px-3 py-2 text-[11px] font-bold capitalize ${filter === item ? 'bg-[#14140F] text-white' : 'bg-white text-[#6B6A62]'}`}
-                  >
-                    {item}
-                  </button>
-                ))}
-              </div>
-              <div className="grid grid-cols-2 gap-2.5 md:grid-cols-4">
-                {filteredVouchers.map(voucher => (
-                  <VoucherCard key={voucher.id} voucher={voucher} orders={monthlyOrders} onOpen={setSelectedVoucher} />
-                ))}
-              </div>
-            </>
-          )}
-
           {view === 'rewards' && (
             <div className="space-y-3">
-              <section className="rounded-[18px] bg-[#FFFDF8] p-4 shadow-[0_8px_24px_rgba(20,20,15,.05)]">
-                <div className="flex items-end justify-between gap-3"><div><p className="text-[10px] font-extrabold uppercase tracking-[.14em] text-[#E85D04]">Daily streak</p><h2 className="mt-1 text-xl font-extrabold">7-Day Check-in</h2><p className="mt-1 text-xs text-[#6B6A62]">Complete every day to unlock higher point rewards.</p></div><span className="rounded-full bg-[#FFF3E0] px-3 py-1.5 text-[10px] font-extrabold">{Math.min(7, Number(rewardWallet.streak || 0))}/7</span></div>
-                <div className="mt-4 grid grid-cols-7 gap-1.5">{Array.from({ length: 7 }, (_, index) => { const complete=index<Number(rewardWallet.streak||0); return <div key={index} className={`rounded-xl p-2 text-center ${complete?'bg-[#0E7C6F] text-white':'bg-[#F1ECE3] text-[#6B6A62]'}`}><p className="text-[8px] font-extrabold">D{index+1}</p><p className="mt-1 text-[9px] font-extrabold">+{Number(rewardSettings.checkInRewards?.[index]??0)}</p><p className="text-[7px] font-bold">PTS</p></div>; })}</div>
-                <button type="button" onClick={checkInReward} disabled={rewardBusy || rewardWallet.lastCheckIn===rewardDayKey()} className="mt-4 w-full rounded-xl bg-[#14140F] py-3.5 text-xs font-extrabold text-white disabled:opacity-45">{rewardWallet.lastCheckIn===rewardDayKey()?'✓ Checked in today':`Check in +${Number(rewardSettings.checkInRewards?.[Math.min(6,Number(rewardWallet.streak||0))]??10)} points`}</button>
-              </section>
-              {wheel.active && <RewardWheel settings={wheel} rewardSettings={rewardSettings} wallet={rewardWallet} onWallet={setRewardWallet} />}
               <section className="rounded-[18px] bg-[#FFFDF8] p-4 shadow-[0_8px_24px_rgba(20,20,15,.05)]">
                 <div className="flex items-end justify-between gap-3"><div><p className="text-[10px] font-extrabold uppercase tracking-[.14em] text-[#0E7C6F]">Point store</p><h2 className="mt-1 text-xl font-extrabold">Gifts & Products</h2><p className="mt-1 text-xs text-[#6B6A62]">Rewards added from Admin appear here automatically.</p></div><span className="rounded-full bg-[#FFF3E0] px-3 py-1.5 text-[10px] font-extrabold">{Number(rewardWallet.points||0).toLocaleString()} PTS</span></div>
                 <div className="mt-4 grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">{rewardGifts.length ? rewardGifts.map(gift => { const product=rewardProducts[gift.productId]; const image=gift.imageUrl || rewardProductImage(product); const need=Math.max(0,Number(gift.pointsCost)-Number(rewardWallet.points||0)); return <article key={gift.id} className="overflow-hidden rounded-2xl border border-black/[.06] bg-white"><div className="aspect-[4/3] bg-[#F1ECE3]">{image?<img src={image} alt={gift.title||'Reward gift'} className="h-full w-full object-cover"/>:<div className="grid h-full place-items-center text-3xl">🎁</div>}</div><div className="p-3"><h3 className="text-sm font-extrabold">{gift.title||product?.title||product?.name||'Reward Gift'}</h3><p className="mt-1 text-xs font-extrabold text-[#E85D04]">{Number(gift.pointsCost).toLocaleString()} points</p><p className="mt-1 text-[10px] text-[#0E7C6F]">Free delivery included</p><Link href="/rewards#redeem-rewards" className="mt-3 block rounded-xl bg-[#14140F] px-3 py-2.5 text-center text-[10px] font-extrabold text-white">{need?`Need ${need} more points`:'Redeem gift'}</Link></div></article>; }) : <div className="rounded-2xl bg-[#F1ECE3] p-6 text-center text-xs text-[#6B6A62] sm:col-span-2 lg:col-span-3">Admin se add kiye gaye active gifts yahan show honge.</div>}</div>
