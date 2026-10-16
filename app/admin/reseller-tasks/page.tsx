@@ -185,7 +185,7 @@ export default function ResellerTasksAdminPage() {
               <div className="mt-3 grid grid-cols-2 gap-2">
                 <Field label="Name"><input value={tier.name} onChange={e => setTiers(list => list.map(x => x.id === tier.id ? { ...x, name: e.target.value } : x))} className="admin-input"/></Field>
                 <Field label="Min orders"><input type="number" min="0" value={tier.minMonthlyOrders} onChange={e => setTiers(list => list.map(x => x.id === tier.id ? { ...x, minMonthlyOrders: Math.max(0, Number(e.target.value) || 0) } : x))} className="admin-input"/></Field>
-                <Field label="Discount %"><input type="number" min="0" max="100" value={tier.discountPercent || 0} onChange={e => setTiers(list => list.map(x => x.id === tier.id ? { ...x, discountPercent: Math.min(100, Math.max(0, Number(e.target.value) || 0)) } : x))} className="admin-input"/></Field>
+                <Field label="Cashback after Delivery %"><input type="number" min="0" max="100" value={tier.discountPercent || 0} onChange={e => setTiers(list => list.map(x => x.id === tier.id ? { ...x, discountPercent: Math.min(100, Math.max(0, Number(e.target.value) || 0)) } : x))} className="admin-input"/></Field>
                 <Field label="Benefits" wide><textarea rows={3} value={(tier.benefits || []).join('\n')} onChange={e => setTiers(list => list.map(x => x.id === tier.id ? { ...x, benefits: e.target.value.split('\n').map(v => v.trim()).filter(Boolean) } : x))} className="admin-input resize-none"/></Field>
               </div>
             </details>)}
