@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, CalendarDays, ShoppingCart, Sparkles, LockKeyhole } from 'lucide-react';
 import { useCartStore } from '@/lib/cartStore';
 import { weeklyCartPrice } from '@/lib/weeklyCartPrice';
+import { getVerifiedDealProduct } from '@/lib/verifiedDealProduct';
 import { useSettings } from '@/lib/useSettings';
 import { loadProductsForNavigation } from '@/lib/productNavigationCache';
 import type { Product, Weekday, WeeklyDeal } from '@/lib/types';
@@ -60,6 +61,8 @@ export default function WeeklyDealsPage() {
   const openVariantModal = useCartStore((state) => state.openVariantModal);
   const [products, setProducts] = useState<Record<string, Product>>({});
   const [addedId, setAddedId] = useState<string | null>(null);
+  const [addingId, setAddingId] = useState<string | null>(null);
+  const [dealError, setDealError] = useState('');
   const [nowTick, setNowTick] = useState(Date.now());
   const nowState = pakistanParts();
   const today = nowState.weekday;
@@ -93,24 +96,27 @@ export default function WeeklyDealsPage() {
     });
   }, [settings.weeklyDeals, today]);
 
-  const addToCart = (deal: WeeklyDeal) => {
-    const product = products[deal.productId];
-    if (!product || Number(product.stock ?? 0) <= 0) return;
-    const { price, comparison, live: isLiveToday } = weeklyCartPrice(deal, product);
-    if (price <= 0) return;
-    const image = imageOf(product, deal);
-    if (openVariantModal({ ...product, price, originalPrice: comparison, image, imageUrl: image }, 'cart')) return;
-    addItem({
-      id: product.id,
-      name: product.title || deal.title || `${LABELS[deal.day]} Deal`,
-      price,
-      originalPrice: comparison,
-      image: image || undefined,
-      imageUrl: image || undefined,
-      dealDay: isLiveToday ? deal.day : undefined,
-    });
-    setAddedId(deal.id);
-    window.setTimeout(() => setAddedId((current) => current === deal.id ? null : current), 1200);
+  const addToCart = async (deal: WeeklyDeal) => {
+    if (addingId || !deal.productId) return;
+    setAddingId(deal.id);
+    setDealError('');
+    try {
+      const product = await getVerifiedDealProduct(deal.productId);
+      const { price, comparison, live: isLiveToday } = weeklyCartPrice(deal, product);
+      if (price <= 0) throw new Error('Deal price is unavailable.');
+      const image = imageOf(product as Product, deal);
+      const priced = { ...product, price, originalPrice: comparison, image, imageUrl: image,
+        ...(isLiveToday ? { dealDay: deal.day } : {}) };
+      if (openVariantModal(priced, 'cart')) return;
+      addItem({ id: product.id, productId: deal.productId,
+        name: String(product.title || deal.title || `${LABELS[deal.day]} Deal`),
+        price, originalPrice: comparison, image: image || undefined,
+        imageUrl: image || undefined, dealDay: isLiveToday ? deal.day : undefined });
+      setAddedId(deal.id);
+      window.setTimeout(() => setAddedId(current => current === deal.id ? null : current), 1200);
+    } catch (error) {
+      setDealError(error instanceof Error ? error.message : 'Unable to verify variant options.');
+    } finally { setAddingId(null); }
   };
 
   if (loading) {
@@ -127,6 +133,7 @@ export default function WeeklyDealsPage() {
           <p className="mt-2 max-w-2xl text-sm leading-6 text-black/50">Every deal repeats automatically on its assigned weekday. The live day is first; locked days show when they unlock next.</p>
         </header>
 
+        {dealError && <p role="alert" className="mt-4 rounded-xl bg-red-50 p-3 text-xs font-bold text-red-700">{dealError}</p>}
         {!deals.length ? (
           <section className="mt-6 rounded-[30px] bg-white p-10 text-center shadow-sm"><Sparkles className="mx-auto h-10 w-10 text-black/20" /><h2 className="mt-4 text-2xl font-black">No Weekly Deals Scheduled</h2><p className="mt-2 text-xs text-black/45">Add weekly deals from the admin panel.</p></section>
         ) : (
@@ -156,7 +163,7 @@ export default function WeeklyDealsPage() {
                     ) : (
                       <div className="mt-3 rounded-xl bg-[#F7F7F4] px-3 py-2.5"><p className="flex items-center gap-1.5 text-[8px] font-black uppercase tracking-[0.1em] text-black/60"><LockKeyhole size={11} /> 🔒 Unlocks Next {LABELS[deal.day]}</p><p className="mt-1 font-[family-name:var(--font-mono)] text-sm font-black text-[#0F6A5F]">{unlockCountdown.days}d {String(unlockCountdown.hours).padStart(2, '0')}h {String(unlockCountdown.minutes).padStart(2, '0')}m {String(unlockCountdown.seconds).padStart(2, '0')}s</p><p className="mt-1 text-[9px] text-black/55">Regular price: Rs. {price.toLocaleString()}</p>{comparison > regularPrice && <p className="text-[9px] text-black/35 line-through">Was Rs. {comparison.toLocaleString()}</p>}</div>
                     )}
-                    <button type="button" disabled={!inStock || addedId === deal.id} onClick={() => addToCart(deal)} className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-[#14140F] px-3 py-3 text-[10px] font-black text-white disabled:cursor-not-allowed disabled:opacity-35"><ShoppingCart size={14} />{addedId === deal.id ? 'ADDED TO CART' : 'ADD TO CART'}</button>
+                    <button type="button" disabled={addingId === deal.id || !deal.productId || addedId === deal.id || price <= 0} onClick={() => addToCart(deal)} className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-[#14140F] px-3 py-3 text-[10px] font-black text-white disabled:cursor-not-allowed disabled:opacity-35"><ShoppingCart size={14} />{addingId === deal.id ? 'CHECKING OPTIONS…' : addedId === deal.id ? 'ADDED TO CART' : 'ADD TO CART'}</button>
                   </div>
                 </article>
               );
