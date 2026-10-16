@@ -448,9 +448,9 @@ export default function PrimeFamilyDashboard({
         router.push('/shop');
       } else if (task.id === 'refer-reseller') {
         router.push('/reseller/join');
-      } else {
-        setTaskMessage(`Admin Panel mein ${task.title} ka official link add karein.`);
       }
+      // A missing Admin URL is not an actionable social destination.
+      // Keep the task visible for proof submission without showing an error banner.
       return;
     }
     // The clickable link opens synchronously from the customer's tap. Logging
@@ -750,9 +750,9 @@ function TaskRow({
           {destination ? (
             <a href={destination} target="_blank" rel="noopener noreferrer" onClick={onOpen}
               className="inline-flex items-center gap-1 rounded-xl bg-[#14140F] px-3 py-2 text-[10px] font-extrabold text-white">{launchLabel} <ChevronRight size={12}/></a>
-          ) : (
+          ) : !isSocial ? (
             <button type="button" onClick={onOpen} className="inline-flex items-center gap-1 rounded-xl bg-[#14140F] px-3 py-2 text-[10px] font-extrabold text-white">{launchLabel} <ChevronRight size={12}/></button>
-          )}
+          ) : null}
           {isSocial && (
             <button type="button" onClick={onSubmit} disabled={submitted}
               className="rounded-xl bg-[#E7F6F3] px-3 py-2 text-[10px] font-extrabold text-[#0E7C6F] disabled:opacity-50">
