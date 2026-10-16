@@ -113,6 +113,17 @@ export default function BottomNav() {
                   return;
                 }
 
+                // Remember the originating storefront tab for the Prime Family
+                // header Back button. A fresh bottom-tab visit replaces any old path.
+                if (key === 'reseller' && pathname !== href && !pathname.startsWith('/reseller/')) {
+                  try {
+                    const from = pathname + window.location.search + window.location.hash;
+                    window.sessionStorage.setItem('ph-family-return-path', JSON.stringify({ path: from, at: Date.now() }));
+                  } catch {}
+                } else if (key !== 'reseller' && pathname.startsWith('/reseller')) {
+                  try { window.sessionStorage.removeItem('ph-family-return-path'); } catch {}
+                }
+
                 if (pathname !== href) setPendingHref(href);
               }}
               className={`group relative flex min-w-0 touch-manipulation select-none flex-col items-center justify-center gap-1 px-0.5 py-2.5 transition-[color,background-color,transform] duration-100 active:scale-[0.98] active:bg-black/[0.035] ${
