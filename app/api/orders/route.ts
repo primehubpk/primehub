@@ -232,8 +232,12 @@ export async function POST(request: Request) {
     const cashbackPercent = reseller?.discountPercent || 0;
     const cashbackEstimate = cashbackPercent > 0 ? cashBackForTier(eligibleAfterVoucher, cashbackPercent) : 0;
     const subtotal = Math.max(0, rawSubtotal - voucherDiscount);
-    const rewardWallet = user && body?.mode !== 'whatsapp_intent' ? await readRewardWallet(user.uid) : {}; const freeDeliveryReward = !selfCollect && Number(rewardWallet.freeDeliveryCredits || 0) > 0;
     const calculatedDelivery = selfCollect ? { baseDelivery: 0, wholesaleItems: 0, wholesaleSurcharge: 0, deliveryCharge: 0 } : calculateDeliveryCharge(items);
+    // Free delivery at five items (or self-collect) must not consume a Spin
+    // reward credit unnecessarily. The server decides from verified quantities.
+    const rewardWallet = user && calculatedDelivery.deliveryCharge > 0 && body?.mode !== 'whatsapp_intent'
+      ? await readRewardWallet(user.uid) : {};
+    const freeDeliveryReward = !selfCollect && calculatedDelivery.deliveryCharge > 0 && Number(rewardWallet.freeDeliveryCredits || 0) > 0;
     const delivery = freeDeliveryReward ? { ...calculatedDelivery, deliveryCharge: 0 } : calculatedDelivery;
     const total = subtotal + delivery.deliveryCharge;
     // A regular cart quote/order must NEVER read Firebase wallet collections.
