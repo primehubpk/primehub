@@ -5,6 +5,7 @@ import { publicProductCacheTag } from '@/lib/storefrontCachePolicy';
 import { getAdminDb } from '@/lib/firebaseAdmin';
 import {
   getSupabasePrimaryPayload,
+  isSupabaseWriteConfigured,
   mapDocumentToSupabase,
   recordMirrorFailure,
   supabasePrimaryDelete,
