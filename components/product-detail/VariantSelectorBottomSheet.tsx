@@ -337,7 +337,7 @@ export default function VariantSelectorBottomSheet({
                   <button type="button" onClick={() => setMarkEditorOpen(true)}
                     aria-label="Edit and mark your favourite colour on product photos"
                     className="inline-flex shrink-0 items-center gap-1 rounded-full border border-[#0F6A5F]/30 bg-[#EAF7F3] px-2.5 py-2 text-[9px] font-black text-[#0F6A5F]">
-                    <Pencil size={12}/> Mark favourite colour {markedImages.length ? `(${markedImages.length} saved)` : ''}
+                    <Pencil size={12}/> Edit & mark favourite colour {markedImages.length ? `(${markedImages.length} saved)` : ''}
                   </button>
                 ) : null}
                 <button
