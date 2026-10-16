@@ -991,6 +991,13 @@ export default function SalarWidget() {
     setSelectedProducts([]);
   }
 
+  // Only the two Admin Panel-controlled contact slots may appear. Some older
+  // settings payloads contain repeated entries: never render those as extra cards.
+  const activeAdminWhatsappContacts = (['business', 'helpline'] as const)
+    .map((id) => whatsappContacts.find((contact) => contact?.id === id))
+    .filter((contact): contact is SalarWhatsAppContact =>
+      Boolean(contact && contact.enabled !== false && whatsappTileHref(contact.number)));
+
   const chatShellClass = expanded
     ? 'relative flex h-[100dvh] w-screen flex-col overflow-hidden bg-[#FFFDF8] shadow-2xl'
     : 'relative flex h-[min(620px,calc(100dvh-120px))] w-[min(390px,calc(100vw-24px))] flex-col overflow-hidden rounded-[26px] border border-black/10 bg-[#FFFDF8] shadow-2xl';
@@ -1011,10 +1018,10 @@ export default function SalarWidget() {
             </div>
           </div>
 
-          {whatsappContacts.some(contact => contact.enabled !== false && whatsappTileHref(contact.number)) && (
-            <nav aria-label="Salar WhatsApp contacts" className="grid shrink-0 grid-cols-2 gap-2 border-b border-black/10 bg-white p-2.5">
-              {whatsappContacts.filter(contact => contact.enabled !== false && whatsappTileHref(contact.number)).map(contact => (
-                <a key={contact.id} href={whatsappTileHref(contact.number)} target="_blank" rel="noopener noreferrer"
+          {activeAdminWhatsappContacts.length > 0 && (
+            <nav aria-label="Salar WhatsApp contacts" data-salar-admin-whatsapp="1" className="grid shrink-0 grid-cols-2 gap-2 border-b border-black/10 bg-white p-2.5">
+              {activeAdminWhatsappContacts.map(contact => (
+                <a key={contact.id} data-salar-contact-id={contact.id} href={whatsappTileHref(contact.number)} target="_blank" rel="noopener noreferrer"
                   className="flex min-w-0 items-center gap-2 rounded-2xl border border-[#0F6A5F]/15 bg-[#EEFAF6] px-2 py-3 text-[9px] font-black text-[#0F6A5F]">
                   <span aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#20B76C] text-[10px] text-white">WA</span>
                   <span className="min-w-0"><span className="block truncate">{contact.label}</span><span className="mt-0.5 block text-[8px] font-semibold">{contact.number}</span></span>
