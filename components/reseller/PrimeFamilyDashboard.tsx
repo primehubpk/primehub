@@ -301,7 +301,7 @@ export default function PrimeFamilyDashboard({
   const walletSpendable = walletAvailable + walletShopping;
   const sortedTiers = [...resellerTiers].sort((a,b) => a.minMonthlyOrders - b.minMonthlyOrders);
   const hasAdminTiers = sortedTiers.length === 4;
-  const tier = [...sortedTiers].reverse().find(item => monthlyOrders >= item.minMonthlyOrders) || sortedTiers[0];
+  const tier = [...sortedTiers].reverse().find(item => monthlyOrders >= item.minMonthlyOrders) || sortedTiers[0]!;
   const tierIndex = tier ? Math.max(0, sortedTiers.findIndex(item => item.id === tier.id)) : 0;
   const nextTier = tier ? sortedTiers[tierIndex + 1] || null : null;
   const tierProgress = tier && nextTier ? Math.min(100, Math.round(((monthlyOrders-tier.minMonthlyOrders)/Math.max(1,nextTier.minMonthlyOrders-tier.minMonthlyOrders))*100)) : 100;
@@ -763,7 +763,7 @@ function TaskRow({
     : task.id === 'refer-reseller' ? 'Refer now' : 'Open task';
 
   return (
-    <div className="flex gap-3 border-b border-black/[.08] py-3 last:border-0 last:pb-0">
+    <div id={task.id} className="flex scroll-mt-24 gap-3 border-b border-black/[.08] py-3 last:border-0 last:pb-0">
       <div className="grid h-[42px] w-[42px] shrink-0 place-items-center rounded-[14px] bg-[#FFF3E0] text-[#0E7C6F]"><Icon size={18}/></div>
       <div className="min-w-0 flex-1">
         {destination ? (
