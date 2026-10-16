@@ -213,7 +213,7 @@ export default function DealScheduleManager() {
       </div>
     </div>
 
-    <div className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-4 xl:grid-cols-4">
+    <div className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-4 sm:gap-3 xl:gap-4">
       {shownProducts.map(product => {
         const saved = assignedByProduct.get(product.id);
         const state = cards[product.id] || fromDeal(saved);
