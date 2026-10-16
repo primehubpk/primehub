@@ -74,7 +74,11 @@ export function resolveCheckoutVoucher(vouchers: CheckoutVoucher[], value: unkno
   if (!code) return null;
   const voucher = vouchers.find(v => v.code === code && v.active);
   if (!voucher) throw new Error('Voucher code is invalid or inactive.');
-  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Karachi', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+  const dayParts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Karachi', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(new Date());
+  const part = (type: string) => dayParts.find(row => row.type === type)?.value || '';
+  const today = `${part('year')}-${part('month')}-${part('day')}`;
   if (voucher.expiresAt && voucher.expiresAt < today) throw new Error('Voucher has expired.');
   if (eligibleSubtotal <= 0) throw new Error('This voucher is not applicable to Big Deal or Weekly Deal products.');
   const amount = Math.min(voucher.amount, eligibleSubtotal);
