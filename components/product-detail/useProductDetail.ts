@@ -162,9 +162,11 @@ export function useProductDetail(options?: {
 
   const regularPrice = product ? regularPriceOf(product) : 0;
   const productOriginal = product ? originalPriceOf(product) : 0;
-  // Match the storefront's default inventory of 30 only when no stock was set.
-  // Nullish fallback preserves an intentionally configured stock of 0.
-  const stock = Number(product?.stock ?? product?.quantity ?? product?.inventory ?? 30);
+  // Fall back to 30 only when the stock fields are genuinely missing/blank.
+  // An explicitly configured 0 (including "0") must remain out of stock.
+  const configuredStock = [product?.stock, product?.quantity, product?.inventory]
+    .find((value) => value != null && String(value).trim() !== '');
+  const stock = configuredStock === undefined ? 30 : Math.max(0, Number(configuredStock) || 0);
   const rating = Number(product?.rating || 0);
   const reviews = Number(product?.reviews || 0);
   const normalizedVariants = useMemo(
