@@ -119,10 +119,15 @@ export default function DealScheduleManager() {
   }
 
   function focusDay(day: Weekday) {
+    const existing = deals.find(deal => deal.day === day && deal.productId);
     setActiveCategory('');
-    setFilterDay(day);
+    // An empty day must show products available for assignment, not a blank list.
+    setFilterDay(existing ? day : '');
     setSearch('');
     setVisibleCount(24);
+    if (!existing) {
+      setMessage(`No ${day} deal is configured. Choose any category and product below, select ${day}, then Save deal.`);
+    } else setMessage('');
     window.setTimeout(() => catalogRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 30);
   }
 
