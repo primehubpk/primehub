@@ -74,7 +74,11 @@ async function buildAuthoritativeItems(items: IncomingItem[]) {
   const settings = settingsResult.documents.main || {};
   const weeklyDeals = Array.isArray(settings.weeklyDeals) ? settings.weeklyDeals : [];
   const liveDeal = weeklyDeals.find((deal: any) => deal?.day === currentDay && deal?.active !== false && typeof deal?.productId === 'string' && numberValue(deal?.dealPrice) > 0);
-  const big = settings.dailyDeal;
+  // Live Big Deal is now administered under main.bigDeal. dailyDeal is a
+  // legacy alias used by older homepage code, not the canonical source.
+  // Price and discount eligibility MUST use the same dedicated rotation.
+  const big = settings.bigDeal && typeof settings.bigDeal === 'object'
+    ? settings.bigDeal : settings.dailyDeal;
   const now = Date.now();
   const bigStarts = big?.startAt ? new Date(big.startAt).getTime() : 0;
   const bigEnds = big?.endAt ? new Date(big.endAt).getTime() : 0;
