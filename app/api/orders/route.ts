@@ -45,7 +45,7 @@ function trustedMarkedImages(input: IncomingItem, productId: string) {
       if (marked.protocol !== 'https:' || marked.hostname !== 'images.primehubmall.com' ||
           marked.username || marked.password || marked.port || marked.search || marked.hash ||
           !marked.pathname.startsWith(prefix) ||
-          !/^[0-9a-f-]{36}\\.webp$/.test(marked.pathname.slice(prefix.length)) ||
+          !/^[0-9a-f-]{36}\.webp$/.test(marked.pathname.slice(prefix.length)) ||
           original.protocol !== 'https:' ||
           !['images.primehubmall.com', 'i.ibb.co'].includes(original.hostname) ||
           unique.has(markedUrl)) continue;
