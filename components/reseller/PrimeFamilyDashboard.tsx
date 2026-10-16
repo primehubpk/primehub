@@ -422,8 +422,7 @@ export default function PrimeFamilyDashboard({
   );
 
   const goBackFromFamily = () => {
-    // Returning from the bottom Prime Family tab should take customers back
-    // to their actual storefront tab. For a direct/deep link, Home is safe.
+    // Return to the originating bottom tab when available; direct visits go Home.
     let destination = '/';
     try {
       const stored = window.sessionStorage.getItem('ph-family-return-path');
@@ -433,10 +432,14 @@ export default function PrimeFamilyDashboard({
         const path = previous.path;
         if (typeof path === 'string' && path.length < 500 &&
             path.startsWith('/') && !path.startsWith('//') &&
-            !/[\\\r\n]/.test(path) && !/^\\/(?:reseller|admin)(?:\\/|$)/.test(path) &&
+            path.indexOf(String.fromCharCode(92)) === -1 &&
             typeof previous.at === 'number' && Date.now() - previous.at >= 0 &&
             Date.now() - previous.at < 12 * 60 * 60 * 1000) {
-          destination = path;
+          const url = new URL(path, window.location.origin);
+          if (url.origin === window.location.origin &&
+              !url.pathname.startsWith('/reseller') && !url.pathname.startsWith('/admin')) {
+            destination = url.pathname + url.search + url.hash;
+          }
         }
       }
     } catch {}
