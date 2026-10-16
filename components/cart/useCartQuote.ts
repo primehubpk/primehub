@@ -74,6 +74,6 @@ export function useCartQuote(items: CartItem[]) {
   };
   return {
     selfCollect, setSelfCollect, voucherCode, voucherInput, setVoucherInput,
-    applyVoucher, quote, quoteError, loading: loading || !preferencesReady || !authReady,
+    applyVoucher, quote, quoteError, signedIn: Boolean(uid), authReady, loading: loading || !preferencesReady || !authReady,
   };
 }
