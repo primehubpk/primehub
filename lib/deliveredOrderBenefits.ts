@@ -71,7 +71,8 @@ export async function creditDeliveredOrderBenefits(orderId: string, authoritativ
     }
     // A cash voucher can pay each real member once. Cashback still pays on
     // subsequent legitimate delivered orders if a cash code is reused.
-    const voucherAwarded = voucherClaimRef && !priorVoucher?.exists ? voucherCash : 0;
+    const voucherAwarded = voucherClaimRef && !priorVoucher?.exists
+      ? Math.min(voucherCash, Math.max(0, eligible - tierCash)) : 0;
     const reward = tierCash + voucherAwarded;
     if (!Number.isSafeInteger(existingCash + reward)) throw new Error('Wallet limit exceeded.');
     tx.update(profileRef, {
