@@ -31,7 +31,7 @@ import {
   type ResellerTask,
   type ResellerWheelSettings,
 } from '@/lib/resellerTasks';
-import { getResellerTiers } from '@/lib/resellerTiers';
+import { useSettings } from '@/lib/useSettings';
 import type { ResellerProfile, ResellerTier } from '@/lib/resellerTypes';
 import PremiumSpinWheel from '@/components/rewards/PremiumSpinWheel';
 import { orderPremiumWheelPrizes, rewardWheelPrizeLabel } from '@/components/rewards/RewardWheelArtwork';
@@ -103,6 +103,8 @@ export default function PrimeFamilyDashboard({
   initialSettings?: Record<string, unknown> | null;
 }) {
   const router = useRouter();
+  const { settings: storefrontSettings } = useSettings();
+  const familySettings = storefrontSettings as typeof storefrontSettings & SettingsSnapshot & { youtubeGuideUrl?: string };
   const [memberUser, setMemberUser] = useState<User | null>(() => auth.currentUser);
   const [profile, setProfile] = useState<ResellerProfile | null>(null);
   const seededSettings = (initialSettings || {}) as SettingsSnapshot & { homeRewardSettings?: RewardSettings };
@@ -135,11 +137,18 @@ export default function PrimeFamilyDashboard({
   const [voucherImages, setVoucherImages] = useState<Record<string, string>>(
     () => seededSettings.resellerVoucherImages || {},
   );
-  const [resellerTiers, setResellerTiers] = useState<ResellerTier[]>(
-    () => Array.isArray(seededSettings.resellerTiers) && seededSettings.resellerTiers.length === 4
-      ? seededSettings.resellerTiers
-      : getResellerTiers(),
+  // Never show hardcoded discounts while the real Admin settings are loading.
+  // The Home seed and the standalone dashboard use the same SettingsProvider.
+  const [resellerTiers, setResellerTiers] = useState<ResellerTier[]>(() =>
+    Array.isArray(seededSettings.resellerTiers) && seededSettings.resellerTiers.length === 4
+      ? seededSettings.resellerTiers : [],
   );
+  const [proofTask, setProofTask] = useState<ResellerTask | null>(null);
+  const [proofValue, setProofValue] = useState('');
+  const [proofBusy, setProofBusy] = useState(false);
+  const [taskMessage, setTaskMessage] = useState('');
+  const [submittedTaskIds, setSubmittedTaskIds] = useState<string[]>([]);
+
 
   useEffect(() => {
     const onBonus = (event: Event) => {
@@ -196,43 +205,42 @@ export default function PrimeFamilyDashboard({
     };
   }, []);
 
+  // Single source of truth for both Home and the standalone Prime Family tab.
+  // The global provider already refreshes the tagged Supabase-primary settings.
+  useEffect(() => {
+    if (Array.isArray(familySettings.resellerTasks)) setTasks(familySettings.resellerTasks);
+    if (familySettings.resellerMonthlyChallenge) {
+      setChallenge({ ...DEFAULT_MONTHLY_CHALLENGE, ...familySettings.resellerMonthlyChallenge });
+    }
+    if (familySettings.resellerWheel) setWheel({ ...DEFAULT_RESELLER_WHEEL, ...familySettings.resellerWheel });
+    if (familySettings.resellerVoucherImages) setVoucherImages(familySettings.resellerVoucherImages);
+    if (Array.isArray(familySettings.resellerTiers) && familySettings.resellerTiers.length === 4) {
+      setResellerTiers(familySettings.resellerTiers);
+    }
+  }, [
+    familySettings.resellerTasks,
+    familySettings.resellerMonthlyChallenge,
+    familySettings.resellerWheel,
+    familySettings.resellerVoucherImages,
+    familySettings.resellerTiers,
+  ]);
+
   useEffect(() => {
     let cancelled = false;
-    const hasSeededSettings = Boolean(initialSettings && Object.keys(initialSettings).length);
-
-    Promise.all([
-      hasSeededSettings
-        ? Promise.resolve<Response | null>(null)
-        : fetch('/api/storefront/read?type=settings', { cache: 'no-store' }),
-      fetch('/api/storefront/read?type=rewards', { cache: 'no-store' }),
-    ])
-      .then(async ([settingsResponse, rewardsResponse]) => {
-        const settingsData = settingsResponse?.ok ? await settingsResponse.json() : null;
-        const rewardsData = rewardsResponse.ok ? await rewardsResponse.json() : null;
-        if (cancelled) return;
-
-        const data = (settingsData?.documents?.main || initialSettings || null) as SettingsSnapshot | null;
-        if (Array.isArray(data?.resellerTasks)) setTasks(data.resellerTasks);
-        if (data?.resellerMonthlyChallenge) {
-          setChallenge({ ...DEFAULT_MONTHLY_CHALLENGE, ...data.resellerMonthlyChallenge });
-        }
-        if (data?.resellerWheel) setWheel({ ...DEFAULT_RESELLER_WHEEL, ...data.resellerWheel });
-        if (data?.resellerVoucherImages) setVoucherImages(data.resellerVoucherImages);
-        if (Array.isArray(data?.resellerTiers) && data.resellerTiers.length === 4) setResellerTiers(data.resellerTiers);
-
-        const gifts = (Array.isArray(rewardsData?.gifts) ? rewardsData.gifts : [])
+    fetch('/api/storefront/read?type=rewards')
+      .then(async (response) => response.ok ? response.json() : null)
+      .then((rewardsData) => {
+        if (cancelled || !rewardsData) return;
+        const gifts = (Array.isArray(rewardsData.gifts) ? rewardsData.gifts : [])
           .filter((gift: RewardGift) => gift.active !== false);
         setRewardGifts(gifts);
-        if (rewardsData?.settings) {
+        if (rewardsData.settings) {
           setRewardSettings(current => ({ ...current, ...rewardsData.settings }));
         }
       })
       .catch(() => undefined);
-
-    return () => {
-      cancelled = true;
-    };
-  }, [initialSettings]);
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     const productIds = Array.from(
@@ -292,10 +300,11 @@ export default function PrimeFamilyDashboard({
   const walletShopping = Number(profile?.walletShopping ?? 0);
   const walletSpendable = walletAvailable + walletShopping;
   const sortedTiers = [...resellerTiers].sort((a,b) => a.minMonthlyOrders - b.minMonthlyOrders);
+  const hasAdminTiers = sortedTiers.length === 4;
   const tier = [...sortedTiers].reverse().find(item => monthlyOrders >= item.minMonthlyOrders) || sortedTiers[0];
-  const tierIndex = Math.max(0, sortedTiers.findIndex(item => item.id === tier.id));
-  const nextTier = sortedTiers[tierIndex + 1] || null;
-  const tierProgress = nextTier ? Math.min(100, Math.round(((monthlyOrders-tier.minMonthlyOrders)/Math.max(1,nextTier.minMonthlyOrders-tier.minMonthlyOrders))*100)) : 100;
+  const tierIndex = tier ? Math.max(0, sortedTiers.findIndex(item => item.id === tier.id)) : 0;
+  const nextTier = tier ? sortedTiers[tierIndex + 1] || null : null;
+  const tierProgress = tier && nextTier ? Math.min(100, Math.round(((monthlyOrders-tier.minMonthlyOrders)/Math.max(1,nextTier.minMonthlyOrders-tier.minMonthlyOrders))*100)) : 100;
   const target = Math.max(1, Number(challenge.targetOrders || DEFAULT_MONTHLY_CHALLENGE.targetOrders));
   const challengePercent = Math.min(100, Math.round((monthlyOrders / target) * 100));
   const remaining = Math.max(0, target - monthlyOrders);
@@ -420,6 +429,78 @@ export default function PrimeFamilyDashboard({
     ],
     [challenge.cashReward, challenge.giftTitle, target, voucherImages],
   );
+
+  const socialTaskIds = new Set(['youtube', 'instagram', 'tiktok']);
+  const taskDestination = (task: ResellerTask): string => {
+    const configured = String(task.url || '').trim();
+    // Admin's YouTube guide is the only existing verified first-party
+    // destination when the social-task URL is not configured separately.
+    const candidate = configured || (task.id === 'youtube' ? String(familySettings.youtubeGuideUrl || '') : '');
+    try {
+      const url = new URL(candidate);
+      if (url.protocol !== 'https:') return '';
+      return url.href;
+    } catch { return ''; }
+  };
+  const openTask = (task: ResellerTask) => {
+    const destination = taskDestination(task);
+    if (!destination) {
+      if (task.id.includes('order')) {
+        router.push('/shop');
+      } else if (task.id === 'refer-reseller') {
+        router.push('/reseller/join');
+      } else {
+        setTaskMessage(`Admin Panel mein ${task.title} ka official link add karein.`);
+      }
+      return;
+    }
+    // The clickable link opens synchronously from the customer's tap. Logging
+    // an authenticated 'open' event must never block the external platform.
+    if (memberUser) {
+      void memberUser.getIdToken().then(token => fetch('/api/reseller/task-claims', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ taskId: task.id, action: 'open' }),
+      })).catch(() => undefined);
+    }
+  };
+  const submitTaskProof = async () => {
+    if (!proofTask || proofBusy) return;
+    const proof = proofValue.trim();
+    if (!memberUser) {
+      router.push('/reseller/join?redirect=%2Freseller%2Fdashboard%3Ftab%3Dtasks');
+      return;
+    }
+    if (proof.length < 3) {
+      setTaskMessage('Apna username ya profile/proof link likhein.');
+      return;
+    }
+    setProofBusy(true);
+    setTaskMessage('');
+    try {
+      const token = await memberUser.getIdToken();
+      const response = await fetch('/api/reseller/task-claims', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ taskId: proofTask.id, action: 'submit', proof }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Proof submit nahi hua.');
+      setSubmittedTaskIds(current => [...new Set([...current, proofTask.id])]);
+      setTaskMessage('Proof Admin review ke liye submit ho gaya. Points approval ke baad milenge.');
+      setProofTask(null);
+      setProofValue('');
+    } catch (error) {
+      setTaskMessage(error instanceof Error ? error.message : 'Proof submit nahi hua.');
+    } finally { setProofBusy(false); }
+  };
+
+  // Existing /reseller/tasks bookmarks now point to this unified task view.
+  useEffect(() => {
+    if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('tab') === 'tasks') {
+      setView('tasks');
+    }
+  }, []);
 
   const goBackFromFamily = () => {
     // Return to the originating bottom tab when available; direct visits go Home.
