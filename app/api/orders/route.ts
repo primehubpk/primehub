@@ -137,7 +137,7 @@ async function readSupabaseResellerProfile(uid: string) {
   };
 }
 
-async function optionalReseller(request: Request) {
+async function optionalReseller(request: Request, settings: Record<string, any>) {
   const decoded = await decodedUser(request); if (!decoded) return null;
   let data: any = null;
   let shouldTryFirebase = true;
@@ -160,8 +160,7 @@ async function optionalReseller(request: Request) {
   }
   if (!data || data.status !== 'active') return null;
 
-  const settingsResult = await getDualStorefrontSettings({ cache: 'no-store', timeoutMs: 5000 });
-  const configured = Array.isArray(settingsResult.documents.main?.resellerTiers) ? settingsResult.documents.main.resellerTiers : [];
+  const configured = Array.isArray(settings.resellerTiers) ? settings.resellerTiers : [];
   if (configured.length !== 4) throw new Error('Cashback tier settings are temporarily unavailable; please retry checkout.');
   const tiers = configured;
   const monthlyOrders = Math.max(0, Number(data.monthlyOrders || 0));
@@ -206,7 +205,7 @@ export async function POST(request: Request) {
     const { items, settings } = await buildAuthoritativeItems(rawItems);
     const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
     const rawSubtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
-    const [reseller, user] = await Promise.all([optionalReseller(request), decodedUser(request)]);
+    const [reseller, user] = await Promise.all([optionalReseller(request, settings), decodedUser(request)]);
     const eligibleSubtotal = orderEligibleSubtotal(items, settings);
     const submittedVoucher = String(body?.voucherCode || '').trim();
     const voucher = submittedVoucher
