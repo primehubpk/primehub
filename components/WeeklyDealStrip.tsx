@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, type MouseEvent } from 'react';
-import { doc, getDoc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import Link from 'next/link';
 import { ArrowRight, Clock3, ShoppingBag } from 'lucide-react';
@@ -9,6 +9,7 @@ import type { WeeklyDeal } from '@/lib/types';
 import { useCartStore, type VariantModalProduct } from '@/lib/cartStore';
 import { getPakistanDay } from '@/lib/dealPricing';
 import { weeklyCartPrice } from '@/lib/weeklyCartPrice';
+import { getVerifiedDealProduct } from '@/lib/verifiedDealProduct';
 
 type DealProduct = VariantModalProduct & {
   stock?: number;
@@ -49,6 +50,7 @@ function getProductImage(product: any): string {
 export default function WeeklyDealStrip() {
   const [deals, setDeals] = useState<WeeklyDeal[]>([]);
   const [loadingDealId, setLoadingDealId] = useState<string | null>(null);
+  const [dealError, setDealError] = useState('');
   const today = getToday();
   const addItem = useCartStore((state) => state.addItem);
   const openVariantModal = useCartStore((state) => state.openVariantModal);
@@ -78,37 +80,24 @@ export default function WeeklyDealStrip() {
 
     setLoadingDealId(deal.id || targetId);
     try {
-      const snap = await getDoc(doc(db, 'products', targetId));
-      const fullProduct = snap.exists() ? { id: snap.id, ...snap.data() } : deal;
-      const product = fullProduct as DealProduct;
+      setDealError('');
+      const product = await getVerifiedDealProduct(targetId);
       const image = getProductImage(product);
       const { price: effectivePrice, comparison, live: isLiveToday } = weeklyCartPrice(deal, product);
-      const productWithDealPrice: DealProduct = {
-        ...product,
+      if (effectivePrice <= 0) throw new Error('Deal price is unavailable.');
+      const productWithDealPrice = { ...product,
         price: effectivePrice,
-        dealPrice: effectivePrice,
         dealDay: isLiveToday ? deal.day : undefined,
-        originalPrice: comparison,
-        image,
-        imageUrl: image,
-      };
-
-      if (hasVariants(productWithDealPrice) && typeof openVariantModal === 'function') {
-        openVariantModal(productWithDealPrice, 'cart');
-        return;
-      }
-
+        originalPrice: comparison, image, imageUrl: image };
+      if (openVariantModal(productWithDealPrice, 'cart')) return;
       addItem({
-        id: productWithDealPrice.id,
-        name: productWithDealPrice.title || productWithDealPrice.name || deal.title || 'PrimeHub Deal',
-        price: effectivePrice,
-        originalPrice: comparison,
-        image,
-        imageUrl: image,
-        dealDay: isLiveToday ? deal.day : undefined,
+        id: product.id, productId: product.id,
+        name: String(product.title || product.name || deal.title || 'PrimeHub Deal'),
+        price: effectivePrice, originalPrice: comparison,
+        image, imageUrl: image, dealDay: isLiveToday ? deal.day : undefined,
       });
     } catch (error) {
-      console.error('Error fetching deal product variants:', error);
+      setDealError(error instanceof Error ? error.message : 'Could not verify product options.');
     } finally {
       setLoadingDealId(null);
     }
