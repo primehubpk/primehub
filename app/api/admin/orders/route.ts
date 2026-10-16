@@ -505,6 +505,11 @@ export async function POST(request: Request) {
     }
 
     if (action === 'delete') {
+      // Preserve an immutable audit trail for every paid cashback or cash voucher.
+      const paidReward = await db.collection('reseller_rewards').doc(orderId).get();
+      if (paidReward.exists) {
+        return NextResponse.json({ error: 'Orders with delivered cashback cannot be deleted. Contact financial support for a reviewed adjustment.' }, { status: 409 });
+      }
       const walletSpend = await db.collection('reseller_wallet_spends').doc(orderId).get();
       if (walletSpend.exists) {
         if (!authorizedWalletAdmin(request)) return NextResponse.json({ error: 'Wallet admin login required.' }, { status: 401 });
