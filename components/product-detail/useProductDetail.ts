@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { normalizeProductVariants, useCartStore } from '@/lib/cartStore';
 import { useSettings } from '@/lib/useSettings';
@@ -9,7 +9,7 @@ import { navigateFromProductOverlay } from '@/lib/productOverlay';
 import { normalizeImageUrl } from '@/lib/imageUrl';
 import { rememberProduct } from '@/lib/recentlyViewedHistory';
 import { makeTikTokContent, trackTikTokEvent } from '@/lib/tiktokPixel';
-import type { ProductVariantSelection, WeeklyDeal } from '@/lib/types';
+import type { MarkedProductImage, ProductVariantSelection, WeeklyDeal } from '@/lib/types';
 import { dealDiscount, imagesOf, originalPriceOf, regularPriceOf, titleOf, type Product, type ProductDetailModel, money } from './ProductDetailTypes';
 
 type IdleWindow = Window & {
@@ -99,6 +99,11 @@ export function useProductDetail(options?: {
   const [variantModalOpen, setVariantModalOpen] = useState(false);
   const [variantMode, setVariantMode] = useState<'cart' | 'buy'>('cart');
   const [variantSelection, setVariantSelection] = useState<ProductVariantSelection | undefined>();
+  const [variantCheckLoading, setVariantCheckLoading] = useState(false);
+  const [variantCheckError, setVariantCheckError] = useState('');
+  const [pendingVerifiedAction, setPendingVerifiedAction] = useState<'cart' | 'buy' | null>(null);
+  const verifyingOptions = useRef(false);
+  const verifiedProductId = useRef('');
 
   useEffect(() => {
     const timer = window.setInterval(() => setNowTick(Date.now()), 1000);
@@ -280,7 +285,7 @@ export function useProductDetail(options?: {
     : '—';
   const hasVariants = normalizedVariants.hasVariants;
 
-  const addResolved = (selection: ProductVariantSelection | undefined, qty: number) => {
+  const addResolved = (selection: ProductVariantSelection | undefined, qty: number, markedImages: MarkedProductImage[] = []) => {
     if (!product || currentPrice <= 0 || stock === 0) return;
     const row =
       selection && variantRows.length
@@ -298,7 +303,7 @@ export function useProductDetail(options?: {
         : liveDeal
           ? currentPrice
           : Number(row?.price ?? currentPrice) || currentPrice;
-    const image = String(row?.imageUrl || images[0] || product.imageUrl || product.image || '');
+    const image = String(markedImages[0]?.markedUrl || row?.imageUrl || images[0] || product.imageUrl || product.image || '');
     const cartItem = {
       id:
         selection && Object.values(selection).some(Boolean)
@@ -317,6 +322,7 @@ export function useProductDetail(options?: {
       imageUrl: image,
       dealDay: !activeAdminDeal && liveDeal && currentDeal ? currentDeal.day : undefined,
       variant: selection,
+      markedImages,
     };
     const addedQuantity = Math.min(qty, selectedStock);
     for (let index = 0; index < addedQuantity; index += 1) addItem(cartItem);
@@ -337,42 +343,76 @@ export function useProductDetail(options?: {
     window.setTimeout(() => setAdded(false), 1200);
   };
 
-  const addProduct = () => {
+  const completeAction = (mode: 'cart' | 'buy') => {
     if (hasVariants) {
-      setVariantMode('cart');
+      setVariantMode(mode);
       setVariantModalOpen(true);
       return;
     }
     addResolved(undefined, quantity);
+    if (mode === 'buy' && !navigateFromProductOverlay('/checkout')) router.push('/checkout');
   };
 
-  const orderNow = () => {
-    if (hasVariants) {
-      setVariantMode('buy');
+  // Catalog/Home navigation seeds intentionally omit large variant matrices to
+  // reduce payload. Never treat "no rows in a compact seed" as "no variants".
+  // Only uncertain Add/Buy clicks ask for the fresh single product; no polling.
+  const requestVerifiedAction = async (mode: 'cart' | 'buy') => {
+    if (!product || currentPrice <= 0 || stock === 0 || verifyingOptions.current) return;
+    setVariantCheckError('');
+    if (hasVariants || verifiedProductId.current === id) {
+      completeAction(mode);
+      return;
+    }
+    verifyingOptions.current = true;
+    setVariantCheckLoading(true);
+    try {
+      const response = await fetch(`/api/storefront/read?type=product&id=${encodeURIComponent(id)}`, { cache: 'no-store' });
+      if (!response.ok) throw new Error('Could not verify available product options.');
+      const data = await response.json();
+      const fresh = data?.product && String(data.product.id) === id ? data.product as Product : null;
+      if (!fresh) throw new Error('Product options are temporarily unavailable.');
+      const rawRows = [
+        ...(Array.isArray(fresh.variantMatrix) ? fresh.variantMatrix : []),
+        ...(Array.isArray(fresh.variants) ? fresh.variants : []),
+      ];
+      if (rawRows.length && !normalizeProductVariants(fresh).hasVariants) {
+        throw new Error('No available colour or size options for this product.');
+      }
+      verifiedProductId.current = id;
+      setProduct(fresh);
+      cacheProductForNavigation(fresh);
+      setPendingVerifiedAction(mode);
+    } catch (cause) {
+      setVariantCheckError(cause instanceof Error ? cause.message : 'Please retry checking product options.');
+    } finally {
+      verifyingOptions.current = false;
+      setVariantCheckLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!pendingVerifiedAction || verifiedProductId.current !== id || !product) return;
+    const mode = pendingVerifiedAction;
+    setPendingVerifiedAction(null);
+    if (normalizedVariants.hasVariants) {
+      setVariantMode(mode);
       setVariantModalOpen(true);
-      return;
+    } else {
+      addResolved(undefined, quantity);
+      if (mode === 'buy' && !navigateFromProductOverlay('/checkout')) router.push('/checkout');
     }
-    if (!product || currentPrice <= 0 || stock === 0) return;
-    addResolved(undefined, quantity);
-    if (!navigateFromProductOverlay('/checkout')) router.push('/checkout');
-  };
+  }, [pendingVerifiedAction, product, id]);
 
-  const openVariantSelector = (mode: 'cart' | 'buy') => {
-    if (!hasVariants) {
-      if (mode === 'buy') orderNow();
-      else addProduct();
-      return;
-    }
-    setVariantMode(mode);
-    setVariantModalOpen(true);
-  };
+  const addProduct = () => { void requestVerifiedAction('cart'); };
+  const orderNow = () => { void requestVerifiedAction('buy'); };
+  const openVariantSelector = (mode: 'cart' | 'buy') => { void requestVerifiedAction(mode); };
 
   const closeVariantSelector = () => setVariantModalOpen(false);
 
-  const confirmVariant = (selection: ProductVariantSelection, qty: number) => {
+  const confirmVariant = (selection: ProductVariantSelection, qty: number, markedImages: MarkedProductImage[] = []) => {
     setVariantSelection(selection);
     setVariantModalOpen(false);
-    addResolved(selection, qty);
+    addResolved(selection, qty, markedImages);
     if (variantMode === 'buy' && !navigateFromProductOverlay('/checkout')) router.push('/checkout');
   };
 
@@ -437,6 +477,8 @@ export function useProductDetail(options?: {
     variantModalOpen,
     variantMode,
     variantSelection,
+    variantCheckLoading,
+    variantCheckError,
     setActiveImage,
     setQuantity,
     setWished,
