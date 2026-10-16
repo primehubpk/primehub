@@ -1,16 +1,19 @@
 'use client';
 
-import type { MouseEvent } from 'react';
+import { useState, type MouseEvent } from 'react';
 import Link from 'next/link';
 import { ShoppingBag } from 'lucide-react';
 import type { DealCardProps } from './DealsTypes';
 import { imageOf, regularPriceOf, statusLabel, statusStyles } from './DealsTypes';
 import { useCartStore } from '@/lib/cartStore';
 import { weeklyCartPrice } from '@/lib/weeklyCartPrice';
+import { getVerifiedDealProduct } from '@/lib/verifiedDealProduct';
 
 export default function DealCard({ deal, label, status, product, adding }: DealCardProps) {
   const addItem = useCartStore((state) => state.addItem);
   const openVariantModal = useCartStore((state) => state.openVariantModal);
+  const [verifying, setVerifying] = useState(false);
+  const [actionError, setActionError] = useState('');
 
   const regularPrice = regularPriceOf(product, deal);
   const dealPrice = Number(deal.dealPrice || 0);
@@ -21,41 +24,27 @@ export default function DealCard({ deal, label, status, product, adding }: DealC
   const canBuy = Boolean(product && stock > 0 && regularPrice > 0);
   const productHref = `/deals/${deal.day}`;
 
-  function handleAddToCart(event: MouseEvent<HTMLButtonElement>) {
+  async function handleAddToCart(event: MouseEvent<HTMLButtonElement>) {
     event.preventDefault();
     event.stopPropagation();
-
-    if (!product) return;
-
-    const hasVariants = Boolean(
-      (product.variants && product.variants.length > 0) ||
-      (product.variantOptions && product.variantOptions.length > 0) ||
-      (Array.isArray(product.options) && product.options.length > 0) ||
-      product.hasVariants,
-    );
-
-    if (hasVariants && typeof openVariantModal === 'function') {
-      const modalProduct = {
-        ...product,
-        price: livePrice,
-        dealPrice: livePrice,
-        dealDay: live ? deal.day : undefined,
-        originalPrice: comparison,
-        image,
-        imageUrl: image,
-      };
-      if (openVariantModal(modalProduct, 'cart')) return;
-    }
-
-    addItem({
-      id: product.id,
-      name: title,
-      price: livePrice,
-      originalPrice: comparison,
-      image,
-      imageUrl: image,
-      dealDay: live ? deal.day : undefined,
-    });
+    if (verifying || !deal.productId) return;
+    setVerifying(true);
+    setActionError('');
+    try {
+      const fresh = await getVerifiedDealProduct(deal.productId);
+      const { price, comparison: correctComparison, live: active } = weeklyCartPrice(deal, fresh);
+      if (price <= 0) throw new Error('Deal price is not available.');
+      const picture = imageOf(fresh as typeof product, deal);
+      const priced = { ...fresh, price, originalPrice: correctComparison,
+        image: picture, imageUrl: picture, ...(active ? { dealDay: deal.day } : {}) };
+      if (openVariantModal(priced, 'cart')) return;
+      addItem({ id: fresh.id, productId: fresh.id,
+        name: String(fresh.title || fresh.name || deal.title || `${label} Deal`),
+        price, originalPrice: correctComparison, image: picture,
+        imageUrl: picture, dealDay: active ? deal.day : undefined });
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : 'Could not check product options.');
+    } finally { setVerifying(false); }
   }
 
   return (
@@ -96,15 +85,16 @@ export default function DealCard({ deal, label, status, product, adding }: DealC
         </div>
       </Link>
 
+      {actionError && <p role="alert" className="mx-4 rounded-lg bg-red-50 p-2 text-xs font-bold text-red-700">{actionError}</p>}
       <div className="mt-4 flex gap-2 px-4 pb-4">
         <button
           type="button"
-          disabled={!canBuy || adding}
+          disabled={!deal.productId || livePrice <= 0 || verifying || adding}
           onClick={handleAddToCart}
           className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-[#14140F] px-3 py-3 text-[10px] font-black text-white disabled:cursor-not-allowed disabled:opacity-35"
         >
           <ShoppingBag size={14} />
-          {adding ? 'ADDED' : status === 'live' ? 'ADD TO CART' : 'SHOP NOW'}
+          {verifying ? 'CHECKING OPTIONS…' : adding ? 'ADDED' : status === 'live' ? 'ADD TO CART' : 'SHOP NOW'}
         </button>
         <Link href={`/deals/${deal.day}`} className="inline-flex items-center justify-center rounded-xl border border-black/10 px-3 py-3 text-[10px] font-black">
           VIEW

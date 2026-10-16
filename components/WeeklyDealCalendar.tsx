@@ -6,6 +6,8 @@ import Image from 'next/image';
 import { Check, Clock3, LockKeyhole, ShoppingCart } from 'lucide-react';
 import FastProductLink from '@/components/FastProductLink';
 import { useCartStore } from '@/lib/cartStore';
+import { getVerifiedDealProduct } from '@/lib/verifiedDealProduct';
+import { weeklyCartPrice } from '@/lib/weeklyCartPrice';
 import { WEEKDAY_LABELS, countdownParts, dealTiming } from '@/lib/weeklyDealUtils';
 import type { Product, WeeklyDeal } from '@/lib/types';
 
@@ -19,26 +21,34 @@ export default function WeeklyDealCalendar({ weeklyDeals, weeklyProducts, nowTic
   const addItem = useCartStore((state) => state.addItem);
   const openVariantModal = useCartStore((state) => state.openVariantModal);
   const [addedId, setAddedId] = useState<string | null>(null);
-  const addDeal = (deal: WeeklyDeal) => {
-    const item = weeklyProducts[deal.productId];
-    const dealPrice = Number(deal.dealPrice || 0);
-    const stock = item?.stock ?? 10;
-    if (!item || dealPrice <= 0 || stock <= 0) return;
-    const normalPrice = Number(item.price || deal.originalPrice || 0);
-    const itemTiming = nowTick !== null ? dealTiming(deal.day, new Date(nowTick)) : null;
-    const itemLive = Boolean(itemTiming?.isLive);
-    const price = itemLive ? dealPrice : normalPrice;
-    if (price <= 0) return;
-    const image = getDealImageUrl({ product: item, ...deal });
-    const productForCart = { ...item, price, originalPrice: normalPrice, image, imageUrl: image };
-    if (openVariantModal(productForCart, 'cart')) return;
-    addItem({ id: item.id, name: item.title || (item as any).name || deal.title, price, originalPrice: normalPrice, image, imageUrl: image, dealDay: itemLive ? deal.day : undefined });
-    setAddedId(deal.id);
-    window.setTimeout(() => setAddedId(null), 1200);
+  const [checkingId, setCheckingId] = useState('');
+  const [dealError, setDealError] = useState('');
+  const addDeal = async (deal: WeeklyDeal) => {
+    if (checkingId || !deal.productId) return;
+    setCheckingId(deal.id);
+    setDealError('');
+    try {
+      const item = await getVerifiedDealProduct(deal.productId);
+      const { price, comparison, live: itemLive } = weeklyCartPrice(deal, item);
+      if (price <= 0) throw new Error('Deal price is unavailable.');
+      const image = getDealImageUrl({ product: item, ...deal });
+      const priced = { ...item, price, originalPrice: comparison, image, imageUrl: image,
+        ...(itemLive ? { dealDay: deal.day } : {}) };
+      if (openVariantModal(priced, 'cart')) return;
+      addItem({ id: item.id, productId: item.id,
+        name: String(item.title || item.name || deal.title),
+        price, originalPrice: comparison, image, imageUrl: image,
+        dealDay: itemLive ? deal.day : undefined });
+      setAddedId(deal.id);
+      window.setTimeout(() => setAddedId(null), 1200);
+    } catch (error) {
+      setDealError(error instanceof Error ? error.message : 'Could not verify deal options.');
+    } finally { setCheckingId(''); }
   };
 
   return (
     <section className="mx-auto mt-8 max-w-6xl px-3 md:px-5">
+      {dealError && <p role="alert" className="mb-3 rounded-xl bg-red-50 p-3 text-xs font-bold text-red-700">{dealError}</p>}
       <div className="rounded-[30px] border border-black/7 bg-white p-4 shadow-sm sm:p-5">
         <div className="flex items-end justify-between gap-3">
           <div><p className="text-[9px] font-black uppercase tracking-[0.22em] text-[#E1352B]">Weekly Deal Calendar</p><h2 className="mt-1 text-2xl font-black">🔥 Explore All Weekly Deals</h2><p className="mt-1 text-[10px] font-bold text-black/40">All seven days, one premium deal destination.</p></div>
@@ -67,7 +77,7 @@ export default function WeeklyDealCalendar({ weeklyDeals, weeklyProducts, nowTic
                 <FastProductLink productId={deal.productId} product={item} className="block">
                   <div className="p-3"><p className="text-[8px] font-black uppercase tracking-[0.16em] text-[#0F6A5F]">{WEEKDAY_LABELS[deal.day]} Deal</p><h3 className="mt-1 line-clamp-2 min-h-[36px] text-sm font-black">{item?.title || (item as any)?.name || deal.title}</h3><div className="mt-2 flex flex-wrap items-baseline gap-2"><span className="font-[family-name:var(--font-mono)] text-base font-black text-[#E1352B]">{money(dealP)}</span>{normal > dealP && <span className="text-[9px] font-bold text-black/35 line-through">{money(normal)}</span>}</div>{itemSave > 0 && <p className="mt-1 text-[8px] font-black text-[#0F6A5F]">SAVE {itemSave}% • {money(normal - dealP)} off</p>}<div className="mt-2 flex items-center gap-1 text-[8px] font-bold text-black/40">{itemLive ? <Clock3 size={10} /> : <LockKeyhole size={10} />}{itemLive ? `Ends in ${itemCountdown ? `${itemCountdown.hours.toString().padStart(2, '0')}:${itemCountdown.minutes.toString().padStart(2, '0')}:${itemCountdown.seconds.toString().padStart(2, '0')}` : '—'}` : `Unlocks ${WEEKDAY_LABELS[deal.day]}`}</div></div>
                 </FastProductLink>
-                <button type="button" onClick={(event) => { event.stopPropagation(); addDeal(deal); }} disabled={!canAdd} className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-[#14140F] px-3 py-3 text-[9px] font-black text-white transition hover:bg-[#0F6A5F] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40" aria-label={canAdd ? `Add ${deal.title} to cart` : 'Deal out of stock'}>{addedId === deal.id ? <Check size={13} /> : <ShoppingCart size={13} />}{addedId === deal.id ? 'ADDED' : stock <= 0 ? 'OUT OF STOCK' : '🛒 ADD TO CART'}</button>
+                <button type="button" onClick={(event) => { event.stopPropagation(); addDeal(deal); }} disabled={!deal.productId || dealP <= 0 || checkingId === deal.id} className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-[#14140F] px-3 py-3 text-[9px] font-black text-white transition hover:bg-[#0F6A5F] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40" aria-label={canAdd ? `Add ${deal.title} to cart` : 'Deal out of stock'}>{addedId === deal.id ? <Check size={13} /> : <ShoppingCart size={13} />}{addedId === deal.id ? 'ADDED' : stock <= 0 ? 'OUT OF STOCK' : '🛒 ADD TO CART'}</button>
               </div>
             );
           })}

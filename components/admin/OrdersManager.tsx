@@ -294,7 +294,7 @@ async function adminOrderAction(action: 'status' | 'delete', orderId: string, st
   if (!response.ok || result?.success !== true) {
     throw new Error(result?.error || 'Order action failed.');
   }
-  return result as { success: true; mirrorWarning?: string };
+  return result as { success: true; mirrorWarning?: string; cashback?: number; voucherCash?: number; alreadyCredited?: boolean };
 }
 
 export default function OrdersManager() {
@@ -414,7 +414,7 @@ export default function OrdersManager() {
     try {
       const result = await adminOrderAction('status', orderId, status);
       setOrders((current) => current.map((order) => (order.id === orderId ? { ...order, status } : order)));
-      setActionMessage({ kind: 'success', text: `Order #${orderId.slice(-6)} status updated to ${status}.` });
+      setActionMessage({ kind: 'success', text: `Order #${orderId.slice(-6)} status updated to ${status}.` + (status === 'delivered' && result.cashback !== undefined ? ` Cashback Rs. ${result.cashback}, cash voucher Rs. ${result.voucherCash || 0} recorded once.` : '') });
       if (result.mirrorWarning) setLoadWarning('Order saved in Supabase. Firebase mirror is temporarily unavailable.');
     } catch (error) {
       setActionMessage({ kind: 'error', text: error instanceof Error ? error.message : 'Status update failed.' });
@@ -768,16 +768,11 @@ export default function OrdersManager() {
                       <span className="mb-1.5 block text-[9px] font-black uppercase tracking-[0.14em] text-black/35">Reseller</span>
                       {row.resellerUserId ? (
                         row.resellerRewardStatus === 'credited' ? (
-                          <div className="flex min-h-[42px] items-center rounded-xl bg-[#DDF5F0] px-3 text-[10px] font-black text-[#0F6A5F]">Reward credited</div>
+                          <div className="flex min-h-[42px] items-center rounded-xl bg-[#DDF5F0] px-3 text-[10px] font-black text-[#0F6A5F]">Cashback credited on delivery</div>
                         ) : (
-                          <button
-                            type="button"
-                            disabled={Boolean(rewardingOrderId) || deletingOrderId === order.id}
-                            onClick={() => void approveReward(order)}
-                            className="flex min-h-[42px] w-full items-center justify-center gap-1.5 rounded-xl bg-[#0F6A5F] px-3 text-[10px] font-black text-white disabled:opacity-50"
-                          >
-                            <CheckCircle2 size={14} /> {rewardingOrderId === order.id ? 'Please wait…' : 'Confirm + Reward'}
-                          </button>
+                          <div className="flex min-h-[42px] items-center rounded-xl bg-[#F4F4F1] px-3 text-[10px] font-black text-black/60">
+                            {status === 'delivered' ? 'Legacy order / cashback pending review' : 'Cashback only after Delivered'}
+                          </div>
                         )
                       ) : (
                         <div className="flex min-h-[42px] items-center rounded-xl bg-[#F4F4F1] px-3 text-[10px] font-bold text-black/35">Regular customer</div>

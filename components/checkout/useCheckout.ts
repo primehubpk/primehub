@@ -2,6 +2,7 @@
 import { fetchPublicStorefront } from '@/lib/storefrontClient';
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { BASE_DELIVERY_CHARGE } from '@/lib/deliveryCharges';
+import { readCheckoutPreferences, clearCheckoutPreferences } from '@/lib/checkoutPreferences';
 import { auth } from '@/lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { useCartStore } from '@/lib/cartStore';
@@ -29,8 +30,8 @@ function tikTokContents(rows: any[], fallbackRows: any[] = rows) {
     .filter(Boolean);
 }
 async function authHeader(): Promise<Record<string, string>> { const user = auth.currentUser; if (!user) return {}; try { return { Authorization: `Bearer ${await user.getIdToken()}` }; } catch { return {}; } }
-export async function getAuthoritativeQuote(items: any[], selfCollect = false, useShoppingCredit = false) {
-  const response = await fetch('/api/orders', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(await authHeader()) }, body: JSON.stringify({ mode: 'quote', items, selfCollect, useShoppingCredit }) });
+export async function getAuthoritativeQuote(items: any[], selfCollect = false, useShoppingCredit = false, voucherCode = '') {
+  const response = await fetch('/api/orders', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(await authHeader()) }, body: JSON.stringify({ mode: 'quote', items, selfCollect, useShoppingCredit, voucherCode }) });
   const data = await response.json();
   if (!response.ok) throw new Error(data.error || 'Unable to verify current prices.');
   return data;
@@ -58,8 +59,28 @@ export function useCheckout() {
   const [walletShoppingBalance, setWalletShoppingBalance] = useState(0);
   const [walletBalanceStatus, setWalletBalanceStatus] = useState<'loading' | 'ready' | 'unavailable'>('loading');
   const walletRequestId = useRef('');
+  const [voucherInput, setVoucherInput] = useState('');
+  const [voucherCode, setVoucherCode] = useState('');
+  const [voucherError, setVoucherError] = useState('');
+  const [voucherDiscount, setVoucherDiscount] = useState(0);
+  const [voucherCashAmount, setVoucherCashAmount] = useState(0);
+  const [eligibleAfterVoucher, setEligibleAfterVoucher] = useState(0);
+  const [cashbackPercent, setCashbackPercent] = useState(0);
+  const [cashbackEstimate, setCashbackEstimate] = useState(0);
+  const [quoteReady, setQuoteReady] = useState(false);
+  const [quoteNonce, setQuoteNonce] = useState(0);
+  const [serverTotal, setServerTotal] = useState<number | null>(null);
+  const [serverSubtotal, setServerSubtotal] = useState<number | null>(null);
   const whatsappRequestId = useRef('');
   const [selfCollect, setSelfCollect] = useState(false);
+  const [preferencesReady, setPreferencesReady] = useState(false);
+  useEffect(() => {
+    const values = readCheckoutPreferences();
+    setSelfCollect(values.selfCollect);
+    setVoucherCode(values.voucherCode);
+    setVoucherInput(values.voucherCode);
+    setPreferencesReady(true);
+  }, []);
   const [wholesaleItems, setWholesaleItems] = useState(0);
   const [tierDiscount, setTierDiscount] = useState(0), [tierDiscountPercent, setTierDiscountPercent] = useState(0), [resellerTier, setResellerTier] = useState('');
   const checkoutTracked = useRef(false);
@@ -111,15 +132,15 @@ export function useCheckout() {
 
   const totalItems = useMemo(() => items.reduce((sum: number, item: any) => sum + Number(item.quantity || item.qty || 1), 0), [items]);
   const subtotal = useMemo(() => items.reduce((sum: number, item: any) => sum + priceOf(item) * Number(item.quantity || item.qty || 1), 0), [items]);
-  const discountedSubtotal = Math.max(0, subtotal - tierDiscount);
-  const total = discountedSubtotal + deliveryCharge;
+  const discountedSubtotal = serverSubtotal ?? Math.max(0, subtotal - voucherDiscount);
+  const total = serverTotal ?? discountedSubtotal + deliveryCharge;
   // One wallet read per signed-in checkout, not one read per cart/price change.
   // Server recalculates and debits the real balances atomically at order placement.
   const useShoppingCredit = walletBalanceStatus === 'ready' && walletShoppingBalance > 0;
-  const walletShoppingApplied = useShoppingCredit ? Math.min(walletShoppingBalance, total) : 0;
+  const walletShoppingApplied = useShoppingCredit ? Math.min(walletShoppingBalance, eligibleAfterVoucher) : 0;
   const amountDue = Math.max(0, total - walletShoppingApplied);
   const walletCheckoutReady = checkoutAuthReady &&
-    (!checkoutAuthUid || walletBalanceStatus === 'ready');
+    (!checkoutAuthUid || walletBalanceStatus === 'ready') && preferencesReady && quoteReady && !voucherError;
   useEffect(() => {
     if (checkoutTracked.current || !items.length || subtotal <= 0) return;
     const contents = tikTokContents(items);
@@ -132,14 +153,44 @@ export function useCheckout() {
     checkoutTracked.current = true;
   }, [items, subtotal]);
   useEffect(() => {
-    if (!checkoutAuthReady) return; // avoid duplicate Supabase price quotes before Firebase resolves login
-    if (!items.length) { setDeliveryCharge(BASE_DELIVERY_CHARGE); setWholesaleItems(0); setRewardLabel(''); return; }
+    if (!checkoutAuthReady || !preferencesReady) return; // wait for login and cart-selected pickup/voucher
+    if (!items.length) { setDeliveryCharge(BASE_DELIVERY_CHARGE); setWholesaleItems(0); setRewardLabel(''); setQuoteReady(false); return; }
     let cancelled = false;
-    getAuthoritativeQuote(items, selfCollect).then(quote => { if (!cancelled) { setDeliveryCharge(Number(quote.deliveryCharge ?? BASE_DELIVERY_CHARGE)); setWholesaleItems(Number(quote.wholesaleItems || 0)); setTierDiscount(Number(quote.tierDiscount || 0)); setTierDiscountPercent(Number(quote.tierDiscountPercent || 0)); setResellerTier(String(quote.resellerTier || '')); setRewardLabel(String(quote.rewardLabel || '')); } }).catch(() => undefined);
+    setQuoteReady(false);
+    setVoucherError('');
+    getAuthoritativeQuote(items, selfCollect, false, voucherCode).then(quote => {
+      if (cancelled) return;
+      setDeliveryCharge(Number(quote.deliveryCharge ?? BASE_DELIVERY_CHARGE));
+      setWholesaleItems(Number(quote.wholesaleItems || 0));
+      setTierDiscount(0); setTierDiscountPercent(0);
+      setResellerTier(String(quote.resellerTier || ''));
+      setRewardLabel(String(quote.rewardLabel || ''));
+      setVoucherDiscount(Number(quote.voucherDiscount || 0));
+      setVoucherCashAmount(Number(quote.voucherCashAmount || 0));
+      setEligibleAfterVoucher(Number(quote.eligibleAfterVoucher || 0));
+      setCashbackPercent(Number(quote.cashbackPercent || 0));
+      setCashbackEstimate(Number(quote.cashbackEstimate || 0));
+      setServerTotal(Number(quote.total));
+      setServerSubtotal(Number(quote.subtotal));
+      setQuoteReady(true);
+    }).catch(error => {
+      if (!cancelled) {
+        setVoucherError(error instanceof Error ? error.message : 'Could not verify checkout prices.');
+        setQuoteReady(false);
+      }
+    });
     return () => { cancelled = true; };
-  }, [items, selfCollect, checkoutAuthUid, checkoutAuthReady]);
+  }, [items, selfCollect, checkoutAuthUid, checkoutAuthReady, preferencesReady, voucherCode, quoteNonce]);
   const update = (key: keyof Customer, value: string) => setCustomer(previous => ({ ...previous, [key]: value }));
-  const placeOrder = async (event: FormEvent) => { event.preventDefault(); setError(''); if (!walletCheckoutReady) return setError(walletBalanceStatus === 'unavailable' ? 'Your wallet balance could not be verified. Please refresh this page before ordering so all available cash can be applied.' : 'Checking wallet balance. Please wait a moment.'); if (!items.length) return setError('Your cart is empty. Please add a product first.'); if (!customer.name.trim() || !customer.phone.trim() || (!selfCollect && (!customer.address.trim() || !customer.city.trim()))) return setError(selfCollect ? 'Please fill your name and phone.' : 'Please fill your name, phone, address and city.'); setPlacing(true); try { const response = await fetch('/api/orders', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(await authHeader()) }, body: JSON.stringify({ customer, items, selfCollect, guestId: guestId(), useShoppingCredit, ...(useShoppingCredit ? { orderRequestId: (walletRequestId.current ||= crypto.randomUUID()) } : {}) }) }); const data = await response.json(); if (!response.ok) throw new Error(data.error || 'Order save nahi ho saka.'); const productIds = Array.isArray(data.items) ? data.items.map((item: any) => String(item.productId || item.id || '')).filter(Boolean) : items.map((item: any) => String(item.productId || item.id || '')).filter(Boolean); const completedItems = Array.isArray(data.items) && data.items.length ? data.items : items; const completedContents = tikTokContents(completedItems, items); if (completedContents.length) { trackTikTokEvent('PlaceAnOrder', { contents: completedContents as any, value: Number(data.total ?? total), currency: 'PKR' }, { eventId: `order_${data.orderId}` }); } setReviewProductIds(productIds); rememberReviewOrder(data.orderId, productIds); rememberOrderProgress(data.orderId, Number(data.wholesaleItems || wholesaleItems || 0)); setWalletPaidReceipt(Number(data.walletShoppingApplied || 0)); setAmountDueReceipt(Number(data.amountDue ?? data.total ?? 0)); setOrderId(data.orderId); walletRequestId.current = ''; try { window.PrimeHubNative?.postMessage(JSON.stringify({ action: 'purchase', orderId: data.orderId })); } catch {} clearCart(); } catch (caught) { console.error(caught); setError(caught instanceof Error ? caught.message : 'Order save nahi ho saka. Please try again.'); } finally { setPlacing(false); } };
+  const applyVoucher = () => {
+    const next = voucherInput.trim().toUpperCase();
+    setQuoteReady(false);
+    setVoucherError('');
+    setVoucherCode(next);
+    setQuoteNonce(value => value + 1);
+    // Code is now always revalidated by the server before Place Order.
+  };
+  const placeOrder = async (event: FormEvent) => { event.preventDefault(); setError(''); if (!walletCheckoutReady) return setError(walletBalanceStatus === 'unavailable' ? 'Your wallet balance could not be verified. Please refresh this page before ordering so all available cash can be applied.' : 'Checking wallet balance. Please wait a moment.'); if (!items.length) return setError('Your cart is empty. Please add a product first.'); if (!customer.name.trim() || !customer.phone.trim() || (!selfCollect && (!customer.address.trim() || !customer.city.trim()))) return setError(selfCollect ? 'Please fill your name and phone.' : 'Please fill your name, phone, address and city.'); setPlacing(true); try { const response = await fetch('/api/orders', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(await authHeader()) }, body: JSON.stringify({ customer, items, selfCollect, guestId: guestId(), voucherCode, useShoppingCredit, ...(useShoppingCredit ? { orderRequestId: (walletRequestId.current ||= crypto.randomUUID()) } : {}) }) }); const data = await response.json(); if (!response.ok) throw new Error(data.error || 'Order save nahi ho saka.'); const productIds = Array.isArray(data.items) ? data.items.map((item: any) => String(item.productId || item.id || '')).filter(Boolean) : items.map((item: any) => String(item.productId || item.id || '')).filter(Boolean); const completedItems = Array.isArray(data.items) && data.items.length ? data.items : items; const completedContents = tikTokContents(completedItems, items); if (completedContents.length) { trackTikTokEvent('PlaceAnOrder', { contents: completedContents as any, value: Number(data.total ?? total), currency: 'PKR' }, { eventId: `order_${data.orderId}` }); } setReviewProductIds(productIds); rememberReviewOrder(data.orderId, productIds); rememberOrderProgress(data.orderId, Number(data.wholesaleItems || wholesaleItems || 0)); setWalletPaidReceipt(Number(data.walletShoppingApplied || 0)); setAmountDueReceipt(Number(data.amountDue ?? data.total ?? 0)); setOrderId(data.orderId); walletRequestId.current = ''; try { window.PrimeHubNative?.postMessage(JSON.stringify({ action: 'purchase', orderId: data.orderId })); } catch {} clearCheckoutPreferences(); clearCart(); } catch (caught) { console.error(caught); setError(caught instanceof Error ? caught.message : 'Order save nahi ho saka. Please try again.'); } finally { setPlacing(false); } };
   const whatsappOrder = async () => {
     if (!items.length) return;
     setError('');
@@ -185,5 +236,5 @@ export function useCheckout() {
       setError(caught instanceof Error ? caught.message : 'Could not prepare your WhatsApp order.');
     }
   };
-  return { items, customer, placing, orderId, reviewProductIds, error, walletPaidReceipt, amountDueReceipt, walletShoppingBalance, walletShoppingApplied, useShoppingCredit, walletBalanceStatus, walletCheckoutReady, amountDue, totalItems, subtotal: discountedSubtotal, rawSubtotal: subtotal, tierDiscount, tierDiscountPercent, resellerTier, rewardLabel, deliveryCharge, wholesaleItems, total, selfCollect, setSelfCollect, update, placeOrder, whatsappOrder };
+  return { items, customer, placing, orderId, reviewProductIds, error, walletPaidReceipt, amountDueReceipt, walletShoppingBalance, walletShoppingApplied, useShoppingCredit, walletBalanceStatus, walletCheckoutReady, amountDue, totalItems, subtotal: discountedSubtotal, rawSubtotal: subtotal, tierDiscount, tierDiscountPercent, resellerTier, cashbackPercent, cashbackEstimate, eligibleAfterVoucher, voucherInput, setVoucherInput, voucherCode, voucherError, voucherDiscount, voucherCashAmount, applyVoucher, rewardLabel, deliveryCharge, wholesaleItems, total, selfCollect, setSelfCollect, update, placeOrder, whatsappOrder };
 }

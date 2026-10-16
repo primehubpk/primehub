@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, ShoppingBag, Tag } from 'lucide-react';
 import { useCartStore } from '@/lib/cartStore';
 import { weeklyCartPrice } from '@/lib/weeklyCartPrice';
+import { getVerifiedDealProduct } from '@/lib/verifiedDealProduct';
 import { useSettings } from '@/lib/useSettings';
 import { loadProductsForNavigation } from '@/lib/productNavigationCache';
 import LiveDealCelebration from './LiveDealCelebration';
@@ -74,6 +75,8 @@ export default function DayDealPage({ initialProducts = [] }: { initialProducts?
   const { settings, loading } = useSettings();
   const addItem = useCartStore((state) => state.addItem);
   const openVariantModal = useCartStore((state) => state.openVariantModal);
+  const [actionError, setActionError] = useState('');
+  const [verifyingDealId, setVerifyingDealId] = useState('');
   const today = pakistanWeekday();
   const day = String(params?.day || '').toLowerCase() as Weekday;
   const valid = Boolean(DAYS.find((item) => item.key === day));
@@ -126,16 +129,27 @@ export default function DayDealPage({ initialProducts = [] }: { initialProducts?
   const available = Number(product?.stock ?? 0) > 0;
   const savings = deal ? weeklyCartPrice(deal, product).savings : 0;
 
-  const addToCart = (itemDeal: WeeklyDeal, itemStatus: DealStatus) => {
-    const itemProduct = itemDeal.productId === deal?.productId && product ? product : products[itemDeal.productId];
-    if (!itemProduct || Number(itemProduct.stock ?? 0) <= 0) return;
-    const { price, comparison, live: itemLive } = weeklyCartPrice(itemDeal, itemProduct);
-    if (price <= 0) return;
-    const itemImage = imageOf(itemProduct, itemDeal);
-    if (openVariantModal({ ...itemProduct, price, originalPrice: comparison, image: itemImage, imageUrl: itemImage }, 'cart')) return;
-    addItem({ id: itemProduct.id, name: itemProduct.title || itemDeal.title || `${itemDeal.day} Deal`, price, originalPrice: comparison, image: itemImage || undefined, imageUrl: itemImage || undefined, ...(itemLive ? { dealDay: itemDeal.day } : {}) });
-    setAddingId(itemDeal.id);
-    window.setTimeout(() => setAddingId((current) => current === itemDeal.id ? null : current), 1200);
+  const addToCart = async (itemDeal: WeeklyDeal, _itemStatus: DealStatus) => {
+    if (verifyingDealId || !itemDeal.productId) return;
+    setVerifyingDealId(itemDeal.id);
+    setActionError('');
+    try {
+      const itemProduct = await getVerifiedDealProduct(itemDeal.productId);
+      const { price, comparison, live: itemLive } = weeklyCartPrice(itemDeal, itemProduct);
+      if (price <= 0) throw new Error('Deal price is unavailable.');
+      const itemImage = imageOf(itemProduct as DealProduct, itemDeal);
+      const priced = { ...itemProduct, price, originalPrice: comparison,
+        image: itemImage, imageUrl: itemImage, ...(itemLive ? { dealDay: itemDeal.day } : {}) };
+      if (openVariantModal(priced, 'cart')) return;
+      addItem({ id: itemProduct.id, productId: itemProduct.id,
+        name: String(itemProduct.title || itemDeal.title || `${itemDeal.day} Deal`),
+        price, originalPrice: comparison, image: itemImage || undefined,
+        imageUrl: itemImage || undefined, ...(itemLive ? { dealDay: itemDeal.day } : {}) });
+      setAddingId(itemDeal.id);
+      window.setTimeout(() => setAddingId(current => current === itemDeal.id ? null : current), 1200);
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : 'Could not verify product variants.');
+    } finally { setVerifyingDealId(''); }
   };
 
   if (!valid) return <main className="min-h-screen bg-neutral-50 px-4 py-10 pb-28"><div className="mx-auto max-w-2xl rounded-[30px] bg-white p-10 text-center shadow-sm"><Tag className="mx-auto h-10 w-10 text-black/20" /><h1 className="mt-4 text-2xl font-black">Deal day not found</h1><BackHomeLink className="mt-5 inline-flex rounded-full bg-[#14140F] px-5 py-3 text-xs font-black text-white">Back to Home</BackHomeLink></div></main>;
@@ -143,6 +157,7 @@ export default function DayDealPage({ initialProducts = [] }: { initialProducts?
 
   return <main className={`min-h-screen pb-28 ${live ? 'deal-festival-page' : 'bg-neutral-50'}`}>
     <div className="mx-auto max-w-6xl px-4 py-5 md:px-6 md:py-7">
+      {actionError && <p role="alert" className="mb-3 rounded-xl bg-red-50 px-4 py-3 text-xs font-semibold text-red-700">{actionError}</p>}
       <div className="flex flex-wrap items-center gap-3"><BackHomeLink className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2.5 text-[10px] font-black shadow-sm"><ArrowLeft size={14} /> Back to Home</BackHomeLink><span className="text-[9px] font-black uppercase tracking-[0.22em] text-black/35">Weekly Deal • {label}</span></div>
 
       <header className="mt-5 rounded-[28px] bg-white p-5 shadow-sm md:p-7"><p className="text-[9px] font-black uppercase tracking-[0.25em] text-[#E1352B]">{label} Deal</p><h1 className="mt-1 text-3xl font-black tracking-tight md:text-5xl">{title}</h1><p className="mt-2 max-w-2xl text-sm leading-6 text-black/50">{live ? 'Today’s special offer is live in Pakistan time.' : `This offer is scheduled for ${label}. The special price unlocks on ${label}.`}</p></header>
@@ -160,13 +175,13 @@ export default function DayDealPage({ initialProducts = [] }: { initialProducts?
                 <div className="mt-3 flex flex-wrap items-end gap-3"><span className="text-lg text-black/35 line-through">Rs. {comparisonPrice.toLocaleString()}</span><span className="text-sm font-bold text-[#0F6A5F]">Regular Rs. {regularPrice.toLocaleString()}</span><span className="font-[family-name:var(--font-mono)] text-4xl font-black text-[#E1352B]">Rs. {dealPrice.toLocaleString()}</span></div>
                 {savings > 0 && <div className="mt-3 inline-flex rounded-full bg-emerald-50 px-3 py-1.5 text-[10px] font-black text-emerald-700">YOU SAVE Rs. {savings.toLocaleString()} ({discount}% OFF)</div>}
                 <div className="mt-5 rounded-2xl border border-black/8 bg-neutral-50 px-4 py-3"><p className="text-[9px] font-black uppercase tracking-[0.22em] text-black/40">Deal ends in</p><div className="mt-1 font-[family-name:var(--font-mono)] text-2xl font-black tracking-wide text-[#14140F]">{formatCountdown(countdown)}</div></div>
-                <button type="button" disabled={!product || !available || dealPrice <= 0 || addingId === deal?.id} onClick={() => deal && addToCart(deal, 'live')} className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl bg-[#14140F] px-5 py-4 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-35"><ShoppingBag size={18} /> {addingId === deal?.id ? 'ADDED' : `BUY NOW - Rs. ${dealPrice.toLocaleString()}`}</button>
+                <button type="button" disabled={!deal?.productId || dealPrice <= 0 || verifyingDealId === deal?.id || addingId === deal?.id} onClick={() => deal && addToCart(deal, 'live')} className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl bg-[#14140F] px-5 py-4 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-35"><ShoppingBag size={18} /> {addingId === deal?.id ? 'ADDED' : `BUY NOW - Rs. ${dealPrice.toLocaleString()}`}</button>
               </>
             ) : (
               <>
                 <div className="mt-4 rounded-2xl bg-neutral-50 p-4"><p className="text-sm font-black text-[#14140F]">Upcoming {label} Deal Price: Rs. {dealPrice.toLocaleString()}</p><p className="mt-2 text-xs font-bold text-black/45">⏰ Unlocks in: {formatCountdown(countdown)}</p></div>
                 <div className="mt-4 rounded-2xl bg-white p-1 ring-1 ring-black/5"><div className="flex items-center justify-between px-3 py-2 text-sm"><span className="font-bold text-black/55">Current Storefront Price</span><span className="font-black">Rs. {regularPrice.toLocaleString()}</span></div>{comparisonPrice > regularPrice && <div className="px-3 pb-2 text-right text-xs text-black/35 line-through">Was Rs. {comparisonPrice.toLocaleString()}</div>}</div>
-                <button type="button" disabled={!product || !available || regularPrice <= 0 || addingId === deal?.id} onClick={() => deal && addToCart(deal, status)} className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl bg-[#14140F] px-5 py-4 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-35"><ShoppingBag size={18} /> {addingId === deal?.id ? 'ADDED' : `ADD TO CART (REGULAR PRICE) — Rs. ${regularPrice.toLocaleString()}`}</button>
+                <button type="button" disabled={!deal?.productId || regularPrice <= 0 || verifyingDealId === deal?.id || addingId === deal?.id} onClick={() => deal && addToCart(deal, status)} className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl bg-[#14140F] px-5 py-4 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-35"><ShoppingBag size={18} /> {addingId === deal?.id ? 'ADDED' : `ADD TO CART (REGULAR PRICE) — Rs. ${regularPrice.toLocaleString()}`}</button>
               </>
             )}
           </div>

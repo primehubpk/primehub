@@ -31,7 +31,7 @@ import {
   type ResellerTask,
   type ResellerWheelSettings,
 } from '@/lib/resellerTasks';
-import { getResellerTiers } from '@/lib/resellerTiers';
+import { useSettings } from '@/lib/useSettings';
 import type { ResellerProfile, ResellerTier } from '@/lib/resellerTypes';
 import PremiumSpinWheel from '@/components/rewards/PremiumSpinWheel';
 import { orderPremiumWheelPrizes, rewardWheelPrizeLabel } from '@/components/rewards/RewardWheelArtwork';
@@ -103,6 +103,8 @@ export default function PrimeFamilyDashboard({
   initialSettings?: Record<string, unknown> | null;
 }) {
   const router = useRouter();
+  const { settings: storefrontSettings } = useSettings();
+  const familySettings = storefrontSettings as typeof storefrontSettings & SettingsSnapshot & { youtubeGuideUrl?: string };
   const [memberUser, setMemberUser] = useState<User | null>(() => auth.currentUser);
   const [profile, setProfile] = useState<ResellerProfile | null>(null);
   const seededSettings = (initialSettings || {}) as SettingsSnapshot & { homeRewardSettings?: RewardSettings };
@@ -135,11 +137,18 @@ export default function PrimeFamilyDashboard({
   const [voucherImages, setVoucherImages] = useState<Record<string, string>>(
     () => seededSettings.resellerVoucherImages || {},
   );
-  const [resellerTiers, setResellerTiers] = useState<ResellerTier[]>(
-    () => Array.isArray(seededSettings.resellerTiers) && seededSettings.resellerTiers.length === 4
-      ? seededSettings.resellerTiers
-      : getResellerTiers(),
+  // Never show hardcoded discounts while the real Admin settings are loading.
+  // The Home seed and the standalone dashboard use the same SettingsProvider.
+  const [resellerTiers, setResellerTiers] = useState<ResellerTier[]>(() =>
+    Array.isArray(seededSettings.resellerTiers) && seededSettings.resellerTiers.length === 4
+      ? seededSettings.resellerTiers : [],
   );
+  const [proofTask, setProofTask] = useState<ResellerTask | null>(null);
+  const [proofValue, setProofValue] = useState('');
+  const [proofBusy, setProofBusy] = useState(false);
+  const [taskMessage, setTaskMessage] = useState('');
+  const [submittedTaskIds, setSubmittedTaskIds] = useState<string[]>([]);
+
 
   useEffect(() => {
     const onBonus = (event: Event) => {
@@ -196,43 +205,42 @@ export default function PrimeFamilyDashboard({
     };
   }, []);
 
+  // Single source of truth for both Home and the standalone Prime Family tab.
+  // The global provider already refreshes the tagged Supabase-primary settings.
+  useEffect(() => {
+    if (Array.isArray(familySettings.resellerTasks)) setTasks(familySettings.resellerTasks);
+    if (familySettings.resellerMonthlyChallenge) {
+      setChallenge({ ...DEFAULT_MONTHLY_CHALLENGE, ...familySettings.resellerMonthlyChallenge });
+    }
+    if (familySettings.resellerWheel) setWheel({ ...DEFAULT_RESELLER_WHEEL, ...familySettings.resellerWheel });
+    if (familySettings.resellerVoucherImages) setVoucherImages(familySettings.resellerVoucherImages);
+    if (Array.isArray(familySettings.resellerTiers) && familySettings.resellerTiers.length === 4) {
+      setResellerTiers(familySettings.resellerTiers);
+    }
+  }, [
+    familySettings.resellerTasks,
+    familySettings.resellerMonthlyChallenge,
+    familySettings.resellerWheel,
+    familySettings.resellerVoucherImages,
+    familySettings.resellerTiers,
+  ]);
+
   useEffect(() => {
     let cancelled = false;
-    const hasSeededSettings = Boolean(initialSettings && Object.keys(initialSettings).length);
-
-    Promise.all([
-      hasSeededSettings
-        ? Promise.resolve<Response | null>(null)
-        : fetch('/api/storefront/read?type=settings', { cache: 'no-store' }),
-      fetch('/api/storefront/read?type=rewards', { cache: 'no-store' }),
-    ])
-      .then(async ([settingsResponse, rewardsResponse]) => {
-        const settingsData = settingsResponse?.ok ? await settingsResponse.json() : null;
-        const rewardsData = rewardsResponse.ok ? await rewardsResponse.json() : null;
-        if (cancelled) return;
-
-        const data = (settingsData?.documents?.main || initialSettings || null) as SettingsSnapshot | null;
-        if (Array.isArray(data?.resellerTasks)) setTasks(data.resellerTasks);
-        if (data?.resellerMonthlyChallenge) {
-          setChallenge({ ...DEFAULT_MONTHLY_CHALLENGE, ...data.resellerMonthlyChallenge });
-        }
-        if (data?.resellerWheel) setWheel({ ...DEFAULT_RESELLER_WHEEL, ...data.resellerWheel });
-        if (data?.resellerVoucherImages) setVoucherImages(data.resellerVoucherImages);
-        if (Array.isArray(data?.resellerTiers) && data.resellerTiers.length === 4) setResellerTiers(data.resellerTiers);
-
-        const gifts = (Array.isArray(rewardsData?.gifts) ? rewardsData.gifts : [])
+    fetch('/api/storefront/read?type=rewards')
+      .then(async (response) => response.ok ? response.json() : null)
+      .then((rewardsData) => {
+        if (cancelled || !rewardsData) return;
+        const gifts = (Array.isArray(rewardsData.gifts) ? rewardsData.gifts : [])
           .filter((gift: RewardGift) => gift.active !== false);
         setRewardGifts(gifts);
-        if (rewardsData?.settings) {
+        if (rewardsData.settings) {
           setRewardSettings(current => ({ ...current, ...rewardsData.settings }));
         }
       })
       .catch(() => undefined);
-
-    return () => {
-      cancelled = true;
-    };
-  }, [initialSettings]);
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     const productIds = Array.from(
@@ -292,10 +300,11 @@ export default function PrimeFamilyDashboard({
   const walletShopping = Number(profile?.walletShopping ?? 0);
   const walletSpendable = walletAvailable + walletShopping;
   const sortedTiers = [...resellerTiers].sort((a,b) => a.minMonthlyOrders - b.minMonthlyOrders);
-  const tier = [...sortedTiers].reverse().find(item => monthlyOrders >= item.minMonthlyOrders) || sortedTiers[0];
-  const tierIndex = Math.max(0, sortedTiers.findIndex(item => item.id === tier.id));
-  const nextTier = sortedTiers[tierIndex + 1] || null;
-  const tierProgress = nextTier ? Math.min(100, Math.round(((monthlyOrders-tier.minMonthlyOrders)/Math.max(1,nextTier.minMonthlyOrders-tier.minMonthlyOrders))*100)) : 100;
+  const hasAdminTiers = sortedTiers.length === 4;
+  const tier = [...sortedTiers].reverse().find(item => monthlyOrders >= item.minMonthlyOrders) || sortedTiers[0]!;
+  const tierIndex = tier ? Math.max(0, sortedTiers.findIndex(item => item.id === tier.id)) : 0;
+  const nextTier = tier ? sortedTiers[tierIndex + 1] || null : null;
+  const tierProgress = tier && nextTier ? Math.min(100, Math.round(((monthlyOrders-tier.minMonthlyOrders)/Math.max(1,nextTier.minMonthlyOrders-tier.minMonthlyOrders))*100)) : 100;
   const target = Math.max(1, Number(challenge.targetOrders || DEFAULT_MONTHLY_CHALLENGE.targetOrders));
   const challengePercent = Math.min(100, Math.round((monthlyOrders / target) * 100));
   const remaining = Math.max(0, target - monthlyOrders);
@@ -421,6 +430,77 @@ export default function PrimeFamilyDashboard({
     [challenge.cashReward, challenge.giftTitle, target, voucherImages],
   );
 
+  const taskDestination = (task: ResellerTask): string => {
+    const configured = String(task.url || '').trim();
+    // Admin's YouTube guide is the only existing verified first-party
+    // destination when the social-task URL is not configured separately.
+    const candidate = configured || (task.id === 'youtube' ? String(familySettings.youtubeGuideUrl || '') : '');
+    try {
+      const url = new URL(candidate);
+      if (url.protocol !== 'https:') return '';
+      return url.href;
+    } catch { return ''; }
+  };
+  const openTask = (task: ResellerTask) => {
+    const destination = taskDestination(task);
+    if (!destination) {
+      if (task.id.includes('order')) {
+        router.push('/shop');
+      } else if (task.id === 'refer-reseller') {
+        router.push('/reseller/join');
+      }
+      // A missing Admin URL is not an actionable social destination.
+      // Keep the task visible for proof submission without showing an error banner.
+      return;
+    }
+    // The clickable link opens synchronously from the customer's tap. Logging
+    // an authenticated 'open' event must never block the external platform.
+    if (memberUser) {
+      void memberUser.getIdToken().then(token => fetch('/api/reseller/task-claims', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ taskId: task.id, action: 'open' }),
+      })).catch(() => undefined);
+    }
+  };
+  const submitTaskProof = async () => {
+    if (!proofTask || proofBusy) return;
+    const proof = proofValue.trim();
+    if (!memberUser) {
+      router.push('/reseller/join?redirect=%2Freseller%2Fdashboard%3Ftab%3Dtasks');
+      return;
+    }
+    if (proof.length < 3) {
+      setTaskMessage('Apna username ya profile/proof link likhein.');
+      return;
+    }
+    setProofBusy(true);
+    setTaskMessage('');
+    try {
+      const token = await memberUser.getIdToken();
+      const response = await fetch('/api/reseller/task-claims', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ taskId: proofTask.id, action: 'submit', proof }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Proof submit nahi hua.');
+      setSubmittedTaskIds(current => [...new Set([...current, proofTask.id])]);
+      setTaskMessage('Proof Admin review ke liye submit ho gaya. Points approval ke baad milenge.');
+      setProofTask(null);
+      setProofValue('');
+    } catch (error) {
+      setTaskMessage(error instanceof Error ? error.message : 'Proof submit nahi hua.');
+    } finally { setProofBusy(false); }
+  };
+
+  // Existing /reseller/tasks bookmarks now point to this unified task view.
+  useEffect(() => {
+    if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('tab') === 'tasks') {
+      setView('tasks');
+    }
+  }, []);
+
   const goBackFromFamily = () => {
     // Return to the originating bottom tab when available; direct visits go Home.
     let destination = '/';
@@ -482,12 +562,27 @@ export default function PrimeFamilyDashboard({
           {wheel.active && <RewardWheel settings={wheel} rewardSettings={rewardSettings} wallet={rewardWallet} onWallet={setRewardWallet} />}
           </>}
 
-          {(view === 'home' || view === 'tiers') && <section className="rounded-[28px] border border-black/[.06] bg-[#FFFDF8] p-4 shadow-[0_16px_40px_rgba(20,20,15,.08)]"><div className="flex items-end justify-between gap-3"><div><p className="text-[9px] font-extrabold uppercase tracking-[.2em] text-[#B4871D]">Prime Loyalty Program</p><h2 className="mt-1 text-xl font-extrabold">Your reseller tiers</h2><p className="mt-1 text-[10px] text-black/45">Current tier: <b className="text-[#0E7C6F]">{tier.name}</b></p></div><span className="rounded-full bg-[#14140F] px-3 py-2 text-[9px] font-extrabold text-white">4 TIERS</span></div><div className="mt-4 grid grid-cols-2 gap-2.5 lg:grid-cols-4">{sortedTiers.map((item,index)=>{const active=item.id===tier.id;const colors=[['#7B3F1D','#F6D6B5'],['#59636E','#F1F5F8'],['#8A5A00','#FFE7A3'],['#171B2D','#B8C5FF']][index];const benefits=item.benefits?.length?item.benefits:['Exclusive member pricing','Earn bonus rewards','Special tier offers'];return <article key={item.id} className={`relative overflow-hidden rounded-[20px] border p-3 transition ${active?'border-[#14140F] shadow-[0_12px_26px_rgba(20,20,15,.16)]':'border-black/[.07]'}`} style={{background:'linear-gradient(145deg,#FFFDF8,'+colors[1]+')'}}><div className="absolute -right-7 -top-8 h-24 w-24 rounded-full opacity-20" style={{backgroundColor:colors[1]}}/><div className="relative flex items-center justify-between"><div className="grid h-9 w-9 place-items-center rounded-xl text-xs font-extrabold text-white shadow-md" style={{background:'linear-gradient(145deg,'+colors[0]+','+colors[1]+')'}}>{index+1}</div>{active&&<span className="rounded-full bg-[#14140F] px-2.5 py-1 text-[8px] font-extrabold text-white">CURRENT</span>}</div><h3 className="relative mt-3 text-base font-extrabold">{item.name}</h3><p className="mt-1 text-[10px] font-bold text-black/40">{item.minMonthlyOrders}+ monthly orders</p><p className="mt-2 text-xl font-extrabold" style={{color:colors[0]}}>{Number(item.discountPercent||0)}% <span className="text-[10px] text-black/35">OFF</span></p><div className="mt-3 space-y-1.5">{benefits.slice(0,4).map((benefit,n)=><p key={n} className="flex items-start gap-2 text-[9px] font-bold text-black/55"><span className="mt-0.5 grid h-3.5 w-3.5 shrink-0 place-items-center rounded-full bg-[#0E7C6F] text-[8px] text-white">✓</span>{benefit}</p>)}</div><div className={`mt-3 rounded-xl py-2 text-center text-[9px] font-extrabold ${active?'bg-[#14140F] text-white':'bg-white text-black/45'}`}>{active?'Your current tier':index<=tierIndex?'Unlocked':`Need ${Math.max(0,item.minMonthlyOrders-monthlyOrders)} orders`}</div></article>})}</div></section>}
+          {(view === 'home' || view === 'tiers') && !hasAdminTiers && (
+            <section className="rounded-[22px] bg-white p-6 text-center text-xs font-bold text-[#6B6A62]" role="status">
+              Loading reseller tiers from Admin Panel…
+            </section>
+          )}
+          {(view === 'home' || view === 'tiers') && hasAdminTiers && <section className="rounded-[28px] border border-black/[.06] bg-[#FFFDF8] p-4 shadow-[0_16px_40px_rgba(20,20,15,.08)]"><div className="flex items-end justify-between gap-3"><div><p className="text-[9px] font-extrabold uppercase tracking-[.2em] text-[#B4871D]">Prime Loyalty Program</p><h2 className="mt-1 text-xl font-extrabold">Your reseller tiers</h2><p className="mt-1 text-[10px] text-black/45">Current tier: <b className="text-[#0E7C6F]">{tier.name}</b></p></div><span className="rounded-full bg-[#14140F] px-3 py-2 text-[9px] font-extrabold text-white">4 TIERS</span></div><div className="mt-4 grid grid-cols-2 gap-2.5 lg:grid-cols-4">{sortedTiers.map((item,index)=>{const active=item.id===tier.id;const colors=[['#7B3F1D','#F6D6B5'],['#59636E','#F1F5F8'],['#8A5A00','#FFE7A3'],['#171B2D','#B8C5FF']][index];const benefits=item.benefits?.length?item.benefits:['Cashback after delivery','Earn bonus rewards','Special tier offers'];return <article key={item.id} className={`relative overflow-hidden rounded-[20px] border p-3 transition ${active?'border-[#14140F] shadow-[0_12px_26px_rgba(20,20,15,.16)]':'border-black/[.07]'}`} style={{background:'linear-gradient(145deg,#FFFDF8,'+colors[1]+')'}}><div className="absolute -right-7 -top-8 h-24 w-24 rounded-full opacity-20" style={{backgroundColor:colors[1]}}/><div className="relative flex items-center justify-between"><div className="grid h-9 w-9 place-items-center rounded-xl text-xs font-extrabold text-white shadow-md" style={{background:'linear-gradient(145deg,'+colors[0]+','+colors[1]+')'}}>{index+1}</div>{active&&<span className="rounded-full bg-[#14140F] px-2.5 py-1 text-[8px] font-extrabold text-white">CURRENT</span>}</div><h3 className="relative mt-3 text-base font-extrabold">{item.name}</h3><p className="mt-1 text-[10px] font-bold text-black/40">{item.minMonthlyOrders}+ monthly orders</p><p className="mt-2 text-xl font-extrabold" style={{color:colors[0]}}>{Number(item.discountPercent||0)}% <span className="text-[10px] text-black/35">CASHBACK</span></p><div className="mt-3 space-y-1.5">{benefits.slice(0,4).map((benefit,n)=><p key={n} className="flex items-start gap-2 text-[9px] font-bold text-black/55"><span className="mt-0.5 grid h-3.5 w-3.5 shrink-0 place-items-center rounded-full bg-[#0E7C6F] text-[8px] text-white">✓</span>{/discount|member-only prices/i.test(benefit) ? 'Cashback credited after Delivered' : benefit}</p>)}</div><div className={`mt-3 rounded-xl py-2 text-center text-[9px] font-extrabold ${active?'bg-[#14140F] text-white':'bg-white text-black/45'}`}>{active?'Your current tier':index<=tierIndex?'Unlocked':`Need ${Math.max(0,item.minMonthlyOrders-monthlyOrders)} orders`}</div></article>})}</div></section>}
 
-          {(view === 'home' || view === 'tasks') && <section className="rounded-[18px] bg-[#FFFDF8] p-3.5 shadow-[0_8px_24px_rgba(20,20,15,.05)]">
+          {(view === 'home' || view === 'tasks') && <section id="club-tasks" className="rounded-[18px] bg-[#FFFDF8] p-3.5 shadow-[0_8px_24px_rgba(20,20,15,.05)]">
             <div className="flex items-center justify-between"><div><span className="text-[10px] font-extrabold uppercase tracking-[.14em] text-[#E85D04]">Tasks</span><h2 className="mt-1 text-lg font-extrabold">Earn points & cash</h2></div><span className="rounded-full bg-[#E7F6F3] px-2 py-1 text-[11px] font-extrabold text-[#0E7C6F]">{activeTasks.length} live</span></div>
             {challenge.active && <div className="mt-3 rounded-2xl bg-[#F6F1E8] p-3"><div className="flex items-center justify-between"><p className="text-xs font-extrabold">{target} orders = gift or cash</p><span className="text-[10px] font-extrabold text-[#0E7C6F]">{monthlyOrders}/{target}</span></div><Progress value={challengePercent}/><p className="text-[10px] text-[#6B6A62]">{remaining ? `${remaining} eligible orders remaining` : 'Challenge complete — choose your reward.'}</p></div>}
-            <div className="mt-2">{activeTasks.length ? activeTasks.map(task => <TaskRow key={task.id} task={task} monthlyOrders={monthlyOrders} target={target} />) : <p className="py-6 text-center text-xs text-[#6B6A62]">No active missions right now.</p>}</div>
+            <div className="mt-2">{activeTasks.length ? activeTasks.map(task => <TaskRow
+              key={task.id}
+              task={task}
+              monthlyOrders={monthlyOrders}
+              target={target}
+              destination={taskDestination(task)}
+              submitted={submittedTaskIds.includes(task.id)}
+              onOpen={() => openTask(task)}
+              onSubmit={() => { setProofTask(task); setProofValue(''); setTaskMessage(''); }}
+            />) : <p className="py-6 text-center text-xs text-[#6B6A62]">No active missions right now.</p>}</div>
+            {taskMessage && <p className="mt-2 rounded-xl bg-[#E7F6F3] p-3 text-xs font-bold text-[#0E7C6F]" role="status">{taskMessage}</p>}
           </section>}
 
           {(view === 'home' || view === 'vouchers') && <section>
@@ -501,7 +596,7 @@ export default function PrimeFamilyDashboard({
             <div className="mt-4 grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">{rewardGifts.length ? rewardGifts.map(gift => { const product=rewardProducts[gift.productId]; const image=gift.imageUrl || rewardProductImage(product); const need=Math.max(0,Number(gift.pointsCost)-Number(rewardWallet.points||0)); return <article key={gift.id} className="overflow-hidden rounded-2xl border border-black/[.06] bg-white"><div className="aspect-[4/3] bg-[#F1ECE3]">{image?<img src={image} alt={gift.title||'Reward gift'} className="h-full w-full object-cover"/>:<div className="grid h-full place-items-center text-3xl">🎁</div>}</div><div className="p-3"><h3 className="text-sm font-extrabold">{gift.title||product?.title||product?.name||'Reward Gift'}</h3><p className="mt-1 text-xs font-extrabold text-[#E85D04]">{Number(gift.pointsCost).toLocaleString()} points</p><p className="mt-1 text-[10px] text-[#0E7C6F]">Free delivery included</p><Link href="/rewards#redeem-rewards" className="mt-3 block rounded-xl bg-[#14140F] px-3 py-2.5 text-center text-[10px] font-extrabold text-white">{need?`Need ${need} more points`:'Redeem gift'}</Link></div></article>; }) : <div className="rounded-2xl bg-[#F1ECE3] p-6 text-center text-xs text-[#6B6A62] sm:col-span-2 lg:col-span-3">Admin se add kiye gaye active gifts yahan show honge.</div>}</div>
           </section>}
 
-          {view === 'tiers' && (
+          {view === 'tiers' && hasAdminTiers && (
             <section className="rounded-[18px] bg-[#FFFDF8] p-3.5 shadow-[0_8px_24px_rgba(20,20,15,.05)]">
               <div className="flex items-center justify-between"><div><span className="text-[10px] font-extrabold uppercase tracking-[.14em] text-[#B4871D]">Tier progress</span><h2 className="mt-1 text-lg font-extrabold">{tier.name}</h2></div><span className="text-[11px] font-extrabold text-[#0E7C6F]">{monthlyOrders} orders</span></div>
               <Progress value={tierProgress}/>
@@ -509,50 +604,8 @@ export default function PrimeFamilyDashboard({
             </section>
           )}
 
-          {view === 'tasks' && (
-            <section id="club-tasks" className="rounded-[18px] bg-[#FFFDF8] p-3.5 shadow-[0_8px_24px_rgba(20,20,15,.05)]">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-extrabold uppercase tracking-[.14em] text-[#E85D04]">Reseller tasks</span>
-                <span className="rounded-full bg-[#E7F6F3] px-2 py-1 text-[11px] font-extrabold text-[#0E7C6F]">{activeTasks.length} live</span>
-              </div>
-              <h2 className="mt-1.5 text-lg font-extrabold">Earn extra beyond orders</h2>
-              <p className="mt-1 text-xs leading-relaxed text-[#6B6A62]">Complete social and growth missions to collect points after verification.</p>
-              <div className="mt-2">
-                {activeTasks.length ? activeTasks.map(task => <TaskRow key={task.id} task={task} monthlyOrders={monthlyOrders} target={target} />) : <p className="py-6 text-center text-xs text-[#6B6A62]">No active missions right now.</p>}
-              </div>
-            </section>
-          )}
-
-          {view === 'vouchers' && (
-            <>
-              <div className="mb-2.5 flex gap-1.5 overflow-x-auto pb-1">
-                {(['all', 'cash', 'gift', 'discount', 'brand'] as VoucherFilter[]).map(item => (
-                  <button
-                    key={item}
-                    type="button"
-                    onClick={() => setFilter(item)}
-                    className={`whitespace-nowrap rounded-full px-3 py-2 text-[11px] font-bold capitalize ${filter === item ? 'bg-[#14140F] text-white' : 'bg-white text-[#6B6A62]'}`}
-                  >
-                    {item}
-                  </button>
-                ))}
-              </div>
-              <div className="grid grid-cols-2 gap-2.5 md:grid-cols-4">
-                {filteredVouchers.map(voucher => (
-                  <VoucherCard key={voucher.id} voucher={voucher} orders={monthlyOrders} onOpen={setSelectedVoucher} />
-                ))}
-              </div>
-            </>
-          )}
-
           {view === 'rewards' && (
             <div className="space-y-3">
-              <section className="rounded-[18px] bg-[#FFFDF8] p-4 shadow-[0_8px_24px_rgba(20,20,15,.05)]">
-                <div className="flex items-end justify-between gap-3"><div><p className="text-[10px] font-extrabold uppercase tracking-[.14em] text-[#E85D04]">Daily streak</p><h2 className="mt-1 text-xl font-extrabold">7-Day Check-in</h2><p className="mt-1 text-xs text-[#6B6A62]">Complete every day to unlock higher point rewards.</p></div><span className="rounded-full bg-[#FFF3E0] px-3 py-1.5 text-[10px] font-extrabold">{Math.min(7, Number(rewardWallet.streak || 0))}/7</span></div>
-                <div className="mt-4 grid grid-cols-7 gap-1.5">{Array.from({ length: 7 }, (_, index) => { const complete=index<Number(rewardWallet.streak||0); return <div key={index} className={`rounded-xl p-2 text-center ${complete?'bg-[#0E7C6F] text-white':'bg-[#F1ECE3] text-[#6B6A62]'}`}><p className="text-[8px] font-extrabold">D{index+1}</p><p className="mt-1 text-[9px] font-extrabold">+{Number(rewardSettings.checkInRewards?.[index]??0)}</p><p className="text-[7px] font-bold">PTS</p></div>; })}</div>
-                <button type="button" onClick={checkInReward} disabled={rewardBusy || rewardWallet.lastCheckIn===rewardDayKey()} className="mt-4 w-full rounded-xl bg-[#14140F] py-3.5 text-xs font-extrabold text-white disabled:opacity-45">{rewardWallet.lastCheckIn===rewardDayKey()?'✓ Checked in today':`Check in +${Number(rewardSettings.checkInRewards?.[Math.min(6,Number(rewardWallet.streak||0))]??10)} points`}</button>
-              </section>
-              {wheel.active && <RewardWheel settings={wheel} rewardSettings={rewardSettings} wallet={rewardWallet} onWallet={setRewardWallet} />}
               <section className="rounded-[18px] bg-[#FFFDF8] p-4 shadow-[0_8px_24px_rgba(20,20,15,.05)]">
                 <div className="flex items-end justify-between gap-3"><div><p className="text-[10px] font-extrabold uppercase tracking-[.14em] text-[#0E7C6F]">Point store</p><h2 className="mt-1 text-xl font-extrabold">Gifts & Products</h2><p className="mt-1 text-xs text-[#6B6A62]">Rewards added from Admin appear here automatically.</p></div><span className="rounded-full bg-[#FFF3E0] px-3 py-1.5 text-[10px] font-extrabold">{Number(rewardWallet.points||0).toLocaleString()} PTS</span></div>
                 <div className="mt-4 grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">{rewardGifts.length ? rewardGifts.map(gift => { const product=rewardProducts[gift.productId]; const image=gift.imageUrl || rewardProductImage(product); const need=Math.max(0,Number(gift.pointsCost)-Number(rewardWallet.points||0)); return <article key={gift.id} className="overflow-hidden rounded-2xl border border-black/[.06] bg-white"><div className="aspect-[4/3] bg-[#F1ECE3]">{image?<img src={image} alt={gift.title||'Reward gift'} className="h-full w-full object-cover"/>:<div className="grid h-full place-items-center text-3xl">🎁</div>}</div><div className="p-3"><h3 className="text-sm font-extrabold">{gift.title||product?.title||product?.name||'Reward Gift'}</h3><p className="mt-1 text-xs font-extrabold text-[#E85D04]">{Number(gift.pointsCost).toLocaleString()} points</p><p className="mt-1 text-[10px] text-[#0E7C6F]">Free delivery included</p><Link href="/rewards#redeem-rewards" className="mt-3 block rounded-xl bg-[#14140F] px-3 py-2.5 text-center text-[10px] font-extrabold text-white">{need?`Need ${need} more points`:'Redeem gift'}</Link></div></article>; }) : <div className="rounded-2xl bg-[#F1ECE3] p-6 text-center text-xs text-[#6B6A62] sm:col-span-2 lg:col-span-3">Admin se add kiye gaye active gifts yahan show honge.</div>}</div>
@@ -603,6 +656,26 @@ export default function PrimeFamilyDashboard({
         {selectedVoucher && (
           <VoucherSheet voucher={selectedVoucher} orders={monthlyOrders} onClose={() => setSelectedVoucher(null)} />
         )}
+        {proofTask && (
+          <div className="fixed inset-0 z-[105] flex items-end justify-center bg-black/60 sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-label={`Submit proof for ${proofTask.title}`}>
+            <section className="w-full max-w-md rounded-t-[22px] bg-white p-4 pb-[calc(22px+env(safe-area-inset-bottom))] sm:rounded-[22px]">
+              <div className="flex items-center justify-between gap-2">
+                <h2 className="text-base font-extrabold">{proofTask.title}</h2>
+                <button type="button" aria-label="Close proof form" onClick={() => { setProofTask(null); setTaskMessage(''); }} className="rounded-full bg-[#F1ECE3] p-2"><X size={18}/></button>
+              </div>
+              <p className="mt-2 text-xs text-[#6B6A62]">Apna username ya completed task ka profile/proof link dein. Admin approval ke baad hi points milenge.</p>
+              <label htmlFor="family-task-proof" className="mt-4 block text-[11px] font-bold">Username or proof link</label>
+              <input id="family-task-proof" autoFocus value={proofValue} onChange={(event) => setProofValue(event.target.value)}
+                maxLength={500} placeholder="Your username or profile link"
+                className="mt-2 w-full rounded-xl border border-black/15 px-3 py-3 text-sm outline-none focus:border-[#0E7C6F]" />
+              {taskMessage && <p role="alert" className="mt-2 text-xs font-semibold text-rose-600">{taskMessage}</p>}
+              <button type="button" disabled={proofBusy || proofValue.trim().length < 3} onClick={() => void submitTaskProof()}
+                className="mt-4 w-full rounded-xl bg-[#0E7C6F] px-4 py-3 text-xs font-extrabold text-white disabled:opacity-45">
+                {proofBusy ? 'Submitting…' : memberUser ? 'Submit for Admin approval' : 'Sign in to submit'}
+              </button>
+            </section>
+          </div>
+        )}
       </div>
     </Shell>
   );
@@ -637,29 +710,56 @@ function Progress({ value }: { value: number }) {
   );
 }
 
-function TaskRow({ task, monthlyOrders, target }: { task: ResellerTask; monthlyOrders: number; target: number }) {
+function TaskRow({
+  task, monthlyOrders, target, destination, submitted, onOpen, onSubmit,
+}: {
+  task: ResellerTask;
+  monthlyOrders: number;
+  target: number;
+  destination: string;
+  submitted: boolean;
+  onOpen: () => void;
+  onSubmit: () => void;
+}) {
   const Icon = taskIcons[task.icon || 'order'] || Check;
   const isMonthly = task.id.includes('monthly');
   const isOrderTask = isMonthly || task.id.includes('weekly') || task.id.includes('order');
+  const isSocial = ['youtube', 'instagram', 'tiktok'].includes(task.id);
   const taskTarget = isMonthly ? target : task.id.includes('weekly') ? 3 : 1;
   const progress = isOrderTask ? Math.min(monthlyOrders, taskTarget) : 0;
   const percent = Math.round((progress / Math.max(1, taskTarget)) * 100);
-  const href = task.url || '/reseller/tasks';
-  const external = href.startsWith('http');
+  const launchLabel = task.id === 'youtube' ? 'Open YouTube'
+    : task.id === 'instagram' ? 'Open Instagram'
+    : task.id === 'tiktok' ? 'Open TikTok'
+    : isOrderTask ? 'Shop now'
+    : task.id === 'refer-reseller' ? 'Refer now' : 'Open task';
 
   return (
-    <div className="grid grid-cols-[42px_1fr_auto] items-center gap-2.5 border-b border-black/[.08] py-3 last:border-0 last:pb-0">
-      <div className="grid h-[42px] w-[42px] place-items-center rounded-[14px] bg-[#FFF3E0] text-[#0E7C6F]"><Icon size={18} /></div>
-      <div className="min-w-0">
-        <h3 className="text-[13px] font-bold">{task.title}</h3>
-        <p className="truncate text-xs text-[#6B6A62]">{task.description}</p>
-        <Progress value={percent} />
-      </div>
-      <div className="text-right">
-        <p className="text-[11px] font-extrabold text-[#0E7C6F]">{task.id === 'weekly-orders' || task.id === 'monthly-orders' ? <>Rs. {Number(task.reward || 0).toLocaleString()}</> : <>+{Number(task.reward || 0).toLocaleString()} pts</>}</p>
-        <Link href={href} target={external ? '_blank' : undefined} rel={external ? 'noreferrer' : undefined} className="mt-1.5 inline-flex items-center gap-1 rounded-xl bg-[#F1ECE3] px-2.5 py-2 text-[11px] font-extrabold">
-          {task.verification === 'manual' ? 'Submit' : 'Do'} <ChevronRight size={12} />
-        </Link>
+    <div id={task.id} className="flex scroll-mt-24 gap-3 border-b border-black/[.08] py-3 last:border-0 last:pb-0">
+      <div className="grid h-[42px] w-[42px] shrink-0 place-items-center rounded-[14px] bg-[#FFF3E0] text-[#0E7C6F]"><Icon size={18}/></div>
+      <div className="min-w-0 flex-1">
+        {destination ? (
+          <a href={destination} target="_blank" rel="noopener noreferrer" onClick={onOpen} className="text-[13px] font-extrabold text-[#14140F] underline-offset-2 hover:underline">{task.title}</a>
+        ) : (
+          <button type="button" onClick={onOpen} className="text-left text-[13px] font-extrabold text-[#14140F]">{task.title}</button>
+        )}
+        <p className="mt-0.5 text-[11px] leading-4 text-[#6B6A62]">{task.description}</p>
+        {isOrderTask && <Progress value={percent}/>}
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <span className="mr-auto text-[10px] font-extrabold text-[#0E7C6F]">{task.id === 'weekly-orders' || task.id === 'monthly-orders' ? `Rs. ${Number(task.reward || 0).toLocaleString()}` : `+${Number(task.reward || 0).toLocaleString()} pts`}</span>
+          {destination ? (
+            <a href={destination} target="_blank" rel="noopener noreferrer" onClick={onOpen}
+              className="inline-flex items-center gap-1 rounded-xl bg-[#14140F] px-3 py-2 text-[10px] font-extrabold text-white">{launchLabel} <ChevronRight size={12}/></a>
+          ) : !isSocial ? (
+            <button type="button" onClick={onOpen} className="inline-flex items-center gap-1 rounded-xl bg-[#14140F] px-3 py-2 text-[10px] font-extrabold text-white">{launchLabel} <ChevronRight size={12}/></button>
+          ) : null}
+          {isSocial && (
+            <button type="button" onClick={onSubmit} disabled={submitted}
+              className="rounded-xl bg-[#E7F6F3] px-3 py-2 text-[10px] font-extrabold text-[#0E7C6F] disabled:opacity-50">
+              {submitted ? 'Submitted' : 'Submit proof'}
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

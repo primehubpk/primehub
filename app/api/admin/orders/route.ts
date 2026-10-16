@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getAdminDb } from '@/lib/firebaseAdmin';
 import { authorizedWalletAdmin } from '@/lib/walletAdminSession';
 import { refundShoppingWalletOrder } from '@/lib/resellerShoppingCheckout';
+import { creditDeliveredOrderBenefits } from '@/lib/deliveredOrderBenefits';
 import {
   getSupabasePrimaryPayload,
   isSupabaseWriteConfigured,
@@ -447,7 +448,21 @@ export async function POST(request: Request) {
           }
         }
 
-        const nextOrder = { ...existing, status, updatedAt: new Date().toISOString() };
+        if (['cancelled', 'refunded'].includes(String(existing.status || '')) && status === 'delivered') {
+          return NextResponse.json({ error: 'Cancelled orders cannot be delivered or rewarded.' }, { status: 409 });
+        }
+        if (String(existing.status || '') === 'delivered' && status !== 'delivered' &&
+            existing.resellerRewardStatus === 'credited') {
+          return NextResponse.json({ error: 'Credited delivered orders require manual financial review before changing their status.' }, { status: 409 });
+        }
+        let credited: Awaited<ReturnType<typeof creditDeliveredOrderBenefits>> | null = null;
+        if (status === 'delivered' && existing.resellerUserId &&
+            existing.cashbackPolicy === 'delivered_only_v1') {
+          credited = await creditDeliveredOrderBenefits(orderId, existing);
+        }
+        const nextOrder = { ...existing, status, updatedAt: new Date().toISOString(),
+          ...(credited ? { resellerRewardStatus: 'credited', resellerReward: credited.reward,
+            resellerCashback: credited.cashback, voucherCashCredited: credited.voucherCash } : {}) };
         const row = {
           ...mapOrderToSupabase(orderId, nextOrder),
           authoritative_source: 'supabase',
@@ -465,17 +480,36 @@ export async function POST(request: Request) {
         }
 
         legacyOrdersCache = legacyOrdersCache.map((order) => order.id === orderId ? { ...order, status } : order);
-        return NextResponse.json({ success: true, primary: 'supabase' });
+        return NextResponse.json({ success: true, primary: 'supabase', ...(credited ? { cashback: credited.cashback, voucherCash: credited.voucherCash, alreadyCredited: credited.alreadyCredited } : {}) });
       }
 
       const snapshot = await orderRef.get();
       if (!snapshot.exists) return NextResponse.json({ error: 'Order not found.' }, { status: 404 });
-      await orderRef.update({ status, updatedAt: new Date() });
+      const existingOrder = snapshot.data() || {};
+      if (status === 'delivered' && ['cancelled', 'refunded'].includes(String(existingOrder.status || ''))) {
+        return NextResponse.json({ error: 'Cancelled orders cannot be delivered.' }, { status: 409 });
+      }
+      if (existingOrder.status === 'delivered' && existingOrder.resellerRewardStatus === 'credited' && status !== 'delivered') {
+        return NextResponse.json({ error: 'Credited orders require a manual financial review.' }, { status: 409 });
+      }
+      let credited: Awaited<ReturnType<typeof creditDeliveredOrderBenefits>> | null = null;
+      if (status === 'delivered' && existingOrder.resellerUserId && existingOrder.cashbackPolicy === 'delivered_only_v1') {
+        credited = await creditDeliveredOrderBenefits(orderId, existingOrder);
+      }
+      await orderRef.update({ status, updatedAt: new Date(),
+        ...(credited ? { resellerRewardStatus: 'credited', resellerReward: credited.reward,
+          resellerCashback: credited.cashback, voucherCashCredited: credited.voucherCash } : {}) });
       legacyOrdersCache = legacyOrdersCache.map((order) => order.id === orderId ? { ...order, status } : order);
-      return NextResponse.json({ success: true, primary: 'firebase' });
+      return NextResponse.json({ success: true, primary: 'firebase',
+        ...(credited ? { cashback: credited.cashback, voucherCash: credited.voucherCash, alreadyCredited: credited.alreadyCredited } : {}) });
     }
 
     if (action === 'delete') {
+      // Preserve an immutable audit trail for every paid cashback or cash voucher.
+      const paidReward = await db.collection('reseller_rewards').doc(orderId).get();
+      if (paidReward.exists) {
+        return NextResponse.json({ error: 'Orders with delivered cashback cannot be deleted. Contact financial support for a reviewed adjustment.' }, { status: 409 });
+      }
       const walletSpend = await db.collection('reseller_wallet_spends').doc(orderId).get();
       if (walletSpend.exists) {
         if (!authorizedWalletAdmin(request)) return NextResponse.json({ error: 'Wallet admin login required.' }, { status: 401 });

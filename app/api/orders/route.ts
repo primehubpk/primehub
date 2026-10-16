@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { createHash } from 'node:crypto';
 import { pakistanDay } from '@/lib/notifications/dailyPush';
 import { calculateDeliveryCharge } from '@/lib/deliveryCharges';
 import { getDualProduct, getDualStorefrontSettings } from '@/lib/dualReadServer';
@@ -6,6 +7,9 @@ import { getAdminAuth, getAdminDb } from '@/lib/firebaseAdmin';
 import { isSupabaseWriteConfigured, mapOrderToSupabase, mirrorSupabaseUpsert, recordMirrorFailure, supabasePrimaryUpsert } from '@/lib/dualWriteServer';
 import { isWholesaleProduct } from '@/lib/wholesale';
 import { createShoppingWalletOrder, shoppingWalletBalance } from '@/lib/resellerShoppingCheckout';
+import { cashBackForTier, orderEligibleSubtotal } from '@/lib/orderBenefits';
+import { listCheckoutVouchers, resolveCheckoutVoucher } from '@/lib/checkoutVouchersServer';
+import { bigDealConfiguredSlotCount, bigDealRotationIndex } from '@/lib/bigDealRotation';
 
 export const runtime = 'nodejs';
 const WEEKDAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const;
@@ -70,9 +74,23 @@ async function buildAuthoritativeItems(items: IncomingItem[]) {
   const settings = settingsResult.documents.main || {};
   const weeklyDeals = Array.isArray(settings.weeklyDeals) ? settings.weeklyDeals : [];
   const liveDeal = weeklyDeals.find((deal: any) => deal?.day === currentDay && deal?.active !== false && typeof deal?.productId === 'string' && numberValue(deal?.dealPrice) > 0);
+  // Live Big Deal is now administered under main.bigDeal. dailyDeal is a
+  // legacy alias used by older homepage code, not the canonical source.
+  // Price and discount eligibility MUST use the same dedicated rotation.
+  const big = settings.bigDeal && typeof settings.bigDeal === 'object'
+    ? settings.bigDeal : settings.dailyDeal;
+  const now = Date.now();
+  const bigStarts = big?.startAt ? new Date(big.startAt).getTime() : 0;
+  const bigEnds = big?.endAt ? new Date(big.endAt).getTime() : 0;
+  const bigActive = big?.active === true &&
+    (!bigStarts || Number.isNaN(bigStarts) || now >= bigStarts) &&
+    (!bigEnds || Number.isNaN(bigEnds) || now < bigEnds);
+  const bigSlot = bigActive ? bigDealRotationIndex(big.rotationStartedAt, new Date(now), bigDealConfiguredSlotCount(big)) : -1;
+  const bigProductId = bigActive ? String(big.productIds?.[bigSlot] || big.productId || '') : '';
+  const bigPrice = bigActive ? numberValue(big.dealPrices?.[bigSlot] ?? big.dealPrice ?? 0) : 0;
   const products = new Map(productResults.filter(result => result.product).map(result => [String(result.product!.id), result.product]));
 
-  return items.map(item => {
+  const pricedItems = items.map(item => {
     const productId = String(item.productId || item.id || '');
     const product: any = products.get(productId);
     if (!product) throw new Error(`Product ${productId} is no longer available.`);
@@ -82,13 +100,22 @@ async function buildAuthoritativeItems(items: IncomingItem[]) {
     if (stockProvided && numberValue(rawStock) <= 0) throw new Error(`${product.title || product.name || 'This product'} is currently unavailable.`);
     const regularPrice = numberValue(product.price);
     const liveDealPrice = liveDeal?.productId === productId ? numberValue(liveDeal.dealPrice) : 0;
-    const isLiveDealItem = liveDealPrice > 0 && liveDealPrice < regularPrice;
-    const price = isLiveDealItem ? liveDealPrice : (variant && numberValue(variant.price) > 0 ? numberValue(variant.price) : regularPrice);
+    const isLiveDealItem = liveDealPrice > 0 && liveDeal?.productId === productId;
+    const isBigDealItem = bigProductId === productId && bigPrice > 0;
+    // Exclude active labelled deals even when product.price is already reduced.
+    // Do not charge above the published base price on a scheduled offer.
+    const price = isLiveDealItem ? Math.min(liveDealPrice, regularPrice) :
+      isBigDealItem ? Math.min(bigPrice, regularPrice) :
+      (variant && numberValue(variant.price) > 0 ? numberValue(variant.price) : regularPrice);
     if (price <= 0) throw new Error('Product price is not available.');
     const quantity = Math.max(1, Math.min(50, Math.floor(numberValue(item.quantity ?? item.qty ?? 1))));
     const markedImages = trustedMarkedImages(item, productId);
-    return { productId, title: String(product.title || product.name || item.title || item.name || 'Product'), price, originalPrice: numberValue(product.originalPrice) > regularPrice ? numberValue(product.originalPrice) : regularPrice, quantity, image: String(markedImages[0]?.markedUrl || variant?.imageUrl || product.imageUrl || product.image || item.imageUrl || item.image || ''), ...(markedImages.length ? { markedImages } : {}), variant: item.variant || null, weeklyDealDay: isLiveDealItem ? currentDay : null, isWholesale: isWholesaleProduct(product), category: product.category || '', categoryId: product.categoryId || '' };
+    return { productId, title: String(product.title || product.name || item.title || item.name || 'Product'), price, originalPrice: numberValue(product.originalPrice) > regularPrice ? numberValue(product.originalPrice) : regularPrice, quantity, image: String(markedImages[0]?.markedUrl || variant?.imageUrl || product.imageUrl || product.image || item.imageUrl || item.image || ''), ...(markedImages.length ? { markedImages } : {}), variant: item.variant || null, weeklyDealDay: isLiveDealItem ? currentDay : null,
+      rewardExcluded: isLiveDealItem || isBigDealItem,
+      dealCategory: isLiveDealItem ? 'weekly' : isBigDealItem ? 'big' : '',
+      isWholesale: isWholesaleProduct(product), category: product.category || '', categoryId: product.categoryId || '' };
   });
+  return { items: pricedItems, settings };
 }
 
 async function decodedUser(request: Request) { const header = request.headers.get('authorization') || ''; if (!header.startsWith('Bearer ')) return null; try { return await getAdminAuth().verifyIdToken(header.slice(7)); } catch { return null; } }
@@ -115,7 +142,7 @@ async function readSupabaseResellerProfile(uid: string) {
   };
 }
 
-async function optionalReseller(request: Request) {
+async function optionalReseller(request: Request, settings: Record<string, any>) {
   const decoded = await decodedUser(request); if (!decoded) return null;
   let data: any = null;
   let shouldTryFirebase = true;
@@ -138,9 +165,9 @@ async function optionalReseller(request: Request) {
   }
   if (!data || data.status !== 'active') return null;
 
-  const settingsResult = await getDualStorefrontSettings({ cache: 'no-store', timeoutMs: 5000 });
-  const configured = Array.isArray(settingsResult.documents.main?.resellerTiers) ? settingsResult.documents.main.resellerTiers : [];
-  const tiers = configured.length === 4 ? configured : [{ id: 'starter', minMonthlyOrders: 0, discountPercent: 0 }, { id: 'prime', minMonthlyOrders: 10, discountPercent: 2 }, { id: 'pro', minMonthlyOrders: 20, discountPercent: 5 }, { id: 'elite', minMonthlyOrders: 30, discountPercent: 8 }];
+  const configured = Array.isArray(settings.resellerTiers) ? settings.resellerTiers : [];
+  if (configured.length !== 4) throw new Error('Cashback tier settings are temporarily unavailable; please retry checkout.');
+  const tiers = configured;
   const monthlyOrders = Math.max(0, Number(data.monthlyOrders || 0));
   const tier = [...tiers].sort((a:any,b:any)=>Number(b.minMonthlyOrders)-Number(a.minMonthlyOrders)).find((item:any)=>monthlyOrders>=Number(item.minMonthlyOrders)) || tiers[0];
   return { userId: decoded.uid, tierId: String(tier.id || 'starter'), tierName: String(tier.name || 'Starter'), discountPercent: Math.min(100, Math.max(0, Number(tier.discountPercent || 0))) };
@@ -180,11 +207,47 @@ export async function POST(request: Request) {
   try {
     const body = await request.json(); const rawItems = Array.isArray(body?.items) ? body.items as IncomingItem[] : []; const quoteOnly = body?.mode === 'quote'; const selfCollect = body?.selfCollect === true; const useShoppingCredit = body?.useShoppingCredit === true;
     if (!rawItems.length || rawItems.length > 50) return NextResponse.json({ error: 'Your cart is empty or contains too many items.' }, { status: 400 });
-    const items = await buildAuthoritativeItems(rawItems); const totalItems = items.reduce((sum, item) => sum + item.quantity, 0); const rawSubtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
-    const [reseller, user] = await Promise.all([optionalReseller(request), decodedUser(request)]);
-    const tierDiscountPercent = reseller?.discountPercent || 0; const tierDiscount = Math.round(rawSubtotal * tierDiscountPercent / 100); const subtotal = Math.max(0, rawSubtotal - tierDiscount);
-    const rewardWallet = user && body?.mode !== 'whatsapp_intent' ? await readRewardWallet(user.uid) : {}; const freeDeliveryReward = !selfCollect && Number(rewardWallet.freeDeliveryCredits || 0) > 0;
+    const { items, settings } = await buildAuthoritativeItems(rawItems);
+    const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
+    const rawSubtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    const [reseller, user] = await Promise.all([optionalReseller(request, settings), decodedUser(request)]);
+    const eligibleSubtotal = orderEligibleSubtotal(items, settings);
+    const submittedVoucher = String(body?.voucherCode || '').trim();
+    const voucher = submittedVoucher
+      ? resolveCheckoutVoucher(await listCheckoutVouchers(), submittedVoucher, eligibleSubtotal)
+      : null;
+    if (voucher?.kind === 'cash') {
+      if (!user || !reseller?.userId) {
+        throw new Error('Sign in to your active Prime Family account to use cash vouchers.');
+      }
+      const claimId = createHash('sha256').update(user.uid + ':' + voucher.code).digest('hex');
+      const prior = await getAdminDb().collection('reseller_voucher_claims').doc(claimId).get();
+      if (prior.exists) throw new Error('This cash voucher was already used by your account.');
+    }
+    const voucherDiscount = voucher?.kind === 'discount' ? voucher.amount : 0;
+    const voucherCashAmount = voucher?.kind === 'cash' ? voucher.amount : 0;
+    const eligibleAfterVoucher = Math.max(0, eligibleSubtotal - voucherDiscount);
+    // Discount at checkout has been replaced by CASHBACK only after Admin delivery.
+    const tierDiscountPercent = 0, tierDiscount = 0;
+    // Share only public Admin tier labels / thresholds with the cart UI.
+    // Neither tier selection nor credit amount is ever trusted from the browser.
+    const cashbackTiers = Array.isArray(settings.resellerTiers) && settings.resellerTiers.length === 4
+      ? settings.resellerTiers.map((tier: any) => ({
+          id: String(tier.id || ''),
+          name: String(tier.name || '').slice(0, 30),
+          minMonthlyOrders: Math.max(0, Number(tier.minMonthlyOrders || 0)),
+          cashbackPercent: Math.min(100, Math.max(0, Number(tier.discountPercent || 0))),
+        })).sort((a: any, b: any) => a.minMonthlyOrders - b.minMonthlyOrders)
+      : [];
+    const cashbackPercent = reseller?.discountPercent || 0;
+    const cashbackEstimate = cashbackPercent > 0 ? cashBackForTier(eligibleAfterVoucher, cashbackPercent) : 0;
+    const subtotal = Math.max(0, rawSubtotal - voucherDiscount);
     const calculatedDelivery = selfCollect ? { baseDelivery: 0, wholesaleItems: 0, wholesaleSurcharge: 0, deliveryCharge: 0 } : calculateDeliveryCharge(items);
+    // Free delivery at five items (or self-collect) must not consume a Spin
+    // reward credit unnecessarily. The server decides from verified quantities.
+    const rewardWallet = user && calculatedDelivery.deliveryCharge > 0 && body?.mode !== 'whatsapp_intent'
+      ? await readRewardWallet(user.uid) : {};
+    const freeDeliveryReward = !selfCollect && calculatedDelivery.deliveryCharge > 0 && Number(rewardWallet.freeDeliveryCredits || 0) > 0;
     const delivery = freeDeliveryReward ? { ...calculatedDelivery, deliveryCharge: 0 } : calculatedDelivery;
     const total = subtotal + delivery.deliveryCharge;
     // A regular cart quote/order must NEVER read Firebase wallet collections.
@@ -193,9 +256,16 @@ export async function POST(request: Request) {
     if (useShoppingCredit && !user) throw new Error('Sign in to your reseller account to use shopping credit.');
     const walletShoppingBalance = (quoteOnly && useShoppingCredit && user)
       ? await shoppingWalletBalance(user.uid) : 0;
-    const walletShoppingApplied = quoteOnly && useShoppingCredit ? Math.min(walletShoppingBalance, total) : 0;
+    const walletShoppingApplied = quoteOnly && useShoppingCredit ? Math.min(walletShoppingBalance, eligibleAfterVoucher) : 0;
     const amountDue = total - walletShoppingApplied;
-    const quote = { items, rawSubtotal, tierDiscount, tierDiscountPercent, resellerTier: reseller?.tierName || '', subtotal, totalItems, ...delivery, total, selfCollect, fulfillment: selfCollect ? 'self_collect' : 'delivery', freeDeliveryReward, rewardLabel: freeDeliveryReward ? 'Spin & Win Reward — Free Delivery' : '', walletShoppingBalance, walletShoppingApplied, amountDue };
+    const quote = { items, rawSubtotal, tierDiscount, tierDiscountPercent, resellerTier: reseller?.tierName || '',
+      eligibleSubtotal, eligibleAfterVoucher, voucherCode: voucher?.code || '', voucherId: voucher?.id || '',
+      voucherKind: voucher?.kind || '', voucherDiscount, voucherCashAmount,
+      cashbackPercent, cashbackEstimate, cashbackPolicy: 'delivered_only_v1',
+      ...(quoteOnly ? { cashbackMemberActive: Boolean(reseller?.userId), cashbackTiers } : {}),
+      subtotal, totalItems, ...delivery, total, selfCollect, fulfillment: selfCollect ? 'self_collect' : 'delivery',
+      freeDeliveryReward, rewardLabel: freeDeliveryReward ? 'Spin & Win Reward — Free Delivery' : '',
+      walletShoppingBalance, walletShoppingApplied, amountDue };
     if (quoteOnly) return NextResponse.json(quote);
 
     // A WhatsApp handoff is NOT a placed order. Record complete, server-verified
@@ -243,14 +313,15 @@ export async function POST(request: Request) {
 
     const resellerUserId = reseller?.userId || '';
     const resellerGuestId = cleanGuestId(body?.guestId);
-    const orderId = useShoppingCredit ? String(body?.orderRequestId || '') : crypto.randomUUID();
+    const shouldUseWallet = useShoppingCredit && eligibleAfterVoucher > 0 && total > 0;
+    const orderId = shouldUseWallet ? String(body?.orderRequestId || '') : crypto.randomUUID();
     const salar = cleanSalarOrderContext(body?.orderContext);
     const orderData: any = { customer: { name: customer.name.trim(), phone: customer.phone.trim(), email: String(customer.email || '').trim(), address: selfCollect ? 'PrimeHub Shop Pickup' : customer.address.trim(), city: selfCollect ? 'Lahore' : customer.city.trim(), notes: String(customer.notes || '').trim() }, ...quote, idempotencyKey: `${salar ? 'salar' : 'website'}-order:${orderId}`, currency: 'PKR', status: 'pending', source: salar ? 'salar' : 'website', ...(salar ? { salar } : {}), createdAt: new Date() };
     if (resellerUserId) orderData.resellerUserId = resellerUserId;
     if (resellerGuestId) orderData.resellerGuestId = resellerGuestId;
 
-    if (useShoppingCredit && user) {
-      // Atomic source of truth: order + debit + append-only spend are one Firestore commit.
+    if (shouldUseWallet && user) {
+      // Atomic source of truth: order + eligible-only debit + append-only spend are one Firestore commit.
       const saved = await createShoppingWalletOrder(user.uid, orderId, { ...orderData, resellerUserId: user.uid });
       if (isSupabaseWriteConfigured()) {
         const row = { ...mapOrderToSupabase(orderId, saved.order), authoritative_source: 'firebase', mirror_status: 'synced', mirror_error: null };

@@ -7,13 +7,14 @@ import {
 } from '@/lib/cartStore';
 import VariantSelectorBottomSheet from '@/components/product-detail/VariantSelectorBottomSheet';
 import type { MarkedProductImage, ProductVariantSelection } from '@/lib/types';
-import { getEffectivePrice, getPakistanDay } from '@/lib/dealPricing';
+import { getPakistanDay } from '@/lib/dealPricing';
 import { makeTikTokContent, trackTikTokEvent } from '@/lib/tiktokPixel';
 
 type GlobalProduct = VariantModalProduct & {
   stock?: number;
   dealPrice?: number | string;
   dealDay?: string;
+  bigDealActive?: boolean;
 };
 
 function imageOf(product?: GlobalProduct | null | any): string {
@@ -40,16 +41,16 @@ export default function GlobalVariantSelector() {
   const rows = normalized.rows;
   const basePrice = Number(product.price ?? 0);
   const originalPrice = Number(product.compareAtPrice ?? product.originalPrice ?? basePrice);
-  const explicitDealPrice = Number(product.dealPrice ?? 0);
-  const dealDay = product.dealDay || (originalPrice > basePrice ? getPakistanDay() : undefined);
-  const effectiveProductPrice = getEffectivePrice(
-    {
-      price: explicitDealPrice > 0 ? originalPrice : basePrice,
-      dealPrice: explicitDealPrice > 0 ? explicitDealPrice : basePrice,
-      dealDay,
-    },
-    new Date(),
-  );
+  // Deal buttons already pass their verified active-day price. Comparison
+  // prices alone must never turn a normal variant into a special deal.
+  const today = getPakistanDay();
+  const activeDealDay = product.dealDay && product.dealDay.toLowerCase() === today.toLowerCase()
+    ? product.dealDay : undefined;
+  // Preserve existing marked-down product pricing (Sale Mela etc.) even when
+  // a variant has its own old regular price.
+  const isSpecialPrice = product.bigDealActive === true || Boolean(activeDealDay) ||
+    originalPrice > basePrice;
+  const effectiveProductPrice = basePrice;
   const title = product.title || product.name || 'PrimeHub Deal';
 
   function confirm(selection: ProductVariantSelection, quantity: number, markedImages: MarkedProductImage[] = []) {
@@ -61,15 +62,7 @@ export default function GlobalVariantSelector() {
         (!selection.size || row.size === selection.size),
     );
     const variantPrice = Number(selected?.price ?? basePrice) || basePrice;
-    const price = getEffectivePrice(
-      {
-        price: effectiveProductPrice,
-        dealPrice: effectiveProductPrice,
-        dealDay: dealDay || undefined,
-      },
-      new Date(),
-    );
-    const finalPrice = dealDay ? price : variantPrice;
+    const finalPrice = isSpecialPrice ? basePrice : variantPrice;
     const image = String(markedImages[0]?.markedUrl || selected?.imageUrl || imageOf(product));
     const variantIdentity = Object.entries(selection)
       .filter(([, value]) => Boolean(value))
@@ -89,6 +82,7 @@ export default function GlobalVariantSelector() {
         image,
         imageUrl: image,
         variant: selection,
+        ...(activeDealDay ? { dealDay: activeDealDay as import('@/lib/types').Weekday } : {}),
         markedImages,
       });
     }

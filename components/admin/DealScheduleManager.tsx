@@ -1,94 +1,254 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { onSnapshot } from 'firebase/firestore';
-import { CheckCircle2, Loader2, Save, Tag } from 'lucide-react';
-import { adminCollection, getAdminDocument, setAdminDocument, type Product } from './shared';
-import type { DailyDeal, Weekday, WeeklyDeal } from '@/lib/types';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
+import { ArrowRight, CalendarDays, CheckCircle2, ChevronDown, Loader2, Save, Search, Tag } from 'lucide-react';
+import { getAdminDocument, setAdminDocument, type Category, type Product } from './shared';
+import type { Weekday, WeeklyDeal } from '@/lib/types';
+import { getPakistanDay } from '@/lib/dealPricing';
 
-type DealDay = Weekday | 'big' | '';
-type CardState = { day: DealDay; dealPrice: string; saving: boolean };
-
-const DEAL_OPTIONS: Array<{ value: DealDay; label: string }> = [
-  { value: '', label: 'None — Regular Product' },
-  { value: 'monday', label: 'Monday Deal' }, { value: 'tuesday', label: 'Tuesday Deal' },
-  { value: 'wednesday', label: 'Wednesday Deal' }, { value: 'thursday', label: 'Thursday Deal' },
-  { value: 'friday', label: 'Friday Deal' }, { value: 'saturday', label: 'Saturday Deal' },
-  { value: 'sunday', label: 'Sunday Deal' }, { value: 'big', label: 'Big Deal' },
+type DealDay = Weekday | '';
+type CardState = { day: DealDay; dealPrice: string };
+const DAYS: Array<{ key: Weekday; label: string }> = [
+  { key: 'monday', label: 'Monday' }, { key: 'tuesday', label: 'Tuesday' },
+  { key: 'wednesday', label: 'Wednesday' }, { key: 'thursday', label: 'Thursday' },
+  { key: 'friday', label: 'Friday' }, { key: 'saturday', label: 'Saturday' },
+  { key: 'sunday', label: 'Sunday' },
 ];
 
-const DAY_LABELS: Record<Exclude<DealDay, ''>, string> = {
-  monday: 'Monday Deal', tuesday: 'Tuesday Deal', wednesday: 'Wednesday Deal', thursday: 'Thursday Deal',
-  friday: 'Friday Deal', saturday: 'Saturday Deal', sunday: 'Sunday Deal', big: 'Big Deal',
-};
-
-const imageOf = (p: any): string => {
-  if (!p) return '';
-  const img = p.images?.[0];
-  if (typeof img === 'string') return img;
-  if (img && typeof img === 'object' && typeof img.url === 'string') return img.url;
-  if (typeof p.imageUrl === 'string') return p.imageUrl;
-  if (typeof p.image === 'string') return p.image;
-  return '';
-};
-function normalPrice(product: Product) { return Number(product.originalPrice ?? product.price ?? 0); }
-function emptyCard(): CardState { return { day: '', dealPrice: '', saving: false }; }
+function imageOf(product: Product | null | undefined): string {
+  if (!product) return '';
+  const image = product.images?.[0];
+  if (typeof image === 'string') return image;
+  if (image && typeof image === 'object' && typeof image.url === 'string') return image.url;
+  return String(product.imageUrl || '');
+}
+function priceOf(product: Product) {
+  // Regular selling price—not the crossed-out marketing comparison price.
+  const price = Number(product.price ?? product.originalPrice ?? 0);
+  return Number.isFinite(price) && price > 0 ? price : 0;
+}
+function keyOf(value: unknown) { return String(value || '').trim().toLowerCase(); }
+function fromDeal(deal?: WeeklyDeal): CardState {
+  return { day: deal?.day || '', dealPrice: deal?.dealPrice ? String(deal.dealPrice) : '' };
+}
 
 export default function DealScheduleManager() {
   const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [deals, setDeals] = useState<WeeklyDeal[]>([]);
-  const [bigDeal, setBigDeal] = useState<DailyDeal | null>(null);
   const [cards, setCards] = useState<Record<string, CardState>>({});
+  const [activeCategory, setActiveCategory] = useState('');
+  const [search, setSearch] = useState('');
+  const [filterDay, setFilterDay] = useState('');
+  const [visibleCount, setVisibleCount] = useState(24);
+  const [savingId, setSavingId] = useState('');
+  const [settingsReady, setSettingsReady] = useState(false);
   const [message, setMessage] = useState('');
+  const catalogRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => onSnapshot(adminCollection('products'), snapshot => setProducts(snapshot.docs.map(item => ({ id: item.id, ...item.data() }) as Product)), () => setProducts([])), []);
   useEffect(() => {
-    getAdminDocument('settings', 'main').then(snapshot => {
-      const data = snapshot.exists() ? snapshot.data() as { weeklyDeals?: WeeklyDeal[]; dailyDeal?: DailyDeal } : {};
-      const weekly = Array.isArray(data.weeklyDeals) ? data.weeklyDeals : [];
-      setDeals(weekly); setBigDeal(data.dailyDeal || null);
-      const next: Record<string, CardState> = {};
-      products.forEach(product => {
-        const weeklyDeal = weekly.find(item => item.productId === product.id);
-        const big = data.dailyDeal?.productId === product.id;
-        next[product.id] = { day: big ? 'big' : (weeklyDeal?.day || ''), dealPrice: big ? String(data.dailyDeal?.dealPrice || '') : String(weeklyDeal?.dealPrice || ''), saving: false };
+    let cancelled = false;
+    // Catalog is Supabase-primary on the storefront. Firebase product mirror
+    // subscriptions can be stale or incomplete, so do not use them to assign
+    // One Day Deals. Load one compact catalog snapshot, not 600 product reads.
+    fetch('/api/storefront/read?type=catalog&refresh=1', {
+      credentials: 'same-origin', cache: 'no-store',
+    }).then(async response => {
+      if (!response.ok) throw new Error('Could not load the live products catalog.');
+      return response.json();
+    }).then(data => {
+      if (cancelled) return;
+      if (!Array.isArray(data?.products)) throw new Error('Live products data is missing.');
+      setProducts(data.products as Product[]);
+      setCategories(Array.isArray(data.categories) ? data.categories as Category[] : []);
+    }).catch(error => {
+      if (!cancelled) setMessage(error instanceof Error ? error.message : 'Products could not load.');
+    });
+    return () => { cancelled = true; };
+  }, []);
+  useEffect(() => {
+    let active = true;
+    getAdminDocument('settings', 'main')
+      .then(snapshot => {
+        if (!active) return;
+        const saved = snapshot.exists() ? snapshot.data() as { weeklyDeals?: WeeklyDeal[] } : {};
+        setDeals(Array.isArray(saved.weeklyDeals) ? saved.weeklyDeals : []);
+        setSettingsReady(true);
+      })
+      .catch(() => { if (active) setMessage('One Day Deals settings could not load. Refresh before editing.'); });
+    return () => { active = false; };
+  }, []);
+
+  const productById = useMemo(() => new Map(products.map(product => [product.id, product])), [products]);
+  const currentDay = getPakistanDay().toLowerCase();
+  const activeDeals = deals.filter(item => item.active !== false && item.productId);
+  const assignedIds = new Set(deals.map(deal => deal.productId));
+  const assignedByProduct = useMemo(() => {
+    const lookup = new Map<string, WeeklyDeal>();
+    deals.forEach(deal => { if (deal.productId) lookup.set(deal.productId, deal); });
+    return lookup;
+  }, [deals]);
+
+  // Categories are sourced from the Admin catalog; product category strings are
+  // added only when needed so category filters work with both old and new items.
+  const categoryItems = useMemo(() => {
+    const known = new Map<string, { id: string; title: string; aliases: string[] }>();
+    categories.filter(category => category.active !== false).forEach(category => {
+      known.set(keyOf(category.id), {
+        id: category.id, title: category.title || category.slug || category.id,
+        aliases: [category.id, category.slug || '', category.title || ''].map(keyOf),
       });
-      setCards(next);
-    }).catch(() => undefined);
-  }, [products.length]);
+    });
+    for (const product of products) {
+      const category = String(product.category || '').trim();
+      const categoryId = String(product.categoryId || '').trim();
+      const matching = [...known.values()].some(item => item.aliases.includes(keyOf(category)) || item.aliases.includes(keyOf(categoryId)));
+      if (!matching && category) known.set(keyOf(category), { id: category, title: category, aliases: [keyOf(category), keyOf(categoryId)] });
+    }
+    return [...known.values()].sort((a, b) => a.title.localeCompare(b.title));
+  }, [categories, products]);
 
-  const productList = useMemo(() => [...products].sort((a, b) => a.title.localeCompare(b.title)), [products]);
-  const updateCard = (id: string, patch: Partial<CardState>) => setCards(current => ({ ...current, [id]: { ...(current[id] || emptyCard()), ...patch } }));
+  const filteredProducts = useMemo(() => {
+    const category = categoryItems.find(item => item.id === activeCategory);
+    const text = keyOf(search);
+    return [...products].filter(product => {
+      if (category && !category.aliases.includes(keyOf(product.category)) &&
+        !category.aliases.includes(keyOf(product.categoryId))) return false;
+      if (filterDay && !deals.some(deal => deal.day === filterDay && deal.productId === product.id)) return false;
+      if (text && !keyOf(product.title).includes(text) && !keyOf(product.id).includes(text)) return false;
+      return true;
+    }).sort((a, b) => Number(assignedIds.has(b.id)) - Number(assignedIds.has(a.id)) ||
+      String(a.title || '').localeCompare(String(b.title || '')));
+  }, [products, categoryItems, activeCategory, filterDay, search, deals, assignedIds]);
 
-  async function saveDeal(product: Product) {
-    const state = cards[product.id] || emptyCard();
-    const regular = normalPrice(product);
-    if (state.day && (!state.dealPrice || Number(state.dealPrice) <= 0)) { setMessage(`Enter a deal price for ${product.title}.`); return; }
-    if (state.day && Number(state.dealPrice) >= regular) { setMessage(`${product.title}: deal price must be lower than Rs. ${regular.toLocaleString()}.`); return; }
-    updateCard(product.id, { saving: true }); setMessage('');
-    try {
-      const snapshot = await getAdminDocument('settings', 'main');
-      const data = snapshot.exists() ? snapshot.data() as { weeklyDeals?: WeeklyDeal[]; dailyDeal?: DailyDeal } : {};
-      let nextWeekly = Array.isArray(data.weeklyDeals) ? [...data.weeklyDeals] : [];
-      let nextBig = data.dailyDeal || null;
-      nextWeekly = nextWeekly.filter(item => item.productId !== product.id && item.day !== state.day);
-      if (nextBig?.productId === product.id) nextBig = null;
-      if (state.day === 'big') {
-        nextBig = { productId: product.id, imageUrl: imageOf(product), title: product.title, originalPrice: regular, dealPrice: Number(state.dealPrice), startAt: '', endAt: '', buttonText: 'Shop Big Deal', buttonLink: '/deals/big', active: true } as DailyDeal;
-      } else if (state.day) {
-        nextWeekly.push({ id: `weekly-${state.day}`, day: state.day, label: 'One Day Deal', productId: product.id, imageUrl: imageOf(product), title: product.title, originalPrice: regular, dealPrice: Number(state.dealPrice), startAt: '', endAt: '', buttonText: 'Shop Deal', buttonLink: `/product/${product.id}`, active: true });
-      }
-      await setAdminDocument('settings', 'main', { weeklyDeals: nextWeekly, dailyDeal: nextBig });
-      setDeals(nextWeekly); setBigDeal(nextBig);
-      setMessage(`${product.title}: ${state.day ? DAY_LABELS[state.day] : 'regular product'} saved.`);
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Could not save this deal.');
-    } finally { updateCard(product.id, { saving: false }); }
+  const shownProducts = filteredProducts.slice(0, visibleCount);
+
+  function updateCard(productId: string, patch: Partial<CardState>) {
+    setCards(current => ({
+      ...current,
+      [productId]: { ...(current[productId] || fromDeal(assignedByProduct.get(productId))), ...patch },
+    }));
   }
 
-  return <section className="mx-auto max-w-7xl px-4 py-6">
-    <div className="mb-6 flex items-end justify-between gap-4"><div><div className="flex items-center gap-2 text-[#0F6A5F]"><Tag size={16}/><span className="text-[10px] font-black uppercase tracking-[.22em]">Reward Store Style</span></div><h2 className="mt-1 text-2xl font-black tracking-tight">One Day Deals</h2><p className="mt-1 text-sm text-black/45">Assign a deal day directly to any product and save it independently.</p></div><span className="hidden rounded-full bg-white px-3 py-2 text-[10px] font-black text-black/45 shadow-sm ring-1 ring-black/5 sm:block">{productList.length} products</span></div>
-    {message && <div role="status" className="mb-5 flex items-center gap-2 rounded-2xl border border-[#0F6A5F]/10 bg-[#0F6A5F]/8 px-4 py-3 text-xs font-bold text-[#0F6A5F]"><CheckCircle2 size={16}/>{message}</div>}
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">{productList.map(product => { const state = cards[product.id] || emptyCard(); const regular = normalPrice(product); const invalid = Boolean(state.day && state.dealPrice && Number(state.dealPrice) >= regular); return <article key={product.id} className="overflow-hidden rounded-3xl border border-black/7 bg-white shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg"><div className="border-b border-black/5 bg-[#F8F8F5] p-3"><label className="mb-1.5 block text-[9px] font-black uppercase tracking-[.16em] text-black/35">Assign Deal Day</label><select value={state.day} onChange={e => updateCard(product.id, { day: e.target.value as DealDay })} className="w-full rounded-xl border border-black/8 bg-white px-3 py-2.5 text-xs font-bold outline-none focus:border-[#0F6A5F]">{DEAL_OPTIONS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select></div><div className="aspect-[4/3] w-full bg-[#F3F2ED] p-5">{imageOf(product) ? <img src={imageOf(product)} alt={product.title} className="h-full w-full rounded-2xl object-cover" loading="lazy"/> : <div className="flex h-full items-center justify-center rounded-2xl bg-white text-xs font-bold text-black/25">No product image</div>}</div><div className="p-4"><h3 className="line-clamp-2 min-h-10 text-sm font-black leading-5">{product.title}</h3><div className="mt-2 flex items-center gap-2"><span className="text-sm font-black text-[#0F6A5F]">Rs. {regular.toLocaleString()}</span>{state.day && <span className="text-[10px] font-bold text-black/30">Deal price below</span>}</div><div className="mt-4 grid grid-cols-[1fr_110px] gap-2"><input value={state.dealPrice} onChange={e => updateCard(product.id, { dealPrice: e.target.value })} type="number" min="1" placeholder="Deal price" disabled={!state.day} className={`rounded-xl border px-3 py-2.5 text-xs font-bold outline-none ${invalid ? 'border-red-300 bg-red-50' : 'border-black/8 bg-white'}`}/><button type="button" onClick={() => saveDeal(product)} disabled={state.saving || !state.day || invalid} className="flex items-center justify-center gap-1.5 rounded-xl bg-[#0F6A5F] px-3 py-2.5 text-[10px] font-black uppercase tracking-wider text-white disabled:cursor-not-allowed disabled:opacity-40">{state.saving ? <Loader2 size={14} className="animate-spin"/> : <Save size={14}/>}Save</button></div></div></article>; })}</div>
+  function focusDay(day: Weekday) {
+    const existing = deals.find(deal => deal.day === day && deal.productId);
+    setActiveCategory('');
+    // An empty day must show products available for assignment, not a blank list.
+    setFilterDay(existing ? day : '');
+    setSearch('');
+    setVisibleCount(24);
+    if (!existing) {
+      setMessage(`No ${day} deal is configured. Choose any category and product below, select ${day}, then Save deal.`);
+    } else setMessage('');
+    window.setTimeout(() => catalogRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 30);
+  }
+
+  async function saveDeal(product: Product) {
+    if (!settingsReady || savingId) return;
+    const currentDeal = assignedByProduct.get(product.id);
+    const state = cards[product.id] || fromDeal(currentDeal);
+    const regular = priceOf(product), special = Number(state.dealPrice);
+    if (state.day && (!Number.isSafeInteger(special) || special <= 0 || special >= regular)) {
+      setMessage(`For ${product.title}, enter a deal price less than the regular price Rs. ${regular.toLocaleString()}.`);
+      return;
+    }
+    if (state.day) {
+      const occupant = deals.find(deal => deal.day === state.day && deal.productId !== product.id);
+      if (occupant && !window.confirm(`Replace ${occupant.title || 'the current product'} on ${state.day}? The other six deals will stay unchanged.`)) return;
+    }
+    setSavingId(product.id);
+    setMessage('');
+    try {
+      // Refresh immediately before writing and change only weeklyDeals. The
+      // independent seven-slot Big Deal rotation must never be reset here.
+      const snapshot = await getAdminDocument('settings', 'main');
+      if (!snapshot.exists()) throw new Error('Settings not available. Please retry.');
+      const saved = snapshot.data() as { weeklyDeals?: WeeklyDeal[] };
+      let next = Array.isArray(saved.weeklyDeals) ? saved.weeklyDeals : [];
+      next = next.filter(deal => deal.productId !== product.id && (!state.day || deal.day !== state.day));
+      if (state.day) {
+        next.push({
+          id: `weekly-${state.day}`, day: state.day, label: 'One Day Deal',
+          productId: product.id, imageUrl: imageOf(product), title: product.title,
+          originalPrice: regular, dealPrice: special,
+          startAt: '', endAt: '', buttonText: 'Shop Deal',
+          buttonLink: `/product/${product.id}`, active: true,
+        });
+      }
+      await setAdminDocument('settings', 'main', { weeklyDeals: next });
+      setDeals(next);
+      setCards(current => ({ ...current, [product.id]: fromDeal(next.find(item => item.productId === product.id)) }));
+      setMessage(`${product.title}: ${state.day ? state.day + ' deal' : 'deal removed'} saved. Big Deal rotation unchanged.`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Could not save deal. Try again.');
+    } finally { setSavingId(''); }
+  }
+
+  return <section className="mx-auto max-w-7xl px-3 py-5 sm:px-6">
+    <header className="mb-5 flex flex-wrap items-center justify-between gap-3">
+      <div><span className="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-[.2em] text-[#0F6A5F]"><CalendarDays size={16}/> One Day Deals Manager</span><h2 className="mt-1 text-2xl font-black">7 days. 7 deal slots.</h2><p className="mt-1 max-w-xl text-xs leading-5 text-black/50">Tap a day to see its product below. The live day uses its special price; future days keep regular prices until their day.</p></div>
+      <Link href="/admin/big-deal" className="inline-flex items-center gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-xs font-black text-amber-950">Big Deal rotation <ArrowRight size={14}/></Link>
+    </header>
+    {message && <p role="status" className="mb-4 rounded-xl border border-[#0F6A5F]/20 bg-[#E8F7F3] px-4 py-3 text-xs font-bold text-[#0F6A5F]">{message}</p>}
+
+    <div className="rounded-[26px] border border-[#C9DDCF] bg-gradient-to-b from-[#EFF8F3] to-white p-3 shadow-sm sm:p-5">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><h3 className="text-sm font-black">Weekly schedule</h3><span className="rounded-full bg-[#0F6A5F] px-3 py-1.5 text-[10px] font-bold text-white">{activeDeals.length}/7 configured · Pakistan time</span></div>
+      <div className="grid grid-cols-4 gap-2 sm:gap-3">
+        {DAYS.map(({ key, label }) => {
+          const deal = deals.find(item => item.day === key && item.active !== false);
+          const product = deal ? productById.get(deal.productId) : null;
+          const picture = imageOf(product) || deal?.imageUrl || '';
+          const isLive = Boolean(deal && key === currentDay);
+          return <button type="button" key={key} onClick={() => focusDay(key)}
+            aria-label={`View ${label} deal`} aria-pressed={filterDay === key}
+            className={`min-w-0 overflow-hidden rounded-2xl border bg-white text-left shadow-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#0F6A5F] ${filterDay===key?'border-[#0F6A5F] ring-2 ring-[#0F6A5F]/20':isLive?'border-emerald-500':'border-black/10'}`}>
+            <span className="flex items-center justify-between gap-1 px-2 py-1.5 text-[9px] font-black sm:text-xs"><span className="truncate">{label}</span><span className={`shrink-0 rounded px-1 py-0.5 text-[7px] ${isLive?'bg-emerald-100 text-emerald-700':'bg-[#F1F1EB] text-black/45'}`}>{isLive?'LIVE':deal?'SET':'—'}</span></span>
+            <span className="relative block aspect-square overflow-hidden bg-[#F2F3EE]">{picture ? <img src={picture} loading="lazy" alt="" className="h-full w-full object-cover"/> : <span className="flex h-full items-center justify-center text-[9px] font-bold text-black/30">Not set</span>}</span>
+            <span className="block px-2 py-2"><span className="block truncate text-[9px] font-semibold text-black/70" title={deal?.title || ''}>{deal?.title || 'Choose product'}</span><span className="mt-0.5 block text-[10px] font-black text-[#0F6A5F]">{deal ? `Rs. ${Number(deal.dealPrice).toLocaleString()}` : 'No deal'}</span></span>
+          </button>;
+        })}
+      </div>
+      <p className="mt-3 text-[10px] text-black/50">First row: Monday–Thursday (4). Second row: Friday–Sunday (3). A grey SET label means scheduled; LIVE is today’s active deal only.</p>
+    </div>
+
+    <div ref={catalogRef} className="mt-6 scroll-mt-20 rounded-[26px] bg-white p-3 shadow-sm sm:p-5">
+      <div className="flex flex-wrap items-center justify-between gap-2"><div><div className="flex items-center gap-2"><Tag size={15} className="text-[#0F6A5F]"/><h3 className="text-lg font-black">Choose a category</h3></div><p className="mt-1 text-[11px] text-black/45">Category select karein, neeche sirf uske products nazar aayenge.</p></div><span className="text-[11px] font-bold text-black/40">{filteredProducts.length} products</span></div>
+      <div className="mt-4 flex gap-2 overflow-x-auto pb-2 [scrollbar-width:thin]">
+        <button type="button" onClick={() => {setActiveCategory('');setFilterDay('');setVisibleCount(24);}} aria-pressed={!activeCategory&&!filterDay} className={`shrink-0 rounded-full px-4 py-2 text-xs font-bold ${!activeCategory&&!filterDay?'bg-[#0F6A5F] text-white':'bg-[#F2F1EC] text-black/70'}`}>All products</button>
+        {categoryItems.map(item => <button key={item.id} type="button"
+          onClick={() => {setActiveCategory(item.id);setFilterDay('');setSearch('');setVisibleCount(24);}} aria-pressed={activeCategory===item.id}
+          className={`shrink-0 rounded-full px-4 py-2 text-xs font-bold ${activeCategory===item.id?'bg-[#0F6A5F] text-white':'bg-[#F2F1EC] text-black/70'}`}>{item.title}</button>)}
+      </div>
+      <div className="mt-3 flex flex-wrap items-center gap-3">
+        <label className="relative block min-w-0 flex-1"><Search size={15} className="absolute left-3 top-3 text-black/35"/><input value={search} onChange={event=>{setSearch(event.target.value);setVisibleCount(24);}} placeholder="Search products or ID" className="w-full rounded-xl border border-black/10 bg-white py-2.5 pl-9 pr-3 text-xs outline-none focus:border-[#0F6A5F]"/></label>
+        {filterDay && <button type="button" onClick={()=>setFilterDay('')} className="rounded-xl bg-amber-100 px-4 py-2.5 text-xs font-bold text-amber-900">{filterDay} ×</button>}
+      </div>
+    </div>
+
+    <div className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-4 sm:gap-3 xl:gap-4">
+      {shownProducts.map(product => {
+        const saved = assignedByProduct.get(product.id);
+        const state = cards[product.id] || fromDeal(saved);
+        const regular = priceOf(product);
+        const invalid = Boolean(state.day && (!state.dealPrice || Number(state.dealPrice) <= 0 || Number(state.dealPrice) >= regular));
+        return <article key={product.id} className="min-w-0 overflow-hidden rounded-[20px] border border-black/10 bg-white shadow-sm">
+          <div className="relative aspect-square overflow-hidden bg-[#F3F2ED]">{imageOf(product) ? <img src={imageOf(product)} alt={product.title} loading="lazy" className="h-full w-full object-cover"/> : <span className="flex h-full items-center justify-center text-xs text-black/35">No image</span>}{saved && <span className="absolute left-2 top-2 rounded-full bg-[#0F6A5F] px-2 py-1 text-[8px] font-bold text-white">{saved.day.toUpperCase()} DEAL</span>}</div>
+          <div className="p-3">
+            <h4 className="line-clamp-2 min-h-9 text-xs font-extrabold sm:text-sm">{product.title}</h4><p className="mt-1 text-[11px] font-black text-[#0F6A5F]">Regular Rs. {regular.toLocaleString()}</p>
+            <label className="mt-3 block text-[10px] font-bold text-black/50">Assign day</label>
+            <div className="relative"><select value={state.day} onChange={event=>updateCard(product.id,{day:event.target.value as DealDay})} className="mt-1 w-full appearance-none rounded-xl border border-black/10 bg-white p-2.5 pr-6 text-[11px] font-bold focus:border-[#0F6A5F] focus:outline-none"><option value="">No deal</option>{DAYS.map(({key,label})=><option key={key} value={key}>{label}</option>)}</select><ChevronDown size={14} className="pointer-events-none absolute right-2 top-3.5 text-black/40"/></div>
+            <label className="mt-3 block text-[10px] font-bold text-black/50">Special price (Rs.)<input type="number" min="1" step="1" value={state.dealPrice} onChange={event=>updateCard(product.id,{dealPrice:event.target.value})} disabled={!state.day} placeholder="Deal price" className={`mt-1 block w-full rounded-xl border bg-white px-3 py-2.5 text-xs font-bold focus:outline-none ${invalid?'border-red-400':'border-black/10'}`}/></label>
+            <button type="button" disabled={Boolean(savingId)||!settingsReady||invalid||(!state.day&&!saved)}
+              onClick={()=>void saveDeal(product)} className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#0F6A5F] px-3 py-3 text-xs font-bold text-white disabled:cursor-not-allowed disabled:opacity-40">
+              {savingId===product.id?<Loader2 size={14} className="animate-spin"/>:state.day?<Save size={14}/>:<CheckCircle2 size={14}/>}
+              {savingId===product.id?'Saving…':!state.day?'Remove deal':'Save deal'}
+            </button>
+          </div>
+        </article>;
+      })}
+    </div>
+    {!filteredProducts.length && <p className="mt-4 rounded-2xl bg-white p-6 text-center text-xs text-black/50">No products for these filters.</p>}
+    {filteredProducts.length > visibleCount && <div className="mt-5 text-center"><button type="button" onClick={()=>setVisibleCount(value=>value+24)} className="rounded-xl bg-[#14140F] px-6 py-3 text-xs font-black text-white">Show more products ({filteredProducts.length-visibleCount} remaining)</button></div>}
   </section>;
 }

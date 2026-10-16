@@ -1,28 +1,17 @@
 import { NextResponse } from 'next/server';
-import { getAdminAuth } from '@/lib/firebaseAdmin';
-import { approveResellerReward } from '@/lib/resellerRewardsAdmin';
-import { mirrorLegacyApprovedReward } from '@/lib/resellerDualMirror';
+import { authorizedWalletAdmin } from '@/lib/walletAdminSession';
+
 export const runtime = 'nodejs';
-const ADMIN_UID = process.env.FIREBASE_ADMIN_UID || '';
-async function requireAdmin(request: Request) {
-  const header = request.headers.get('authorization') || '';
-  if (!header.startsWith('Bearer ')) throw new Error('Unauthorized');
-  const decoded = await getAdminAuth().verifyIdToken(header.slice(7));
-  if (!ADMIN_UID || decoded.uid !== ADMIN_UID) throw new Error('Forbidden');
-}
+
+/** Manual "Confirm + Reward" is intentionally retired.
+ * The only automatic payout path is Admin Orders -> Delivered, where a
+ * transactional order ledger prevents duplicate cashback and voucher credits.
+ */
 export async function POST(request: Request) {
-  try {
-    await requireAdmin(request);
-    const body = await request.json();
-    const resellerUserId = String(body?.resellerUserId || '');
-    const orderId = String(body?.orderId || '');
-    const orderTotal = Number(body?.orderTotal || 0);
-    const source = String(body?.source || 'website');
-    if (!resellerUserId || !orderId || !Number.isFinite(orderTotal)) return NextResponse.json({ error: 'Reseller ID, order ID and valid order total are required.' }, { status: 400 });
-    const result = await approveResellerReward({ resellerUserId, orderId, orderTotal, source });
-    await mirrorLegacyApprovedReward(orderId);
-    return NextResponse.json({ ok: true, ...result });
-  } catch (error) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : 'Unable to approve reseller reward.' }, { status: 403 });
+  if (!authorizedWalletAdmin(request)) {
+    return NextResponse.json({ error: 'Admin login required.' }, { status: 401 });
   }
+  return NextResponse.json({
+    error: 'Manual rewards are disabled. Mark the verified order Delivered in Admin Orders to issue cashback once.',
+  }, { status: 409 });
 }

@@ -5,6 +5,7 @@ import { publicProductCacheTag } from '@/lib/storefrontCachePolicy';
 import { getAdminDb } from '@/lib/firebaseAdmin';
 import {
   getSupabasePrimaryPayload,
+  isSupabaseWriteConfigured,
   mapDocumentToSupabase,
   recordMirrorFailure,
   supabasePrimaryDelete,
@@ -210,6 +211,13 @@ export async function POST(request: Request) {
 
     if (action === 'get') {
       if (!id) return NextResponse.json({ error: 'Document id is required.' }, { status: 400 });
+      // The website reads Supabase-primary settings. Admin must read the very
+      // same authoritative document before editing weekly deals; reading only
+      // the Firestore mirror risks silently replacing newer deal schedules.
+      if (name === 'settings' && isSupabaseWriteConfigured()) {
+        const data = await getSupabasePrimaryPayload(name, id);
+        if (data) return NextResponse.json({ success: true, exists: true, data });
+      }
       const snapshot = await db.collection(name).doc(id).get();
       return NextResponse.json({ success: true, exists: snapshot.exists, data: snapshot.exists ? snapshot.data() : null });
     }
