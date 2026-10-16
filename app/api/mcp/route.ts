@@ -103,7 +103,7 @@ function safeProduct(item: any) {
   };
 }
 function safeCategory(category: any) {
-  if (!isPublic(category)) return null;
+  if (typeof category !== 'string' && !isPublic(category)) return null;
   const name = typeof category === 'string'
     ? category.trim()
     : text(category.title) || text(category.name) || text(category.label);
