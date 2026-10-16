@@ -1,7 +1,7 @@
 /** Global persistent cart state + global variant selector trigger. */
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
-import type { ProductVariantRow, ProductVariantSelection, Weekday } from '@/lib/types';
+import type { MarkedProductImage, ProductVariantRow, ProductVariantSelection, Weekday } from '@/lib/types';
 import { trackMetaStoreEvent } from '@/lib/metaPixel';
 
 export const FREE_DELIVERY_THRESHOLD = 5;
@@ -20,6 +20,7 @@ export interface CartItem {
   productId?: string;
   category?: string;
   variant?: ProductVariantSelection;
+  markedImages?: MarkedProductImage[];
 }
 
 export interface VariantModalProduct {
