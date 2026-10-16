@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { createHash } from 'node:crypto';
 import { pakistanDay } from '@/lib/notifications/dailyPush';
 import { calculateDeliveryCharge } from '@/lib/deliveryCharges';
 import { getDualProduct, getDualStorefrontSettings } from '@/lib/dualReadServer';
@@ -211,8 +212,13 @@ export async function POST(request: Request) {
     const voucher = submittedVoucher
       ? resolveCheckoutVoucher(await listCheckoutVouchers(), submittedVoucher, eligibleSubtotal)
       : null;
-    if (voucher?.kind === 'cash' && (!user || !reseller?.userId)) {
-      throw new Error('Sign in to your active Prime Family account to use cash vouchers.');
+    if (voucher?.kind === 'cash') {
+      if (!user || !reseller?.userId) {
+        throw new Error('Sign in to your active Prime Family account to use cash vouchers.');
+      }
+      const claimId = createHash('sha256').update(user.uid + ':' + voucher.code).digest('hex');
+      const prior = await getAdminDb().collection('reseller_voucher_claims').doc(claimId).get();
+      if (prior.exists) throw new Error('This cash voucher was already used by your account.');
     }
     const voucherDiscount = voucher?.kind === 'discount' ? voucher.amount : 0;
     const voucherCashAmount = voucher?.kind === 'cash' ? voucher.amount : 0;
