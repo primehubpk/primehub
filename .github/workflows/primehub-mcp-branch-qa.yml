@@ -31,3 +31,43 @@ jobs:
         run: npm run build
         env:
           CI: 'true'
+
+      - name: Run MCP HTTP protocol smoke tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run start -- -p 3217 > /tmp/primehub-mcp-start.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" || true' EXIT
+          for i in $(seq 1 40); do
+            if curl -fsS http://localhost:3217/robots.txt >/dev/null 2>&1; then break; fi
+            sleep 1
+          done
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          const base = 'http://127.0.0.1:3217/api/mcp';
+          const request = async (method, params = {}, extras = {}) => {
+            const response = await fetch(base, {
+              method: 'POST',
+              headers: {'content-type': 'application/json', 'accept': 'application/json,text/event-stream', ...extras},
+              body: JSON.stringify({jsonrpc: '2.0', id: 1, method, params}),
+            });
+            return {status: response.status, data: await response.json()};
+          };
+          const old = await request('initialize', {protocolVersion:'2025-11-25', capabilities:{}, clientInfo:{name:'smoke',version:'1'}});
+          assert.equal(old.status, 200);
+          assert.equal(old.data.result.serverInfo.name, 'primehubmall-store');
+          const tools = await request('tools/list');
+          assert.deepEqual(tools.data.result.tools.map(t => t.name), ['search_products','list_categories','get_product']);
+          const modern = await request('server/discover', {
+            _meta:{'io.modelcontextprotocol/clientInfo':{name:'smoke',version:'1'}},
+          }, {'mcp-protocol-version':'2026-07-28', 'mcp-method':'server/discover'});
+          assert.equal(modern.status, 200);
+          assert.equal(modern.data.result.resultType, 'complete');
+          assert.ok(modern.data.result.supportedVersions.includes('2026-07-28'));
+          const invalidTool = await request('tools/call',{name:'delete_orders',arguments:{}});
+          assert.equal(invalidTool.data.error.code, -32602);
+          const blockedOrigin = await request('tools/list', {}, { origin:'https://unrelated.example' });
+          assert.equal(blockedOrigin.status, 403);
+          console.log('MCP initialize, tools, modern discovery and safety smoke tests passed');
+          NODE
