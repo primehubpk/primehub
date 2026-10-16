@@ -162,7 +162,9 @@ export function useProductDetail(options?: {
 
   const regularPrice = product ? regularPriceOf(product) : 0;
   const productOriginal = product ? originalPriceOf(product) : 0;
-  const stock = Number(product?.stock ?? product?.quantity ?? product?.inventory ?? 10);
+  // Match the storefront's default inventory of 30 only when no stock was set.
+  // Nullish fallback preserves an intentionally configured stock of 0.
+  const stock = Number(product?.stock ?? product?.quantity ?? product?.inventory ?? 30);
   const rating = Number(product?.rating || 0);
   const reviews = Number(product?.reviews || 0);
   const normalizedVariants = useMemo(
