@@ -65,19 +65,6 @@ export default function CartPage() {
           <p className="mt-2 text-[10px] text-black/45">5 total items = Rs. 0 delivery, including wholesale items. Shop pickup is always free.</p>
         </section>
 
-        <CartSummary
-          totalItems={itemCount}
-          quote={selection.quote as any}
-          loading={selection.loading}
-          quoteError={selection.quoteError}
-          selfCollect={selection.selfCollect}
-          setSelfCollect={selection.setSelfCollect}
-          coupon={selection.voucherInput}
-          setCoupon={selection.setVoucherInput}
-          voucherCode={selection.voucherCode}
-          applyCoupon={selection.applyVoucher}
-        />
-
         <section className="pt-2">
           <div className="mb-4 flex items-end justify-between gap-3">
             <div>
@@ -90,6 +77,20 @@ export default function CartPage() {
             {items.map(item => <CartItem key={String(item.id)} item={item} removeItem={removeItem} updateQty={updateQty}/>)}
           </div>
         </section>
+
+        <CartSummary
+          totalItems={itemCount}
+          signedIn={selection.signedIn}
+          quote={selection.quote as any}
+          loading={selection.loading}
+          quoteError={selection.quoteError}
+          selfCollect={selection.selfCollect}
+          setSelfCollect={selection.setSelfCollect}
+          coupon={selection.voucherInput}
+          setCoupon={selection.setVoucherInput}
+          voucherCode={selection.voucherCode}
+          applyCoupon={selection.applyVoucher}
+        />
       </div>
     </main>
   );
