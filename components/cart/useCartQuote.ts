@@ -42,7 +42,9 @@ export function useCartQuote(items: CartItem[]) {
     setLoading(true);
     setQuote(null);
     setQuoteError('');
-    (async () => {
+    // Debounce quantity taps so one quick cart edit does not create multiple
+    // chargeable server/database quotes.
+    const timer = window.setTimeout(() => { void (async () => {
       try {
         const user = auth.currentUser;
         const token = user && user.uid === uid ? await user.getIdToken() : '';
@@ -62,8 +64,8 @@ export function useCartQuote(items: CartItem[]) {
       } finally {
         if (!cancelled) setLoading(false);
       }
-    })();
-    return () => { cancelled = true; abort.abort(); };
+    })(); }, 250);
+    return () => { cancelled = true; window.clearTimeout(timer); abort.abort(); };
   }, [items, selfCollect, voucherCode, uid, authReady, preferencesReady, quoteNonce]);
 
   const applyVoucher = () => {
