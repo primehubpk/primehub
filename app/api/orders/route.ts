@@ -229,6 +229,16 @@ export async function POST(request: Request) {
     const eligibleAfterVoucher = Math.max(0, eligibleSubtotal - voucherDiscount);
     // Discount at checkout has been replaced by CASHBACK only after Admin delivery.
     const tierDiscountPercent = 0, tierDiscount = 0;
+    // Share only public Admin tier labels / thresholds with the cart UI.
+    // Neither tier selection nor credit amount is ever trusted from the browser.
+    const cashbackTiers = Array.isArray(settings.resellerTiers) && settings.resellerTiers.length === 4
+      ? settings.resellerTiers.map((tier: any) => ({
+          id: String(tier.id || ''),
+          name: String(tier.name || '').slice(0, 30),
+          minMonthlyOrders: Math.max(0, Number(tier.minMonthlyOrders || 0)),
+          cashbackPercent: Math.min(100, Math.max(0, Number(tier.discountPercent || 0))),
+        })).sort((a: any, b: any) => a.minMonthlyOrders - b.minMonthlyOrders)
+      : [];
     const cashbackPercent = reseller?.discountPercent || 0;
     const cashbackEstimate = cashbackPercent > 0 ? cashBackForTier(eligibleAfterVoucher, cashbackPercent) : 0;
     const subtotal = Math.max(0, rawSubtotal - voucherDiscount);
@@ -251,7 +261,7 @@ export async function POST(request: Request) {
     const quote = { items, rawSubtotal, tierDiscount, tierDiscountPercent, resellerTier: reseller?.tierName || '',
       eligibleSubtotal, eligibleAfterVoucher, voucherCode: voucher?.code || '', voucherId: voucher?.id || '',
       voucherKind: voucher?.kind || '', voucherDiscount, voucherCashAmount,
-      cashbackPercent, cashbackEstimate, cashbackPolicy: 'delivered_only_v1',
+      cashbackPercent, cashbackEstimate, cashbackMemberActive: Boolean(reseller?.userId), cashbackTiers, cashbackPolicy: 'delivered_only_v1',
       subtotal, totalItems, ...delivery, total, selfCollect, fulfillment: selfCollect ? 'self_collect' : 'delivery',
       freeDeliveryReward, rewardLabel: freeDeliveryReward ? 'Spin & Win Reward — Free Delivery' : '',
       walletShoppingBalance, walletShoppingApplied, amountDue };
