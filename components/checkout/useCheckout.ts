@@ -161,6 +161,7 @@ export function useCheckout() {
         variantText(validated.variant),
         `Rs. ${Number(validated.price).toLocaleString()} each`,
         `Photo: ${validated.image || '-'}`,
+        ...(Array.isArray(validated.markedImages) ? validated.markedImages.map((photo: { markedUrl: string }, photoIndex: number) => `Marked favourite photo ${photoIndex + 1}: ${photo.markedUrl}`) : []),
       ].join('\n'));
       const text = [
         '*PrimeHubMall WhatsApp Order Request*',
