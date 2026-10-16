@@ -3,19 +3,11 @@ export type BenefitItem = { productId: string; price: number; quantity: number; 
 export type BenefitSettings = { dailyDeal?: any; weeklyDeals?: any[] };
 
 export function orderEligibleSubtotal(items: BenefitItem[], settings: BenefitSettings) {
-  const excluded = new Set<string>();
-  const weekly = Array.isArray(settings.weeklyDeals) ? settings.weeklyDeals : [];
-  // Exclude all products currently assigned to enabled special-deal sections,
-  // including off-day or rotating Big Deal slots, avoiding double promotions.
-  for (const row of weekly) if (row?.active !== false && row?.productId) excluded.add(String(row.productId));
-  const big = settings.dailyDeal;
-  if (big?.active === true) {
-    for (const id of [...(Array.isArray(big.productIds) ? big.productIds : []), big.productId]) {
-      if (id) excluded.add(String(id));
-    }
-  }
+  // Only verified special-deal prices are ineligible. Do not punish customers
+  // who buy a scheduled weekly/rotating Big Deal item at its ordinary price.
+  // The order API sets rewardExcluded based on authoritative Admin deal data.
   return items.reduce((sum, item) => {
-    if (excluded.has(String(item.productId)) || item.weeklyDealDay || item.rewardExcluded) return sum;
+    if (item.weeklyDealDay || item.rewardExcluded) return sum;
     const lineTotal = Number(item.price) * Number(item.quantity);
     if (!Number.isSafeInteger(lineTotal) || lineTotal < 0) throw new Error('Invalid eligible order amount.');
     if (!Number.isSafeInteger(sum + lineTotal)) throw new Error('Order total exceeds supported range.');
