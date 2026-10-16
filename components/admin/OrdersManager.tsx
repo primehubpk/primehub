@@ -90,6 +90,13 @@ function itemImage(item: OrderItem) {
   }
 }
 
+function markedPhotosFor(item: OrderItem) {
+  const raw = item.markedImages;
+  if (!Array.isArray(raw)) return [] as string[];
+  return raw.slice(0, 12).map((photo: any) => textValue(photo?.markedUrl))
+    .filter((url: string) => /^https:\/\/images\.primehubmall\.com\/products\/customer-marks\//.test(url));
+}
+
 function itemVariant(item: OrderItem) {
   const variant = item.variant;
   if (!variant || typeof variant !== 'object') return '';
@@ -227,6 +234,7 @@ function orderForwardMessage(order: Order) {
     if (price > 0) lines.push(`Line total: Rs. ${money(price * quantity)}`);
     if (item.isWholesale === true) lines.push('Wholesale: Yes');
     if (image) lines.push(`Image: ${image}`);
+    markedPhotosFor(item).forEach((url, photoIndex) => lines.push(`Customer marked photo ${photoIndex + 1}: ${url}`));
   });
 
   lines.push('', '💰 *Order Total*');
@@ -654,6 +662,7 @@ export default function OrdersManager() {
                   <div className="mt-3 divide-y divide-black/7">
                     {items.length > 0 ? items.map((item, index) => {
                       const image = itemImage(item);
+                      const markedPhotos = markedPhotosFor(item);
                       const quantity = Math.max(1, Number(item.quantity || 1));
                       const price = Number(item.price || 0);
                       const variant = itemVariant(item);
@@ -671,6 +680,18 @@ export default function OrdersManager() {
                           <div className="min-w-0">
                             <p className="text-xs font-black leading-5 sm:text-sm">{item.title || 'Item'}</p>
                             {variant && <p className="mt-0.5 text-[10px] font-semibold text-black/45">{variant}</p>}
+                            {markedPhotos.length > 0 ? (
+                              <div className="mt-2">
+                                <p className="mb-1 text-[9px] font-black text-[#0F6A5F]">Customer marked favourite colours · {markedPhotos.length} photo{markedPhotos.length === 1 ? '' : 's'}</p>
+                                <div className="flex flex-wrap gap-2">
+                                  {markedPhotos.map((url, photoIndex) => (
+                                    <a key={url} href={url} target="_blank" rel="noopener noreferrer" title={`Open marked photo ${photoIndex + 1}`} className="relative block h-16 w-16 overflow-hidden rounded-lg border-2 border-[#0F6A5F]/40">
+                                      <img src={url} alt={`Customer marked product photo ${photoIndex + 1}`} loading="lazy" className="h-full w-full object-cover"/>
+                                    </a>
+                                  ))}
+                                </div>
+                              </div>
+                            ) : null}
                             <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                               <span className="rounded-full bg-white px-2 py-1 text-[9px] font-black text-black/55">Qty {quantity}</span>
                               {wholesale && <span className="rounded-full bg-amber-100 px-2 py-1 text-[9px] font-black text-amber-700">Wholesale</span>}

@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Bot, Minus, Plus, ShoppingCart, X, Zap } from 'lucide-react';
-import type { ProductVariantRow, ProductVariantSelection } from '@/lib/types';
+import { Bot, Check, ChevronRight, Minus, Pencil, Plus, ShoppingCart, Sparkles, X, Zap } from 'lucide-react';
+import type { MarkedProductImage, ProductVariantRow, ProductVariantSelection } from '@/lib/types';
+import MarkedPhotoEditor from '@/components/product-detail/MarkedPhotoEditor';
 import { normalizeProductVariants, type VariantModalProduct } from '@/lib/cartStore';
 import { normalizeImageUrl } from '@/lib/imageUrl';
 import { money, titleOf } from './ProductDetailTypes';
@@ -18,7 +19,7 @@ type Props = {
   originalPrice: number;
   preferredImage?: string;
   onClose: () => void;
-  onConfirm: (selection: ProductVariantSelection, quantity: number) => void;
+  onConfirm: (selection: ProductVariantSelection, quantity: number, markedImages?: MarkedProductImage[]) => void;
 };
 
 const warmedImages = new Map<string, HTMLImageElement>();
@@ -189,6 +190,24 @@ export default function VariantSelectorBottomSheet({
   const [color, setColor] = useState('');
   const [size, setSize] = useState('');
   const [qty, setQty] = useState(Math.max(1, quantity));
+  const [markEditorOpen, setMarkEditorOpen] = useState(false);
+  const [markedImages, setMarkedImages] = useState<MarkedProductImage[]>([]);
+  const markableImages = useMemo(() => {
+    const candidates: unknown[] = [
+      ...(Array.isArray(product.images) ? product.images : []),
+      ...(Array.isArray((product as any).galleryImages) ? (product as any).galleryImages : []),
+      product.imageUrl, product.image,
+      ...colors.map((item) => item.imageUrl),
+      ...effectiveRows.map((row) => row.imageUrl),
+      ...Object.values(product.colorImages || {}),
+      fallbackImage,
+    ];
+    return Array.from(new Set(candidates.map(safeImage).filter(Boolean))).slice(0, 12);
+  }, [product, colors, effectiveRows, fallbackImage]);
+
+  useEffect(() => {
+    if (open) { setMarkedImages([]); setMarkEditorOpen(false); }
+  }, [open, product.id]);
 
   useEffect(() => {
     if (!open) return;
@@ -312,7 +331,7 @@ export default function VariantSelectorBottomSheet({
           <div>
             <div className="flex items-center justify-between gap-2">
               <p className="text-[10px] font-black uppercase tracking-[0.18em] text-black/45">Color</p>
-              <div className="flex min-w-0 items-center gap-2">
+              <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
                 <span className="truncate text-[9px] font-bold text-black/30">{color || 'Choose one'}</span>
                 <button
                   type="button"
@@ -327,6 +346,34 @@ export default function VariantSelectorBottomSheet({
                 </button>
               </div>
             </div>
+
+            {markableImages.length > 0 ? (
+              <button
+                type="button"
+                onClick={() => setMarkEditorOpen(true)}
+                aria-label="Open photo editor to mark your favourite colours and attach saved photos to your order"
+                className="group mt-3 flex w-full touch-manipulation items-center gap-3 rounded-2xl border border-[#B8DED1] bg-[linear-gradient(115deg,#E8F6F0_0%,#FDFCF9_70%,#FFF0D1_100%)] px-3 py-3.5 text-left shadow-[0_5px_18px_rgba(15,106,95,0.09)] transition-all hover:border-[#0F6A5F]/40 active:scale-[0.99]"
+              >
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#0F6A5F] text-white shadow-[0_4px_12px_rgba(15,106,95,0.22)]">
+                  <Pencil size={19} aria-hidden="true" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="flex flex-wrap items-center gap-1.5">
+                    <span className="text-[12px] font-black leading-4 text-[#124F46]">Edit & mark your favourite colours</span>
+                    <span className="inline-flex items-center gap-1 rounded-full bg-white/90 px-2 py-0.5 text-[8px] font-extrabold text-[#A56A0A] ring-1 ring-[#EBD9B3]">
+                      <Sparkles size={10} aria-hidden="true" />
+                      {markedImages.length ? `${markedImages.length} SAVED` : 'YOUR CHOICE'}
+                    </span>
+                  </span>
+                  <span className="mt-1 block text-[10px] font-semibold leading-[1.55] text-[#31534C]">
+                    Tap a photo, circle the colours you want & save. Your marked photos will automatically attach to your cart and order.
+                  </span>
+                </span>
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-[#0F6A5F] shadow-sm transition-transform group-hover:translate-x-0.5">
+                  <ChevronRight size={19} aria-hidden="true" />
+                </span>
+              </button>
+            ) : null}
 
             <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
               {colors.map((item) => {
@@ -375,6 +422,12 @@ export default function VariantSelectorBottomSheet({
             </div>
           </div>
 
+          {markedImages.length > 0 ? (
+            <div className="mt-3 rounded-xl bg-[#EAF7F3] px-3 py-2 text-[10px] font-bold text-[#0F6A5F]">
+              <Check size={13} className="mr-1 inline"/> {markedImages.length} marked photo{markedImages.length === 1 ? '' : 's'} saved. They will appear in your cart and order.
+            </div>
+          ) : null}
+
           <div className="mt-5 border-t border-black/7 pt-4">
             <div className="flex items-center justify-between">
               <p className="text-[10px] font-black uppercase tracking-[0.18em] text-black/45">Size</p>
@@ -416,10 +469,19 @@ export default function VariantSelectorBottomSheet({
           </div>
         </div>
 
-        <button type="button" disabled={!valid} onClick={() => onConfirm({ color: color || undefined, size: size || undefined }, safeQty)} className={`flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl py-4 text-xs font-black text-white shadow-lg transition-all disabled:cursor-not-allowed disabled:opacity-40 ${mode === 'buy' ? 'bg-[#E1352B]' : 'bg-[#14140F]'}`}>
+        <button type="button" disabled={!valid} onClick={() => onConfirm({ color: color || undefined, size: size || undefined }, safeQty, markedImages)} className={`flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl py-4 text-xs font-black text-white shadow-lg transition-all disabled:cursor-not-allowed disabled:opacity-40 ${mode === 'buy' ? 'bg-[#E1352B]' : 'bg-[#14140F]'}`}>
           {mode === 'buy' ? <Zap size={17} fill="currentColor" /> : <ShoppingCart size={17} />}
           {mode === 'buy' ? 'Buy Now / Proceed to Checkout' : 'Add to Cart'}
         </button>
+        {markEditorOpen ? (
+          <MarkedPhotoEditor
+            productId={String(product.id)}
+            images={markableImages}
+            markedImages={markedImages}
+            onSaved={(image) => setMarkedImages((current) => [...current.filter((item) => item.originalUrl !== image.originalUrl), image])}
+            onClose={() => setMarkEditorOpen(false)}
+          />
+        ) : null}
       </section>
     </div>
   );

@@ -10,6 +10,7 @@ import StorefrontPageCache from '@/components/StorefrontPageCache';
 import GlobalFooter from '@/components/GlobalFooter';
 import ProductOverlayHost from '@/components/ProductOverlayHost';
 import CartMiniBar from '@/components/CartMiniBar';
+import FloatingCartShortcut from '@/components/FloatingCartShortcut';
 import PWARegister from '@/components/PWARegister';
 import VisitorTracker from '@/components/VisitorTracker';
 import MetaPixelTracker from '@/components/MetaPixelTracker';
@@ -164,6 +165,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <GlobalFooter />
           <GlobalVariantSelector />
           <CartMiniBar />
+          <FloatingCartShortcut />
           <AdminQuickAccess />
           <PWARegister />
           <SalarViewportShell />

@@ -284,6 +284,12 @@ public class MainActivity extends Activity {
     private class StoreWebViewClient extends WebViewClient {
         @Override
         public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+            // Embedded YouTube players are subframe navigations, not a customer
+            // asking to leave PrimeHub. Do not launch Chrome for iframe URLs.
+            // Only top-level outbound navigation opens the external app/browser.
+            if (!request.isForMainFrame()) {
+                return false;
+            }
             return handleUrl(request.getUrl());
         }
 

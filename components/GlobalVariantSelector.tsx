@@ -6,7 +6,7 @@ import {
   type VariantModalProduct,
 } from '@/lib/cartStore';
 import VariantSelectorBottomSheet from '@/components/product-detail/VariantSelectorBottomSheet';
-import type { ProductVariantSelection } from '@/lib/types';
+import type { MarkedProductImage, ProductVariantSelection } from '@/lib/types';
 import { getEffectivePrice, getPakistanDay } from '@/lib/dealPricing';
 import { makeTikTokContent, trackTikTokEvent } from '@/lib/tiktokPixel';
 
@@ -52,7 +52,7 @@ export default function GlobalVariantSelector() {
   );
   const title = product.title || product.name || 'PrimeHub Deal';
 
-  function confirm(selection: ProductVariantSelection, quantity: number) {
+  function confirm(selection: ProductVariantSelection, quantity: number, markedImages: MarkedProductImage[] = []) {
     if (!product) return;
 
     const selected = rows.find(
@@ -70,7 +70,7 @@ export default function GlobalVariantSelector() {
       new Date(),
     );
     const finalPrice = dealDay ? price : variantPrice;
-    const image = String(selected?.imageUrl || imageOf(product));
+    const image = String(markedImages[0]?.markedUrl || selected?.imageUrl || imageOf(product));
     const variantIdentity = Object.entries(selection)
       .filter(([, value]) => Boolean(value))
       .sort(([a], [b]) => a.localeCompare(b))
@@ -89,6 +89,7 @@ export default function GlobalVariantSelector() {
         image,
         imageUrl: image,
         variant: selection,
+        markedImages,
       });
     }
 
