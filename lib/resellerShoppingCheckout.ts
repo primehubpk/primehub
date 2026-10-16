@@ -4,12 +4,13 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { getAdminDb } from '@/lib/firebaseAdmin';
 import { mirrorResellerFirestoreDoc } from '@/lib/resellerDualMirror';
 
-export function allocateShoppingCash(shopping: number, withdrawable: number, total: number) {
-  if (![shopping, withdrawable, total, shopping + withdrawable].every(n => Number.isSafeInteger(n) && n >= 0) || total <= 0) {
+export function allocateShoppingCash(shopping: number, withdrawable: number, total: number, eligibleLimit = total) {
+  if (![shopping, withdrawable, total, eligibleLimit, shopping + withdrawable].every(n => Number.isSafeInteger(n) && n >= 0) ||
+      total <= 0 || eligibleLimit > total) {
     throw new Error('Invalid shopping cash allocation.');
   }
-  const shoppingApplied = Math.min(shopping, total);
-  const withdrawableApplied = Math.min(withdrawable, total - shoppingApplied);
+  const shoppingApplied = Math.min(shopping, eligibleLimit);
+  const withdrawableApplied = Math.min(withdrawable, eligibleLimit - shoppingApplied);
   return { shoppingApplied, withdrawableApplied, amount: shoppingApplied + withdrawableApplied,
     amountDue: total - shoppingApplied - withdrawableApplied };
 }
@@ -17,6 +18,7 @@ export function allocateShoppingCash(shopping: number, withdrawable: number, tot
 export function walletOrderFingerprint(data: Record<string, any>) {
   return createHash('sha256').update(JSON.stringify({
     customer: data.customer, items: data.items, subtotal: data.subtotal,
+    eligibleAfterVoucher: data.eligibleAfterVoucher, voucherCode: data.voucherCode,
     deliveryCharge: data.deliveryCharge, total: data.total,
     selfCollect: data.selfCollect, resellerUserId: data.resellerUserId,
   })).digest('hex');
@@ -67,7 +69,7 @@ export async function createShoppingWalletOrder(userId: string, orderId: string,
     // First use restricted shopping cash. Only then spend withdrawable rewards.
     // Both balances are decremented atomically with the actual order creation.
     const { shoppingApplied, withdrawableApplied, amount, amountDue } =
-      allocateShoppingCash(shopping, withdrawable, orderData.total);
+      allocateShoppingCash(shopping, withdrawable, orderData.total, Number(orderData.eligibleAfterVoucher ?? orderData.total));
     const savedOrder = {
       ...orderData, resellerUserId: userId, walletFingerprint: fingerprint,
       walletShoppingApplied: amount, walletShoppingOnlyApplied: shoppingApplied,
