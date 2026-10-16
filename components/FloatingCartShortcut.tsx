@@ -9,6 +9,7 @@ import { useCartStore } from '@/lib/cartStore';
 /**
  * A one-tap way back to the full cart while browsing or scrolling anywhere.
  * Independent from the existing cart mini panel and its minimize/drawer state.
+ * Shares the bottom offset of Salar's closed launcher on the opposite side.
  */
 export default function FloatingCartShortcut() {
   const pathname = usePathname();
@@ -32,7 +33,7 @@ export default function FloatingCartShortcut() {
       prefetch={false}
       aria-label={`View shopping cart, ${count} item${count === 1 ? '' : 's'}`}
       title="View cart"
-      className="fixed left-2 top-[43%] z-[60] flex h-12 w-12 -translate-y-1/2 touch-manipulation items-center justify-center rounded-full border-2 border-white bg-[#14140F] text-white shadow-[0_8px_26px_rgba(20,20,15,0.28)] transition-transform active:scale-95 sm:left-4 sm:h-14 sm:w-14"
+      className="fixed bottom-[104px] left-3 z-[49] flex h-14 w-14 touch-manipulation items-center justify-center rounded-full border-2 border-white bg-[#14140F] text-white shadow-[0_8px_26px_rgba(20,20,15,0.28)] transition-transform active:scale-95 sm:bottom-6 sm:left-5"
     >
       <ShoppingCart size={21} aria-hidden="true" />
       <span aria-hidden="true" className="absolute -right-1.5 -top-1.5 flex min-h-6 min-w-6 items-center justify-center rounded-full bg-[#E1352B] px-1 text-[10px] font-black leading-none text-white ring-2 ring-white">
