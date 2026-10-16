@@ -10,7 +10,7 @@ import { createShoppingWalletOrder, shoppingWalletBalance } from '@/lib/reseller
 export const runtime = 'nodejs';
 const WEEKDAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const;
 type Weekday = (typeof WEEKDAYS)[number];
-type IncomingItem = { id?: string | number; productId?: string; name?: string; title?: string; price?: number; originalPrice?: number; image?: string; imageUrl?: string; qty?: number; quantity?: number; dealDay?: Weekday; variant?: { color?: string; size?: string } };
+type IncomingItem = { id?: string | number; productId?: string; name?: string; title?: string; price?: number; originalPrice?: number; image?: string; imageUrl?: string; qty?: number; quantity?: number; dealDay?: Weekday; variant?: { color?: string; size?: string }; markedImages?: Array<{ originalUrl?: string; markedUrl?: string }> };
 type Customer = { name: string; phone: string; email?: string; address: string; city: string; notes?: string };
 type SalarOrderContext = { chatId: string; customerImageUrls: string[]; markedImageUrl?: string };
 type RewardWallet = { freeDeliveryCredits?: number; history?: any[]; [key: string]: any };
@@ -32,6 +32,29 @@ function cleanSalarOrderContext(value: unknown): SalarOrderContext | null {
 function pakistanWeekday(): Weekday { const day = new Intl.DateTimeFormat('en-US', { timeZone: 'Asia/Karachi', weekday: 'long' }).format(new Date()).toLowerCase(); return (WEEKDAYS.includes(day as Weekday) ? day : 'sunday') as Weekday; }
 function numberValue(value: unknown) { const parsed = Number(value); return Number.isFinite(parsed) ? parsed : 0; }
 function cleanGuestId(value: unknown) { const id = String(value || '').trim(); return /^g_[a-zA-Z0-9]{12,80}$/.test(id) ? id : ''; }
+function trustedMarkedImages(input: IncomingItem, productId: string) {
+  if (!Array.isArray(input.markedImages)) return [];
+  const photos: Array<{ originalUrl: string; markedUrl: string }> = [];
+  const unique = new Set<string>();
+  for (const row of input.markedImages.slice(0, 12)) {
+    const markedUrl = String(row?.markedUrl || '').trim();
+    const originalUrl = String(row?.originalUrl || '').trim();
+    try {
+      const marked = new URL(markedUrl), original = new URL(originalUrl);
+      const prefix = `/products/customer-marks/${productId}/`;
+      if (marked.protocol !== 'https:' || marked.hostname !== 'images.primehubmall.com' ||
+          marked.username || marked.password || marked.port || marked.search || marked.hash ||
+          !marked.pathname.startsWith(prefix) ||
+          !/^[0-9a-f-]{36}\\.webp$/.test(marked.pathname.slice(prefix.length)) ||
+          original.protocol !== 'https:' ||
+          !['images.primehubmall.com', 'i.ibb.co'].includes(original.hostname) ||
+          unique.has(markedUrl)) continue;
+      photos.push({ originalUrl, markedUrl });
+      unique.add(markedUrl);
+    } catch {}
+  }
+  return photos;
+}
 function variantValue(row: any, key: 'color' | 'size') { const direct = row?.[key] ?? row?.[`variant${key[0].toUpperCase()}${key.slice(1)}`]; if (typeof direct === 'string' || typeof direct === 'number') return String(direct).trim().toLowerCase(); if (row?.options && typeof row.options === 'object') { const value = row.options[key]; if (typeof value === 'string' || typeof value === 'number') return String(value).trim().toLowerCase(); } return ''; }
 function findVariant(product: any, item: IncomingItem) { const rows = [...(Array.isArray(product.variantMatrix) ? product.variantMatrix : []), ...(Array.isArray(product.variants) ? product.variants : [])]; if (!rows.length) return null; const variant = item.variant || {}; const wantedColor = variant.color ? String(variant.color).trim().toLowerCase() : ''; const wantedSize = variant.size ? String(variant.size).trim().toLowerCase() : ''; return rows.find((row: any) => (!wantedColor || variantValue(row, 'color') === wantedColor) && (!wantedSize || variantValue(row, 'size') === wantedSize)) || rows[0]; }
 
@@ -63,7 +86,8 @@ async function buildAuthoritativeItems(items: IncomingItem[]) {
     const price = isLiveDealItem ? liveDealPrice : (variant && numberValue(variant.price) > 0 ? numberValue(variant.price) : regularPrice);
     if (price <= 0) throw new Error('Product price is not available.');
     const quantity = Math.max(1, Math.min(50, Math.floor(numberValue(item.quantity ?? item.qty ?? 1))));
-    return { productId, title: String(product.title || product.name || item.title || item.name || 'Product'), price, originalPrice: numberValue(product.originalPrice) > regularPrice ? numberValue(product.originalPrice) : regularPrice, quantity, image: String(variant?.imageUrl || product.imageUrl || product.image || item.imageUrl || item.image || ''), variant: item.variant || null, weeklyDealDay: isLiveDealItem ? currentDay : null, isWholesale: isWholesaleProduct(product), category: product.category || '', categoryId: product.categoryId || '' };
+    const markedImages = trustedMarkedImages(item, productId);
+    return { productId, title: String(product.title || product.name || item.title || item.name || 'Product'), price, originalPrice: numberValue(product.originalPrice) > regularPrice ? numberValue(product.originalPrice) : regularPrice, quantity, image: String(markedImages[0]?.markedUrl || variant?.imageUrl || product.imageUrl || product.image || item.imageUrl || item.image || ''), ...(markedImages.length ? { markedImages } : {}), variant: item.variant || null, weeklyDealDay: isLiveDealItem ? currentDay : null, isWholesale: isWholesaleProduct(product), category: product.category || '', categoryId: product.categoryId || '' };
   });
 }
 
