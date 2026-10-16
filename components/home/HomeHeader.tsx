@@ -35,7 +35,6 @@ export default function HomeHeader({ categories = [] }: { categories?: Category[
   const menuButton = useRef<HTMLButtonElement>(null);
   const [count, setCount] = useState(0);
   const items = useCartStore((s) => s.items);
-  const openDrawer = useCartStore((s) => s.openDrawer);
   const menuCategories = [...categories]
     .filter((category) => category.active !== false && String(category.title || "").trim())
     .sort(
@@ -99,11 +98,11 @@ export default function HomeHeader({ categories = [] }: { categories?: Category[
               <ShoppingBag />
               <span>Shop</span>
             </Link>
-            <button onClick={openDrawer} aria-label={`Cart, ${count} items`}>
+            <Link href="/cart" prefetch={false} aria-label={`View cart, ${count} items`} className="touch-manipulation" title="View shopping cart">
               <ShoppingCart />
               {count > 0 && <b className="home-cart-count">{count}</b>}
               <span>Cart</span>
-            </button>
+            </Link>
           </nav>
         </div>
         <form onSubmit={search} className="home-search" role="search">
