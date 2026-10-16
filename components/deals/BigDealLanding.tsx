@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react';
 import { ArrowLeft, LockKeyhole, ShoppingCart } from 'lucide-react';
 import { bigDealConfiguredSlotCount, bigDealRotationIndex } from '@/lib/bigDealRotation';
 import { normalizeImageUrl } from '@/lib/imageUrl';
+import { getVerifiedDealProduct } from '@/lib/verifiedDealProduct';
 import { useCartStore } from '@/lib/cartStore';
 import type { SiteSettings } from '@/lib/types';
 import type { Product } from '@/components/shop/ShopTypes';
@@ -27,6 +28,7 @@ function slotAt(deal: NonNullable<BigDeal>, index: number): Slot {
 export default function BigDealLanding({ deal, products }: { deal?: BigDeal; products: Product[] }) {
   const [now, setNow] = useState<number | null>(null);
   const [adding, setAdding] = useState(false);
+  const [addError, setAddError] = useState('');
   const addItem = useCartStore((state) => state.addItem);
   const openVariantModal = useCartStore((state) => state.openVariantModal);
   useEffect(() => {
@@ -46,20 +48,19 @@ export default function BigDealLanding({ deal, products }: { deal?: BigDeal; pro
   async function addActive() {
     if (!live || !active?.productId || active.price <= 0 || adding) return;
     setAdding(true);
+    setAddError('');
     try {
-      const fallback = products.find((item) => item.id === active.productId);
-      const result = await fetch(`/api/storefront/read?type=product&id=${encodeURIComponent(active.productId)}`, { cache: 'no-store' })
-        .then((response) => response.ok ? response.json() : null)
-        .catch(() => null);
-      const product = (result?.product || fallback) as Product | undefined;
-      if (!product || Number(product.stock ?? product.quantity ?? 1) <= 0) return;
+      const product = await getVerifiedDealProduct(active.productId);
       const image = active.imageUrl || product.imageUrl || '';
-      const priced = { ...product, price: active.price, originalPrice: active.regular, image, imageUrl: image };
+      const priced = { ...product, price: active.price, originalPrice: active.regular,
+        image, imageUrl: image, bigDealActive: true };
       if (openVariantModal(priced, 'cart')) return;
-      addItem({ id: product.id, productId: product.id, category: String(product.category || ''), name: active.title,
-        price: active.price, originalPrice: active.regular || active.price, image, imageUrl: image });
+      addItem({ id: product.id, productId: product.id, category: String(product.category || ''),
+        name: String(product.title || active.title), price: active.price,
+        originalPrice: active.regular || active.price, image, imageUrl: image });
     } catch (error) {
-      console.warn('Big Deal product read unavailable', error);
+      setAddError(error instanceof Error ? error.message : 'Could not check Big Deal variants.');
+
     } finally {
       setAdding(false);
     }
@@ -72,6 +73,7 @@ export default function BigDealLanding({ deal, products }: { deal?: BigDeal; pro
       <h1 className="mt-1 text-3xl font-black">Big Deal</h1>
       <p className="mt-2 text-sm text-white/60">Today&apos;s offer and the upcoming locked deals.</p>
     </header>
+    {addError && <p role="alert" className="mt-3 rounded-xl bg-red-50 p-3 text-xs font-bold text-red-700">{addError}</p>}
     {deal?.active && active ? <>
       <article className="mt-5 grid overflow-hidden rounded-[28px] bg-white shadow-sm md:grid-cols-2">
         <div className="relative aspect-square bg-[#F4F4F1]">
