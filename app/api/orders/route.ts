@@ -8,6 +8,7 @@ import { isWholesaleProduct } from '@/lib/wholesale';
 import { createShoppingWalletOrder, shoppingWalletBalance } from '@/lib/resellerShoppingCheckout';
 import { cashBackForTier, orderEligibleSubtotal } from '@/lib/orderBenefits';
 import { listCheckoutVouchers, resolveCheckoutVoucher } from '@/lib/checkoutVouchersServer';
+import { bigDealConfiguredSlotCount, bigDealRotationIndex } from '@/lib/bigDealRotation';
 
 export const runtime = 'nodejs';
 const WEEKDAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const;
@@ -72,6 +73,16 @@ async function buildAuthoritativeItems(items: IncomingItem[]) {
   const settings = settingsResult.documents.main || {};
   const weeklyDeals = Array.isArray(settings.weeklyDeals) ? settings.weeklyDeals : [];
   const liveDeal = weeklyDeals.find((deal: any) => deal?.day === currentDay && deal?.active !== false && typeof deal?.productId === 'string' && numberValue(deal?.dealPrice) > 0);
+  const big = settings.dailyDeal;
+  const now = Date.now();
+  const bigStarts = big?.startAt ? new Date(big.startAt).getTime() : 0;
+  const bigEnds = big?.endAt ? new Date(big.endAt).getTime() : 0;
+  const bigActive = big?.active === true &&
+    (!bigStarts || Number.isNaN(bigStarts) || now >= bigStarts) &&
+    (!bigEnds || Number.isNaN(bigEnds) || now < bigEnds);
+  const bigSlot = bigActive ? bigDealRotationIndex(big.rotationStartedAt, new Date(now), bigDealConfiguredSlotCount(big)) : -1;
+  const bigProductId = bigActive ? String(big.productIds?.[bigSlot] || big.productId || '') : '';
+  const bigPrice = bigActive ? numberValue(big.dealPrices?.[bigSlot] ?? big.dealPrice ?? 0) : 0;
   const products = new Map(productResults.filter(result => result.product).map(result => [String(result.product!.id), result.product]));
 
   const pricedItems = items.map(item => {
@@ -85,11 +96,16 @@ async function buildAuthoritativeItems(items: IncomingItem[]) {
     const regularPrice = numberValue(product.price);
     const liveDealPrice = liveDeal?.productId === productId ? numberValue(liveDeal.dealPrice) : 0;
     const isLiveDealItem = liveDealPrice > 0 && liveDealPrice < regularPrice;
-    const price = isLiveDealItem ? liveDealPrice : (variant && numberValue(variant.price) > 0 ? numberValue(variant.price) : regularPrice);
+    const isBigDealItem = bigProductId === productId && bigPrice > 0 && bigPrice < regularPrice;
+    const price = isLiveDealItem ? liveDealPrice : isBigDealItem ? bigPrice :
+      (variant && numberValue(variant.price) > 0 ? numberValue(variant.price) : regularPrice);
     if (price <= 0) throw new Error('Product price is not available.');
     const quantity = Math.max(1, Math.min(50, Math.floor(numberValue(item.quantity ?? item.qty ?? 1))));
     const markedImages = trustedMarkedImages(item, productId);
-    return { productId, title: String(product.title || product.name || item.title || item.name || 'Product'), price, originalPrice: numberValue(product.originalPrice) > regularPrice ? numberValue(product.originalPrice) : regularPrice, quantity, image: String(markedImages[0]?.markedUrl || variant?.imageUrl || product.imageUrl || product.image || item.imageUrl || item.image || ''), ...(markedImages.length ? { markedImages } : {}), variant: item.variant || null, weeklyDealDay: isLiveDealItem ? currentDay : null, isWholesale: isWholesaleProduct(product), category: product.category || '', categoryId: product.categoryId || '' };
+    return { productId, title: String(product.title || product.name || item.title || item.name || 'Product'), price, originalPrice: numberValue(product.originalPrice) > regularPrice ? numberValue(product.originalPrice) : regularPrice, quantity, image: String(markedImages[0]?.markedUrl || variant?.imageUrl || product.imageUrl || product.image || item.imageUrl || item.image || ''), ...(markedImages.length ? { markedImages } : {}), variant: item.variant || null, weeklyDealDay: isLiveDealItem ? currentDay : null,
+      rewardExcluded: isLiveDealItem || isBigDealItem,
+      dealCategory: isLiveDealItem ? 'weekly' : isBigDealItem ? 'big' : '',
+      isWholesale: isWholesaleProduct(product), category: product.category || '', categoryId: product.categoryId || '' };
   });
   return { items: pricedItems, settings };
 }
