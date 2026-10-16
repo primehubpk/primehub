@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { ImageOff, Maximize2, Minus, Plus, Home, ShoppingBag, X } from 'lucide-react';
+import { usePathname } from 'next/navigation';
+import { ImageOff, Maximize2, Minus, Plus, Home, ShoppingBag, ShoppingCart, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useCartStore } from '@/lib/cartStore';
 import { useSettings } from '@/lib/useSettings';
@@ -15,6 +16,7 @@ const money = (value: number) => `Rs. ${Number(value || 0).toLocaleString()}`;
 const productIdOf = (item: any) => String(item?.productId || String(item?.id || '').split(':')[0] || '').trim();
 
 export default function CartMiniBar() {
+  const pathname = usePathname();
   const { settings } = useSettings();
   const items = useCartStore((state) => state.items);
   const isDrawerOpen = useCartStore((state) => state.isDrawerOpen);
@@ -87,7 +89,27 @@ export default function CartMiniBar() {
   }, [items, resolvedImages]);
 
   if (!items.length) return null;
-  if (!isDrawerOpen && !isMiniCollapsed) return null;
+  // Checkout and the cart itself already show the complete order. Do not
+  // place a floating control above their forms, or above administration.
+  const hideFloatingCart = pathname === '/cart' || pathname.startsWith('/checkout') ||
+    pathname === '/admin' || pathname.startsWith('/admin/');
+  if (!isDrawerOpen && !isMiniCollapsed) {
+    if (hideFloatingCart) return null;
+    return (
+      <button
+        type="button"
+        onClick={openDrawer}
+        aria-label={`Open shopping cart, ${totalItems} item${totalItems === 1 ? '' : 's'}`}
+        title="View your cart"
+        className="fixed left-3 bottom-[calc(88px+env(safe-area-inset-bottom))] z-[55] flex h-14 w-14 touch-manipulation items-center justify-center rounded-full border-2 border-white bg-[#14140F] text-white shadow-[0_8px_28px_rgba(20,20,15,0.28)] transition-transform active:scale-95 sm:left-5 sm:h-16 sm:w-16"
+      >
+        <ShoppingCart size={23} aria-hidden="true" />
+        <span aria-hidden="true" className="absolute -right-1.5 -top-1.5 flex min-h-6 min-w-6 items-center justify-center rounded-full bg-[#E1352B] px-1 text-[10px] font-black leading-none text-white ring-2 ring-white">
+          {totalItems > 99 ? '99+' : totalItems}
+        </span>
+      </button>
+    );
+  }
 
   if (isMiniCollapsed) {
     return (
