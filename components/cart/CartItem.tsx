@@ -47,6 +47,18 @@ export default function CartItem({
             </div>
           </div>
 
+          {Array.isArray(item.markedImages) && item.markedImages.length > 0 ? (
+            <div className="mt-2">
+              <p className="text-[9px] font-black text-[#0F6A5F]">Your selected favourite colours · {item.markedImages.length} marked photo{item.markedImages.length === 1 ? '' : 's'}</p>
+              <div className="mt-1 flex flex-wrap gap-1.5">
+                {item.markedImages.slice(0, 12).map((photo: { markedUrl: string }, index: number) => (
+                  <a key={photo.markedUrl} href={photo.markedUrl} target="_blank" rel="noopener noreferrer" title={`View marked photo ${index + 1}`}>
+                    <img src={photo.markedUrl} alt={`Marked photo ${index + 1}`} className="h-11 w-11 rounded-lg border border-[#0F6A5F]/30 object-cover"/>
+                  </a>
+                ))}
+              </div>
+            </div>
+          ) : null}
           <div className="mt-4 flex items-end justify-between gap-3">
             <div>
               <p className="mb-1 text-[8px] font-black uppercase tracking-[0.16em] text-black/35">Quantity</p>
