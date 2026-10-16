@@ -19,6 +19,7 @@ import { useSettings } from "@/lib/useSettings";
 import { useCartStore } from "@/lib/cartStore";
 import { db } from "@/lib/firebase";
 import { weeklyCartPrice } from '@/lib/weeklyCartPrice';
+import { getVerifiedDealProduct } from '@/lib/verifiedDealProduct';
 import { normalizeImageUrl } from "@/lib/imageUrl";
 import { makeTikTokContent, trackTikTokEvent } from "@/lib/tiktokPixel";
 import type { Product, Weekday } from "@/lib/types";
@@ -57,20 +58,6 @@ function pakistanMidnightCountdown(now: Date) {
   const day = Number(parts.find((p) => p.type === "day")?.value);
   const tomorrow = new Date(Date.UTC(year, month - 1, day + 1, -5, 0, 0));
   return countdownParts(tomorrow.getTime() - now.getTime());
-}
-
-function hasProductVariants(product?: Product): boolean {
-  if (!product) return false;
-  return Boolean(
-    (Array.isArray(product.variants) && product.variants.length > 0) ||
-    (Array.isArray(product.variantMatrix) && product.variantMatrix.length > 0) ||
-    (Array.isArray(product.variantOptions) && product.variantOptions.length > 0) ||
-    (Array.isArray(product.variantColors) && product.variantColors.length > 0) ||
-    (Array.isArray(product.variantSizes) && product.variantSizes.length > 0) ||
-    (Array.isArray(product.colors) && product.colors.length > 0) ||
-    (Array.isArray(product.sizes) && product.sizes.length > 0) ||
-    product.hasVariants === true,
-  );
 }
 
 type ProductDealFields = Product & {
@@ -129,6 +116,8 @@ export default function HeroFlashBanner({ initialProducts = [], liveUpdates = tr
   const bigDeal = settings.dailyDeal as BigDealFields | undefined;
   const addItem = useCartStore((state) => state.addItem);
   const openVariantModal = useCartStore((state) => state.openVariantModal);
+  const [addingDealId, setAddingDealId] = useState('');
+  const [dealActionError, setDealActionError] = useState('');
 
   useEffect(() => {
     setNowTick(Date.now());
@@ -175,60 +164,61 @@ export default function HeroFlashBanner({ initialProducts = [], liveUpdates = tr
     return [...DAYS.slice(todayIndex), ...DAYS.slice(0, todayIndex)];
   }, [todayKey]);
 
-  function addDealToCart(deal: NonNullable<typeof weeklyDeals>[number]) {
-    const product = products[deal.productId];
-    const { price, regular: normalPrice, comparison, live: isLive } = weeklyCartPrice(deal, product);
-    if (!deal.productId || price <= 0 || Number((product as ProductDealFields | undefined)?.stock ?? 1) <= 0) return;
-    const image = normalizeImageUrl(product?.imageUrl || deal.imageUrl || "");
-    const productWithDealPrice = {
-      ...product,
-      id: deal.productId,
-      title: product?.title || deal.title,
-      price,
-      originalPrice: comparison,
-      image,
-      imageUrl: image,
-    } as Product;
-    if (hasProductVariants(productWithDealPrice) && openVariantModal(productWithDealPrice, "cart")) return;
-    addItem({
-      id: deal.productId,
-      productId: deal.productId,
-      category: String(product?.category || ""),
-      name: productWithDealPrice.title || deal.title,
-      price,
-      originalPrice: productWithDealPrice.originalPrice || price,
-      image,
-      imageUrl: image,
-      dealDay: isLive ? deal.day : undefined,
-    });
-    trackTikTokEvent("AddToCart", {
-      contents: [makeTikTokContent({ id: deal.productId, name: productWithDealPrice.title || deal.title, category: product?.category, price, quantity: 1 })],
-      value: price,
-      currency: "PKR",
-    });
+  async function addDealToCart(deal: NonNullable<typeof weeklyDeals>[number]) {
+    if (addingDealId || !deal.productId) return;
+    setAddingDealId(deal.productId);
+    setDealActionError('');
+    try {
+      // Home tiles carry compact product data; full variantMatrix is fetched
+      // on tap so a customer can never skip a real colour/size selector.
+      const product = await getVerifiedDealProduct(deal.productId);
+      const { price, comparison, live: isLive } = weeklyCartPrice(deal, product);
+      if (price <= 0) throw new Error('The scheduled product price is unavailable.');
+      const image = normalizeImageUrl(product.imageUrl || deal.imageUrl || '');
+      const priced = { ...product, title: product.title || deal.title, price,
+        originalPrice: comparison, image, imageUrl: image,
+        dealDay: isLive ? deal.day : undefined };
+      if (openVariantModal(priced, 'cart')) return;
+      addItem({ id: deal.productId, productId: deal.productId,
+        category: String(product.category || ''), name: priced.title || deal.title,
+        price, originalPrice: comparison || price, image, imageUrl: image,
+        dealDay: isLive ? deal.day : undefined });
+      trackTikTokEvent('AddToCart', { contents: [
+        makeTikTokContent({ id: deal.productId, name: priced.title || deal.title,
+          category: String(product.category || ''), price, quantity: 1 }),
+      ], value: price, currency: 'PKR' });
+    } catch (error) {
+      setDealActionError(error instanceof Error ? error.message : 'Could not verify product options. Try again.');
+    } finally { setAddingDealId(''); }
   }
 
-  function addBigDealToCart() {
-    if (!bigDeal?.active || !activeBigSlot?.productId) return;
+  async function addBigDealToCart() {
+    if (!bigDeal?.active || !activeBigSlot?.productId || addingDealId) return;
     const now = Date.now();
     const start = bigDeal.startAt ? new Date(bigDeal.startAt).getTime() : 0;
     const end = bigDeal.endAt ? new Date(bigDeal.endAt).getTime() : 0;
     if ((start && now < start) || (end && now >= end)) return;
-    const product = products[activeBigSlot.productId];
-    const productData = product as ProductDealFields | undefined;
-    const currentPrice = Number(activeBigSlot.dealPrice || productData?.dealPrice || productData?.price || 0);
-    const normalPrice = Number(activeBigSlot.originalPrice || productData?.originalPrice || productData?.normalPrice || currentPrice);
-    const stock = Number(productData?.stock ?? productData?.quantity ?? bigDeal.stock ?? 0);
-    if (currentPrice <= 0 || stock <= 0) return;
-    const image = normalizeImageUrl(activeBigSlot.imageUrl || productData?.imageUrl || "");
-    const productWithDealPrice = { ...product, id: activeBigSlot.productId, title: activeBigSlot.title, price: currentPrice, originalPrice: normalPrice, image, imageUrl: image } as Product;
-    if (hasProductVariants(productWithDealPrice) && openVariantModal(productWithDealPrice, "cart")) return;
-    addItem({ id: activeBigSlot.productId, productId: activeBigSlot.productId, category: String(product?.category || ""), name: productWithDealPrice.title, price: currentPrice, originalPrice: productWithDealPrice.originalPrice || currentPrice, image, imageUrl: image });
-    trackTikTokEvent("AddToCart", {
-      contents: [makeTikTokContent({ id: activeBigSlot.productId, name: productWithDealPrice.title, category: product?.category, price: currentPrice, quantity: 1 })],
-      value: currentPrice,
-      currency: "PKR",
-    });
+    setAddingDealId(activeBigSlot.productId);
+    setDealActionError('');
+    try {
+      const product = await getVerifiedDealProduct(activeBigSlot.productId);
+      const currentPrice = Number(activeBigSlot.dealPrice || product.price || 0);
+      const normalPrice = Number(activeBigSlot.originalPrice || product.originalPrice || product.price || currentPrice);
+      if (currentPrice <= 0) throw new Error('Big Deal price is unavailable.');
+      const image = normalizeImageUrl(activeBigSlot.imageUrl || product.imageUrl || '');
+      const priced = { ...product, title: product.title || activeBigSlot.title, price: currentPrice,
+        originalPrice: normalPrice, image, imageUrl: image, bigDealActive: true };
+      if (openVariantModal(priced, 'cart')) return;
+      addItem({ id: activeBigSlot.productId, productId: activeBigSlot.productId,
+        category: String(product.category || ''), name: priced.title,
+        price: currentPrice, originalPrice: normalPrice || currentPrice, image, imageUrl: image });
+      trackTikTokEvent('AddToCart', { contents: [
+        makeTikTokContent({ id: activeBigSlot.productId, name: priced.title,
+          category: String(product.category || ''), price: currentPrice, quantity: 1 }),
+      ], value: currentPrice, currency: 'PKR' });
+    } catch (error) {
+      setDealActionError(error instanceof Error ? error.message : 'Could not verify Big Deal options. Try again.');
+    } finally { setAddingDealId(''); }
   }
 
   if (homeLayout) {
@@ -249,6 +239,7 @@ export default function HeroFlashBanner({ initialProducts = [], liveUpdates = tr
     const live = nowTick !== null && (!start || nowTick >= start) && (!end || nowTick < end);
     return (
       <>
+        {dealActionError && <p role="alert" className="mx-3 my-2 rounded-xl bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">{dealActionError}</p>}
         <section className="home-weekly" id="weekly-deals">
           <HomeHeading>PrimeHubMall Weekly Deals</HomeHeading>
           <div className="home-week-grid">
@@ -292,7 +283,7 @@ export default function HeroFlashBanner({ initialProducts = [], liveUpdates = tr
                     ) : <b className="home-price">Coming soon</b>}
                   </Link>
                   {deal ? (
-                    <button type="button" className="home-week-add" onClick={() => addDealToCart(deal)} disabled={!dealProduct || Number(dealProduct.stock ?? dealProduct.quantity ?? 1) <= 0}>
+                    <button type="button" className="home-week-add" onClick={() => addDealToCart(deal)} disabled={!deal.productId || addingDealId === deal.productId}>
                       <ShoppingCart size={11} /> Add · Rs. {(weeklyOffer?.price || dealPrice).toLocaleString("en-PK")}
                     </button>
                   ) : null}
@@ -320,7 +311,7 @@ export default function HeroFlashBanner({ initialProducts = [], liveUpdates = tr
                     {saved > 0 ? <em>Save Rs. {saved.toLocaleString("en-PK")}</em> : null}
                   </div>
                   <small>Limited-time deal · Pakistan Time</small>
-                  <button className="home-add" onClick={addBigDealToCart} disabled={!live || !product || stock <= 0 || price <= 0}>
+                  <button className="home-add" onClick={addBigDealToCart} disabled={!live || !activeBigSlot?.productId || price <= 0 || Boolean(addingDealId)}>
                     <ShoppingCart size={14} />{stock <= 0 ? "Sold out" : !live ? "Deal unavailable" : "Add to cart"}
                   </button>
                 </div>
@@ -338,6 +329,7 @@ export default function HeroFlashBanner({ initialProducts = [], liveUpdates = tr
 
   return (
     <>
+      {dealActionError && <p role="alert" className="mx-4 my-2 rounded-xl bg-red-50 px-3 py-2 text-xs font-semibold text-red-700">{dealActionError}</p>}
       <section id="weekly-deals" className="mx-4 mt-3 scroll-mt-4">
         <div className="mb-3 flex items-center justify-between gap-3 rounded-[22px] border border-black/8 bg-white px-4 py-3 shadow-sm sm:px-5">
           <div><p className="text-[8px] font-black uppercase tracking-[0.2em] text-[#E1352B]">Deals every day</p><h2 className="mt-0.5 text-lg font-black tracking-tight sm:text-xl">Weekly Deals</h2></div>
@@ -383,7 +375,7 @@ export default function HeroFlashBanner({ initialProducts = [], liveUpdates = tr
                         {comparisonPrice > normalPrice && <span className="block text-[8px] text-black/35 line-through">Was Rs. {comparisonPrice.toLocaleString()}</span>}
                       </Link>
                     ) : <span className="block whitespace-nowrap text-[10px] font-black uppercase tracking-[0.07em] text-[#14140F]">{label.toUpperCase()}</span>}
-                    {deal && <button type="button" onClick={(event) => { event.preventDefault(); event.stopPropagation(); addDealToCart(deal); }} disabled={!product || Number((product as ProductDealFields).stock ?? 1) <= 0} className="mt-2 inline-flex items-center gap-1 rounded-full bg-[#14140F] px-2.5 py-1.5 text-[7px] font-black uppercase tracking-[0.08em] text-white hover:bg-[#0F6A5F] disabled:cursor-not-allowed disabled:opacity-50"><ShoppingCart size={8} /> Add to Cart</button>}
+                    {deal && <button type="button" onClick={(event) => { event.preventDefault(); event.stopPropagation(); addDealToCart(deal); }} disabled={!deal?.productId || addingDealId === deal.productId} className="mt-2 inline-flex items-center gap-1 rounded-full bg-[#14140F] px-2.5 py-1.5 text-[7px] font-black uppercase tracking-[0.08em] text-white hover:bg-[#0F6A5F] disabled:cursor-not-allowed disabled:opacity-50"><ShoppingCart size={8} /> Add to Cart</button>}
                     {timing && !isLive && <span className="sr-only">Unlocks {WEEKDAY_LABELS[key]} at the next weekly cycle.</span>}
                   </span>
                 </div>
@@ -416,7 +408,7 @@ export default function HeroFlashBanner({ initialProducts = [], liveUpdates = tr
               <Link href={productHref} prefetch={false} className="group/title block" aria-label={`View ${title}`}><h2 className="line-clamp-2 text-2xl font-black leading-tight tracking-tight text-[#14140F] transition group-hover/title:text-[#0F6A5F] sm:text-4xl">{title}</h2></Link>
               <div className="mt-4 flex flex-wrap items-center gap-2.5"><span className="text-3xl font-black text-[#E1352B] sm:text-4xl">Rs. {currentPrice.toLocaleString()}</span>{normalPrice > currentPrice && <span className="text-sm font-bold text-black/40 line-through sm:text-base">Rs. {normalPrice.toLocaleString()}</span>}</div>
               {stock > 0 && stock <= 10 && <div className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-amber-500/15 px-3 py-1 text-[11px] font-black text-amber-700"><span className="h-2 w-2 rounded-full bg-amber-500 animate-ping" />Only {stock} left in stock - order soon!</div>}
-              <div className="mt-4"><button type="button" onClick={(event) => { event.preventDefault(); event.stopPropagation(); addBigDealToCart(); }} disabled={!activeBigSlot?.productId || !product || stock <= 0 || currentPrice <= 0} className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#14140F] px-5 py-3 text-xs font-black text-white transition hover:bg-[#0F6A5F] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"><ShoppingCart size={15} /> Add to Cart</button></div>
+              <div className="mt-4"><button type="button" onClick={(event) => { event.preventDefault(); event.stopPropagation(); addBigDealToCart(); }} disabled={!activeBigSlot?.productId || !live || Boolean(addingDealId) || currentPrice <= 0} className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#14140F] px-5 py-3 text-xs font-black text-white transition hover:bg-[#0F6A5F] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"><ShoppingCart size={15} /> Add to Cart</button></div>
             </div>
           </section>
         );
