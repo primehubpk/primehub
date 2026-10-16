@@ -226,7 +226,8 @@ export default function HeroFlashBanner({ initialProducts = [], liveUpdates = tr
     const price = Number(activeBigSlot?.dealPrice || product?.dealPrice || product?.price || 0);
     const regularPrice = Number(activeBigSlot?.originalPrice || product?.normalPrice || product?.originalPrice || product?.price || price);
     const saved = Math.max(0, regularPrice - price);
-    const stock = Number(product?.stock ?? product?.quantity ?? bigDeal?.stock ?? 0);
+    const stockValue = product?.stock ?? product?.quantity ?? bigDeal?.stock;
+    const stock = stockValue == null || stockValue === '' ? 30 : Math.max(0, Number(stockValue) || 0);
     const src = normalizeImageUrl(activeBigSlot?.imageUrl || product?.imageUrl || "");
     const slotCount = bigDealConfiguredSlotCount(bigDeal);
     const nextDeal = bigDealSlotAt(bigDeal, nextBigDealRotationIndex(bigDeal?.rotationStartedAt, nowTick === null ? new Date() : new Date(nowTick), slotCount));
@@ -392,7 +393,8 @@ export default function HeroFlashBanner({ initialProducts = [], liveUpdates = tr
         const currentPrice = Number(activeBigSlot?.dealPrice || productData?.dealPrice || productData?.price || 0);
         const normalPrice = Number(activeBigSlot?.originalPrice || productData?.originalPrice || productData?.normalPrice || currentPrice);
         const savedAmount = normalPrice > currentPrice ? normalPrice - currentPrice : 0;
-        const stock = Number(productData?.stock ?? productData?.quantity ?? deal.stock ?? 0);
+        const stockValue = productData?.stock ?? productData?.quantity ?? deal.stock;
+        const stock = stockValue == null || stockValue === '' ? 30 : Math.max(0, Number(stockValue) || 0);
         const productImage = normalizeImageUrl(activeBigSlot?.imageUrl || productData?.imageUrl || deal.imageUrl || "");
         const productHref = "/deals/big";
         return (
