@@ -186,7 +186,7 @@ export async function POST(request: Request) {
     return rpcError(payload?.id ?? null, -32600, 'Invalid JSON-RPC request.', 400);
   }
   const { id, method } = payload;
-  const params = payload.params && typeof payload.params === 'object' && !Array.isArray(payload.params)
+  const params: Record<string, unknown> = payload.params && typeof payload.params === 'object' && !Array.isArray(payload.params)
     ? payload.params : {};
   const modern = request.headers.get('mcp-protocol-version') === VERSION ||
     (params._meta as Record<string, unknown> | undefined)?.['io.modelcontextprotocol/protocolVersion'] === VERSION;
