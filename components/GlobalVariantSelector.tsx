@@ -46,7 +46,10 @@ export default function GlobalVariantSelector() {
   const today = getPakistanDay();
   const activeDealDay = product.dealDay && product.dealDay.toLowerCase() === today.toLowerCase()
     ? product.dealDay : undefined;
-  const isSpecialPrice = product.bigDealActive === true || Boolean(activeDealDay);
+  // Preserve existing marked-down product pricing (Sale Mela etc.) even when
+  // a variant has its own old regular price.
+  const isSpecialPrice = product.bigDealActive === true || Boolean(activeDealDay) ||
+    originalPrice > basePrice;
   const effectiveProductPrice = basePrice;
   const title = product.title || product.name || 'PrimeHub Deal';
 
