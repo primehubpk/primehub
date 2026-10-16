@@ -1,6 +1,7 @@
 import { isWholesaleProduct } from '@/lib/wholesale';
 
 export const BASE_DELIVERY_CHARGE = 350;
+export const FREE_DELIVERY_QUANTITY = 5;
 export const WHOLESALE_ITEM_DELIVERY_CHARGE = 30;
 
 type DeliveryItem = {
@@ -20,10 +21,14 @@ export function calculateDeliveryCharge(items: DeliveryItem[]) {
     (total, item) => total + (isWholesaleProduct(item) ? quantityOfDeliveryItem(item) : 0),
     0,
   );
+  const totalQuantity = items.reduce((count, item) => count + quantityOfDeliveryItem(item), 0);
+  // Five total units, including different variants and wholesale packs, unlock
+  // FREE delivery. Compute on server-verified items as well as cart previews.
+  const freeDelivery = totalQuantity >= FREE_DELIVERY_QUANTITY;
   return {
-    baseDelivery: BASE_DELIVERY_CHARGE,
+    baseDelivery: freeDelivery ? 0 : BASE_DELIVERY_CHARGE,
     wholesaleItems,
-    wholesaleSurcharge: wholesaleItems * WHOLESALE_ITEM_DELIVERY_CHARGE,
-    deliveryCharge: BASE_DELIVERY_CHARGE + wholesaleItems * WHOLESALE_ITEM_DELIVERY_CHARGE,
+    wholesaleSurcharge: freeDelivery ? 0 : wholesaleItems * WHOLESALE_ITEM_DELIVERY_CHARGE,
+    deliveryCharge: freeDelivery ? 0 : BASE_DELIVERY_CHARGE + wholesaleItems * WHOLESALE_ITEM_DELIVERY_CHARGE,
   };
 }
