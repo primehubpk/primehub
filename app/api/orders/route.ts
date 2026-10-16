@@ -95,9 +95,12 @@ async function buildAuthoritativeItems(items: IncomingItem[]) {
     if (stockProvided && numberValue(rawStock) <= 0) throw new Error(`${product.title || product.name || 'This product'} is currently unavailable.`);
     const regularPrice = numberValue(product.price);
     const liveDealPrice = liveDeal?.productId === productId ? numberValue(liveDeal.dealPrice) : 0;
-    const isLiveDealItem = liveDealPrice > 0 && liveDealPrice < regularPrice;
-    const isBigDealItem = bigProductId === productId && bigPrice > 0 && bigPrice < regularPrice;
-    const price = isLiveDealItem ? liveDealPrice : isBigDealItem ? bigPrice :
+    const isLiveDealItem = liveDealPrice > 0 && liveDeal?.productId === productId;
+    const isBigDealItem = bigProductId === productId && bigPrice > 0;
+    // Exclude active labelled deals even when product.price is already reduced.
+    // Do not charge above the published base price on a scheduled offer.
+    const price = isLiveDealItem ? Math.min(liveDealPrice, regularPrice) :
+      isBigDealItem ? Math.min(bigPrice, regularPrice) :
       (variant && numberValue(variant.price) > 0 ? numberValue(variant.price) : regularPrice);
     if (price <= 0) throw new Error('Product price is not available.');
     const quantity = Math.max(1, Math.min(50, Math.floor(numberValue(item.quantity ?? item.qty ?? 1))));
