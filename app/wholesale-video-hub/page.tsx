@@ -1,13 +1,15 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { ArrowLeft, ExternalLink, Instagram, Play, Youtube } from 'lucide-react';
+import { ArrowLeft, Instagram, Play, Youtube } from 'lucide-react';
 import BackHomeLink from '@/components/BackHomeLink';
+import WholesaleVideoPlayer from '@/components/WholesaleVideoPlayer';
 import { thumbnailOf, type WholesaleVideo } from '@/lib/wholesaleVideos';
 
 export default function WholesaleVideoHub() {
   const [videos, setVideos] = useState<WholesaleVideo[]>([]);
   const [loading, setLoading] = useState(true);
+  const [playingVideo, setPlayingVideo] = useState<WholesaleVideo | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -59,12 +61,12 @@ export default function WholesaleVideoHub() {
               const thumb = thumbnailOf(video);
               const Icon = video.platform === 'youtube' ? Youtube : Instagram;
               return (
-                <a
+                <button
+                  type="button"
                   key={video.id}
-                  href={video.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="group overflow-hidden rounded-[22px] bg-white shadow-sm ring-1 ring-black/5"
+                  onClick={() => setPlayingVideo(video)}
+                  aria-label={`Play ${video.title} inside PrimeHubMall`}
+                  className="group overflow-hidden rounded-[22px] bg-white text-left shadow-sm ring-1 ring-black/5"
                 >
                   <div className="relative aspect-[4/5] overflow-hidden bg-gradient-to-br from-[#14140F] to-[#E1352B]">
                     {thumb ? (
@@ -85,10 +87,10 @@ export default function WholesaleVideoHub() {
                     <h2 className="mt-1 line-clamp-2 text-[11px] font-black">{video.title}</h2>
                     <p className="mt-1 line-clamp-2 text-[9px] text-black/45">{video.description || 'Tap to watch video'}</p>
                     <span className="mt-2 flex items-center gap-1 text-[9px] font-black">
-                      Open video <ExternalLink size={11} />
+                      Watch inside PrimeHubMall <Play size={11} />
                     </span>
                   </div>
-                </a>
+                </button>
               );
             })}
           </div>
@@ -98,6 +100,7 @@ export default function WholesaleVideoHub() {
           </div>
         )}
       </div>
+      <WholesaleVideoPlayer video={playingVideo} onClose={() => setPlayingVideo(null)} />
     </main>
   );
 }
