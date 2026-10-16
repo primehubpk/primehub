@@ -162,6 +162,8 @@ function ProductDetailContent({
     variantRows,
     variantModalOpen,
     variantMode,
+    variantCheckLoading,
+    variantCheckError,
     setActiveImage,
     setQuantity,
     setWished,
@@ -327,8 +329,10 @@ function ProductDetailContent({
                     onQuantityChange={setQuantity}
                     onOrderNow={orderNow}
                     onAddProduct={addProduct}
+                    checkingOptions={variantCheckLoading}
                     onWhatsApp={buyWhatsApp}
                   />
+                  {variantCheckError ? <p role="alert" className="mt-2 rounded-xl bg-rose-50 p-3 text-xs font-bold text-rose-700">{variantCheckError}</p> : null}
 
                   <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
                     {[
