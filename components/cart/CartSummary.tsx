@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { Check, LockKeyhole, RotateCcw, Tag, Truck, ArrowRight } from 'lucide-react';
 import CartTotals from './CartTotals';
 import DeliveryOptions from '@/components/checkout/DeliveryOptions';
+import PrimeFamilyCartCard, { type CashbackTier } from './PrimeFamilyCartCard';
 
 type CartQuote = {
   rawSubtotal: number;
@@ -13,6 +14,8 @@ type CartQuote = {
   voucherCashAmount?: number;
   cashbackEstimate?: number;
   cashbackPercent?: number;
+  cashbackMemberActive?: boolean;
+  cashbackTiers?: CashbackTier[];
   eligibleAfterVoucher?: number;
   resellerTier?: string;
   rewardLabel?: string;
@@ -21,7 +24,7 @@ type CartQuote = {
 
 export default function CartSummary({
   totalItems, quote, loading, quoteError, selfCollect, setSelfCollect,
-  coupon, setCoupon, applyCoupon, voucherCode,
+  coupon, setCoupon, applyCoupon, voucherCode, signedIn,
 }: {
   totalItems: number;
   quote: CartQuote | null;
@@ -33,11 +36,8 @@ export default function CartSummary({
   setCoupon: (value: string) => void;
   applyCoupon: () => void;
   voucherCode: string;
+  signedIn: boolean;
 }) {
-  const cashback = quote
-    ? Math.min(Number(quote.eligibleAfterVoucher || 0),
-      Number(quote.cashbackEstimate || 0) + Number(quote.voucherCashAmount || 0))
-    : 0;
   return (
     <section className="rounded-[28px] border border-black/[0.06] bg-white p-5 shadow-[0_8px_30px_rgba(0,0,0,0.055)] sm:p-6">
       <div className="flex items-start justify-between gap-4">
@@ -95,15 +95,16 @@ export default function CartSummary({
       </div>
       {quoteError && <p role="alert" className="mt-3 rounded-xl bg-rose-50 p-3 text-xs font-bold text-rose-700">{quoteError}</p>}
 
-      {quote && !loading && (
-        <div className="mt-4 rounded-2xl border border-[#0F6A5F]/20 bg-[#E9F6F2] px-4 py-3 text-xs text-[#0F6A5F]">
-          {Number(quote.cashbackPercent || 0) > 0
-            ? <><p className="font-black">{quote.resellerTier || 'Prime Family'} · {quote.cashbackPercent}% Cashback: Rs. {cashback.toLocaleString()}</p>
-              <p className="mt-1 text-[10px] leading-5">Estimated reward goes to your withdrawable Cash Wallet only after Admin marks the order <b>Delivered</b>. No cashback applies to deal products.</p></>
-            : <><p className="font-black">{cashback > 0 ? `Estimated Cash Wallet reward Rs. ${cashback.toLocaleString()}` : 'Prime Family cashback available for signed-in eligible members'}</p>
-              <p className="mt-1 text-[10px] leading-5">Starter tier begins at 5% for eligible regular products. Confirmed rewards are credited after delivery, not deducted from today’s bill.</p></>}
-        </div>
-      )}
+      {quote && !loading && <PrimeFamilyCartCard
+        signedIn={signedIn}
+        activeMember={quote.cashbackMemberActive === true}
+        tierName={String(quote.resellerTier || '')}
+        cashbackPercent={Number(quote.cashbackPercent || 0)}
+        cashbackEstimate={Number(quote.cashbackEstimate || 0)}
+        eligibleSubtotal={Number(quote.eligibleAfterVoucher || 0)}
+        voucherCashAmount={Number(quote.voucherCashAmount || 0)}
+        tiers={Array.isArray(quote.cashbackTiers) ? quote.cashbackTiers : []}
+      />}
 
       {quote && !loading ? (
         <Link href="/checkout"
