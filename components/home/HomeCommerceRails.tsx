@@ -9,6 +9,7 @@ import { useSettings } from "@/lib/useSettings";
 import { PRIME_SKILLS_SEED } from "@/lib/primeSkillsSeed";
 import { normalizeImageUrl } from "@/lib/imageUrl";
 import { thumbnailOf, type WholesaleVideo } from "@/lib/wholesaleVideos";
+import WholesaleVideoPlayer from "@/components/WholesaleVideoPlayer";
 
 type SkillPackage = {
   id?: string;
@@ -59,6 +60,7 @@ function skillDisplayPrice(item: PrimeSkillHomeItem) {
 
 export function HomeWholesaleVideos() {
   const { settings, contact } = useSettings();
+  const [playingVideo, setPlayingVideo] = useState<WholesaleVideo | null>(null);
   const videos = ((settings as typeof settings & { wholesaleVideos?: WholesaleVideo[] })
     .wholesaleVideos || []).filter((video) => video.active !== false);
 
@@ -86,12 +88,11 @@ export function HomeWholesaleVideos() {
             );
             return (
               <article className="home-commerce-card" key={video.id}>
-                <a
+                <button
+                  type="button"
                   className="home-commerce-media"
-                  href={video.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  aria-label={`Open ${video.title}`}
+                  onClick={() => setPlayingVideo(video)}
+                  aria-label={`Play ${video.title} inside PrimeHubMall`}
                 >
                   {thumbnail ? (
                     <img
@@ -107,16 +108,9 @@ export function HomeWholesaleVideos() {
                   <i className="home-commerce-play" aria-hidden="true">
                     <Play fill="currentColor" />
                   </i>
-                </a>
+                </button>
                 <div className="home-commerce-info">
-                  <a
-                    className="home-commerce-title"
-                    href={video.url}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    {video.title}
-                  </a>
+                  <button type="button" className="home-commerce-title" onClick={() => setPlayingVideo(video)}>{video.title}</button>
                   {price > 0 ? (
                     <strong className="home-commerce-price">{money(price)}</strong>
                   ) : null}
@@ -140,6 +134,7 @@ export function HomeWholesaleVideos() {
         </div>
       </div>
       </HomeRailFrame>
+      <WholesaleVideoPlayer video={playingVideo} onClose={() => setPlayingVideo(null)} />
     </section>
   );
 }
