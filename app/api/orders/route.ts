@@ -261,7 +261,8 @@ export async function POST(request: Request) {
     const quote = { items, rawSubtotal, tierDiscount, tierDiscountPercent, resellerTier: reseller?.tierName || '',
       eligibleSubtotal, eligibleAfterVoucher, voucherCode: voucher?.code || '', voucherId: voucher?.id || '',
       voucherKind: voucher?.kind || '', voucherDiscount, voucherCashAmount,
-      cashbackPercent, cashbackEstimate, cashbackMemberActive: Boolean(reseller?.userId), cashbackTiers, cashbackPolicy: 'delivered_only_v1',
+      cashbackPercent, cashbackEstimate, cashbackPolicy: 'delivered_only_v1',
+      ...(quoteOnly ? { cashbackMemberActive: Boolean(reseller?.userId), cashbackTiers } : {}),
       subtotal, totalItems, ...delivery, total, selfCollect, fulfillment: selfCollect ? 'self_collect' : 'delivery',
       freeDeliveryReward, rewardLabel: freeDeliveryReward ? 'Spin & Win Reward — Free Delivery' : '',
       walletShoppingBalance, walletShoppingApplied, amountDue };
