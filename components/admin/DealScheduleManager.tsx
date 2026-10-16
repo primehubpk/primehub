@@ -2,9 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { onSnapshot } from 'firebase/firestore';
 import { ArrowRight, CalendarDays, CheckCircle2, ChevronDown, Loader2, Save, Search, Tag } from 'lucide-react';
-import { adminCollection, getAdminDocument, setAdminDocument, type Category, type Product } from './shared';
+import { getAdminDocument, setAdminDocument, type Category, type Product } from './shared';
 import type { Weekday, WeeklyDeal } from '@/lib/types';
 import { getPakistanDay } from '@/lib/dealPricing';
 
@@ -48,12 +47,26 @@ export default function DealScheduleManager() {
   const [message, setMessage] = useState('');
   const catalogRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => onSnapshot(adminCollection('products'),
-    snapshot => setProducts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Product)),
-    () => setMessage('Products could not load. Please refresh this page.')), []);
-  useEffect(() => onSnapshot(adminCollection('categories'),
-    snapshot => setCategories(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Category)),
-    () => setCategories([])), []);
+  useEffect(() => {
+    let cancelled = false;
+    // Catalog is Supabase-primary on the storefront. Firebase product mirror
+    // subscriptions can be stale or incomplete, so do not use them to assign
+    // One Day Deals. Load one compact catalog snapshot, not 600 product reads.
+    fetch('/api/storefront/read?type=catalog&refresh=1', {
+      credentials: 'same-origin', cache: 'no-store',
+    }).then(async response => {
+      if (!response.ok) throw new Error('Could not load the live products catalog.');
+      return response.json();
+    }).then(data => {
+      if (cancelled) return;
+      if (!Array.isArray(data?.products)) throw new Error('Live products data is missing.');
+      setProducts(data.products as Product[]);
+      setCategories(Array.isArray(data.categories) ? data.categories as Category[] : []);
+    }).catch(error => {
+      if (!cancelled) setMessage(error instanceof Error ? error.message : 'Products could not load.');
+    });
+    return () => { cancelled = true; };
+  }, []);
   useEffect(() => {
     let active = true;
     getAdminDocument('settings', 'main')
