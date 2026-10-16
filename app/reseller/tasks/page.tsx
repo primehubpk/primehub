@@ -1,5 +1,7 @@
-import { ResellerTasksContent } from "@/components/reseller/ResellerTasksContent";
+import { redirect } from 'next/navigation';
 
+// Old Reseller Tasks URL is only a compatibility entry point.
+// All customer tasks now live in the single Prime Family dashboard.
 export default function ResellerTasksPage() {
-  return <ResellerTasksContent />;
+  redirect('/reseller/dashboard?tab=tasks');
 }
