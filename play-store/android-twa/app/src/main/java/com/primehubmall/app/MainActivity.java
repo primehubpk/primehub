@@ -1,6 +1,7 @@
 package com.primehubmall.app;
 
 import android.annotation.SuppressLint;
+import android.graphics.Insets;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.ActivityNotFoundException;
@@ -61,7 +62,7 @@ public class MainActivity extends Activity {
         super.onCreate(savedInstanceState);
         try {
             setContentView(R.layout.activity_main);
-            configureStatusBarInsets();
+            configureSystemBarInsets();
             webView = findViewById(R.id.webview);
             splash = findViewById(R.id.splash);
             // The full-screen P appears on the first successful install launch only.
@@ -87,24 +88,28 @@ public class MainActivity extends Activity {
     }
 
     /**
-     * Android 15+ enforces edge-to-edge for our target SDK. Keep the WebView
-     * below the real status bar (including display cutouts), so the store's
-     * announcement strip never sits behind the clock, signal or battery.
-     * Older Android versions already inset the app content automatically.
-     * Leave navigation-bar spacing and website layout unchanged.
+     * Android 15+ renders our targetSdk 36 WebView edge-to-edge. Inset the
+     * native root against status/navigation bars and display cutouts, keeping
+     * both the website announcement strip and bottom menu fully accessible.
+     * On Android 14 and below the OS already fits content inside system bars.
+     * IME insets protect checkout/search fields from the on-screen keyboard.
      */
-    private void configureStatusBarInsets() {
+    private void configureSystemBarInsets() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.VANILLA_ICE_CREAM) return;
 
         View root = findViewById(R.id.activity_root);
         root.setOnApplyWindowInsetsListener((view, insets) -> {
-            int statusBarTop = insets.getInsets(
-                WindowInsets.Type.statusBars() | WindowInsets.Type.displayCutout()
-            ).top;
-            if (view.getPaddingTop() != statusBarTop) {
-                view.setPadding(view.getPaddingLeft(), statusBarTop,
-                    view.getPaddingRight(), view.getPaddingBottom());
+            Insets safe = insets.getInsets(
+                WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout());
+            Insets keyboard = insets.getInsets(WindowInsets.Type.ime());
+            int bottom = Math.max(safe.bottom, keyboard.bottom);
+            if (view.getPaddingLeft() != safe.left
+                    || view.getPaddingTop() != safe.top
+                    || view.getPaddingRight() != safe.right
+                    || view.getPaddingBottom() != bottom) {
+                view.setPadding(safe.left, safe.top, safe.right, bottom);
             }
+            // Do not consume insets: the WebView still needs keyboard events.
             return insets;
         });
         root.requestApplyInsets();

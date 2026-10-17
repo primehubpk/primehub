@@ -1,9 +1,9 @@
-name: PrimeHub v13 signed Play Store bundle (manual branch build only)
+name: PrimeHub v13 final R8 + edge-to-edge signed Play Store build
 
 on:
   push:
     branches:
-      - release/primehub-v13-splash-push-oct17
+      - release/primehub-v13-final-quality-oct17
     paths:
       - '.github/workflows/v13-signed-artifact.yml'
       - 'play-store/android-twa/**'
@@ -112,6 +112,13 @@ jobs:
           python3 scripts/compact_launcher_icons.py
           bash ./gradlew :app:bundleRelease :app:assembleRelease --no-daemon
 
+      - name: Verify final R8 mapping generated
+        if: steps.keys.outputs.ready == 'true'
+        run: |
+          set -euo pipefail
+          test -s play-store/android-twa/app/build/outputs/mapping/release/mapping.txt
+          echo 'R8 minified release mapping exists.'
+
       - name: Verify bundle and APK package, version, SDK, signature
         if: steps.keys.outputs.ready == 'true'
         shell: bash
@@ -137,30 +144,35 @@ jobs:
           mkdir -p "$RUNNER_TEMP/primehub-v13-output"
           cp "$aab" "$RUNNER_TEMP/primehub-v13-output/PrimeHub-v13-Play-Upload.aab"
           cp "$apk" "$RUNNER_TEMP/primehub-v13-output/PrimeHub-v13-Phone-Test.apk"
+          cp 'play-store/android-twa/app/build/outputs/mapping/release/mapping.txt' "$RUNNER_TEMP/primehub-v13-output/PrimeHub-v13-R8-Mapping.txt"
           cat > "$RUNNER_TEMP/primehub-v13-output/README-IMPORTANT.txt" <<'EOF'
           PrimeHub v13 / com.primehubmall.app / versionCode 13 / targetSdk 36.
           Signed with the SAME verified PrimeHub Play Store upload certificate.
           AAB: upload to the EXISTING PrimeHub Google Play listing when approved.
           APK: optional direct phone testing; Play-installed apps may reject sideload updates.
           This archive contains NO keystore, key password, or other signing secrets.
+          Final build: Android 15/16 safe system/keyboard insets plus release-only
+          R8 code optimization, resource shrinking and deobfuscation mapping.
+          Preserve the mapping file for readable production crash reports.
           Features: automatic Rs.100 Play-installed welcome bonus (server rollout gated), notifications
           with real images and rotating hooks, safe exit confirmation, AndroidX Fragment 1.9.1 and Activity 1.13.0.
           NO Play Integrity setup is needed. Awarding is one per existing email/password account and app-scoped Android ID (client metadata can be spoofed). Activate cash only after updated website backend is deployed and this signed v13 app is live.
           No Play Console upload was performed by this workflow.
           EOF
           sha256sum "$aab" "$apk" > "$RUNNER_TEMP/primehub-v13-output/SHA256SUMS.txt"
-          (cd "$RUNNER_TEMP/primehub-v13-output" && zip -q PrimeHub-v13-Signed-PlayStore.zip PrimeHub-v13-Play-Upload.aab PrimeHub-v13-Phone-Test.apk README-IMPORTANT.txt SHA256SUMS.txt)
+          (cd "$RUNNER_TEMP/primehub-v13-output" && zip -q PrimeHub-v13-Signed-PlayStore.zip PrimeHub-v13-Play-Upload.aab PrimeHub-v13-Phone-Test.apk PrimeHub-v13-R8-Mapping.txt README-IMPORTANT.txt SHA256SUMS.txt)
           echo "Signed v13 upload AAB, test APK and ZIP ready. Play production unchanged."
 
       - name: Upload ZIP and AAB for owner only
         if: steps.keys.outputs.ready == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: PrimeHub-v13-signed-Play-Store
+          name: PrimeHub-v13-final-verified-Play-Store
           path: |
             ${{ runner.temp }}/primehub-v13-output/PrimeHub-v13-Signed-PlayStore.zip
             ${{ runner.temp }}/primehub-v13-output/PrimeHub-v13-Play-Upload.aab
             ${{ runner.temp }}/primehub-v13-output/PrimeHub-v13-Phone-Test.apk
+            ${{ runner.temp }}/primehub-v13-output/PrimeHub-v13-R8-Mapping.txt
             ${{ runner.temp }}/primehub-v13-output/README-IMPORTANT.txt
             ${{ runner.temp }}/primehub-v13-output/SHA256SUMS.txt
           retention-days: 7
