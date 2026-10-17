@@ -4,7 +4,9 @@
  * Browser sessions belong to the provider websites, never to this app.
  * This local-first launcher does not embed, scrape or claim connection to those sites.
  */
-TITLES.apps='My applications';
+const Social=window.PrimeHubSocial;
+if(!Social) throw new Error('Social studio must load before the app launcher');
+Social.titles.apps='My applications';
 const APP_HUB_KEY='primehub-social-custom-apps-v1';
 const APP_PRESETS=[
   {name:'Meta Business Suite',url:'https://business.facebook.com/',badge:'M',tag:'Social'},
@@ -49,12 +51,12 @@ function readCustomApps(){
 let customApps=readCustomApps();
 function saveCustomApps(){
   try{localStorage.setItem(APP_HUB_KEY,JSON.stringify(customApps));return true}
-  catch{toast('Could not save applications: browser storage is blocked or full.',true);return false}
+  catch{Social.notify('Could not save applications: browser storage is blocked or full.',true);return false}
 }
 function appCard(a,isCustom=false){
   let domain='Website';
   try{domain=new URL(a.url).hostname.replace(/^www\./,'')}catch{}
-  return '<div class="app-row"><div class="app-icon">'+esc(a.badge||a.name.slice(0,2).toUpperCase())+'</div><div class="app-title"><strong>'+esc(a.name)+'</strong><small>'+esc(domain)+(a.tag?' · '+esc(a.tag):'')+'</small></div><div class="app-links"><a class="mini primary" target="_blank" rel="noopener noreferrer" href="'+esc(a.url)+'" title="Open the original website and sign in">Open & sign in ↗</a>'+(isCustom?'<button class="mini danger" type="button" data-del-app="'+esc(a.id)+'" aria-label="Remove '+esc(a.name)+'">Remove</button>':'')+'</div></div>';
+  return '<div class="app-row"><div class="app-icon">'+Social.escape(a.badge||a.name.slice(0,2).toUpperCase())+'</div><div class="app-title"><strong>'+Social.escape(a.name)+'</strong><small>'+Social.escape(domain)+(a.tag?' · '+Social.escape(a.tag):'')+'</small></div><div class="app-links"><a class="mini primary" target="_blank" rel="noopener noreferrer" href="'+Social.escape(a.url)+'" title="Open the original website and sign in">Open & sign in ↗</a>'+(isCustom?'<button class="mini danger" type="button" data-del-app="'+Social.escape(a.id)+'" aria-label="Remove '+Social.escape(a.name)+'">Remove</button>':'')+'</div></div>';
 }
 function renderAppHub(){
   const builtins=document.getElementById('builtinApps');
@@ -68,16 +70,16 @@ document.getElementById('addAppForm')?.addEventListener('submit',event=>{
   event.preventDefault();
   const name=document.getElementById('appName').value.trim();
   const input=document.getElementById('appUrl').value;
-  if(name.length<2||name.length>45){toast('App name must be between 2 and 45 characters.',true);return;}
+  if(name.length<2||name.length>45){Social.notify('App name must be between 2 and 45 characters.',true);return;}
   let url;
-  try{url=safeAppUrl(input)}catch(error){toast(error.message,true);return}
-  if(customApps.some(a=>a.url===url)){toast('You already saved this application.',true);return}
-  const newEntry={id:uid(),name,url};
+  try{url=safeAppUrl(input)}catch(error){Social.notify(error.message,true);return}
+  if(customApps.some(a=>a.url===url)){Social.notify('You already saved this application.',true);return}
+  const newEntry={id:Social.makeId(),name,url};
   customApps.unshift(newEntry);
   if(saveCustomApps()){
     event.target.reset();
     renderAppHub();
-    toast('Application added. Open it and sign in on its official website.');
+    Social.notify('Application added. Open it and sign in on its official website.');
   }else customApps.shift();
 });
 document.addEventListener('click',event=>{
@@ -87,6 +89,6 @@ document.addEventListener('click',event=>{
   if(!app)return;
   if(!confirm('Remove '+app.name+' from your shortcuts? This does not sign you out of the website.'))return;
   customApps=customApps.filter(x=>x.id!==app.id);
-  saveCustomApps();renderAppHub();toast('Application shortcut removed.');
+  saveCustomApps();renderAppHub();Social.notify('Application shortcut removed.');
 });
 renderAppHub();
