@@ -1,4 +1,4 @@
-import {processRpc,LIMIT} from '../lib/social-mcp.mjs';
+import {processRpcWithPairing,LIMIT} from '../lib/social-mcp.mjs';
 
 // Streamable HTTP endpoint for the PUBLIC, zero-secret, read-only handoff plugin.
 // Tools never access accounts, Android sessions or remote/private stored data.
@@ -32,6 +32,6 @@ export default async function handler(req,res){
       return res.status(400).json({error:'Invalid notification'});
     return res.status(202).end();
   }
-  const result=processRpc(payload,req.headers);
+  const result=await processRpcWithPairing(payload,req.headers);
   return res.status(result.error && [-32020,-32600].includes(result.error.code)?400:200).json(result);
 }

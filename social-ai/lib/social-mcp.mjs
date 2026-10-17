@@ -1,3 +1,4 @@
+import {executePairing} from './pairing-backend.mjs';
 // PrimeHub Social AI - public, stateless read-only MCP connector.
 // IMPORTANT: This server does NOT access an Android device or social account.
 // It only prepares owner-reviewable handoff links for a separate native app.
@@ -11,8 +12,19 @@ export const CAPABILITIES = [
   'Explain which steps need mobile owner approval'
 ];
 export const LIMIT = 8000;
+const OWNER_PAIR_TOOLS = [
+  { name:'pair_owner_android_device', title:'Pair private Android device',
+    description:'Only pair a phone when the owner provides the 26-character code shown on the Android device. Does not permit phone screen access or app control.',
+    inputSchema:{type:'object',properties:{owner_pair_code:{type:'string',minLength:26,maxLength:26}},required:['owner_pair_code'],additionalProperties:false},
+    annotations:{readOnlyHint:false,destructiveHint:false,openWorldHint:false} },
+  { name:'check_owner_android_connection', title:'Check paired phone status',
+    description:'Read pairing status only while the phone pairing screen is running. Requires a private pairing code; does not read other applications.',
+    inputSchema:{type:'object',properties:{owner_pair_code:{type:'string',minLength:26,maxLength:26}},required:['owner_pair_code'],additionalProperties:false},
+    annotations:{readOnlyHint:true,destructiveHint:false,openWorldHint:false} }
+];
 const platforms = Object.freeze(['TikTok','Facebook','Instagram','YouTube','Google Business']);
 export const TOOL_DEFS = [
+  ...OWNER_PAIR_TOOLS,
   {
     name: 'prepare_android_post',
     title: 'Prepare a post for PrimeHub Social AI Android',
@@ -126,4 +138,43 @@ export function processRpc(payload, headers={}) {
   }
   if(modern && ['server/discover','tools/list','tools/call'].includes(method))result={resultType:'complete',...result,_meta:{...(result._meta||{}),'io.modelcontextprotocol/serverInfo':SERVER_INFO}};
   return {jsonrpc:'2.0',id,result};
+}
+
+// Keep the original synchronous JSON-RPC adapter for existing, read-only tools.
+// Owner pairing RPC requires async HTTPS and is handled separately. No secrets logged.
+export async function processRpcWithPairing(payload,headers={}) {
+  const method=payload?.method,params=payload?.params;
+  const target=params?.name;
+  if(method!=='tools/call'||!['pair_owner_android_device','check_owner_android_connection'].includes(target))
+    return processRpc(payload,headers);
+  const id=payload?.id??null;
+  if(payload.jsonrpc!=='2.0'||typeof id!=='number'&&typeof id!=='string')
+    return {jsonrpc:'2.0',id,error:{code:-32600,message:'Invalid JSON-RPC request'}};
+  const modern=headers['mcp-protocol-version']===MCP_MODERN ||
+    params?._meta?.['io.modelcontextprotocol/protocolVersion']===MCP_MODERN;
+  if(modern && (headers['mcp-method']!==method||headers['mcp-name']!==target))
+    return {jsonrpc:'2.0',id,error:{code:-32020,message:'MCP routing headers do not match'}};
+  const args=params.arguments;
+  if(!args||typeof args!=='object'||Array.isArray(args)||
+    Object.keys(args).some(x=>x!=='owner_pair_code')||
+    !/^[A-Z2-7]{26}$/.test(args.owner_pair_code||''))
+    return {jsonrpc:'2.0',id,result:toolResult({error:'A valid private 26-character owner code is required.'},true)};
+  try{
+    const result=await executePairing(target==='pair_owner_android_device'?'finish':'status',{code:args.owner_pair_code});
+    const data=result.ok?result.result:{error:result.error};
+    // No secrets, pairing tokens, raw device identifiers, or customer data in tool outputs.
+    const safe=target==='pair_owner_android_device'?
+      {paired:data?.paired===true,message:data?.message||data?.reason||data?.error||'Pairing not completed',
+       reminder:'Keep the Pairing screen open to report presence. No remote control or automatic posting is enabled.'}:
+      {found:data?.found===true,paired:data?.paired===true,online:data?.online===true,
+       last_seen:data?.last_seen||null,
+       capabilities:['owner-approved task handoff','foreground-only heartbeat'],
+       can_control_other_apps:false};
+    let response=toolResult(safe,!result.ok);
+    if(modern)response={resultType:'complete',...response,
+      _meta:{'io.modelcontextprotocol/serverInfo':SERVER_INFO}};
+    return {jsonrpc:'2.0',id,result:response};
+  }catch{
+    return {jsonrpc:'2.0',id,result:toolResult({error:'Pairing service unavailable.'},true)};
+  }
 }

@@ -20,6 +20,7 @@
         android:supportsRtl="true">
         <activity android:name=".InstalledAppsActivity" android:exported="false"/>
         <activity android:name=".DeviceCheckActivity" android:exported="false"/>
+        <activity android:name=".PairDeviceActivity" android:exported="false"/>
         <activity android:name=".TaskActivity"
             android:exported="true"
             android:launchMode="singleTop">
