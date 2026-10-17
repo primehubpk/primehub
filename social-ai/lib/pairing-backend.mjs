@@ -12,10 +12,6 @@ const text=x=>typeof x==='string'?x:'';
 export async function executePairing(action,params={}) {
   const rpc=RPC[action];
   if(!rpc)throw Object.assign(new Error('Unknown pairing operation'),{status:400});
-  const url=process.env.PH_SOCIAL_PAIR_SUPABASE_URL;
-  const apiKey=process.env.PH_SOCIAL_PAIR_SUPABASE_ANON;
-  if(!url||!apiKey)throw Object.assign(new Error('Pairing backend is not configured'),{status:503});
-  if(!/^https:\/\/[a-z0-9-]+\.supabase\.co$/.test(url))throw new Error('Invalid backend configuration');
   let payload;
   const code=text(params.code);
   const id=text(params.deviceId),secret=text(params.deviceToken);
@@ -31,6 +27,10 @@ export async function executePairing(action,params={}) {
       payload.p_pair_code=code;
     }
   }
+  const url=process.env.PH_SOCIAL_PAIR_SUPABASE_URL;
+  const apiKey=process.env.PH_SOCIAL_PAIR_SUPABASE_ANON;
+  if(!url||!apiKey)throw Object.assign(new Error('Pairing backend is not configured'),{status:503});
+  if(!/^https:\/\/[a-z0-9-]+\.supabase\.co$/.test(url))throw new Error('Invalid backend configuration');
   const res=await fetch(url+'/rest/v1/rpc/'+rpc,{
     method:'POST',headers:{'content-type':'application/json',apikey:apiKey,authorization:'Bearer '+apiKey},
     body:JSON.stringify(payload),signal:AbortSignal.timeout(8000)
