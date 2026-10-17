@@ -124,6 +124,6 @@ export function processRpc(payload, headers={}) {
   }else{
     return {jsonrpc:'2.0',id,error:{code:-32601,message:'Method not found'}};
   }
-  if(modern && method==='tools/call')result={resultType:'complete',...result,_meta:{'io.modelcontextprotocol/serverInfo':SERVER_INFO}};
+  if(modern && ['server/discover','tools/list','tools/call'].includes(method))result={resultType:'complete',...result,_meta:{...(result._meta||{}),'io.modelcontextprotocol/serverInfo':SERVER_INFO}};
   return {jsonrpc:'2.0',id,result};
 }
