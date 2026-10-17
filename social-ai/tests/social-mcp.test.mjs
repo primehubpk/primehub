@@ -33,6 +33,7 @@ test('2026 MCP discover accepts routing headers and lists tools',()=>{
   const discover=request('server/discover',{},h);
   assert.deepEqual(discover.result.supportedVersions,[MCP_MODERN,MCP_LEGACY]);
   assert.equal(discover.result.capabilities.tools.listChanged,false);
+  assert.equal(discover.result.resultType,'complete');
   const tools=request('tools/list',{}, {'mcp-protocol-version':MCP_MODERN,'mcp-method':'tools/list'});
   assert.equal(tools.result.tools.length,2);
   assert.deepEqual(tools.result.tools.map(x=>x.name),['prepare_android_post','android_bridge_capabilities']);
