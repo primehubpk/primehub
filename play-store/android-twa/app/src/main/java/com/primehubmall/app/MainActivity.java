@@ -88,28 +88,24 @@ public class MainActivity extends Activity {
     }
 
     /**
-     * Android 15+ renders our targetSdk 36 WebView edge-to-edge. Inset the
-     * native root against status/navigation bars and display cutouts, keeping
-     * both the website announcement strip and bottom menu fully accessible.
-     * On Android 14 and below the OS already fits content inside system bars.
-     * IME insets protect checkout/search fields from the on-screen keyboard.
+     * On Android 15+ the WebView already handles bottom system safe area through
+     * its storefront layout. Padding the native root by the bottom navigation
+     * inset *again* lifts the website tab bar and causes a blank white strip.
+     * Keep the status bar and display-cutout safe, but do not add bottom padding.
      */
     private void configureSystemBarInsets() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.VANILLA_ICE_CREAM) return;
-
         View root = findViewById(R.id.activity_root);
         root.setOnApplyWindowInsetsListener((view, insets) -> {
             Insets safe = insets.getInsets(
-                WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout());
-            Insets keyboard = insets.getInsets(WindowInsets.Type.ime());
-            int bottom = Math.max(safe.bottom, keyboard.bottom);
+                WindowInsets.Type.statusBars() | WindowInsets.Type.displayCutout());
             if (view.getPaddingLeft() != safe.left
                     || view.getPaddingTop() != safe.top
                     || view.getPaddingRight() != safe.right
-                    || view.getPaddingBottom() != bottom) {
-                view.setPadding(safe.left, safe.top, safe.right, bottom);
+                    || view.getPaddingBottom() != 0) {
+                view.setPadding(safe.left, safe.top, safe.right, 0);
             }
-            // Do not consume insets: the WebView still needs keyboard events.
+            // Don't consume insets: keyboard resizing stays managed by WebView.
             return insets;
         });
         root.requestApplyInsets();
@@ -145,7 +141,7 @@ public class MainActivity extends Activity {
         settings.setJavaScriptCanOpenWindowsAutomatically(true);
         settings.setSupportMultipleWindows(true);
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
-        settings.setUserAgentString(settings.getUserAgentString() + " PrimeHubApp/13.0.0");
+        settings.setUserAgentString(settings.getUserAgentString() + " PrimeHubApp/13.0.1");
         CookieManager cookies = CookieManager.getInstance();
         cookies.setAcceptCookie(true);
         cookies.setAcceptThirdPartyCookies(webView, true);
