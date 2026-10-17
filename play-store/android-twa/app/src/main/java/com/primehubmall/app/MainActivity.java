@@ -45,11 +45,13 @@ public class MainActivity extends Activity {
     }
     private static final int FILE_CHOOSER_REQUEST = 1001;
     private static final long SPLASH_TIMEOUT_MS = 8000;
+    private static final String STORE_LOADED_ONCE = "store_loaded_once";
 
     private WebView webView;
     private ImageView splash;
     private ValueCallback<Uri[]> filePathCallback;
     private boolean splashHidden;
+    private boolean mainFrameLoadFailed;
     private long lastExitBackPressMs = 0;
     private boolean exitPromptShowing = false;
     private final Handler handler = new Handler(Looper.getMainLooper());
@@ -62,6 +64,12 @@ public class MainActivity extends Activity {
             configureStatusBarInsets();
             webView = findViewById(R.id.webview);
             splash = findViewById(R.id.splash);
+            // The full-screen P appears on the first successful install launch only.
+            // Later cold starts use the system's normal brief splash, not our overlay.
+            if (getPreferences(MODE_PRIVATE).getBoolean(STORE_LOADED_ONCE, false)) {
+                splashHidden = true;
+                splash.setVisibility(View.GONE);
+            }
             configureWebView();
             if (savedInstanceState != null) {
                 if (webView.restoreState(savedInstanceState) == null) {
@@ -72,7 +80,7 @@ public class MainActivity extends Activity {
             } else {
                 webView.loadUrl(urlFromIntent(getIntent()));
             }
-            handler.postDelayed(this::hideSplash, SPLASH_TIMEOUT_MS);
+            if (!splashHidden) handler.postDelayed(this::hideSplash, SPLASH_TIMEOUT_MS);
         } catch (Throwable error) {
             showOpenInBrowserFallback();
         }
@@ -132,7 +140,7 @@ public class MainActivity extends Activity {
         settings.setJavaScriptCanOpenWindowsAutomatically(true);
         settings.setSupportMultipleWindows(true);
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
-        settings.setUserAgentString(settings.getUserAgentString() + " PrimeHubApp/12.0.0");
+        settings.setUserAgentString(settings.getUserAgentString() + " PrimeHubApp/13.0.0");
         CookieManager cookies = CookieManager.getInstance();
         cookies.setAcceptCookie(true);
         cookies.setAcceptThirdPartyCookies(webView, true);
@@ -351,7 +359,18 @@ public class MainActivity extends Activity {
         }
 
         @Override
+        public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
+            super.onPageStarted(view, url, favicon);
+            mainFrameLoadFailed = false;
+        }
+
+        @Override
         public void onPageFinished(WebView view, String url) {
+            // Don't count a network/error page as a successful store launch.
+            if (!mainFrameLoadFailed && isTrustedUrl(Uri.parse(url))) {
+                getPreferences(MODE_PRIVATE).edit()
+                    .putBoolean(STORE_LOADED_ONCE, true).apply();
+            }
             hideSplash();
             PushManager.onPageFinished(MainActivity.this, view, url);
         }
@@ -365,6 +384,7 @@ public class MainActivity extends Activity {
         @Override
         public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
             if (request == null || request.isForMainFrame()) {
+                mainFrameLoadFailed = true;
                 hideSplash();
             }
         }
