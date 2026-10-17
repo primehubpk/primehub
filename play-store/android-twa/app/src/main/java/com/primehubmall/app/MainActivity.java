@@ -141,13 +141,14 @@ public class MainActivity extends Activity {
         settings.setJavaScriptCanOpenWindowsAutomatically(true);
         settings.setSupportMultipleWindows(true);
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
-        settings.setUserAgentString(settings.getUserAgentString() + " PrimeHubApp/13.0.1");
+        settings.setUserAgentString(settings.getUserAgentString() + " PrimeHubApp/" + BuildConfig.VERSION_NAME);
         CookieManager cookies = CookieManager.getInstance();
         cookies.setAcceptCookie(true);
         cookies.setAcceptThirdPartyCookies(webView, true);
         webView.setWebViewClient(new StoreWebViewClient());
         webView.setWebChromeClient(new StoreChromeClient());
         PushManager.attach(this, webView);
+        MetaAppEvents.attach(this, webView);
     }
 
     private String urlFromIntent(Intent intent) {
