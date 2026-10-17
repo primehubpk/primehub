@@ -112,7 +112,10 @@ public final class MainActivity extends Activity {
         if (intent == null || !"com.primehub.socialai.OPEN_SITE".equals(intent.getAction())) return;
         String url=validateHttps(intent.getStringExtra("safe_url"));
         if (url == null) {toast("Invalid HTTPS destination");return;}
-        openSite(url);
+        // Task handoff is user-approved; launch the official external site rather
+        // than embedding an unsupported third-party sign-in inside a WebView.
+        if(STUDIO_URL.equals(url))openSite(url);
+        else openOutside(url);
     }
 
     private void addPresets() {
@@ -231,7 +234,7 @@ public final class MainActivity extends Activity {
         TextView logo = text("P✦", 21, MINT, true);
         logo.setGravity(Gravity.CENTER);
         logo.setBackground(shape(INK, 0, dp(13)));
-        header.addView(logo, margins(45, 45), 0, 0, 10, 0));
+        header.addView(logo, margins(45, 45, 0, 0, 10, 0));
 
         LinearLayout names = column();
         headerTitle = text("primehub.", 22, INK, true);
