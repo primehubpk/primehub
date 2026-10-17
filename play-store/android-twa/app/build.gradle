@@ -49,8 +49,11 @@ android {
         }
         release {
             buildConfigField "String", "PREVIEW_SITE_ORIGIN", '""'
-            minifyEnabled false
-            shrinkResources false
+            // Play release: R8 obfuscates/optimises code and removes unused
+            // resources. Firebase/AndroidX provide their consumer keep rules.
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt')
             if (envFile('PRIMEHUB_STORE_FILE')) {
                 signingConfig signingConfigs.release
             }
