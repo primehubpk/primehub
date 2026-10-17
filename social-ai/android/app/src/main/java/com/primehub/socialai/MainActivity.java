@@ -306,6 +306,9 @@ public final class MainActivity extends Activity {
         warning.setBackground(shape(WHITE, BORDER, dp(13)));
         warning.setPadding(dp(13),dp(13),dp(13),dp(13));
         page.addView(warning, margins(-1,-2,0,15,0,14));
+        Button checkDevice=button("✓ Device Check · Share to ChatGPT",true);
+        checkDevice.setOnClickListener(v->startActivity(new Intent(this,DeviceCheckActivity.class)));
+        page.addView(checkDevice,margins(-1,48,0,12,0,6));
 
         TextView appsTitle = text("Your added apps  ·  " + custom.size(), 19, INK, true);
         page.addView(appsTitle, margins(-1,-2,0,5,0,7));
