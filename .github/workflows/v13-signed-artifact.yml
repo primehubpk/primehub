@@ -138,7 +138,7 @@ jobs:
           cp "$aab" "$RUNNER_TEMP/primehub-v13-output/PrimeHub-v13-Play-Upload.aab"
           cp "$apk" "$RUNNER_TEMP/primehub-v13-output/PrimeHub-v13-Phone-Test.apk"
           cat > "$RUNNER_TEMP/primehub-v13-output/README-IMPORTANT.txt" <<'EOF'
-          PrimeHub v13 / com.primehubmall.app / versionCode 12 / targetSdk 36.
+          PrimeHub v13 / com.primehubmall.app / versionCode 13 / targetSdk 36.
           Signed with the SAME verified PrimeHub Play Store upload certificate.
           AAB: upload to the EXISTING PrimeHub Google Play listing when approved.
           APK: optional direct phone testing; Play-installed apps may reject sideload updates.
