@@ -8,11 +8,13 @@ import android.content.Intent;
 import android.net.Uri;
 import android.os.SystemClock;
 import android.os.Bundle;
+import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.View;
+import android.view.WindowInsets;
 import android.webkit.CookieManager;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
@@ -57,6 +59,7 @@ public class MainActivity extends Activity {
         super.onCreate(savedInstanceState);
         try {
             setContentView(R.layout.activity_main);
+            configureStatusBarInsets();
             webView = findViewById(R.id.webview);
             splash = findViewById(R.id.splash);
             configureWebView();
@@ -73,6 +76,30 @@ public class MainActivity extends Activity {
         } catch (Throwable error) {
             showOpenInBrowserFallback();
         }
+    }
+
+    /**
+     * Android 15+ enforces edge-to-edge for our target SDK. Keep the WebView
+     * below the real status bar (including display cutouts), so the store's
+     * announcement strip never sits behind the clock, signal or battery.
+     * Older Android versions already inset the app content automatically.
+     * Leave navigation-bar spacing and website layout unchanged.
+     */
+    private void configureStatusBarInsets() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.VANILLA_ICE_CREAM) return;
+
+        View root = findViewById(R.id.activity_root);
+        root.setOnApplyWindowInsetsListener((view, insets) -> {
+            int statusBarTop = insets.getInsets(
+                WindowInsets.Type.statusBars() | WindowInsets.Type.displayCutout()
+            ).top;
+            if (view.getPaddingTop() != statusBarTop) {
+                view.setPadding(view.getPaddingLeft(), statusBarTop,
+                    view.getPaddingRight(), view.getPaddingBottom());
+            }
+            return insets;
+        });
+        root.requestApplyInsets();
     }
 
     @Override
