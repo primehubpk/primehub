@@ -1,0 +1,50 @@
+name: PrimeHub Social AI Native Android APK
+on:
+  push:
+    branches:
+      - feat/primehub-social-ai-oct17
+    paths:
+      - 'social-ai/android/**'
+      - '.github/workflows/primehub-social-ai-android.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  android-debug:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout feature branch
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Android SDK API 36
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDK_ROOT="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          if [[ ! -f "$SDK_ROOT/platforms/android-36/android.jar" ]]; then
+            yes | "$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0"
+          fi
+          echo "ANDROID_HOME=$SDK_ROOT" >> "$GITHUB_ENV"
+      - name: Build native Android test APK
+        run: bash play-store/android-twa/gradlew -p social-ai/android :app:assembleDebug --no-daemon --stacktrace
+      - name: Check separate install identity
+        run: |
+          set -euo pipefail
+          test -s social-ai/android/app/build/outputs/apk/debug/app-debug.apk
+          grep -Fq "applicationId 'com.primehub.socialai'" social-ai/android/app/build.gradle
+          ! grep -Fq 'com.primehubmall.app' social-ai/android/app/build.gradle
+          ls -lh social-ai/android/app/build/outputs/apk/debug/app-debug.apk
+      - name: Upload owner test APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: PrimeHub-Social-AI-Native-Android-APK
+          path: social-ai/android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 10
