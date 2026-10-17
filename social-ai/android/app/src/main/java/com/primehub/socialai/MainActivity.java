@@ -127,6 +127,8 @@ public final class MainActivity extends Activity {
         presets.add(new Site("YouTube Studio", "https://studio.youtube.com/", "▶", false));
         presets.add(new Site("WhatsApp Web", "https://web.whatsapp.com/", "◉", false));
         presets.add(new Site("Google Business", "https://business.google.com/", "G", false));
+        presets.add(new Site("Google Maps", "https://www.google.com/maps", "⌖", false));
+        presets.add(new Site("WhatsApp Business", "https://www.whatsapp.com/business/", "W", false));
         presets.add(new Site("Canva", "https://www.canva.com/", "C", false));
         presets.add(new Site("CapCut", "https://www.capcut.com/", "✂", false));
         presets.add(new Site("Metricool", "https://app.metricool.com/", "M", false));
@@ -406,6 +408,8 @@ public final class MainActivity extends Activity {
             case "YouTube Studio": return "com.google.android.apps.youtube.creator";
             case "WhatsApp Web": return "com.whatsapp";
             case "Google Business": return "com.google.android.apps.maps";
+            case "Google Maps": return "com.google.android.apps.maps";
+            case "WhatsApp Business": return "com.whatsapp.w4b";
             case "Canva": return "com.canva.editor";
             case "CapCut": return "com.lemon.lvoverseas";
             case "Pinterest": return "com.pinterest";
