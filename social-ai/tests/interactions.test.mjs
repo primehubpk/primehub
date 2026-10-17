@@ -31,6 +31,12 @@ test('startup initializes buttons and create-post view navigates', async t => {
   const data=JSON.parse(w.localStorage.getItem('primehub-social-v1'));
   assert.equal(data.length,1);
   assert.equal(data[0].title,'Test bangles');
+  w.document.querySelector('[data-action="prepare"]').click();
+  const handoff=w.document.querySelector('a[href^="primehubsocial://import?"]');
+  assert.ok(handoff,'Owner should be offered native Android task handoff');
+  assert.match(handoff.getAttribute('href'),/platform=Facebook/);
+  assert.match(handoff.getAttribute('href'),/title=Test\+bangles/);
+
   w.close();
 });
 
