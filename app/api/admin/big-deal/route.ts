@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { revalidateTag } from 'next/cache';
+import { revalidatePath, revalidateTag } from 'next/cache';
 import { FieldValue } from 'firebase-admin/firestore';
 import { getDualCatalog, getDualStorefrontSettings } from '@/lib/dualReadServer';
 import { getAdminDb } from '@/lib/firebaseAdmin';
@@ -192,6 +192,27 @@ async function writeSupabaseMain(payload: Record<string, any>) {
   }
 }
 
+// Confirm the persisted primary record instead of treating HTTP 2xx as proof
+// that the next storefront read will return the submitted rotation.
+async function verifiedPrimaryDeal(expected: DailyDeal) {
+  const { url, key, configured } = supabaseWriteConfig();
+  if (!configured) return null;
+  try {
+    const response = await fetch(`${url}/rest/v1/settings?id=eq.main&select=payload`, {
+      headers: { apikey: key, Authorization: `Bearer ${key}` },
+      cache: 'no-store',
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!response.ok) return null;
+    const rows = await response.json();
+    const saved = normalizeDeal(Array.isArray(rows) ? rows[0]?.payload?.bigDeal || {} : {});
+    return JSON.stringify(saved) === JSON.stringify(expected) ? saved : null;
+  } catch (error) {
+    console.warn('Big Deal Supabase write verification failed', error);
+    return null;
+  }
+}
+
 async function firebaseBigDealCandidate() {
   const snapshot = await getAdminDb().collection('settings').doc('main').get();
   if (!snapshot.exists) return { dedicated: null as any, legacy: null as any };
@@ -274,6 +295,10 @@ export async function POST(request: Request) {
     const primary = await writeSupabaseMain(nextMain);
 
     if (primary.ok) {
+      const persistedDeal = await verifiedPrimaryDeal(dailyDeal);
+      if (!persistedDeal) {
+        return NextResponse.json({ error: 'Big Deal save could not be verified on Supabase. Refresh the manager before trying again.' }, { status: 503 });
+      }
       let warning = '';
       try {
         await getAdminDb().collection('settings').doc('main').set(
@@ -286,30 +311,18 @@ export async function POST(request: Request) {
       }
       revalidateTag('storefront-settings', { expire: 0 });
       revalidateTag('salaar-store-knowledge', 'max');
-      return NextResponse.json({ success: true, source: 'supabase', dailyDeal, warning });
+      revalidatePath('/');
+      revalidatePath('/deals/big');
+      return NextResponse.json({ success: true, source: 'supabase', dailyDeal: persistedDeal, warning });
     }
 
-    if (!primary.attempted || !primary.retryable) {
-      console.error('Big Deal Supabase primary write blocked', primary.error);
-      return NextResponse.json({ error: primary.error || 'Supabase Big Deal save is unavailable.' }, { status: 503 });
-    }
-
-    try {
-      await getAdminDb().collection('settings').doc('main').set(
-        { bigDeal: dailyDeal, dailyDeal: FieldValue.delete() },
-        { merge: true },
-      );
-      revalidateTag('storefront-settings', { expire: 0 });
-      return NextResponse.json({
-        success: true,
-        source: 'firebase-fallback',
-        dailyDeal,
-        warning: 'Supabase was temporarily unavailable, so the Big Deal was saved to Firebase fallback only.',
-      });
-    } catch (fallbackError) {
-      console.error('Big Deal fallback write failed', fallbackError);
-      return NextResponse.json({ error: 'Big Deal could not be saved to Supabase or Firebase fallback.' }, { status: 503 });
-    }
+    // The live storefront is Supabase-primary. Firebase-only writes would appear
+    // successful to an admin but remain invisible to customers while Supabase
+    // still serves an older rotation, so never acknowledge them as published.
+    console.error('Big Deal Supabase primary write unavailable', primary.error);
+    return NextResponse.json({
+      error: 'Big Deal was not published because the live Supabase database is unavailable. Your previous live deals remain unchanged. Please try again.',
+    }, { status: 503 });
   } catch (error) {
     console.error('Big Deal admin route failed', error);
     return NextResponse.json({ error: 'Big Deal save failed.' }, { status: 500 });
