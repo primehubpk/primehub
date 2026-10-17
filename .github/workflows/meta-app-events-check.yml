@@ -1,0 +1,51 @@
+name: Meta Android App Events verification
+
+on:
+  push:
+    branches: [feat/meta-app-events-oct17]
+    paths:
+      - 'play-store/android-twa/**'
+      - 'lib/metaPixel.ts'
+      - 'tests/meta-pixel.test.mjs'
+      - '.github/workflows/meta-app-events-check.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: node --test tests/meta-pixel.test.mjs
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Prepare existing Android target
+        run: |
+          SDK_ROOT="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          if [[ ! -f "$SDK_ROOT/platforms/android-36/android.jar" ]]; then
+            yes | "$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0"
+          fi
+          echo "ANDROID_HOME=$SDK_ROOT" >> "$GITHUB_ENV"
+      - name: Compile native Meta integration and Android lint
+        working-directory: play-store/android-twa
+        run: bash ./gradlew :app:assembleDebug :app:lintDebug --no-daemon
+      - name: Keep QA reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: PrimeHub-Meta-Android-QA
+          path: play-store/android-twa/app/build/reports/
+          retention-days: 7
+          if-no-files-found: ignore

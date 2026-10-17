@@ -7,5 +7,6 @@ public final class PrimeHubApplication extends Application {
     @Override public void onCreate() {
         super.onCreate();
         PushManager.initialize(this);
+        MetaAppEvents.initialize(this);
     }
 }
