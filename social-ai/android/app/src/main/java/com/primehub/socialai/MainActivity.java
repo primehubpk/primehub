@@ -394,6 +394,89 @@ public final class MainActivity extends Activity {
         dialog.show();
     }
 
+    private String nativePackage(String name) {
+        switch(name) {
+            case "Facebook": return "com.facebook.katana";
+            case "Meta Business Suite": return "com.facebook.pages.app";
+            case "Instagram": return "com.instagram.android";
+            case "TikTok": return "com.zhiliaoapp.musically";
+            case "YouTube Studio": return "com.google.android.apps.youtube.creator";
+            case "WhatsApp Web": return "com.whatsapp";
+            case "Google Business": return "com.google.android.apps.maps";
+            case "Canva": return "com.canva.editor";
+            case "CapCut": return "com.lemon.lvoverseas";
+            case "Pinterest": return "com.pinterest";
+            default: return null;
+        }
+    }
+    private boolean launchInstalled(String pkg) {
+        if(pkg==null)return false;
+        Intent launch=getPackageManager().getLaunchIntentForPackage(pkg);
+        if(launch==null)return false;
+        try{startActivity(launch);return true;}
+        catch(Exception ex){toast("This Android app could not open.");return false;}
+    }
+    private void launchPresetOrWebsite(Site site) {
+        if(STUDIO_URL.equals(site.url)){openSite(STUDIO_URL);return;}
+        if(!launchInstalled(nativePackage(site.name))) {
+            toast("App not installed. Opening official website in Chrome.");
+            openOutside(site.url);
+        }
+    }
+    private void renderInstalledApps(LinearLayout parent) {
+        Set<String> added=prefs.getStringSet(InstalledAppsActivity.INSTALLED_KEY,Collections.emptySet());
+        TextView heading=text("Installed Android apps · "+added.size(),16,INK,true);
+        parent.addView(heading,margins(-1,-2,0,8,0,10));
+        if(added.isEmpty()){
+            TextView empty=text("None yet. Tap + Add at the top and choose the apps already installed on your phone.",12,MUTED,false);
+            parent.addView(empty,margins(-1,-2,0,0,0,8));
+            return;
+        }
+        PackageManager pm=getPackageManager();
+        java.util.ArrayList<String> sorted=new java.util.ArrayList<>(added);
+        Collections.sort(sorted);
+        for(String pkg:sorted) {
+            String label;
+            try{label=pm.getApplicationLabel(pm.getApplicationInfo(pkg,0)).toString();}
+            catch(PackageManager.NameNotFoundException ex){label=pkg;}
+            final String display=label;
+            LinearLayout row=new LinearLayout(this);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            row.setPadding(dp(10),dp(9),dp(10),dp(9));
+            row.setBackground(shape(WHITE,BORDER,dp(13)));
+            android.widget.ImageView icon=new android.widget.ImageView(this);
+            try{icon.setImageDrawable(pm.getApplicationIcon(pkg));}
+            catch(PackageManager.NameNotFoundException ex){icon.setImageResource(android.R.drawable.sym_def_app_icon);}
+            LinearLayout.LayoutParams image=new LinearLayout.LayoutParams(dp(38),dp(38));
+            image.rightMargin=dp(10);row.addView(icon,image);
+            LinearLayout labels=column();
+            labels.addView(text(display,13,INK,true));
+            labels.addView(text("Original Android app • existing login",10,MUTED,false));
+            row.addView(labels,new LinearLayout.LayoutParams(0,-2,1));
+            Button open=button("Open",true);
+            open.setOnClickListener(v->{if(!launchInstalled(pkg))toast("App is unavailable or was removed.");});
+            row.addView(open,new LinearLayout.LayoutParams(-2,dp(42)));
+            TextView remove=text("×",23,MUTED,true);
+            remove.setGravity(Gravity.CENTER);
+            remove.setOnClickListener(v->new AlertDialog.Builder(this)
+                .setTitle("Remove "+display+" shortcut?")
+                .setMessage("Your original Android app and its login will be unchanged.")
+                .setNegativeButton("Cancel",null)
+                .setPositiveButton("Remove",(dialog,which)->{
+                    Set<String> remaining=new HashSet<>(prefs.getStringSet(InstalledAppsActivity.INSTALLED_KEY,Collections.emptySet()));
+                    remaining.remove(pkg);
+                    prefs.edit().putStringSet(InstalledAppsActivity.INSTALLED_KEY,remaining).apply();
+                    showHome();
+                }).show());
+            row.addView(remove,new LinearLayout.LayoutParams(dp(32),dp(42)));
+            parent.addView(row,margins(-1,-2,0,0,0,7));
+        }
+    }
+    @Override protected void onResume() {
+        super.onResume();
+        if(contentContainer!=null && !showingWeb)showHome();
+    }
+
     private void ensureWeb() {
         if(web!=null)return;
         web=new WebView(this);
