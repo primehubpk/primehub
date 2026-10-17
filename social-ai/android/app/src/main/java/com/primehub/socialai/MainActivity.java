@@ -5,6 +5,10 @@ import android.app.AlertDialog;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
+import java.util.Set;
+import java.util.HashSet;
+import java.util.Collections;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
@@ -108,7 +112,10 @@ public final class MainActivity extends Activity {
         if (intent == null || !"com.primehub.socialai.OPEN_SITE".equals(intent.getAction())) return;
         String url=validateHttps(intent.getStringExtra("safe_url"));
         if (url == null) {toast("Invalid HTTPS destination");return;}
-        openSite(url);
+        // Task handoff is user-approved; launch the official external site rather
+        // than embedding an unsupported third-party sign-in inside a WebView.
+        if(STUDIO_URL.equals(url))openSite(url);
+        else openOutside(url);
     }
 
     private void addPresets() {
@@ -116,10 +123,12 @@ public final class MainActivity extends Activity {
         presets.add(new Site("Facebook", "https://www.facebook.com/", "f", false));
         presets.add(new Site("Meta Business Suite", "https://business.facebook.com/", "M", false));
         presets.add(new Site("Instagram", "https://www.instagram.com/", "◎", false));
-        presets.add(new Site("TikTok Studio", "https://www.tiktok.com/tiktokstudio", "♪", false));
+        presets.add(new Site("TikTok", "https://www.tiktok.com/", "♪", false));
         presets.add(new Site("YouTube Studio", "https://studio.youtube.com/", "▶", false));
         presets.add(new Site("WhatsApp Web", "https://web.whatsapp.com/", "◉", false));
         presets.add(new Site("Google Business", "https://business.google.com/", "G", false));
+        presets.add(new Site("Google Maps", "https://www.google.com/maps", "⌖", false));
+        presets.add(new Site("WhatsApp Business", "https://www.whatsapp.com/business/", "W", false));
         presets.add(new Site("Canva", "https://www.canva.com/", "C", false));
         presets.add(new Site("CapCut", "https://www.capcut.com/", "✂", false));
         presets.add(new Site("Metricool", "https://app.metricool.com/", "M", false));
@@ -227,7 +236,7 @@ public final class MainActivity extends Activity {
         TextView logo = text("P✦", 21, MINT, true);
         logo.setGravity(Gravity.CENTER);
         logo.setBackground(shape(INK, 0, dp(13)));
-        header.addView(logo, margins(dp(45), dp(45), 0, 0, 10, 0));
+        header.addView(logo, margins(45, 45, 0, 0, 10, 0));
 
         LinearLayout names = column();
         headerTitle = text("primehub.", 22, INK, true);
@@ -237,8 +246,8 @@ public final class MainActivity extends Activity {
         header.addView(names, new LinearLayout.LayoutParams(0, -2, 1));
 
         Button add = button("＋ Add", true);
-        add.setOnClickListener(v -> addSiteDialog());
-        header.addView(add, margins(-2, dp(43), 2, 0, 0, 0));
+        add.setOnClickListener(v -> startActivity(new Intent(this,InstalledAppsActivity.class)));
+        header.addView(add, margins(-2, 43, 2, 0, 0, 0));
         mainContainer.addView(header, new LinearLayout.LayoutParams(-1, -2));
 
         contentContainer = new FrameLayout(this);
@@ -255,7 +264,7 @@ public final class MainActivity extends Activity {
 
         Button back = button("← Back", false);
         back.setOnClickListener(v -> goBack());
-        footer.addView(back, margins(0, dp(45), 7, 0, 7, 0));
+        footer.addView(back, margins(0, 45, 7, 0, 7, 0));
         ((LinearLayout.LayoutParams)back.getLayoutParams()).width=0;
         ((LinearLayout.LayoutParams)back.getLayoutParams()).weight=1;
 
@@ -284,30 +293,34 @@ public final class MainActivity extends Activity {
         banner.setBackground(shape(MINT, 0, dp(22)));
         banner.addView(text("✦  YOUR PRIVATE SOCIAL WORKSPACE", 11, INK, true));
         banner.addView(text("Your apps.\nOne place.", 32, INK, true), margins(-1,-2,0,10,0,6));
-        banner.addView(text("Open your real websites inside this Android app. Logins may stay saved on this device until each provider expires them.", 13, INK, false), margins(-1,-2,0,0,0,14));
+        banner.addView(text("Add REAL Android applications from your phone. Your existing login stays inside each original application.", 13, INK, false), margins(-1,-2,0,0,0,14));
         Button studio = button("✎  Open Content Studio", false);
         studio.setOnClickListener(v -> openSite(STUDIO_URL));
         banner.addView(studio, new LinearLayout.LayoutParams(-1,dp(47)));
         Button taskInbox = button("✦  AI task inbox & reminders", false);
         taskInbox.setOnClickListener(v -> startActivity(new Intent(this, TaskActivity.class)));
-        banner.addView(taskInbox, margins(-1, dp(47), 0, 8, 0, 0));
+        banner.addView(taskInbox, margins(-1, 47, 0, 8, 0, 0));
         page.addView(banner, new LinearLayout.LayoutParams(-1,-2));
 
-        TextView warning = text("🔐  Sessions belong to this app's Android WebView, not Chrome. Some platforms may require opening the normal browser to sign in. No passwords are collected by PrimeHub Social AI.", 12, MUTED, false);
+        TextView warning = text("🔐  Installed Android apps keep their own login sessions. This launcher cannot read their passwords, control their screens or publish automatically.", 12, MUTED, false);
         warning.setBackground(shape(WHITE, BORDER, dp(13)));
         warning.setPadding(dp(13),dp(13),dp(13),dp(13));
         page.addView(warning, margins(-1,-2,0,15,0,14));
 
         TextView appsTitle = text("Your added apps  ·  " + custom.size(), 19, INK, true);
         page.addView(appsTitle, margins(-1,-2,0,5,0,7));
+        renderInstalledApps(page);
+        Button websiteShortcut=button("＋ Add website link (optional)",false);
+        websiteShortcut.setOnClickListener(v->addSiteDialog());
+        page.addView(websiteShortcut,margins(-1,45,0,6,0,15));
         if (custom.isEmpty()) {
-            TextView empty = text("No apps added yet. Tap + Add above to include any trusted HTTPS website.", 12, MUTED,false);
+            TextView empty = text("Tap + Add to choose REAL installed applications from your phone.", 12, MUTED,false);
             page.addView(empty, margins(-1,-2,0,0,0,14));
         } else {
             for (Site site : custom) page.addView(siteRow(site), margins(-1,-2,0,0,0,9));
         }
 
-        TextView popular = text("Popular applications",19,INK,true);
+        TextView popular = text("Quick launch (native when installed)",19,INK,true);
         page.addView(popular,margins(-1,-2,0,18,0,12));
         for (Site site : presets) page.addView(siteRow(site),margins(-1,-2,0,0,0,9));
         contentContainer.addView(scroll, new FrameLayout.LayoutParams(-1,-1));
@@ -327,12 +340,12 @@ public final class MainActivity extends Activity {
         LinearLayout labels = column();
         labels.addView(text(site.name,14,INK,true));
         Uri uri=Uri.parse(site.url);
-        labels.addView(text(uri.getHost()==null?"Website":uri.getHost(),10,MUTED,false));
+        labels.addView(text(site.url.equals(STUDIO_URL)?"Content Studio":"Opens installed Android app · otherwise Chrome",10,MUTED,false));
         row.addView(labels,margins(0,-2,10,0,8,0));
         ((LinearLayout.LayoutParams)labels.getLayoutParams()).weight=1;
 
         Button visit=button("Open",true);
-        visit.setOnClickListener(v -> openSite(site.url));
+        visit.setOnClickListener(v -> launchPresetOrWebsite(site));
         row.addView(visit,new LinearLayout.LayoutParams(-2,dp(41)));
         if (site.custom) {
             TextView remove=text("×",25,MUTED,true);
@@ -343,7 +356,7 @@ public final class MainActivity extends Activity {
                  .setMessage("Remove " + site.name + " from this device? This will not log you out.")
                  .setNegativeButton("Cancel",null)
                  .setPositiveButton("Remove",(d,w)->{custom.remove(site);saveCustom();showHome();}).show());
-            row.addView(remove,margins(dp(32),dp(43),4,0,0,0));
+            row.addView(remove,margins(32,43,4,0,0,0));
         }
         return row;
     }
@@ -365,8 +378,8 @@ public final class MainActivity extends Activity {
         form.addView(website,new LinearLayout.LayoutParams(-1,dp(60)));
 
         AlertDialog dialog=new AlertDialog.Builder(this)
-            .setTitle("Add application")
-            .setMessage("Add a website, then open it to sign in. PrimeHub Social AI does not request or save your password.")
+            .setTitle("Add website shortcut")
+            .setMessage("For REAL Android apps, tap + Add. Website shortcuts are just browser links.")
             .setView(form)
             .setNegativeButton("Cancel",null)
             .setPositiveButton("Save",null).create();
@@ -384,6 +397,91 @@ public final class MainActivity extends Activity {
             toast("App saved — open it to sign in.");
         }));
         dialog.show();
+    }
+
+    private String nativePackage(String name) {
+        switch(name) {
+            case "Facebook": return "com.facebook.katana";
+            case "Meta Business Suite": return "com.facebook.pages.app";
+            case "Instagram": return "com.instagram.android";
+            case "TikTok": return "com.zhiliaoapp.musically";
+            case "YouTube Studio": return "com.google.android.apps.youtube.creator";
+            case "WhatsApp Web": return "com.whatsapp";
+            case "Google Business": return "com.google.android.apps.maps";
+            case "Google Maps": return "com.google.android.apps.maps";
+            case "WhatsApp Business": return "com.whatsapp.w4b";
+            case "Canva": return "com.canva.editor";
+            case "CapCut": return "com.lemon.lvoverseas";
+            case "Pinterest": return "com.pinterest";
+            default: return null;
+        }
+    }
+    private boolean launchInstalled(String pkg) {
+        if(pkg==null)return false;
+        Intent launch=getPackageManager().getLaunchIntentForPackage(pkg);
+        if(launch==null)return false;
+        try{startActivity(launch);return true;}
+        catch(Exception ex){toast("This Android app could not open.");return false;}
+    }
+    private void launchPresetOrWebsite(Site site) {
+        if(STUDIO_URL.equals(site.url)){openSite(STUDIO_URL);return;}
+        if(!launchInstalled(nativePackage(site.name))) {
+            toast("App not installed. Opening official website in Chrome.");
+            openOutside(site.url);
+        }
+    }
+    private void renderInstalledApps(LinearLayout parent) {
+        Set<String> added=prefs.getStringSet(InstalledAppsActivity.INSTALLED_KEY,Collections.emptySet());
+        TextView heading=text("Installed Android apps · "+added.size(),16,INK,true);
+        parent.addView(heading,margins(-1,-2,0,8,0,10));
+        if(added.isEmpty()){
+            TextView empty=text("None yet. Tap + Add at the top and choose the apps already installed on your phone.",12,MUTED,false);
+            parent.addView(empty,margins(-1,-2,0,0,0,8));
+            return;
+        }
+        PackageManager pm=getPackageManager();
+        java.util.ArrayList<String> sorted=new java.util.ArrayList<>(added);
+        Collections.sort(sorted);
+        for(String pkg:sorted) {
+            String label;
+            try{label=pm.getApplicationLabel(pm.getApplicationInfo(pkg,0)).toString();}
+            catch(PackageManager.NameNotFoundException ex){label=pkg;}
+            final String display=label;
+            LinearLayout row=new LinearLayout(this);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            row.setPadding(dp(10),dp(9),dp(10),dp(9));
+            row.setBackground(shape(WHITE,BORDER,dp(13)));
+            android.widget.ImageView icon=new android.widget.ImageView(this);
+            try{icon.setImageDrawable(pm.getApplicationIcon(pkg));}
+            catch(PackageManager.NameNotFoundException ex){icon.setImageResource(android.R.drawable.sym_def_app_icon);}
+            LinearLayout.LayoutParams image=new LinearLayout.LayoutParams(dp(38),dp(38));
+            image.rightMargin=dp(10);row.addView(icon,image);
+            LinearLayout labels=column();
+            labels.addView(text(display,13,INK,true));
+            labels.addView(text("Original Android app • existing login",10,MUTED,false));
+            row.addView(labels,new LinearLayout.LayoutParams(0,-2,1));
+            Button open=button("Open",true);
+            open.setOnClickListener(v->{if(!launchInstalled(pkg))toast("App is unavailable or was removed.");});
+            row.addView(open,new LinearLayout.LayoutParams(-2,dp(42)));
+            TextView remove=text("×",23,MUTED,true);
+            remove.setGravity(Gravity.CENTER);
+            remove.setOnClickListener(v->new AlertDialog.Builder(this)
+                .setTitle("Remove "+display+" shortcut?")
+                .setMessage("Your original Android app and its login will be unchanged.")
+                .setNegativeButton("Cancel",null)
+                .setPositiveButton("Remove",(dialog,which)->{
+                    Set<String> remaining=new HashSet<>(prefs.getStringSet(InstalledAppsActivity.INSTALLED_KEY,Collections.emptySet()));
+                    remaining.remove(pkg);
+                    prefs.edit().putStringSet(InstalledAppsActivity.INSTALLED_KEY,remaining).apply();
+                    showHome();
+                }).show());
+            row.addView(remove,new LinearLayout.LayoutParams(dp(32),dp(42)));
+            parent.addView(row,margins(-1,-2,0,0,0,7));
+        }
+    }
+    @Override protected void onResume() {
+        super.onResume();
+        if(contentContainer!=null && !showingWeb)showHome();
     }
 
     private void ensureWeb() {
@@ -424,7 +522,8 @@ public final class MainActivity extends Activity {
                 }
                 if (!"https".equalsIgnoreCase(scheme)) {
                     // Never auto-launch custom URI handlers or insecure HTTP redirects.
-                    toast("For safety, open this link in a trusted external browser.");
+                    toast("Platform app link cannot run in WebView. Opening Chrome instead.");
+                    openOutside(activeUrl);
                     return true;
                 }
                 return false;
@@ -494,7 +593,7 @@ public final class MainActivity extends Activity {
         controls.addView(refresh,new LinearLayout.LayoutParams(0,dp(38),1));
         Button share=button("↗ Open Chrome",false);
         share.setOnClickListener(v -> openOutside(web.getUrl()));
-        controls.addView(share,margins(0,dp(38),9,0,0,0));
+        controls.addView(share,margins(0,38,9,0,0,0));
         ((LinearLayout.LayoutParams)share.getLayoutParams()).weight=1;
         screen.addView(controls,new LinearLayout.LayoutParams(-1,-2));
 

@@ -2,6 +2,13 @@
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+    <!-- Android 11+ scoped visibility: show only launchable installed apps, never QUERY_ALL_PACKAGES. -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN"/>
+            <category android:name="android.intent.category.LAUNCHER"/>
+        </intent>
+    </queries>
     <application
         android:allowBackup="false"
         android:fullBackupContent="false"
@@ -11,6 +18,7 @@
         android:roundIcon="@drawable/launcher_icon"
         android:theme="@android:style/Theme.Material.Light.NoActionBar"
         android:supportsRtl="true">
+        <activity android:name=".InstalledAppsActivity" android:exported="false"/>
         <activity android:name=".TaskActivity"
             android:exported="true"
             android:launchMode="singleTop">
