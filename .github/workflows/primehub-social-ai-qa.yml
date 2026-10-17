@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - feat/primehub-social-ai-oct17
+      - feat/primehub-social-mcp-bridge-oct17
   workflow_dispatch:
 permissions:
   contents: read
