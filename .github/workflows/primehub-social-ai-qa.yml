@@ -20,6 +20,9 @@ jobs:
       - name: Validate app JavaScript
         working-directory: social-ai
         run: npm run check
+      - name: Install browser-DOM test dependency
+        working-directory: social-ai
+        run: npm install --no-save --no-audit --no-fund jsdom@26
       - name: Run studio unit tests
         working-directory: social-ai
         run: npm test
