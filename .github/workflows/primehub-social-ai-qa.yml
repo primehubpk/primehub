@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - feat/primehub-social-ai-oct17
+      - feat/primehub-social-mcp-bridge-oct17
   workflow_dispatch:
 permissions:
   contents: read
@@ -26,3 +27,7 @@ jobs:
       - name: Run studio unit tests
         working-directory: social-ai
         run: npm test
+      - name: Verify deployed production MCP JSON-RPC
+        if: github.ref == 'refs/heads/feat/primehub-social-mcp-bridge-oct17'
+        working-directory: social-ai
+        run: node tests/remote-mcp.smoke.mjs
