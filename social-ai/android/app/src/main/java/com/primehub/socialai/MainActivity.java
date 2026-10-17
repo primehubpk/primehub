@@ -95,6 +95,20 @@ public final class MainActivity extends Activity {
         restoreCustom();
         createShell();
         showHome();
+        handleOpenRequest(getIntent());
+    }
+
+    @Override protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        handleOpenRequest(intent);
+    }
+
+    private void handleOpenRequest(Intent intent) {
+        if (intent == null || !"com.primehub.socialai.OPEN_SITE".equals(intent.getAction())) return;
+        String url=validateHttps(intent.getStringExtra("safe_url"));
+        if (url == null) {toast("Invalid HTTPS destination");return;}
+        openSite(url);
     }
 
     private void addPresets() {
@@ -248,6 +262,9 @@ public final class MainActivity extends Activity {
         Button chrome = button("↗ Chrome", true);
         chrome.setOnClickListener(v -> openOutside(showingWeb && web != null ? web.getUrl() : activeUrl));
         footer.addView(chrome, new LinearLayout.LayoutParams(0, dp(45), 1));
+        Button tasks = button("✦ AI Tasks", true);
+        tasks.setOnClickListener(v -> startActivity(new Intent(this, TaskActivity.class)));
+        footer.addView(tasks, new LinearLayout.LayoutParams(0, dp(45), 1));
         mainContainer.addView(footer, new LinearLayout.LayoutParams(-1, -2));
     }
 
@@ -271,6 +288,9 @@ public final class MainActivity extends Activity {
         Button studio = button("✎  Open Content Studio", false);
         studio.setOnClickListener(v -> openSite(STUDIO_URL));
         banner.addView(studio, new LinearLayout.LayoutParams(-1,dp(47)));
+        Button taskInbox = button("✦  AI task inbox & reminders", false);
+        taskInbox.setOnClickListener(v -> startActivity(new Intent(this, TaskActivity.class)));
+        banner.addView(taskInbox, margins(-1, dp(47), 0, 8, 0, 0));
         page.addView(banner, new LinearLayout.LayoutParams(-1,-2));
 
         TextView warning = text("🔐  Sessions belong to this app's Android WebView, not Chrome. Some platforms may require opening the normal browser to sign in. No passwords are collected by PrimeHub Social AI.", 12, MUTED, false);
@@ -394,6 +414,14 @@ public final class MainActivity extends Activity {
                 Uri uri = request.getUrl();
                 if (uri == null) return true;
                 String scheme=uri.getScheme();
+                if ("primehubsocial".equalsIgnoreCase(scheme) && 
+                    "import".equalsIgnoreCase(uri.getHost())) {
+                    Intent handoff = new Intent(MainActivity.this, TaskActivity.class);
+                    handoff.setAction(Intent.ACTION_VIEW);
+                    handoff.setData(uri);
+                    startActivity(handoff);
+                    return true;
+                }
                 if (!"https".equalsIgnoreCase(scheme)) {
                     // Never auto-launch custom URI handlers or insecure HTTP redirects.
                     toast("For safety, open this link in a trusted external browser.");
