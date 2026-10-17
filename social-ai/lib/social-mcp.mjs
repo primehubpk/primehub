@@ -14,11 +14,16 @@ export const CAPABILITIES = [
 ];
 export const LIMIT = 8000;
 const OWNER_PAIR_TOOLS = [
-  {
-    name:'pair_owner_android_device',
-    title:'Pair my own PrimeHub Social AI Android phone',
-    description:'Use ONLY after the owner explicitly asks to pair their own phone and supplies the 26-character secret displayed on the phone. Finalize a 15-minute enrollment. This creates NO ability to see phone screens or control other installed apps.',
-    inputSchema:{type:'object',properties:{owner_pair_code:{type:'string',pattern:'^[A-Z2-7]{26}
+  { name:'pair_owner_android_device', title:'Pair private Android device',
+    description:'Only pair a phone when its owner gives a 26-character code from its pairing screen. This does not permit screen access or control.',
+    inputSchema:{type:'object',properties:{owner_pair_code:{type:'string',minLength:26,maxLength:26}},required:['owner_pair_code'],additionalProperties:false},
+    annotations:{readOnlyHint:false,destructiveHint:false,openWorldHint:false} },
+  { name:'check_owner_android_connection', title:'Check paired phone status',
+    description:'Read owner-authorized pairing status only while the phone pairing screen is running. Does not read other applications.',
+    inputSchema:{type:'object',properties:{owner_pair_code:{type:'string',minLength:26,maxLength:26}},required:['owner_pair_code'],additionalProperties:false},
+    annotations:{readOnlyHint:true,destructiveHint:false,openWorldHint:false} }
+];
+
 const platforms = Object.freeze(['TikTok','Facebook','Instagram','YouTube','Google Business']);
 export const TOOL_DEFS = [
   ...OWNER_PAIR_TOOLS,
