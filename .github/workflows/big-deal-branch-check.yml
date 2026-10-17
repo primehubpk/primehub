@@ -1,0 +1,27 @@
+name: Big Deal temporary branch verification
+on:
+  push:
+    branches:
+      - fix/big-deal-save-live-slot-oct17
+    paths:
+      - '.github/workflows/big-deal-branch-check.yml'
+      - 'app/api/admin/big-deal/route.ts'
+      - 'components/admin/BigDealManager.tsx'
+      - 'tests/big-deal-admin-save.test.mjs'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: node --test tests/big-deal-admin-save.test.mjs
+      - run: npx tsc --noEmit
