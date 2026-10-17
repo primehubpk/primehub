@@ -19,6 +19,7 @@ import {
 } from "@/components/shop/ShopTypes";
 import { isDirectStorefrontImage } from "@/lib/imageUrl";
 import { getEffectivePrice } from "@/lib/dealPricing";
+import { getVerifiedDealProduct } from "@/lib/verifiedDealProduct";
 import { isWholesaleProduct } from "@/lib/wholesale";
 import HomeRailFrame from './HomeRailFrame';
 import { orderHomeProducts, sessionRailSeed } from '@/lib/homeRailOrder';
@@ -176,70 +177,54 @@ export function HomeProductCard({
   const openVariantModal = useCartStore((s) => s.openVariantModal);
   const [added, setAdded] = useState(false);
   const [unavailable, setUnavailable] = useState(false);
+  const [checking, setChecking] = useState(false);
+  const [actionError, setActionError] = useState('');
   const price = homePrice(product);
   const imageCandidates = imageCandidatesOf(product);
   const src = imageCandidates[0] || '';
   const cardHasPrice = price > 0;
 
   async function add() {
-    if (!cardHasPrice) return;
-
-    let currentProduct = product;
+    if (!cardHasPrice || checking) return;
+    setChecking(true);
+    setActionError('');
     try {
-      const response = await fetch(
-        `/api/storefront/read?type=product&id=${encodeURIComponent(product.id)}`,
-        { cache: "no-store" },
-      );
-      if (response.ok) {
-        const data = await response.json();
-        if (data?.product && String(data.product.id || "") === String(product.id)) {
-          currentProduct = data.product as Product;
-        }
+      // Home cards intentionally contain no variant matrix. Never fall back to
+      // that incomplete card when the fresh product lookup fails: a customer
+      // could otherwise add an item without choosing its required variant.
+      const currentProduct = await getVerifiedDealProduct(product.id) as Product;
+      const currentPrice = homePrice(currentProduct);
+      const currentSrc = imageOf(currentProduct) || src;
+
+      if (productHasVariants(currentProduct) &&
+          openVariantModal({ ...currentProduct, price: currentPrice, image: currentSrc, imageUrl: currentSrc }, 'cart')) {
+        setUnavailable(false);
+        return;
       }
-    } catch (error) {
-      console.warn(
-        "Fresh Sale Mela product read unavailable; using current card data",
-        error,
-      );
-    }
 
-    const currentPrice = homePrice(currentProduct);
-    const currentSrc = imageOf(currentProduct) || src;
+      if (availableStockOf(currentProduct) <= 0 || currentPrice <= 0) {
+        setUnavailable(true);
+        return;
+      }
 
-    if (
-      productHasVariants(currentProduct) &&
-      openVariantModal(
-        {
-          ...currentProduct,
-          price: currentPrice,
-          image: currentSrc,
-          imageUrl: currentSrc,
-        },
-        "cart",
-      )
-    ) {
+      addItem({
+        id: currentProduct.id,
+        productId: currentProduct.id,
+        category: String(currentProduct.category || ''),
+        name: titleOf(currentProduct),
+        price: currentPrice,
+        originalPrice: originalOf(currentProduct) || currentPrice,
+        image: currentSrc,
+        imageUrl: currentSrc,
+        dealDay: currentProduct.dealDay,
+      });
       setUnavailable(false);
-      return;
+      setAdded(true);
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : 'Could not verify product options. Please retry.');
+    } finally {
+      setChecking(false);
     }
-
-    if (availableStockOf(currentProduct) <= 0 || currentPrice <= 0) {
-      setUnavailable(true);
-      return;
-    }
-
-    addItem({
-      id: currentProduct.id,
-      productId: currentProduct.id,
-      category: String(currentProduct.category || ""),
-      name: titleOf(currentProduct),
-      price: currentPrice,
-      originalPrice: originalOf(currentProduct) || currentPrice,
-      image: currentSrc,
-      imageUrl: currentSrc,
-      dealDay: currentProduct.dealDay,
-    });
-    setUnavailable(false);
-    setAdded(true);
   }
 
   return (
@@ -288,14 +273,15 @@ export function HomeProductCard({
             className="home-add"
             type="button"
             onClick={add}
-            disabled={!cardHasPrice}
+            disabled={!cardHasPrice || checking}
             aria-label={`${unavailable ? "Out of stock:" : "Add to cart:"} ${titleOf(product)}`}
           >
             <span aria-live="polite">
-              {unavailable ? "Out of stock" : added ? "Add another" : "Add to cart"}
+              {checking ? "Checking options…" : unavailable ? "Out of stock" : added ? "Add another" : "Add to cart"}
             </span>
             <ShoppingCart size={15} />
         </button>
+        {actionError ? <small role="alert" className="mt-1 block text-[10px] font-semibold text-red-700">{actionError}</small> : null}
       </div>
     </article>
   );

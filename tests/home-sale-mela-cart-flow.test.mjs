@@ -32,7 +32,7 @@ test('home Add to Cart checks the fresh product before deciding variants or stoc
   const source = read('components/home/HomeCollections.tsx');
 
   assert.match(source, /async function add\(\)/);
-  assert.match(source, /\/api\/storefront\/read\?type=product&id=/);
+  assert.match(source, /await getVerifiedDealProduct\(product\.id\)/);
   assert.match(source, /productHasVariants\(currentProduct\)/);
   assert.match(source, /availableStockOf\(currentProduct\) <= 0/);
   assert.match(source, /productId: currentProduct\.id/);

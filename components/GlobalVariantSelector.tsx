@@ -1,5 +1,7 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
+
 import {
   normalizeProductVariants,
   useCartStore,
@@ -30,6 +32,7 @@ function imageOf(product?: GlobalProduct | null | any): string {
 }
 
 export default function GlobalVariantSelector() {
+  const router = useRouter();
   const product = useCartStore((state) => state.variantModalProduct) as GlobalProduct | null;
   const mode = useCartStore((state) => state.variantModalMode);
   const close = useCartStore((state) => state.closeVariantModal);
@@ -103,7 +106,8 @@ export default function GlobalVariantSelector() {
 
     close();
     if (mode === 'buy') {
-      window.location.href = '/checkout';
+      // Keep the WebView and mounted storefront alive (no full document reload).
+      router.push('/checkout');
     }
   }
 

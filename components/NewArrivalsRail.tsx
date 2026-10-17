@@ -14,6 +14,7 @@ import { imageCandidatesOf, imageOf, originalOf, priceOf, productHasVariants, ti
 import { isDirectStorefrontImage } from '@/lib/imageUrl';
 import { isWholesaleProduct } from '@/lib/wholesale';
 import { makeTikTokContent, trackTikTokEvent } from '@/lib/tiktokPixel';
+import { getVerifiedDealProduct } from '@/lib/verifiedDealProduct';
 import '@/components/home/NewArrivalsPremium.css';
 
 function timeOf(p: Product) {
@@ -38,6 +39,8 @@ export default function NewArrivalsRail({
 }) {
   const [products, setProducts] = useState<Product[]>(initialProducts);
   const [addedId, setAddedId] = useState<string | null>(null);
+  const [checkingId, setCheckingId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState('');
   const addItem = useCartStore((s) => s.addItem);
   const openVariantModal = useCartStore((s) => s.openVariantModal);
 
@@ -68,27 +71,41 @@ export default function NewArrivalsRail({
     ? newest.slice(0, homeVisibleCount)
     : newest;
 
-  const addProduct = (product: Product) => {
-    const image = imageOf(product);
-    if (productHasVariants(product) && openVariantModal({ ...product, image, imageUrl: image }, 'cart')) return;
-    const currentPrice = priceOf(product);
-    addItem({
-      id: product.id,
-      productId: product.id,
-      category: String(product.category || ''),
-      name: titleOf(product),
-      price: currentPrice,
-      originalPrice: originalOf(product) || currentPrice,
-      image,
-      imageUrl: image,
-    });
-    trackTikTokEvent('AddToCart', {
-      contents: [makeTikTokContent({ id: product.id, name: titleOf(product), category: product.category, price: currentPrice, quantity: 1 })],
-      value: currentPrice,
-      currency: 'PKR',
-    });
-    setAddedId(product.id);
-    window.setTimeout(() => setAddedId((current) => current === product.id ? null : current), 1400);
+  const addProduct = async (product: Product) => {
+    if (checkingId) return;
+    setCheckingId(product.id);
+    setActionError('');
+    try {
+      // New arrivals are seeded with compact catalog records. Use the same
+      // fresh variant check as the other storefront Add to Cart buttons.
+      const fresh = await getVerifiedDealProduct(product.id) as Product;
+      const image = imageOf(fresh) || imageOf(product);
+      const currentPrice = priceOf(fresh);
+      if (productHasVariants(fresh) &&
+          openVariantModal({ ...fresh, price: currentPrice, image, imageUrl: image }, 'cart')) return;
+      if (currentPrice <= 0) throw new Error('Product price is unavailable.');
+      addItem({
+        id: fresh.id,
+        productId: fresh.id,
+        category: String(fresh.category || ''),
+        name: titleOf(fresh),
+        price: currentPrice,
+        originalPrice: originalOf(fresh) || currentPrice,
+        image,
+        imageUrl: image,
+      });
+      trackTikTokEvent('AddToCart', {
+        contents: [makeTikTokContent({ id: fresh.id, name: titleOf(fresh), category: String(fresh.category || ''), price: currentPrice, quantity: 1 })],
+        value: currentPrice,
+        currency: 'PKR',
+      });
+      setAddedId(fresh.id);
+      window.setTimeout(() => setAddedId((current) => current === fresh.id ? null : current), 1400);
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : 'Could not verify product options. Please retry.');
+    } finally {
+      setCheckingId(null);
+    }
   };
 
   if (!newest.length) return null;
@@ -129,6 +146,7 @@ export default function NewArrivalsRail({
         <Link href="/new-arrivals" className="flex items-center gap-1 rounded-full bg-[#14140F] px-3 py-2 text-[9px] font-black text-white">View All <ArrowRight size={12}/></Link>
       </div>
 
+      {actionError ? <p role="alert" className="mx-4 mb-2 rounded-lg bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">{actionError}</p> : null}
       <div className="flex snap-x gap-2.5 overflow-x-auto px-4 pb-2 [scrollbar-width:none]">
         {newest.map((p, index) => {
           const imageCandidates = imageCandidatesOf(p);
@@ -160,7 +178,7 @@ export default function NewArrivalsRail({
               <div className="p-2.5">
                 <FastProductLink product={p} className="block"><p className="line-clamp-2 min-h-[28px] text-[10px] font-black leading-[14px]">{titleOf(p)}</p></FastProductLink>
                 <p className="mt-1 text-[11px] font-black text-[#E1352B]">Rs. {priceOf(p).toLocaleString()}</p>
-                <button type="button" onClick={() => addProduct(p)} className="mt-2 flex w-full items-center justify-center gap-1 rounded-lg bg-[#14140F] px-2 py-2 text-[9px] font-black text-white">{addedId === p.id ? 'Added ✓' : <><ShoppingCart size={12}/>Add to cart</>}</button>
+                <button type="button" onClick={() => void addProduct(p)} disabled={checkingId !== null} className="mt-2 flex w-full items-center justify-center gap-1 rounded-lg bg-[#14140F] px-2 py-2 text-[9px] font-black text-white">{checkingId === p.id ? 'Checking options…' : addedId === p.id ? 'Added ✓' : <><ShoppingCart size={12}/>Add to cart</>}</button>
               </div>
             </article>
           );

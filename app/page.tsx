@@ -7,7 +7,9 @@ import { pakistanNowWeekday } from '@/lib/weeklyDealUtils';
 import type { Category, SiteSettings } from '@/lib/types';
 import type { Product } from '@/components/shop/ShopTypes';
 
-export const revalidate = 3600;
+// The client handles Pakistan-day deal turnover; tagged admin writes invalidate
+// catalog/settings immediately, so hourly homepage ISR regeneration is wasteful.
+export const revalidate = 21600;
 
 function productImage(product: any) {
   if (!product) return '';

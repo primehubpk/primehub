@@ -285,7 +285,7 @@ export default function HeroFlashBanner({ initialProducts = [], liveUpdates = tr
                   </Link>
                   {deal ? (
                     <button type="button" className="home-week-add" onClick={() => addDealToCart(deal)} disabled={!deal.productId || addingDealId === deal.productId}>
-                      <ShoppingCart size={11} /> Add · Rs. {(weeklyOffer?.price || dealPrice).toLocaleString("en-PK")}
+                      <ShoppingCart size={11} /> {addingDealId === deal.productId ? "Checking options…" : `Add · Rs. ${(weeklyOffer?.price || dealPrice).toLocaleString("en-PK")}`}
                     </button>
                   ) : null}
                 </article>
@@ -313,7 +313,7 @@ export default function HeroFlashBanner({ initialProducts = [], liveUpdates = tr
                   </div>
                   <small>Limited-time deal · Pakistan Time</small>
                   <button className="home-add" onClick={addBigDealToCart} disabled={!live || !activeBigSlot?.productId || price <= 0 || Boolean(addingDealId)}>
-                    <ShoppingCart size={14} />{stock <= 0 ? "Sold out" : !live ? "Deal unavailable" : "Add to cart"}
+                    <ShoppingCart size={14} />{addingDealId === activeBigSlot?.productId ? "Checking options…" : stock <= 0 ? "Sold out" : !live ? "Deal unavailable" : "Add to cart"}
                   </button>
                 </div>
               </article>
