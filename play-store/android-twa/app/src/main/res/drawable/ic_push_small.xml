@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Monochrome notification P; Android applies status-bar tint. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="24dp" android:height="24dp" android:viewportWidth="24" android:viewportHeight="24">
-    <path android:fillColor="#FFFFFFFF" android:pathData="M5,7h14l1.2,14H3.8L5,7zM9,7V5a3,3 0,0 1,6 0v2h-2V5a1,1 0,0 0,-2 0v2z" />
+    android:width="24dp" android:height="24dp"
+    android:viewportWidth="24" android:viewportHeight="24">
+    <path android:fillColor="#FFFFFFFF" android:fillType="evenOdd"
+        android:pathData="M5,2.5 H12.5 C18.2,2.5 21.5,5.6 21.5,10.1 C21.5,14.6 18.2,17.5 12.5,17.5 H10 V22 H5 Z M10,7 V13 H12.5 C14.9,13 16.3,11.9 16.3,10.1 C16.3,8.3 14.9,7 12.5,7 Z" />
 </vector>
