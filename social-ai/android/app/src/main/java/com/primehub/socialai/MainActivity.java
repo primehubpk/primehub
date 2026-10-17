@@ -196,7 +196,7 @@ public final class MainActivity extends Activity {
         Toast.makeText(this, message, Toast.LENGTH_LONG).show();
     }
     private LinearLayout.LayoutParams margins(int w, int h, int left, int top, int right, int bottom) {
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(w, h);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(w < 0 ? w : dp(w), h < 0 ? h : dp(h));
         lp.setMargins(dp(left), dp(top), dp(right), dp(bottom));
         return lp;
     }
