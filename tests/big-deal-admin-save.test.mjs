@@ -47,7 +47,7 @@ const sampleDeal = () => ({
 });
 
 function setupRoute(writePersists) {
-  const live = { bigDeal: sampleDeal(), unrelatedSiteSetting: 'preserve' };
+  const live = { bigDeal: { ...sampleDeal(), rotationStartedAt: '2026-10-10T10:00:00.000Z' }, unrelatedSiteSetting: 'preserve' };
   const paths = [];
   const tags = [];
   const fetchMock = async (url, init = {}) => {
