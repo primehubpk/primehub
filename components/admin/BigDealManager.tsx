@@ -4,6 +4,8 @@ import { ChangeEvent, useEffect, useMemo, useState } from 'react';
 import { CheckCircle2, ImagePlus, Loader2, Plus, Save, Sparkles, Trash2 } from 'lucide-react';
 import { uploadImageToImgBB } from './shared';
 import type { DailyDeal } from '@/lib/types';
+import { bigDealRotationIndex } from '@/lib/bigDealRotation';
+import { notifyCatalogUpdated } from '@/lib/catalogRefreshSignal';
 
 type CatalogProduct = {
   id: string;
@@ -134,6 +136,7 @@ export default function BigDealManager() {
   const [categories, setCategories] = useState<CatalogCategory[]>([]);
   const [specialImages, setSpecialImages] = useState<string[]>(EMPTY_STRINGS);
   const [dealCount, setDealCount] = useState(1);
+  const [liveSlot, setLiveSlot] = useState(0);
   const [openPickerIndex, setOpenPickerIndex] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [uploadingSlot, setUploadingSlot] = useState<number | null>(null);
@@ -179,7 +182,9 @@ export default function BigDealManager() {
         setProducts(productList);
         setCategories(Array.isArray(result.categories) ? result.categories : []);
         setSpecialImages(inferredSpecialImages);
-        setDealCount(configuredDealCount(current));
+        const savedCount = configuredDealCount(current);
+        setDealCount(savedCount);
+        setLiveSlot(bigDealRotationIndex(current.rotationStartedAt, new Date(), savedCount));
       })
       .catch((error) => setToast(error instanceof Error ? error.message : 'Unable to load Big Deal settings.'))
       .finally(() => setLoading(false));
@@ -305,6 +310,7 @@ export default function BigDealManager() {
       return next;
     });
     setDealCount((count) => Math.max(1, count - 1));
+    setLiveSlot((index) => Math.min(index, dealCount - 2));
     if (openPickerIndex === index) setOpenPickerIndex(null);
   }
 
@@ -340,6 +346,7 @@ export default function BigDealManager() {
     const nextOriginals = pad(compact.map((item) => item.originalPrice), 0);
     const nextDeals = pad(compact.map((item) => item.dealPrice), 0);
 
+    const selectedLiveSlot = Math.min(liveSlot, dealCount - 1);
     setSaving(true);
     try {
       const nextDeal: DailyDeal = {
@@ -356,7 +363,10 @@ export default function BigDealManager() {
         title: nextTitles[0] || '',
         originalPrice: nextOriginals[0] || 0,
         dealPrice: nextDeals[0] || 0,
-        rotationStartedAt: new Date().toISOString(),
+        // Pakistan has no daylight-saving shift: moving the rotation anchor back
+        // whole days makes the chosen saved slot live TODAY, without changing the
+        // original 1-to-7 product ordering or the storefront rotation contract.
+        rotationStartedAt: new Date(Date.now() - selectedLiveSlot * 86_400_000).toISOString(),
         buttonText: deal.buttonText?.trim() || 'Shop Big Deal',
         buttonLink: deal.buttonLink?.trim() || '/deals/big',
         active: true,
@@ -371,8 +381,11 @@ export default function BigDealManager() {
       });
       const result = await response.json().catch(() => null);
       if (!response.ok || !result?.success) throw new Error(result?.error || 'Unable to save Big Deal rotation.');
+      if (result.source !== 'supabase' || !result.dailyDeal) {
+        throw new Error('Big Deal was not verified on the live database. Please try again.');
+      }
 
-      const saved = { ...nextDeal, ...(result.dailyDeal || {}) } as DailyDeal;
+      const saved = result.dailyDeal as DailyDeal;
       const savedArrays = normalizeArrays(saved);
       setDeal({
         ...saved,
@@ -385,9 +398,12 @@ export default function BigDealManager() {
         dealPrices: savedArrays.dealPrices,
       });
       setSpecialImages(savedArrays.galleryImages);
+      const liveToday = bigDealRotationIndex(saved.rotationStartedAt, new Date(), compact.length);
+      setLiveSlot(liveToday);
+      notifyCatalogUpdated({ action: 'update', collection: 'settings', id: 'main', at: new Date().toISOString() });
       setToast(
-        result.warning ||
-        `${compact.length} Big Deal${compact.length === 1 ? '' : 's'} saved. Blank special-image slots use the selected product photo automatically. Rotation repeats until you update it.`,
+        `Saved & verified! Deal ${liveToday + 1} is LIVE today; Deal ${(liveToday + 1) % compact.length + 1} runs tomorrow (Pakistan time).` +
+        (result.warning ? ` ${result.warning}` : ''),
       );
     } catch (error) {
       setToast(error instanceof Error ? error.message : 'Unable to save Big Deal rotation.');
@@ -660,7 +676,19 @@ export default function BigDealManager() {
       </div>
 
       <div className="mt-5 rounded-[24px] border border-[#0F6A5F]/15 bg-[#0F6A5F]/5 px-4 py-4 text-xs font-semibold leading-5 text-[#0F6A5F]">
-        Save any complete set from 1 to 7 deals. One deal runs per Pakistan day. After the last saved deal, Deal 1 starts again automatically and the same rotation keeps repeating until you update it.
+        <label htmlFor="big-deal-live-slot" className="block text-sm font-black">Which Big Deal should be LIVE today?</label>
+        <select
+          id="big-deal-live-slot"
+          value={Math.min(liveSlot, dealCount - 1)}
+          onChange={(event) => setLiveSlot(Number(event.target.value))}
+          disabled={saving}
+          className="mt-2 w-full rounded-xl border border-[#0F6A5F]/25 bg-white px-3 py-3 text-sm font-bold text-[#0F6A5F]"
+        >
+          {Array.from({ length: dealCount }, (_, index) => (
+            <option key={index} value={index}>Deal {index + 1}{titles[index] ? ` — ${titles[index]}` : ''}</option>
+          ))}
+        </select>
+        <p className="mt-2">The chosen deal goes live as soon as you save. Tomorrow the NEXT deal runs automatically (Pakistan time). After the last deal, the rotation repeats from Deal 1. All 1–7 slots remain saved in their original order.</p>
       </div>
 
       <button
