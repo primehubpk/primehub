@@ -28,6 +28,10 @@ jobs:
       - name: Run studio unit tests
         working-directory: social-ai
         run: npm test
+      - name: Verify real owner pairing backend and revoke test record
+        if: github.ref == 'refs/heads/feat/primehub-owner-device-pairing-oct17'
+        working-directory: social-ai
+        run: node tests/live-pairing.smoke.mjs
       - name: Verify deployed production MCP JSON-RPC
         if: github.ref == 'refs/heads/feat/primehub-social-mcp-bridge-oct17'
         working-directory: social-ai
