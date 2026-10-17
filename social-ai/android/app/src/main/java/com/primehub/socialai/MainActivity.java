@@ -183,7 +183,7 @@ public final class MainActivity extends Activity {
     private Button button(String value, boolean primary) {
         Button b = new Button(this);
         b.setText(value);
-        b.setTextAllCaps(false);
+        b.setAllCaps(false);
         b.setTextSize(12);
         b.setTextColor(primary ? INK : INK);
         b.setBackground(shape(primary ? MINT : WHITE, primary ? 0 : BORDER, dp(11)));
