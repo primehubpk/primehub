@@ -25,8 +25,8 @@ function safeImportPost(x){
 function save(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(posts))}catch{toast('Device storage is full; export your posts and free some space.',true)}}
 function toast(msg,error=false){const t=$('#toast');t.textContent=msg;t.style.background=error?'#8c3f48':'#1a2d32';t.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),3900)}
 function goto(name){if(!TITLES[name])return;view=name;$$('.view').forEach(x=>x.classList.toggle('active',x.id==='view-'+name));$$('.nav-btn').forEach(x=>x.classList.toggle('active',x.dataset.view===name));$('#crumbName').textContent=TITLES[name];window.scrollTo({top:0,behavior:'instant'});render()}
-$$('.nav-btn').forEach(b=>b.addEventListener('click',()=>goto(b.dataset.view)));
-$$('[data-goto]').forEach(b=>b.addEventListener('click',()=>goto(b.dataset.goto)));
+$('.nav-btn').forEach(b=>b.addEventListener('click',()=>b.dataset.view==='compose'?setEditor(null):goto(b.dataset.view)));
+$('[data-goto]').forEach(b=>b.addEventListener('click',()=>b.dataset.goto==='compose'?setEditor(null):goto(b.dataset.goto)));
 function mediaById(id){return mediaRecords.find(x=>x.id===id)||null}
 function mediaURL(id){if(!id)return null;if(mediaCache.has(id))return mediaCache.get(id);const item=mediaById(id);if(!item)return null;const u=URL.createObjectURL(item.file);mediaCache.set(id,u);return u}
 function mediaMarkup(id,klass=''){const item=mediaById(id),url=mediaURL(id);if(!url||!item)return '';return item.type.startsWith('video/')?'<video class="'+klass+'" src="'+esc(url)+'" muted playsinline preload="metadata"></video>':'<img class="'+klass+'" src="'+esc(url)+'" alt="Post media">'}
