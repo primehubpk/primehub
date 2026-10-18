@@ -42,7 +42,8 @@ jobs:
             yes | "$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0"
           fi
           echo "ANDROID_HOME=$SDK_ROOT" >> "$GITHUB_ENV"
-      - name: Require private long-term signing secrets
+      - name: Check owner signing secrets
+        id: owner_keys
         env:
           KEYSTORE_B64: ${{ secrets.PH_SOCIAL_KEYSTORE_B64 }}
           STORE_PASSWORD: ${{ secrets.PH_SOCIAL_KEYSTORE_PASSWORD }}
@@ -53,10 +54,16 @@ jobs:
           set -euo pipefail
           for secret in KEYSTORE_B64 STORE_PASSWORD KEY_ALIAS KEY_PASSWORD; do
             if [[ -z "${!secret}" ]]; then
+              if [[ "$GITHUB_EVENT_NAME" == "push" ]]; then
+                echo "::notice::Owner signing secrets not configured yet. Stable APK build will wait until the owner sets four private GitHub secrets."
+                echo "ready=false" >> "$GITHUB_OUTPUT"
+                exit 0
+              fi
               echo "::error::Missing owner Android signing secret ($secret). No unsigned release is allowed."
               exit 1
             fi
           done
+          echo "ready=true" >> "$GITHUB_OUTPUT"
           umask 077
           printf '%s' "$KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/primehub-owner-release.p12"
           test -s "$RUNNER_TEMP/primehub-owner-release.p12"
@@ -64,6 +71,7 @@ jobs:
           # Note: Passwords are available ONLY to the next build step via step secrets,
           # and never printed, committed to source, or uploaded in artifacts.
       - name: Build release signed with permanent owner key
+        if: steps.owner_keys.outputs.ready == 'true'
         env:
           PH_SOCIAL_KEYSTORE_PASSWORD: ${{ secrets.PH_SOCIAL_KEYSTORE_PASSWORD }}
           PH_SOCIAL_KEY_ALIAS: ${{ secrets.PH_SOCIAL_KEY_ALIAS }}
@@ -78,6 +86,7 @@ jobs:
           cp "$APK" "$OUT"
           echo "PH_SOCIAL_SIGNED_APK=$OUT" >> "$GITHUB_ENV"
       - name: Validate release package identity, signature, version
+        if: steps.owner_keys.outputs.ready == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -93,6 +102,7 @@ jobs:
           grep -Fq "applicationId 'com.primehub.socialai'" social-ai/android/app/build.gradle
           sha256sum "$APK"
       - name: Upload owner-only install file (without signing key)
+        if: steps.owner_keys.outputs.ready == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: PrimeHub-Social-AI-Owner-Signed-Release
@@ -100,7 +110,7 @@ jobs:
           if-no-files-found: error
           retention-days: 10
       - name: Publish only with explicit owner approval
-        if: ${{ inputs.publish == true }}
+        if: ${{ inputs.publish == true && steps.owner_keys.outputs.ready == 'true' }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
