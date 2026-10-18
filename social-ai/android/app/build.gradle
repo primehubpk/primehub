@@ -28,6 +28,7 @@ android {
             owner {
                 storeFile file(ownerKeystorePath)
                 storePassword ownerKeystorePassword
+                storeType 'pkcs12'
                 keyAlias ownerKeyAlias
                 keyPassword ownerKeyPassword
             }
@@ -42,6 +43,7 @@ android {
             versionNameSuffix '-test'
         }
         release {
+            if(hasOwnerSigning)signingConfig signingConfigs.owner
             minifyEnabled false
             shrinkResources false
         }
