@@ -1,6 +1,6 @@
 // Version metadata for PrimeHub Social AI Android app only.
 // Authored GitHub releases are a public distribution channel; app still verifies signing cert.
-const OWNER='primehubpk', REPO='primehub', PREFIX='social-ai-v', ASSET='primehub-social-ai-debug.apk';
+const OWNER='primehubpk', REPO='primehub', PREFIX='social-ai-v', ASSET='primehub-social-ai.apk';
 export default async function handler(req,res){
   res.setHeader('Content-Type','application/json; charset=utf-8');
   res.setHeader('Cache-Control','public, s-maxage=300, stale-while-revalidate=1800');
@@ -24,7 +24,7 @@ export default async function handler(req,res){
       const asset=release.assets?.find(a=>a.name===ASSET&&typeof a.digest==='string'&&/^sha256:[a-f0-9]{64}$/i.test(a.digest));
       if(!asset)continue;
       const url='https://github.com/'+OWNER+'/'+REPO+'/releases/download/'+release.tag_name+'/'+ASSET;
-      if(!best||code>best.versionCode)best={versionCode:code,versionName:release.name||'PrimeHub Social AI',apkUrl:url,sha256:asset.digest.slice(7).toLowerCase(),packageName:'com.primehub.socialai.debug',releaseNotes:(release.body||'').slice(0,600)};
+      if(!best||code>best.versionCode)best={versionCode:code,versionName:release.name||'PrimeHub Social AI',apkUrl:url,sha256:asset.digest.slice(7).toLowerCase(),packageName:'com.primehub.socialai',releaseNotes:(release.body||'').slice(0,600)};
     }
     return res.status(200).json(best||{versionCode:0,status:'not_published',message:'A stable signed Android update is not available yet. Your installed APK cannot silently update.'});
   }catch(e){
