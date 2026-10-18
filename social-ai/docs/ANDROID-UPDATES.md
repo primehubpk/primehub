@@ -23,7 +23,7 @@ Use `keytool -genkeypair -v -keystore owner-social-ai.jks -alias socialowner -ke
 1. Developer edits the **separate** `social-ai/android/` source and increments `versionCode` monotonically (3→4→5 etc.).
 2. Run GitHub Actions **PrimeHub Social AI Native Android APK** for syntax/build QA. That disposable debug artifact is NOT for installation over the stable signed build.
 3. Once the owner approves the release and secrets are set, run **PrimeHub Social AI — Stable Signed Android Update** using the approved branch; type `RELEASE`.
-4. The official `social-ai-vN` public GitHub release contains `primehub-social-ai-debug.apk`, signed with the same permanent keystore.
+4. The official `social-ai-vN` public GitHub release contains `primehub-social-ai.apk`, signed with the same permanent keystore.
 5. On phone open PrimeHub Social AI → **Check app updates**. The app checks `https://primehub-social-ai-primehubmall.vercel.app/api/android-update` which selects the latest `social-ai-vN` tag and reads GitHub's SHA256 digest.
 6. Tap **Download and install verified update**, approve Android's unknown-sources permission if prompted and then confirm the system installer. App data persists on valid in-place updates with the same package/signing key.
 
