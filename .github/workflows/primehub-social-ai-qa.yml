@@ -5,6 +5,7 @@ on:
       - feat/primehub-social-ai-oct17
       - feat/primehub-social-mcp-bridge-oct17
       - feat/primehub-owner-device-pairing-oct17
+      - feat/primehub-social-inapp-updates-oct18
   workflow_dispatch:
 permissions:
   contents: read
