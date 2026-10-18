@@ -60,19 +60,19 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          bash play-store/android-twa/gradlew -p social-ai/android :app:assembleDebug --no-daemon
+          bash play-store/android-twa/gradlew -p social-ai/android :app:assembleRelease --no-daemon
       - name: Validate signing and update metadata
         shell: bash
         run: |
           set -euo pipefail
-          APK="social-ai/android/app/build/outputs/apk/debug/app-debug.apk"
+          APK="social-ai/android/app/build/outputs/apk/release/app-release.apk"
           test -s "$APK"
           CODE="$(awk '/versionCode / { print $2; exit }' social-ai/android/app/build.gradle)"
           [[ "$CODE" =~ ^[1-9][0-9]*$ ]] || exit 1
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs --verbose "$APK"
           echo "SOCIAL_AI_VERSION_CODE=$CODE" >> "$GITHUB_ENV"
           mkdir -p "$RUNNER_TEMP/primehub-social"
-          cp "$APK" "$RUNNER_TEMP/primehub-social/primehub-social-ai-debug.apk"
+          cp "$APK" "$RUNNER_TEMP/primehub-social/primehub-social-ai.apk"
           sha256sum "$RUNNER_TEMP/primehub-social/primehub-social-ai-debug.apk"
       - name: Publish official GitHub release
         shell: bash
