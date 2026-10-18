@@ -122,7 +122,7 @@ public final class UpdateActivity extends Activity {
     }
     private static boolean secureReleaseUrl(String url) {
         return url!=null &&
-            url.matches("^https://github\\.com/primehubpk/primehub/releases/download/social-ai-v[1-9][0-9]{0,5}/primehub-social-ai-debug\\.apk$");
+            url.matches("^https://github\\.com/primehubpk/primehub/releases/download/social-ai-v[1-9][0-9]{0,5}/primehub-social-ai\\.apk$");
     }
     private static String sha256(File file) throws Exception {
         MessageDigest digest=MessageDigest.getInstance("SHA-256");
