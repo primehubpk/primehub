@@ -1,4 +1,5 @@
 name: PrimeHub Social AI Owner-Signed Release
+# Owner signing secrets configured on authorized computer. Release publication remains OFF by default.
 
 # Manual only. Do not publish an APK unless the owner explicitly chooses publish.
 on:
