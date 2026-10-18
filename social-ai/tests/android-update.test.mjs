@@ -23,17 +23,17 @@ test('only signed PrimeHub Social AI releases are offered',async()=>{
  const original=globalThis.fetch;
  const sha='1'.repeat(64);
  globalThis.fetch=async()=>({ok:true,json:async()=>[
-  {tag_name:'social-ai-v4',draft:false,prerelease:false,name:'v4',assets:[{name:'primehub-social-ai-debug.apk',digest:'sha256:'+sha}]},
-  {tag_name:'shopping-v999',draft:false,prerelease:false,assets:[{name:'primehub-social-ai-debug.apk',digest:'sha256:'+sha}]},
-  {tag_name:'social-ai-v5',draft:true,prerelease:false,assets:[{name:'primehub-social-ai-debug.apk',digest:'sha256:'+sha}]},
-  {tag_name:'social-ai-v9',draft:false,prerelease:false,assets:[{name:'primehub-social-ai-debug.apk',digest:'invalid'}]},
-  {tag_name:'social-ai-v3',draft:false,prerelease:false,assets:[{name:'primehub-social-ai-debug.apk',digest:'sha256:'+sha}]}
+  {tag_name:'social-ai-v4',draft:false,prerelease:false,name:'v4',assets:[{name:'primehub-social-ai.apk',digest:'sha256:'+sha}]},
+  {tag_name:'shopping-v999',draft:false,prerelease:false,assets:[{name:'primehub-social-ai.apk',digest:'sha256:'+sha}]},
+  {tag_name:'social-ai-v5',draft:true,prerelease:false,assets:[{name:'primehub-social-ai.apk',digest:'sha256:'+sha}]},
+  {tag_name:'social-ai-v9',draft:false,prerelease:false,assets:[{name:'primehub-social-ai.apk',digest:'invalid'}]},
+  {tag_name:'social-ai-v3',draft:false,prerelease:false,assets:[{name:'primehub-social-ai.apk',digest:'sha256:'+sha}]}
  ]});
  try{
   const r=fakeRes();await updater({method:'GET'},r);
   assert.equal(r.statusCode,200);assert.equal(r.data.versionCode,4);
-  assert.equal(r.data.apkUrl,'https://github.com/primehubpk/primehub/releases/download/social-ai-v4/primehub-social-ai-debug.apk');
+  assert.equal(r.data.apkUrl,'https://github.com/primehubpk/primehub/releases/download/social-ai-v4/primehub-social-ai.apk');
   assert.equal(r.data.sha256,sha);
-  assert.equal(r.data.packageName,'com.primehub.socialai.debug');
+  assert.equal(r.data.packageName,'com.primehub.socialai');
  }finally{globalThis.fetch=original;}
 });
