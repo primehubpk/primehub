@@ -2,6 +2,12 @@ name: PrimeHub Social AI Owner-Signed Release
 
 # Manual only. Do not publish an APK unless the owner explicitly chooses publish.
 on:
+  push:
+    branches:
+      - feat/primehub-social-inapp-updates-oct18
+    paths:
+      - 'social-ai/android/**'
+      - '.github/workflows/primehub-social-owner-signed-release.yml'
   workflow_dispatch:
     inputs:
       publish:
