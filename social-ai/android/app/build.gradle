@@ -1,3 +1,7 @@
+plugins {
+    id 'com.android.application'
+}
+
 // Stable owner signing is provided ONLY by encrypted GitHub Actions secrets.
 // Never commit a private Android keystore or passwords into this public repository.
 def ownerKeystorePath=System.getenv('PH_SOCIAL_KEYSTORE_FILE')
@@ -6,9 +10,6 @@ def ownerKeyAlias=System.getenv('PH_SOCIAL_KEY_ALIAS')
 def ownerKeyPassword=System.getenv('PH_SOCIAL_KEY_PASSWORD')
 def hasOwnerSigning=[ownerKeystorePath,ownerKeystorePassword,ownerKeyAlias,ownerKeyPassword].every { it != null && !it.isEmpty() }
 
-plugins {
-    id 'com.android.application'
-}
 
 android {
     namespace 'com.primehub.socialai'
