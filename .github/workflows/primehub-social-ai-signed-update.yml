@@ -1,0 +1,96 @@
+name: PrimeHub Social AI — Stable Signed Android Update
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_public_release:
+        description: 'Type RELEASE only after owner approval. GitHub repository is public; APK binary will be public.'
+        required: true
+        type: string
+permissions:
+  contents: write
+concurrency:
+  group: social-ai-signed-release
+  cancel-in-progress: false
+jobs:
+  publish-owner-update:
+    if: inputs.confirm_public_release == 'RELEASE'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    environment: social-ai-signing
+    env:
+      PH_SOCIAL_KEYSTORE_PASSWORD: ${{ secrets.SOCIAL_AI_KEYSTORE_PASSWORD }}
+      PH_SOCIAL_KEY_ALIAS: ${{ secrets.SOCIAL_AI_KEY_ALIAS }}
+      PH_SOCIAL_KEY_PASSWORD: ${{ secrets.SOCIAL_AI_KEY_PASSWORD }}
+      SIGNING_B64: ${{ secrets.SOCIAL_AI_KEYSTORE_B64 }}
+    steps:
+      - name: Checkout approved branch
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Validate stable signing secrets are configured
+        shell: bash
+        run: |
+          set -euo pipefail
+          for key in PH_SOCIAL_KEYSTORE_PASSWORD PH_SOCIAL_KEY_ALIAS PH_SOCIAL_KEY_PASSWORD SIGNING_B64; do
+            test -n "${!key}" || { echo "::error::Missing required signed-release secret: $key"; exit 1; }
+          done
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Install Android SDK API 36
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDK_ROOT="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          if [[ ! -f "$SDK_ROOT/platforms/android-36/android.jar" ]]; then
+            yes | "$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0"
+          fi
+          echo "ANDROID_HOME=$SDK_ROOT" >> "$GITHUB_ENV"
+      - name: Decode private signer into temporary runner storage
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          printf '%s' "$SIGNING_B64" | base64 -d > "$RUNNER_TEMP/social-ai-owner.jks"
+          test -s "$RUNNER_TEMP/social-ai-owner.jks"
+          echo "PH_SOCIAL_KEYSTORE_FILE=$RUNNER_TEMP/social-ai-owner.jks" >> "$GITHUB_ENV"
+      - name: Build stable owner-signed update APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash play-store/android-twa/gradlew -p social-ai/android :app:assembleDebug --no-daemon
+      - name: Validate signing and update metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="social-ai/android/app/build/outputs/apk/debug/app-debug.apk"
+          test -s "$APK"
+          CODE="$(awk '/versionCode / { print $2; exit }' social-ai/android/app/build.gradle)"
+          [[ "$CODE" =~ ^[1-9][0-9]*$ ]] || exit 1
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs --verbose "$APK"
+          echo "SOCIAL_AI_VERSION_CODE=$CODE" >> "$GITHUB_ENV"
+          mkdir -p "$RUNNER_TEMP/primehub-social"
+          cp "$APK" "$RUNNER_TEMP/primehub-social/primehub-social-ai-debug.apk"
+          sha256sum "$RUNNER_TEMP/primehub-social/primehub-social-ai-debug.apk"
+      - name: Publish official GitHub release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="social-ai-v$SOCIAL_AI_VERSION_CODE"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "::error::Release already exists. Increment versionCode and get owner approval before publishing."
+            exit 1
+          fi
+          gh release create "$TAG" "$RUNNER_TEMP/primehub-social/primehub-social-ai-debug.apk" \
+            --target "$GITHUB_SHA" \
+            --title "PrimeHub Social AI — Owner Android v$SOCIAL_AI_VERSION_CODE" \
+            --notes "Signed in-app update for PrimeHub Social AI owner testing. APK installs only when Android cert/package matches the existing app, with user confirmation. Not remote-control software. This release is publicly downloadable."
+      - name: Delete temporary signer
+        if: always()
+        shell: bash
+        run: |
+          shred -u "$RUNNER_TEMP/social-ai-owner.jks" 2>/dev/null || rm -f "$RUNNER_TEMP/social-ai-owner.jks"
