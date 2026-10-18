@@ -2,6 +2,15 @@ plugins {
     id 'com.android.application'
 }
 
+// Stable owner signing is provided ONLY by encrypted GitHub Actions secrets.
+// Never commit a private Android keystore or passwords into this public repository.
+def ownerKeystorePath=System.getenv('PH_SOCIAL_KEYSTORE_FILE')
+def ownerKeystorePassword=System.getenv('PH_SOCIAL_KEYSTORE_PASSWORD')
+def ownerKeyAlias=System.getenv('PH_SOCIAL_KEY_ALIAS')
+def ownerKeyPassword=System.getenv('PH_SOCIAL_KEY_PASSWORD')
+def hasOwnerSigning=[ownerKeystorePath,ownerKeystorePassword,ownerKeyAlias,ownerKeyPassword].every { it != null && !it.isEmpty() }
+
+
 android {
     namespace 'com.primehub.socialai'
     compileSdk 36
@@ -10,16 +19,31 @@ android {
         applicationId 'com.primehub.socialai'
         minSdk 24
         targetSdk 35
-        versionCode 2
-        versionName '1.1.0'
+        versionCode 3
+        versionName '1.2.0'
     }
 
+    signingConfigs {
+        if(hasOwnerSigning) {
+            owner {
+                storeFile file(ownerKeystorePath)
+                storePassword ownerKeystorePassword
+                storeType 'pkcs12'
+                keyAlias ownerKeyAlias
+                keyPassword ownerKeyPassword
+            }
+        }
+    }
     buildTypes {
         debug {
+            // Owner test APK retains the same package ID across updates.
+            // Without signing secrets, CI builds disposable test APKs only.
+            if(hasOwnerSigning)signingConfig signingConfigs.owner
             applicationIdSuffix '.debug'
             versionNameSuffix '-test'
         }
         release {
+            if(hasOwnerSigning)signingConfig signingConfigs.owner
             minifyEnabled false
             shrinkResources false
         }

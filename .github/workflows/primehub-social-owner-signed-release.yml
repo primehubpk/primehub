@@ -1,0 +1,132 @@
+name: PrimeHub Social AI Owner-Signed Release
+# Owner signing secrets configured on authorized computer. Release publication remains OFF by default.
+
+# Manual only. Do not publish an APK unless the owner explicitly chooses publish.
+on:
+  push:
+    branches:
+      - feat/primehub-social-inapp-updates-oct18
+    paths:
+      - 'social-ai/android/**'
+      - '.github/workflows/primehub-social-owner-signed-release.yml'
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: "Publish owner-signed APK publicly on GitHub Releases? (Default NO)"
+        type: boolean
+        required: true
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  owner-signed-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout selected revision
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Prepare Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Ensure Android SDK API 36
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDK_ROOT="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          if [[ ! -f "$SDK_ROOT/platforms/android-36/android.jar" ]]; then
+            yes | "$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0"
+          fi
+          echo "ANDROID_HOME=$SDK_ROOT" >> "$GITHUB_ENV"
+      - name: Check owner signing secrets
+        id: owner_keys
+        env:
+          KEYSTORE_B64: ${{ secrets.PH_SOCIAL_KEYSTORE_B64 }}
+          STORE_PASSWORD: ${{ secrets.PH_SOCIAL_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.PH_SOCIAL_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.PH_SOCIAL_KEY_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for secret in KEYSTORE_B64 STORE_PASSWORD KEY_ALIAS KEY_PASSWORD; do
+            if [[ -z "${!secret}" ]]; then
+              if [[ "$GITHUB_EVENT_NAME" == "push" ]]; then
+                echo "::notice::Owner signing secrets not configured yet. Stable APK build will wait until the owner sets four private GitHub secrets."
+                echo "ready=false" >> "$GITHUB_OUTPUT"
+                exit 0
+              fi
+              echo "::error::Missing owner Android signing secret ($secret). No unsigned release is allowed."
+              exit 1
+            fi
+          done
+          echo "ready=true" >> "$GITHUB_OUTPUT"
+          umask 077
+          printf '%s' "$KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/primehub-owner-release.p12"
+          test -s "$RUNNER_TEMP/primehub-owner-release.p12"
+          echo "PH_SOCIAL_KEYSTORE_FILE=$RUNNER_TEMP/primehub-owner-release.p12" >> "$GITHUB_ENV"
+          # Note: Passwords are available ONLY to the next build step via step secrets,
+          # and never printed, committed to source, or uploaded in artifacts.
+      - name: Build release signed with permanent owner key
+        if: steps.owner_keys.outputs.ready == 'true'
+        env:
+          PH_SOCIAL_KEYSTORE_PASSWORD: ${{ secrets.PH_SOCIAL_KEYSTORE_PASSWORD }}
+          PH_SOCIAL_KEY_ALIAS: ${{ secrets.PH_SOCIAL_KEY_ALIAS }}
+          PH_SOCIAL_KEY_PASSWORD: ${{ secrets.PH_SOCIAL_KEY_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash play-store/android-twa/gradlew -p social-ai/android :app:assembleRelease --no-daemon
+          APK="social-ai/android/app/build/outputs/apk/release/app-release.apk"
+          test -s "$APK"
+          OUT="$RUNNER_TEMP/primehub-social-ai.apk"
+          cp "$APK" "$OUT"
+          echo "PH_SOCIAL_SIGNED_APK=$OUT" >> "$GITHUB_ENV"
+      - name: Validate release package identity, signature, version
+        if: steps.owner_keys.outputs.ready == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="$PH_SOCIAL_SIGNED_APK"
+          SDK_ROOT="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          TOOL="$(find "$SDK_ROOT/build-tools" -name apksigner -type f | sort -V | tail -1)"
+          test -x "$TOOL"
+          "$TOOL" verify --verbose --print-certs "$APK" | head -20
+          AAPT="$(find "$SDK_ROOT/build-tools" -name aapt -type f | sort -V | tail -1)"
+          test -x "$AAPT"
+          "$AAPT" dump badging "$APK" | head -3
+          "$AAPT" dump badging "$APK" | grep -Fq "name='com.primehub.socialai'"
+          grep -Fq "applicationId 'com.primehub.socialai'" social-ai/android/app/build.gradle
+          sha256sum "$APK"
+      - name: Upload owner-only install file (without signing key)
+        if: steps.owner_keys.outputs.ready == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: PrimeHub-Social-AI-Owner-Signed-Release
+          path: ${{ env.PH_SOCIAL_SIGNED_APK }}
+          if-no-files-found: error
+          retention-days: 10
+      - name: Publish only with explicit owner approval
+        if: ${{ inputs.publish == true && steps.owner_keys.outputs.ready == 'true' }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Published releases are public because the repo itself is public.
+          # Keep this option OFF until the owner approves public APK distribution.
+          VERSION="$(sed -n -E 's/^[[:space:]]*versionCode[[:space:]]+([0-9]+).*$/\1/p' social-ai/android/app/build.gradle | head -1)"
+          if [[ ! "$VERSION" =~ ^[1-9][0-9]*$ ]]; then
+            echo "::error::Could not determine a valid Android versionCode"
+            exit 1
+          fi
+          TAG="social-ai-v$VERSION"
+          gh release create "$TAG" "$PH_SOCIAL_SIGNED_APK#primehub-social-ai.apk" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "PrimeHub Social AI Android build $VERSION" \
+            --notes "Owner-signed standalone Android application. App updates require the same owner signing key and user confirmation."

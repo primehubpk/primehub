@@ -35,3 +35,9 @@ Requires Java 21, Android SDK API 36. Existing repository Gradle wrapper is reus
 - Test embedded logins and video uploads on physical Android device.
 - Optional in-app website compatibility indicators and dedicated native UI.
 - Implement a separate secure owner-only device companion or compliant remote publishing worker before allowing ChatGPT to interact with the app. Never expose user sessions via a public connector.
+
+## Updates without uninstalling (stable owner-signed app)
+
+This branch adds `Check app updates` in the Android home screen. After a permanently signed standalone release is installed once, future owner-approved updates can install over it without wiping local data, provided the package identity and signing certificate match. See `../docs/ANDROID-IN-APP-UPDATES.md` for the signing/release process and risks.
+
+**Existing CI debug builds use different signing keys. Android will not accept an in-place update from any of those earlier APKs**, even when the MCP connector is paired. Do not uninstall an APK that contains important local data simply to force an update. The new stable package `com.primehub.socialai` can coexist with the old test package `com.primehub.socialai.debug`. No signed stable release has been published yet.

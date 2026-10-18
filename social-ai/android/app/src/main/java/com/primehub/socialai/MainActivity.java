@@ -312,6 +312,9 @@ public final class MainActivity extends Activity {
         Button pairAndroid=button("🔐 Pair my phone with ChatGPT",true);
         pairAndroid.setOnClickListener(v->startActivity(new Intent(this,PairDeviceActivity.class)));
         page.addView(pairAndroid,margins(-1,48,0,9,0,7));
+        Button updateApp=button("⬇ Check app updates",true);
+        updateApp.setOnClickListener(v->startActivity(new Intent(this,UpdateActivity.class)));
+        page.addView(updateApp,margins(-1,48,0,8,0,8));
 
         TextView appsTitle = text("Your added apps  ·  " + custom.size(), 19, INK, true);
         page.addView(appsTitle, margins(-1,-2,0,5,0,7));
