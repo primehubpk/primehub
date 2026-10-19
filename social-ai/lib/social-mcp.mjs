@@ -1,4 +1,5 @@
 import {executePairing} from './pairing-backend.mjs';
+import {checkTikTokByPairCode} from './tiktok-login.mjs';
 // PrimeHub Social AI - public, stateless read-only MCP connector.
 // IMPORTANT: This server does NOT access an Android device or social account.
 // It only prepares owner-reviewable handoff links for a separate native app.
@@ -19,6 +20,10 @@ const OWNER_PAIR_TOOLS = [
     annotations:{readOnlyHint:false,destructiveHint:false,openWorldHint:false} },
   { name:'check_owner_android_connection', title:'Check paired phone status',
     description:'Read pairing status only while the phone pairing screen is running. Requires a private pairing code; does not read other applications.',
+    inputSchema:{type:'object',properties:{owner_pair_code:{type:'string',minLength:26,maxLength:26}},required:['owner_pair_code'],additionalProperties:false},
+    annotations:{readOnlyHint:true,destructiveHint:false,openWorldHint:false} },
+  { name:'check_owner_tiktok_account', title:'Check owner-authorized TikTok account',
+    description:'Read TikTok verified identity after owner OAuth; requires the private Android pairing code. No TikTok tokens, cookies, app control or automatic posting.',
     inputSchema:{type:'object',properties:{owner_pair_code:{type:'string',minLength:26,maxLength:26}},required:['owner_pair_code'],additionalProperties:false},
     annotations:{readOnlyHint:true,destructiveHint:false,openWorldHint:false} }
 ];
@@ -145,7 +150,7 @@ export function processRpc(payload, headers={}) {
 export async function processRpcWithPairing(payload,headers={}) {
   const method=payload?.method,params=payload?.params;
   const target=params?.name;
-  if(method!=='tools/call'||!['pair_owner_android_device','check_owner_android_connection'].includes(target))
+  if(method!=='tools/call'||!['pair_owner_android_device','check_owner_android_connection','check_owner_tiktok_account'].includes(target))
     return processRpc(payload,headers);
   const id=payload?.id??null;
   if(payload.jsonrpc!=='2.0'||typeof id!=='number'&&typeof id!=='string')
@@ -160,10 +165,18 @@ export async function processRpcWithPairing(payload,headers={}) {
     !/^[A-Z2-7]{26}$/.test(args.owner_pair_code||''))
     return {jsonrpc:'2.0',id,result:toolResult({error:'A valid private 26-character owner code is required.'},true)};
   try{
-    const result=await executePairing(target==='pair_owner_android_device'?'finish':'status',{code:args.owner_pair_code});
+    const result=target==='check_owner_tiktok_account'?
+      {ok:true,result:await checkTikTokByPairCode(args.owner_pair_code)}:
+      await executePairing(target==='pair_owner_android_device'?'finish':'status',{code:args.owner_pair_code});
     const data=result.ok?result.result:{error:result.error};
     // No secrets, pairing tokens, raw device identifiers, or customer data in tool outputs.
-    const safe=target==='pair_owner_android_device'?
+    const safe=target==='check_owner_tiktok_account'?
+      {authorized:data?.authorized===true,connected:data?.connected===true,
+       display_name:data?.connected===true?data?.display_name:null,
+       verified_at:data?.connected===true?data?.verified_at:null,
+       can_publish:false,can_control_app:false,
+       note:'TikTok Login Kit identity verification only; TikTok Developer Login Kit setup required first.'}:
+      target==='pair_owner_android_device'?
       {paired:data?.paired===true,message:data?.message||data?.reason||data?.error||'Pairing not completed',
        reminder:'Keep the Pairing screen open to report presence. No remote control or automatic posting is enabled.'}:
       {found:data?.found===true,paired:data?.paired===true,online:data?.online===true,
