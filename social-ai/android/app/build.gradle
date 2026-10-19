@@ -19,8 +19,8 @@ android {
         applicationId 'com.primehub.socialai'
         minSdk 24
         targetSdk 35
-        versionCode 6
-        versionName '1.5.0'
+        versionCode 7
+        versionName '1.6.0'
     }
 
     signingConfigs {
@@ -49,8 +49,18 @@ android {
         }
     }
 
+    // AIDL fixed-function IPC for owner-authorized Shizuku read-only UserService.
+    buildFeatures { aidl true }
+
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
     }
+}
+
+dependencies {
+    // Official Shizuku SDK is MIT licensed. The Shizuku SERVER itself
+    // remains a separate, manually started owner-authorized application.
+    implementation 'dev.rikka.shizuku:api:13.1.5'
+    implementation 'dev.rikka.shizuku:provider:13.1.5'
 }
