@@ -35,10 +35,10 @@ test('2026 MCP discover accepts routing headers and lists tools',()=>{
   assert.equal(discover.result.capabilities.tools.listChanged,false);
   assert.equal(discover.result.resultType,'complete');
   const tools=request('tools/list',{}, {'mcp-protocol-version':MCP_MODERN,'mcp-method':'tools/list'});
-  assert.equal(tools.result.tools.length,5);
-  assert.deepEqual(tools.result.tools.map(x=>x.name),['pair_owner_android_device','check_owner_android_connection','check_owner_tiktok_account','prepare_android_post','android_bridge_capabilities']);
+  assert.equal(tools.result.tools.length,7);
+  assert.deepEqual(tools.result.tools.map(x=>x.name),['pair_owner_android_device','check_owner_android_connection','check_owner_tiktok_account','inspect_owner_android_screen','navigate_owner_android','prepare_android_post','android_bridge_capabilities']);
   assert.equal(tools.result.tools.find(x=>x.name==='pair_owner_android_device').annotations.readOnlyHint,false);
-  assert.ok(tools.result.tools.filter(x=>x.name!=='pair_owner_android_device').every(x=>x.annotations.readOnlyHint));
+  assert.ok(tools.result.tools.filter(x=>x.name!=='pair_owner_android_device'&&x.name!=='navigate_owner_android').every(x=>x.annotations.readOnlyHint));
 });
 test('MCP capability tool explicitly rejects unrestricted automation claims',()=>{
   const out=request('tools/call',{name:'android_bridge_capabilities',arguments:{}});
