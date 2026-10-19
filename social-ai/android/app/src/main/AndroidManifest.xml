@@ -26,6 +26,15 @@
         <!-- Only explicit owner-enabled Accessibility. No auto-granted privileges. -->
         <activity android:name=".NativeTikTokTestActivity" android:exported="false"/>
         <activity android:name=".LiveAgentActivity" android:exported="false"/>
+        <!-- Owner-only Virtual Workspace Shizuku authorization & local read-only probe. -->
+        <activity android:name=".ShizukuSetupActivity" android:exported="false"/>
+        <provider
+            android:name="rikka.shizuku.ShizukuProvider"
+            android:authorities="${applicationId}.shizuku"
+            android:multiprocess="false"
+            android:enabled="true"
+            android:exported="true"
+            android:permission="android.permission.INTERACT_ACROSS_USERS_FULL"/>
         <service android:name=".OwnerTikTokService"
             android:label="PrimeHub Social AI · TikTok owner test"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
