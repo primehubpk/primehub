@@ -1,5 +1,6 @@
 import {executePairing} from './pairing-backend.mjs';
 import {checkTikTokByPairCode} from './tiktok-login.mjs';
+import {viewOwnerScreen,ownerNavigate} from './agent-bridge.mjs';
 // PrimeHub Social AI - public, stateless read-only MCP connector.
 // IMPORTANT: This server does NOT access an Android device or social account.
 // It only prepares owner-reviewable handoff links for a separate native app.
@@ -27,9 +28,25 @@ const OWNER_PAIR_TOOLS = [
     inputSchema:{type:'object',properties:{owner_pair_code:{type:'string',minLength:26,maxLength:26}},required:['owner_pair_code'],additionalProperties:false},
     annotations:{readOnlyHint:true,destructiveHint:false,openWorldHint:false} }
 ];
+const AGENT_TOOLS=[
+ {name:'inspect_owner_android_screen',title:'Inspect my owner-approved Android TikTok screen',
+ description:'Only when owner explicitly starts a time-limited navigation session in PrimeHub Social AI on their Android phone and gives you the NEW 26-character session code. Read its currently visible sanitized Accessibility labels. TikTok only; no screenshots, video/audio, messages, typed text or private credentials. If offline, ask owner to keep TikTok open. This does not publish posts.',
+ inputSchema:{type:'object',properties:{owner_session_code:{type:'string',minLength:26,maxLength:26}},required:['owner_session_code'],additionalProperties:false},
+ annotations:{readOnlyHint:true,destructiveHint:false,openWorldHint:false}},
+ {name:'navigate_owner_android',title:'Navigate TikTok with owner-approved Android session',
+ description:'During the owners live 15-minute TikTok-only Android session, perform ONE low-risk navigation operation based on a FRESH inspected screen revision. Actions: tap exact visible safe label, scroll forward/backward or Android Back. Never post, publish, message, comment, follow, like, delete, pay, change account or enter text. An expired session or stale screen prevents action. Use inspect_owner_android_screen again afterward.',
+ inputSchema:{type:'object',properties:{
+    owner_session_code:{type:'string',minLength:26,maxLength:26},
+    operation:{type:'string',enum:['tap_label','scroll_forward','scroll_backward','back']},
+    label:{type:'string',maxLength:65,description:'Exact visible label; only for tap_label'},
+    expected_revision:{type:'integer',minimum:0}
+ },required:['owner_session_code','operation','expected_revision'],additionalProperties:false},
+ annotations:{readOnlyHint:false,destructiveHint:false,openWorldHint:false}}
+];
 const platforms = Object.freeze(['TikTok','Facebook','Instagram','YouTube','Google Business']);
 export const TOOL_DEFS = [
   ...OWNER_PAIR_TOOLS,
+  ...AGENT_TOOLS,
   {
     name: 'prepare_android_post',
     title: 'Prepare a post for PrimeHub Social AI Android',
@@ -150,7 +167,7 @@ export function processRpc(payload, headers={}) {
 export async function processRpcWithPairing(payload,headers={}) {
   const method=payload?.method,params=payload?.params;
   const target=params?.name;
-  if(method!=='tools/call'||!['pair_owner_android_device','check_owner_android_connection','check_owner_tiktok_account'].includes(target))
+  if(method!=='tools/call'||!['pair_owner_android_device','check_owner_android_connection','check_owner_tiktok_account','inspect_owner_android_screen','navigate_owner_android'].includes(target))
     return processRpc(payload,headers);
   const id=payload?.id??null;
   if(payload.jsonrpc!=='2.0'||typeof id!=='number'&&typeof id!=='string')
@@ -160,6 +177,27 @@ export async function processRpcWithPairing(payload,headers={}) {
   if(modern && (headers['mcp-method']!==method||headers['mcp-name']!==target))
     return {jsonrpc:'2.0',id,error:{code:-32020,message:'MCP routing headers do not match'}};
   const args=params.arguments;
+  if(target==='inspect_owner_android_screen'||target==='navigate_owner_android'){
+    try{
+      if(!args||typeof args!=='object'||Array.isArray(args)||
+        !/^[A-Z2-7]{26}$/.test(args.owner_session_code||'')||
+        Object.keys(args).some(x=>!['owner_session_code','operation','label','expected_revision'].includes(x)))
+        throw Error('Valid personal Android live-session code required');
+      let out;
+      if(target==='inspect_owner_android_screen'){
+        if(Object.keys(args).some(x=>x!=='owner_session_code'))throw Error('Unexpected argument');
+        out=await viewOwnerScreen(args.owner_session_code);
+      }else{
+        out=await ownerNavigate(args.owner_session_code,args.operation,args.expected_revision,args.label);
+      }
+      let response=toolResult(out,out.active===false||out.queued===false);
+      if(modern)response={resultType:'complete',...response,
+        _meta:{'io.modelcontextprotocol/serverInfo':SERVER_INFO}};
+      return {jsonrpc:'2.0',id,result:response};
+    }catch(err){
+      return {jsonrpc:'2.0',id,result:toolResult({error:err.message||'Owner navigation unavailable'},true)};
+    }
+  }
   if(!args||typeof args!=='object'||Array.isArray(args)||
     Object.keys(args).some(x=>x!=='owner_pair_code')||
     !/^[A-Z2-7]{26}$/.test(args.owner_pair_code||''))
