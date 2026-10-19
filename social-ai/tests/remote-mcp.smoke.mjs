@@ -20,7 +20,7 @@ assert.equal(discover.status,200);
 assert.equal(discover.data.result.resultType,'complete');
 const tools=await request('tools/list',{}, {'mcp-protocol-version':M,'mcp-method':'tools/list'});
 assert.equal(tools.status,200);
-assert.deepEqual(tools.data.result.tools.map(t=>t.name),['pair_owner_android_device','check_owner_android_connection','prepare_android_post','android_bridge_capabilities']);
+assert.deepEqual(tools.data.result.tools.map(t=>t.name),['pair_owner_android_device','check_owner_android_connection','check_owner_tiktok_account','prepare_android_post','android_bridge_capabilities']);
 const params={name:'prepare_android_post',arguments:{title:'Public MCP smoke test',caption:'PrimeHubMall test caption',platform:'TikTok'}};
 const generated=await request('tools/call',params,{'mcp-protocol-version':M,'mcp-method':'tools/call','mcp-name':'prepare_android_post'});
 assert.equal(generated.status,200);
