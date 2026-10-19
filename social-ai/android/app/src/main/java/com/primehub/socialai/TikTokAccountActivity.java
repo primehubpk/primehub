@@ -96,7 +96,7 @@ public final class TikTokAccountActivity extends Activity {
     disconnect.setOnClickListener(v->new AlertDialog.Builder(this)
        .setTitle("Disconnect TikTok identity?")
        .setMessage("Remove TikTok's verified profile name from PrimeHub Social AI? It does not sign you out of TikTok.")
-       .setNegativeButton("Cancel",null).setPositiveButton("Disconnect",(d,w)->call("disconnect")).show());
+       .setNegativeButton("Cancel",null).setPositiveButton("Disconnect",(d,w)->run("disconnect",false)).show());
     row(page,disconnect,9);
     Button back=btn("← Back to my apps",false);back.setOnClickListener(v->finish());row(page,back,9);
     TextView note=txt("Important: TikTok passwords stay on TikTok's official page. A connected profile is read-only verification, NOT permission for ChatGPT to operate TikTok or automatically publish posts. Publishing requires separate TikTok Content Posting API approval.",12,false);
