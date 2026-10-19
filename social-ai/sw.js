@@ -1,5 +1,5 @@
-const CACHE='primehub-social-ai-v2';
-const ASSETS=['/','/index.html','/styles.css','/app.js?v=2','/apps.js?v=2','/icon.svg'];
+const CACHE='primehub-social-ai-v3';
+const ASSETS=['/','/index.html','/styles.css','/app.js?v=2','/apps.js?v=2','/account-hub.js?v=3','/icon.svg'];
 self.addEventListener('install',event=>{
   event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)).then(()=>self.skipWaiting()));
 });

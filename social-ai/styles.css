@@ -24,3 +24,36 @@
 .app-list{max-height:none;overflow:visible}
 .apps-layout{grid-template-columns:1fr}
 }
+
+
+/* Live-updatable owner social accounts hub. These are local bookmarks, NOT OAuth sessions. */
+.tiktok-owner-hub{margin:20px 0 26px;padding:25px}
+.tiktok-hub-heading{display:flex;align-items:flex-start;gap:17px}
+.tiktok-hub-heading h2{font-size:24px;letter-spacing:-.7px;margin:3px 0 8px}
+.tiktok-hub-heading p{font-size:12px;color:#687982;line-height:1.65;margin:0;max-width:730px}
+.tiktok-emoji{width:52px;height:52px;background:#eaf8de;border-radius:15px;display:grid;place-items:center;flex:none;color:#326d3e;font-weight:900;font-size:27px}
+.tiktok-actions{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin-top:23px}
+.tiktok-actions a{display:inline-flex;align-items:center;justify-content:center;text-align:center}
+.account-link-status{border:1px solid #f1e5bf;background:#fffaf0;color:#765d30;font-size:12px;line-height:1.7;border-radius:13px;margin:18px 0 22px;padding:13px 15px}
+.account-link-status.is-ready{background:#eff9ec;border-color:#cfecbe;color:#32683d}
+.tiktok-owner-hub>h3{font-size:16px;margin:18px 0 7px}
+.tiktok-owner-hub .muted{font-size:12px;line-height:1.65}
+.tiktok-shortcut-form{display:grid;grid-template-columns:1fr 1fr auto;gap:12px;align-items:end;margin:17px 0 20px}
+.tiktok-shortcut-form .field{margin:0}
+.tiktok-shortcut-form input{width:100%}
+.tiktok-shortcut-form button{min-height:43px;max-width:260px}
+.tiktok-shortcuts{display:grid;gap:11px}
+.tiktok-shortcut-empty{background:#f6faf4;border:1px solid #e4efdf;border-radius:12px;padding:17px}
+.tiktok-shortcut-card{border:1px solid #e1ece4;background:#fdfefd;border-radius:14px;padding:15px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.tiktok-shortcut-title{min-width:0}
+.tiktok-shortcut-title strong{display:block;font-size:13px;overflow-wrap:anywhere}
+.tiktok-shortcut-title small{display:block;color:#879899;margin-top:5px;font-size:11px;overflow-wrap:anywhere}
+.tiktok-shortcut-actions{display:flex;gap:7px;align-items:center;flex-wrap:wrap}
+.tiktok-shortcut-actions .mini{cursor:pointer;font-size:11px;background:#f1f6ef;border:1px solid #dce9dc;border-radius:8px;color:#294b3f;padding:9px 11px;text-decoration:none}
+.tiktok-shortcut-actions .mini.preferred{background:#daf3bf;font-weight:750}
+.tiktok-shortcut-actions .mini.danger{color:#a7434d;background:#fff4f3;border-color:#f1d6d2}
+.account-connector-note{border-top:1px solid #e2ebe6;margin-top:24px;padding-top:20px}
+.account-connector-note strong{font-size:15px}
+.account-connector-note p{font-size:12px;line-height:1.75;color:#61737a;margin:8px 0 14px}
+@media(max-width:900px){.tiktok-shortcut-form{grid-template-columns:1fr 1fr}.tiktok-shortcut-form button{grid-column:1/-1;max-width:none}}
+@media(max-width:640px){.tiktok-owner-hub{padding:17px}.tiktok-hub-heading{gap:11px}.tiktok-hub-heading h2{font-size:21px}.tiktok-emoji{width:42px;height:42px}.tiktok-actions a{width:100%}.tiktok-shortcut-form{grid-template-columns:1fr}.tiktok-shortcut-form button{grid-column:1}.tiktok-shortcut-card{flex-direction:column;align-items:stretch}.tiktok-shortcut-actions{justify-content:flex-start}}
