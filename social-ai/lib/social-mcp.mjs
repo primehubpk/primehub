@@ -1,5 +1,6 @@
 import {executePairing} from './pairing-backend.mjs';
 import {checkTikTokByPairCode} from './tiktok-login.mjs';
+import {viewOwnerScreen,ownerNavigate} from './agent-bridge.mjs';
 // PrimeHub Social AI - public, stateless read-only MCP connector.
 // IMPORTANT: This server does NOT access an Android device or social account.
 // It only prepares owner-reviewable handoff links for a separate native app.
@@ -10,6 +11,8 @@ export const SERVER_INFO = {name:'primehub-social-ai-handoff', version:'0.1.0'};
 export const CAPABILITIES = [
   'Generate owner-reviewable TikTok/Facebook/Instagram/YouTube/Google Business post drafts',
   'Create a tappable HTTPS link to PrimeHub Social AI Android task inbox',
+  'Inspect sanitized TikTok visible navigation labels during owner-approved 15-minute session',
+  'Request only safe navigation taps/scrolls with revocable session code',
   'Explain which steps need mobile owner approval'
 ];
 export const LIMIT = 8000;
@@ -27,9 +30,25 @@ const OWNER_PAIR_TOOLS = [
     inputSchema:{type:'object',properties:{owner_pair_code:{type:'string',minLength:26,maxLength:26}},required:['owner_pair_code'],additionalProperties:false},
     annotations:{readOnlyHint:true,destructiveHint:false,openWorldHint:false} }
 ];
+const AGENT_TOOLS=[
+ {name:'inspect_owner_android_screen',title:'Inspect my owner-approved Android TikTok screen',
+ description:'Only when owner explicitly starts a time-limited navigation session in PrimeHub Social AI on their Android phone and gives you the NEW 26-character session code. Read its currently visible sanitized Accessibility labels. TikTok only; no screenshots, video/audio, messages, typed text or private credentials. If offline, ask owner to keep TikTok open. This does not publish posts.',
+ inputSchema:{type:'object',properties:{owner_session_code:{type:'string',minLength:26,maxLength:26}},required:['owner_session_code'],additionalProperties:false},
+ annotations:{readOnlyHint:true,destructiveHint:false,openWorldHint:false}},
+ {name:'navigate_owner_android',title:'Navigate TikTok with owner-approved Android session',
+ description:'During the owners live 15-minute TikTok-only Android session, perform ONE low-risk navigation operation based on a FRESH inspected screen revision. Actions: tap exact visible safe label, scroll forward/backward or Android Back. Never post, publish, message, comment, follow, like, delete, pay, change account or enter text. An expired session or stale screen prevents action. Use inspect_owner_android_screen again afterward.',
+ inputSchema:{type:'object',properties:{
+    owner_session_code:{type:'string',minLength:26,maxLength:26},
+    operation:{type:'string',enum:['tap_label','scroll_forward','scroll_backward','back']},
+    label:{type:'string',maxLength:65,description:'Exact visible label; only for tap_label'},
+    expected_revision:{type:'integer',minimum:0}
+ },required:['owner_session_code','operation','expected_revision'],additionalProperties:false},
+ annotations:{readOnlyHint:false,destructiveHint:false,openWorldHint:false}}
+];
 const platforms = Object.freeze(['TikTok','Facebook','Instagram','YouTube','Google Business']);
 export const TOOL_DEFS = [
   ...OWNER_PAIR_TOOLS,
+  ...AGENT_TOOLS,
   {
     name: 'prepare_android_post',
     title: 'Prepare a post for PrimeHub Social AI Android',
@@ -50,7 +69,7 @@ export const TOOL_DEFS = [
   {
     name: 'android_bridge_capabilities',
     title: 'Describe PrimeHub Social AI Android bridge capabilities',
-    description: 'Use to clarify what the connected MCP plugin can actually do with the PrimeHub Android app, and what it cannot. Explains user confirmation, device isolation, and why installing app shortcuts does not grant access to the installed apps.',
+    description: 'Explain the ACTUAL direct-ChatGPT screen-label navigation through owner time-limited Android service, tool refresh requirement and remaining limitations: no video viewing/audio or private messages or automatic publishing.',
     inputSchema:{type:'object',properties:{},additionalProperties:false},
     annotations:{readOnlyHint:true,destructiveHint:false,openWorldHint:false}
   }
@@ -94,12 +113,14 @@ export function buildHandoff(args, time=Date.now()) {
 }
 export function capabilities() {
   return {
-    product:'PrimeHub Social AI Android + ChatGPT handoff bridge',
-    status:'MCP draft-link generation only (owner approval required)',
+    product:'PrimeHub Social AI Android + ChatGPT direct-control connector',
+    status:'Owner-approved direct ChatGPT navigation tools are deployed server-side; physical phone test and ChatGPT plugin tool refresh required.',
     can:CAPABILITIES,
-    cannot:['Read a phone screen','Use or extract TikTok/Instagram/Google login cookies','Press buttons in installed Android applications','Publish social posts automatically','Access Google Business Profile via installed Google Maps','Queue instructions on a phone in the background without it opening a handoff link'],
-    native_apps:'Android installed-app shortcuts launch their real apps, preserving the app provider login independently; no connector privileges are implied.',
-    note:'Native automation requires a separate secure device-pairing component and platform-compliant user authorization. This MCP endpoint does not expose a remote-control tool.'
+    cannot:['See TikTok video pixels or listen to trending audio (Accessibility button labels only)','Read private messages, type replies, access analytics that are not exposed in button labels','Use or extract TikTok/Instagram/Google login cookies','Publish, like, comment, follow, send messages, or manage accounts automatically','Operate TikTok when it is not foreground on the phone','Remotely install Android APKs or bypass Android permission and installer confirmation'],
+    native_apps:'The REAL installed TikTok opens with its existing signed-in account. ChatGPT is the decision-maker; the Android companion is mechanical eyes/hands for limited approved navigation, NOT a separate AI model.',
+    next_step:'Install owner-signed v1.5.0 once over stable v1.4.0 (no uninstall), start the 15-minute navigation session in PrimeHub Social AI, share ONLY the new temporary code in a private ChatGPT conversation, and refresh the installed personal plugin tools.',
+    requirements:['Original TikTok installed and foreground','Accessibility enabled by phone owner','Owner-specific time-limited session code','Private ChatGPT custom plugin exposing the new inspect_owner_android_screen and navigate_owner_android tools'],
+    note:'No video/audio screen sharing, downloads, DMs, full management or posting is implemented. Do not claim an end-to-end phone control test passed until owner tests it on the real device.'
   };
 }
 export function processRpc(payload, headers={}) {
@@ -117,13 +138,13 @@ export function processRpc(payload, headers={}) {
     result={
       supportedVersions:[MCP_MODERN,MCP_LEGACY],
       capabilities:{tools:{listChanged:false}},
-      instructions:'PrimeHub Social AI prepares only owner-reviewed Android tasks. NEVER claim to control the Android device, log in to Facebook/TikTok/Google or publish automatically. The user must explicitly open the generated link and approve in their own native app.',
+      instructions:'PrimeHub Social AI provides owner-reviewed post drafts PLUS owner-approved direct ChatGPT TikTok navigation. During a live 15-minute owner session, the inspect_owner_android_screen and navigate_owner_android tools may read only sanitized clickable labels and request low-risk tap/scroll/Back. Never claim video/audio capture, credentials, messages, final publishing, posting or full Android access. Owner must enable Accessibility and start a fresh session.',
       ttlMs:60_000,cacheScope:'public',
       _meta:{'io.modelcontextprotocol/serverInfo':SERVER_INFO}
     };
   }else if(method==='initialize'){
     result={protocolVersion:MCP_LEGACY,capabilities:{tools:{listChanged:false}},serverInfo:SERVER_INFO,
-      instructions:'Read-only post handoff generation. User must open generated link on their Android device and approve.'};
+      instructions:'Draft handoff plus limited direct ChatGPT navigation; Android owner must explicitly enable Accessibility and start a time-limited session. Not full screen/video control or posting.'};
   }else if(method==='ping'){
     result={};
   }else if(method==='tools/list'){
@@ -150,7 +171,7 @@ export function processRpc(payload, headers={}) {
 export async function processRpcWithPairing(payload,headers={}) {
   const method=payload?.method,params=payload?.params;
   const target=params?.name;
-  if(method!=='tools/call'||!['pair_owner_android_device','check_owner_android_connection','check_owner_tiktok_account'].includes(target))
+  if(method!=='tools/call'||!['pair_owner_android_device','check_owner_android_connection','check_owner_tiktok_account','inspect_owner_android_screen','navigate_owner_android'].includes(target))
     return processRpc(payload,headers);
   const id=payload?.id??null;
   if(payload.jsonrpc!=='2.0'||typeof id!=='number'&&typeof id!=='string')
@@ -160,6 +181,27 @@ export async function processRpcWithPairing(payload,headers={}) {
   if(modern && (headers['mcp-method']!==method||headers['mcp-name']!==target))
     return {jsonrpc:'2.0',id,error:{code:-32020,message:'MCP routing headers do not match'}};
   const args=params.arguments;
+  if(target==='inspect_owner_android_screen'||target==='navigate_owner_android'){
+    try{
+      if(!args||typeof args!=='object'||Array.isArray(args)||
+        !/^[A-Z2-7]{26}$/.test(args.owner_session_code||'')||
+        Object.keys(args).some(x=>!['owner_session_code','operation','label','expected_revision'].includes(x)))
+        throw Error('Valid personal Android live-session code required');
+      let out;
+      if(target==='inspect_owner_android_screen'){
+        if(Object.keys(args).some(x=>x!=='owner_session_code'))throw Error('Unexpected argument');
+        out=await viewOwnerScreen(args.owner_session_code);
+      }else{
+        out=await ownerNavigate(args.owner_session_code,args.operation,args.expected_revision,args.label);
+      }
+      let response=toolResult(out,out.active===false||out.queued===false);
+      if(modern)response={resultType:'complete',...response,
+        _meta:{'io.modelcontextprotocol/serverInfo':SERVER_INFO}};
+      return {jsonrpc:'2.0',id,result:response};
+    }catch(err){
+      return {jsonrpc:'2.0',id,result:toolResult({error:err.message||'Owner navigation unavailable'},true)};
+    }
+  }
   if(!args||typeof args!=='object'||Array.isArray(args)||
     Object.keys(args).some(x=>x!=='owner_pair_code')||
     !/^[A-Z2-7]{26}$/.test(args.owner_pair_code||''))

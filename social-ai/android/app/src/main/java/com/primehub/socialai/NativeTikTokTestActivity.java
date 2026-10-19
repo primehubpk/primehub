@@ -84,6 +84,9 @@ public final class NativeTikTokTestActivity extends Activity {
         });row(col,local,9);
         Button check=button("↻ Check test result",false);
         check.setOnClickListener(v->refresh());row(col,check,9);
+        Button ai=button("✦ Start AI navigation session (no hardcoded taps)",true);
+        ai.setOnClickListener(v->startActivity(new Intent(this,LiveAgentActivity.class)));
+        row(col,ai,15);
         Button back=button("← Back to PrimeHub Social AI",false);
         back.setOnClickListener(v->finish());row(col,back,9);
         TextView notice=text("WHAT THIS TEST PROVES\n\n✓ Your original TikTok app retains its own signed-in sessions.\n✓ With explicit Android permission and owner approval, local code can observe safe UI elements and request a click.\n✕ No remote AI click/vision channel is connected yet.\n✕ No account credentials, private messages or screenshots are read or transmitted.\n✕ No automatic posting. Platform UI and Android restrictions may prevent some clicks.\n\nYou can disable the accessibility service in Android Settings → Accessibility.",12,false);

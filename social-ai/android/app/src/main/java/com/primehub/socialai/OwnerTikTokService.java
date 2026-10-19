@@ -25,6 +25,7 @@ public final class OwnerTikTokService extends AccessibilityService {
     private static final String TIKTOK="com.zhiliaoapp.musically";
     private static final String PREFS="primehub-owner-native-tiktok-test-v1";
     private static volatile OwnerTikTokService active;
+    private AndroidAgentRuntime remote;
     private static volatile long armedUntil=0;
     private static volatile boolean armed=false;
     private static volatile long lastProcessed=0;
@@ -48,12 +49,14 @@ public final class OwnerTikTokService extends AccessibilityService {
     }
     @Override protected void onServiceConnected(){
         active=this;
+        remote=new AndroidAgentRuntime(this);
         getSharedPreferences(PREFS,MODE_PRIVATE).edit()
           .putString("last_action","Service ready. Only manual TikTok test supported.").apply();
     }
     @Override public void onAccessibilityEvent(AccessibilityEvent event){
         if(event==null||event.getPackageName()==null
                 ||!TIKTOK.contentEquals(event.getPackageName()))return;
+        if(remote!=null)remote.onEvent(event);
         long now=SystemClock.elapsedRealtime();
         if(now-lastProcessed<200 || !isArmed())return;
         lastProcessed=now;
@@ -101,6 +104,7 @@ public final class OwnerTikTokService extends AccessibilityService {
     }
     @Override public void onDestroy(){
         if(active==this)active=null;
+        if(remote!=null){remote.stop();remote=null;}
         synchronized(OwnerTikTokService.class){armed=false;}
         super.onDestroy();
     }
