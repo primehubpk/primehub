@@ -147,7 +147,8 @@ public final class AndroidAgentRuntime {
     private boolean blockedActionLabel(String label){
         if(label==null||label.isEmpty()||label.length()>65)return true;
         String s=" "+label.toLowerCase(Locale.ROOT)+" ";
-        return s.matches(".*\\b(post|publish|send|delete|confirm|pay|purchase|buy|withdraw|logout|block|report|follow|like|reply|comment|message|share|promote|sign out)\\b.*")||
+        return s.matches(".*\\b(post|publish|send|delete|confirm|pay|purchase|buy|withdraw|logout|block|report|follow|like|reply|comment|message|share|promote|sign out|settings|security|login|log in)\\b.*")||
+          s.contains("switch account")||s.contains("add account")||
           looksSensitive(label);
     }
     private AccessibilityNodeInfo findExact(AccessibilityNodeInfo node,String label,int depth){
