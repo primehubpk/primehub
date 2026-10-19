@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="primehub_owner_assist_disclosure">Optional owner-controlled TikTok navigation test. When you enable this service, Android may allow PrimeHub Social AI to observe visible interface elements. This experimental feature only responds to TikTok screens and clicks a Create or Upload entry once after you explicitly approve the action. It does not record passwords, take screenshots, upload information, publish posts or receive remote AI commands. You can disable it in Android Accessibility settings at any time.</string>
+</resources>
