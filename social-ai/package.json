@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "test": "node --test tests/*.test.mjs",
-    "check": "node --check app.js && node --check apps.js && node --check account-hub.js && node --check api/catalog.js && node --check api/mcp.js && node --check api/pair.js && node --check api/android-update.js && node --check api/tiktok-account.js && node --check api/tiktok-callback.js && node --check lib/tiktok-login.mjs && node --check lib/pairing-backend.mjs && node --check lib/social-mcp.mjs && node --check sw.js"
+    "check": "node --check app.js && node --check apps.js && node --check account-hub.js && node --check api/catalog.js && node --check api/mcp.js && node --check api/pair.js && node --check api/android-update.js && node --check api/tiktok-account.js && node --check api/tiktok-callback.js && node --check lib/tiktok-login.mjs && node --check lib/agent-bridge.mjs && node --check api/android-agent.js && node --check lib/pairing-backend.mjs && node --check lib/social-mcp.mjs && node --check sw.js"
   },
   "engines": {
     "node": ">=20"
