@@ -42,7 +42,7 @@ test('2026 MCP discover accepts routing headers and lists tools',()=>{
 });
 test('MCP capability tool explicitly rejects unrestricted automation claims',()=>{
   const out=request('tools/call',{name:'android_bridge_capabilities',arguments:{}});
-  assert.ok(out.result.structuredContent.cannot.some(x=>x.includes('Read a phone screen')));
+  assert.ok(out.result.structuredContent.cannot.some(x=>x.includes('TikTok video pixels')));
   assert.ok(out.result.structuredContent.cannot.some(x=>x.includes('Publish')));
   assert.ok(capabilities().requires_owner_approval !== false);
 });
