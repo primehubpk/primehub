@@ -9,6 +9,7 @@ on:
       - feat/primehub-social-tiktok-owner-oauth-oct19
       - feat/primehub-owner-assisted-native-tiktok-oct19
       - feat/primehub-general-android-ai-agent-oct19
+      - feat/primehub-shizuku-inapp-diagnostic-oct19
     paths:
       - 'social-ai/android/**'
       - '.github/workflows/primehub-social-owner-signed-release.yml'

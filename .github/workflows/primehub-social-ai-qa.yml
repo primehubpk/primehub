@@ -10,6 +10,7 @@ on:
       - feat/primehub-social-live-web-accounts-oct19
       - feat/primehub-owner-assisted-native-tiktok-oct19
       - feat/primehub-general-android-ai-agent-oct19
+      - feat/primehub-shizuku-inapp-diagnostic-oct19
   workflow_dispatch:
 permissions:
   contents: read
