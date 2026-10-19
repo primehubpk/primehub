@@ -315,8 +315,8 @@ public final class MainActivity extends Activity {
         Button updateApp=button("⬇ Check app updates",true);
         updateApp.setOnClickListener(v->startActivity(new Intent(this,UpdateActivity.class)));
         page.addView(updateApp,margins(-1,48,0,8,0,8));
-        Button connectTikTok=button("🔐 TikTok · Connect my account",true);
-        connectTikTok.setOnClickListener(v->startActivity(new Intent(this,TikTokAccountActivity.class)));
+        Button connectTikTok=button("♪ TikTok · Test real app buttons",true);
+        connectTikTok.setOnClickListener(v->startActivity(new Intent(this,NativeTikTokTestActivity.class)));
         page.addView(connectTikTok,margins(-1,48,0,8,0,8));
 
         TextView appsTitle = text("Your added apps  ·  " + custom.size(), 19, INK, true);
@@ -352,12 +352,12 @@ public final class MainActivity extends Activity {
         LinearLayout labels = column();
         labels.addView(text(site.name,14,INK,true));
         Uri uri=Uri.parse(site.url);
-        labels.addView(text("TikTok".equals(site.name)&&!site.custom?"Link your own account via TikTok official login":site.url.equals(STUDIO_URL)?"Content Studio":"Opens installed Android app · otherwise Chrome",10,MUTED,false));
+        labels.addView(text("TikTok".equals(site.name)&&!site.custom?"Use the original TikTok app · owner-controlled local test":site.url.equals(STUDIO_URL)?"Content Studio":"Opens installed Android app · otherwise Chrome",10,MUTED,false));
         row.addView(labels,margins(0,-2,10,0,8,0));
         ((LinearLayout.LayoutParams)labels.getLayoutParams()).weight=1;
 
-        Button visit=button("TikTok".equals(site.name)&&!site.custom?"Connect":"Open",true);
-        visit.setOnClickListener(v -> {if("TikTok".equals(site.name)&&!site.custom)startActivity(new Intent(this,TikTokAccountActivity.class));else launchPresetOrWebsite(site);});
+        Button visit=button("TikTok".equals(site.name)&&!site.custom?"Control test":"Open",true);
+        visit.setOnClickListener(v -> {if("TikTok".equals(site.name)&&!site.custom)startActivity(new Intent(this,NativeTikTokTestActivity.class));else launchPresetOrWebsite(site);});
         row.addView(visit,new LinearLayout.LayoutParams(-2,dp(41)));
         if (site.custom) {
             TextView remove=text("×",25,MUTED,true);
@@ -474,7 +474,7 @@ public final class MainActivity extends Activity {
             row.addView(labels,new LinearLayout.LayoutParams(0,-2,1));
             boolean isTikTok="com.zhiliaoapp.musically".equals(pkg);
             Button open=button(isTikTok?"Connect":"Open",true);
-            open.setOnClickListener(v->{if(isTikTok)startActivity(new Intent(this,TikTokAccountActivity.class));else if(!launchInstalled(pkg))toast("App is unavailable or was removed.");});
+            open.setOnClickListener(v->{if(isTikTok)startActivity(new Intent(this,NativeTikTokTestActivity.class));else if(!launchInstalled(pkg))toast("App is unavailable or was removed.");});
             row.addView(open,new LinearLayout.LayoutParams(-2,dp(42)));
             TextView remove=text("×",23,MUTED,true);
             remove.setGravity(Gravity.CENTER);

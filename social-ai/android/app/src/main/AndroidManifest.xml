@@ -23,6 +23,18 @@
         <activity android:name=".DeviceCheckActivity" android:exported="false"/>
         <activity android:name=".PairDeviceActivity" android:exported="false"/>
         <activity android:name=".UpdateActivity" android:exported="false"/>
+        <!-- Only explicit owner-enabled Accessibility. No auto-granted privileges. -->
+        <activity android:name=".NativeTikTokTestActivity" android:exported="false"/>
+        <service android:name=".OwnerTikTokService"
+            android:label="PrimeHub Social AI · TikTok owner test"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService"/>
+            </intent-filter>
+            <meta-data android:name="android.accessibilityservice"
+                android:resource="@xml/owner_tiktok_accessibility"/>
+        </service>
         <activity android:name=".TikTokAccountActivity"
             android:exported="true"
             android:launchMode="singleTop">

@@ -8,6 +8,7 @@ on:
       - feat/primehub-owner-device-pairing-oct17
       - feat/primehub-social-inapp-updates-oct18
       - feat/primehub-social-tiktok-owner-oauth-oct19
+      - feat/primehub-owner-assisted-native-tiktok-oct19
     paths:
       - 'social-ai/android/**'
       - '.github/workflows/primehub-social-ai-android.yml'

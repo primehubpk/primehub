@@ -8,6 +8,7 @@ on:
       - feat/primehub-social-inapp-updates-oct18
       - feat/primehub-social-tiktok-owner-oauth-oct19
       - feat/primehub-social-live-web-accounts-oct19
+      - feat/primehub-owner-assisted-native-tiktok-oct19
   workflow_dispatch:
 permissions:
   contents: read
