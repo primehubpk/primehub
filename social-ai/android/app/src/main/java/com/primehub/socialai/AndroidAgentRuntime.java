@@ -56,7 +56,6 @@ public final class AndroidAgentRuntime {
         return LiveAgentActivity.sessionActive(p);
     }
     private boolean tiktokForeground(){
-        if(SystemClock.elapsedRealtime()-lastEvent>25000)return false;
         AccessibilityNodeInfo root=service.getRootInActiveWindow();
         return root!=null && root.getPackageName()!=null &&
            TIKTOK.contentEquals(root.getPackageName());
