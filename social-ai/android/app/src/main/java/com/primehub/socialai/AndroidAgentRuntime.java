@@ -1,6 +1,9 @@
 package com.primehub.socialai;
 
 import android.accessibilityservice.AccessibilityService;
+import android.accessibilityservice.GestureDescription;
+import android.graphics.Path;
+import android.util.DisplayMetrics;
 import android.content.SharedPreferences;
 import android.os.Handler;
 import android.os.Looper;
@@ -187,8 +190,12 @@ public final class AndroidAgentRuntime {
                 }
             }else if("scroll_forward".equals(operation)||"scroll_backward".equals(operation)){
                 AccessibilityNodeInfo scroll=findScroll(root,0);
-                if(scroll==null)message="TikTok exposes no accessible scrollable region";
-                else{
+                if(scroll==null){
+                    // TikTok's feed frequently has no accessibility scrollable node.
+                    // Only fixed, one-page vertical owner-authorized swipes are supported.
+                    ok=swipeFeed(operation.equals("scroll_forward"));
+                    message=ok?"Requested one safe TikTok feed swipe":"TikTok refused bounded feed swipe";
+                }else{
                     int dir=operation.equals("scroll_forward")?
                       AccessibilityNodeInfo.ACTION_SCROLL_FORWARD:AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD;
                     ok=scroll.performAction(dir);
@@ -210,4 +217,18 @@ public final class AndroidAgentRuntime {
             }catch(Exception ignored){}
         });
     }
+    private boolean swipeFeed(boolean forward){
+        if(!enabled()||!tiktokForeground())return false;
+        DisplayMetrics size=service.getResources().getDisplayMetrics();
+        int width=size.widthPixels,height=size.heightPixels;
+        if(width<150||height<400)return false;
+        float center=width*0.5f;
+        Path path=new Path();
+        path.moveTo(center,height*(forward?0.76f:0.27f));
+        path.lineTo(center,height*(forward?0.27f:0.76f));
+        GestureDescription gesture=new GestureDescription.Builder()
+           .addStroke(new GestureDescription.StrokeDescription(path,0,420)).build();
+        return service.dispatchGesture(gesture,null,null);
+    }
+
 }
