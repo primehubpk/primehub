@@ -11,6 +11,8 @@ export const SERVER_INFO = {name:'primehub-social-ai-handoff', version:'0.1.0'};
 export const CAPABILITIES = [
   'Generate owner-reviewable TikTok/Facebook/Instagram/YouTube/Google Business post drafts',
   'Create a tappable HTTPS link to PrimeHub Social AI Android task inbox',
+  'Inspect sanitized TikTok visible navigation labels during owner-approved 15-minute session',
+  'Request only safe navigation taps/scrolls with revocable session code',
   'Explain which steps need mobile owner approval'
 ];
 export const LIMIT = 8000;
