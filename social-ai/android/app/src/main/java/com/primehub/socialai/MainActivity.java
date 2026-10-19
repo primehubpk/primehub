@@ -318,6 +318,9 @@ public final class MainActivity extends Activity {
         Button connectTikTok=button("♪ TikTok · Test real app buttons",true);
         connectTikTok.setOnClickListener(v->startActivity(new Intent(this,NativeTikTokTestActivity.class)));
         page.addView(connectTikTok,margins(-1,48,0,8,0,8));
+        Button shizuku=button("◉ Virtual Workspace · Shizuku connection",true);
+        shizuku.setOnClickListener(v->startActivity(new Intent(this,ShizukuSetupActivity.class)));
+        page.addView(shizuku,margins(-1,48,0,8,0,8));
 
         TextView appsTitle = text("Your added apps  ·  " + custom.size(), 19, INK, true);
         page.addView(appsTitle, margins(-1,-2,0,5,0,7));
