@@ -107,3 +107,8 @@ export async function exchangeAndVerify(code) {
  return {open_id:user.open_id,display_name:user.display_name,
    avatar_url:typeof user.avatar_url==='string'?user.avatar_url.slice(0,1024):''};
 }
+
+export async function checkTikTokByPairCode(code){
+ if(typeof code!=='string'||!/^[A-Z2-7]{26}$/.test(code))throw Error('Owner pairing code required');
+ return await rpc('ph_social_tiktok_owner_check_by_pair_code',{p_pair_code:code});
+}
