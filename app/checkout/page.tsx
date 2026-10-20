@@ -42,13 +42,16 @@ export default function CheckoutPage(){
                 </div>
               </div>
             )}
+            {(c.voucherKind === 'cashback' || c.voucherKind === 'cash') && c.walletCheckoutReady && (
+              <p className="mt-2 rounded-lg bg-emerald-50 p-2 text-[11px] font-bold text-[#0F6A5F]">Promo cashback instead of tier, not additional: {c.voucherKind === 'cashback' ? String(c.voucherCashbackPercent) + '%; ' : 'fixed amount; '}Rs. {c.voucherCashAmount.toLocaleString()} after delivery.</p>
+            )}
             {(c.cashbackPercent > 0 || c.voucherCashAmount > 0) && c.walletCheckoutReady && (
               <div className="mt-3 rounded-xl bg-white px-3 py-3 text-xs font-bold text-[#0F6A5F]">
-                🎁 {c.resellerTier || 'Prime Family'} {c.cashbackPercent}% cashback · Estimated withdrawable Cash Wallet credit Rs. {Math.min(c.eligibleAfterVoucher, c.cashbackEstimate + c.voucherCashAmount).toLocaleString()}
+                🎁 {c.voucherKind === 'cashback' ? 'Cashback promo ' + c.voucherCashbackPercent + '% (instead of tier)' : c.voucherKind === 'cash' ? 'Cash voucher (instead of tier)' : (c.resellerTier || 'Prime Family') + ' ' + c.cashbackPercent + '% cashback'} · Estimated withdrawable Cash Wallet credit Rs. {Math.min(c.eligibleAfterVoucher, c.cashbackEstimate + c.voucherCashAmount).toLocaleString()}
                 <p className="mt-1 text-[10px] font-medium leading-4 text-black/60">Credited only when Admin marks this order Delivered. Weekly/Big Deals excluded. No deduction from checkout bill.</p>
               </div>
             )}
-            {c.cashbackPercent === 0 && c.walletCheckoutReady && (
+            {c.cashbackPercent === 0 && !c.voucherKind && c.walletCheckoutReady && (
               <p className="mt-3 text-[10px] text-[#0F6A5F]">Prime Family Starter cashback starts at 5% for active signed-in members on eligible products.</p>
             )}
           </div>

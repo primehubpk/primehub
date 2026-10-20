@@ -15,6 +15,9 @@ type Props = {
   activeMember: boolean;
   tierName: string;
   cashbackPercent: number;
+  tierCashbackPercent: number;
+  voucherCashbackPercent: number;
+  voucherKind: string;
   cashbackEstimate: number;
   eligibleSubtotal: number;
   voucherCashAmount: number;
@@ -23,7 +26,8 @@ type Props = {
 
 /** Always use prices and tiers from /api/orders quote, not cart prices. */
 export default function PrimeFamilyCartCard({
-  signedIn, activeMember, tierName, cashbackPercent, cashbackEstimate,
+  signedIn, activeMember, tierName, cashbackPercent, tierCashbackPercent,
+  voucherCashbackPercent, voucherKind, cashbackEstimate,
   eligibleSubtotal, voucherCashAmount, tiers,
 }: Props) {
   const active = signedIn && activeMember;
@@ -60,19 +64,21 @@ export default function PrimeFamilyCartCard({
         <div className="mt-3 rounded-2xl border border-[#0F6A5F]/10 bg-white/85 p-3">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="flex items-center gap-1.5 text-[10px] font-extrabold text-[#176E62]"><Crown size={13}/> Your current tier: {tierName || 'Prime Family'} · {cashbackPercent}%</p>
+              <p className="flex items-center gap-1.5 text-[10px] font-extrabold text-[#176E62]"><Crown size={13}/> Your current tier: {tierName || 'Prime Family'} · {tierCashbackPercent || cashbackPercent}%</p>
               <p className="mt-1 text-[10px] leading-4 text-black/55">Eligible products: Rs. {money(eligible)}</p>
             </div>
             <div className="shrink-0 text-right">
               <p className="text-[9px] font-bold text-black/45">You can earn</p>
-              <p className="text-lg font-black leading-6 text-[#0F6A5F]">Rs. {money(tierCashback)}</p>
+              <p className="text-lg font-black leading-6 text-[#0F6A5F]">Rs. {money(tierCashback + cashVoucher)}</p>
             </div>
           </div>
           <p className="mt-2 flex items-start gap-1.5 text-[10px] font-semibold leading-4 text-[#276C5C]">
             <CheckCircle2 size={14} className="mt-0.5 shrink-0" />
             {eligible > 0 ? 'This cashback will be credited to your withdrawable Cash Wallet after Admin marks your order Delivered.' : 'This cart has no cashback-eligible products. Big Deal and Weekly Deal items are excluded.'}
           </p>
-          {cashVoucher > 0 && <p className="mt-1 text-[10px] font-bold text-[#0F6A5F]">+ Rs. {money(cashVoucher)} cash voucher reward after delivery (subject to order verification).</p>}
+          {voucherKind === 'cashback' && <p className="mt-1 text-[10px] font-bold text-[#0F6A5F]">Promo {voucherCashbackPercent}% replaces tier cashback: Rs. {money(cashVoucher)} Cash Wallet credit on delivery (not extra).</p>}
+          {voucherKind === 'cash' && <p className="mt-1 text-[10px] font-bold text-[#0F6A5F]">Fixed cash voucher replaces tier cashback: Rs. {money(cashVoucher)} after delivery.</p>}
+          {voucherKind === 'discount' && <p className="mt-1 text-[10px] font-bold text-[#0F6A5F]">Checkout discount voucher applied instead of tier cashback on this order.</p>}
         </div>
       )}
 

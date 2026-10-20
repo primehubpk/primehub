@@ -31,14 +31,24 @@ export async function creditDeliveredOrderBenefits(orderId: string, authoritativ
       eligible > due || !Number.isFinite(percent) || percent < 0 || percent > 100) {
     throw new Error('Invalid verified order cashback snapshot.');
   }
-  const tierCash = cashBackForTier(eligible, percent);
-  const voucherCash = authoritativeOrder.voucherKind === 'cash'
+  // Keep legacy pending voucher orders' original snapshots unchanged.
+  const exclusiveVoucher = authoritativeOrder.voucherRewardMode === 'exclusive_v1' &&
+    ['cash', 'cashback'].includes(String(authoritativeOrder.voucherKind || ''));
+  const tierCash = exclusiveVoucher ? 0 : cashBackForTier(eligible, percent);
+  const voucherCash = ['cash', 'cashback'].includes(String(authoritativeOrder.voucherKind || ''))
     ? Number(authoritativeOrder.voucherCashAmount || 0) : 0;
   if (!Number.isSafeInteger(voucherCash) || voucherCash < 0 || voucherCash > eligible) {
     throw new Error('Invalid order voucher snapshot.');
   }
   const voucherCode = String(authoritativeOrder.voucherCode || '');
   if (voucherCash > 0 && !/^[A-Z0-9_-]{4,24}$/.test(voucherCode)) throw new Error('Invalid cash voucher.');
+  if (authoritativeOrder.voucherKind === 'cashback') {
+    const voucherPercent = Number(authoritativeOrder.voucherCashbackPercent);
+    if (!Number.isSafeInteger(voucherPercent) || voucherPercent < 1 || voucherPercent > 100 ||
+        voucherCash !== cashBackForTier(eligible, voucherPercent) || !exclusiveVoucher) {
+      throw new Error('Invalid cashback voucher percentage.');
+    }
+  }
   const db = getAdminDb(), profileRef = db.collection('reseller_profiles').doc(userId);
   const creditRef = db.collection('reseller_rewards').doc(orderId);
   const orderRef = db.collection('orders').doc(orderId);

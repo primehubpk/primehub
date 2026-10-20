@@ -6,8 +6,9 @@ import { getSupabasePrimaryPayload, isSupabaseWriteConfigured, mapDocumentToSupa
 export type CheckoutVoucher = {
   id: string;
   code: string;
-  kind: 'discount' | 'cash';
+  kind: 'discount' | 'cash' | 'cashback';
   amount: number;
+  percent?: number;
   active: boolean;
   expiresAt?: string;
 };
@@ -28,13 +29,17 @@ export function cleanVoucher(value: unknown): CheckoutVoucher | null {
   const row = value as Record<string, unknown>;
   const code = normalizedCode(row.code);
   const amount = Number(row.amount);
-  if (!code || !Number.isSafeInteger(amount) || amount < 1 || amount > 100000) return null;
-  if (row.kind !== 'discount' && row.kind !== 'cash') return null;
+  if (!code) return null;
+  if (row.kind !== 'discount' && row.kind !== 'cash' && row.kind !== 'cashback') return null;
+  const percent = Number(row.percent);
+  if (row.kind === 'cashback') {
+    if (amount !== 0 || !Number.isSafeInteger(percent) || percent < 1 || percent > 100) return null;
+  } else if (!Number.isSafeInteger(amount) || amount < 1 || amount > 100000) return null;
   const id = String(row.id || '').trim();
   if (!/^[A-Za-z0-9_-]{5,80}$/.test(id)) return null;
   const expiresAt = String(row.expiresAt || '').trim();
   if (expiresAt && !/^\d{4}-\d{2}-\d{2}$/.test(expiresAt)) return null;
-  return { id, code, kind: row.kind, amount, active: row.active === true, ...(expiresAt ? { expiresAt } : {}) };
+  return { id, code, kind: row.kind, amount, ...(row.kind === 'cashback' ? { percent } : {}), active: row.active === true, ...(expiresAt ? { expiresAt } : {}) };
 }
 
 export async function listCheckoutVouchers(): Promise<CheckoutVoucher[]> {
@@ -81,6 +86,9 @@ export function resolveCheckoutVoucher(vouchers: CheckoutVoucher[], value: unkno
   const today = `${part('year')}-${part('month')}-${part('day')}`;
   if (voucher.expiresAt && voucher.expiresAt < today) throw new Error('Voucher has expired.');
   if (eligibleSubtotal <= 0) throw new Error('This voucher is not applicable to Big Deal or Weekly Deal products.');
-  const amount = Math.min(voucher.amount, eligibleSubtotal);
-  return { id: voucher.id, code: voucher.code, kind: voucher.kind, amount };
+  const amount = voucher.kind === 'cashback'
+    ? Math.min(eligibleSubtotal, Math.round(eligibleSubtotal * Number(voucher.percent) / 100))
+    : Math.min(voucher.amount, eligibleSubtotal);
+  return { id: voucher.id, code: voucher.code, kind: voucher.kind, amount,
+    ...(voucher.kind === 'cashback' ? { percent: voucher.percent } : {}) };
 }

@@ -64,6 +64,8 @@ export function useCheckout() {
   const [voucherError, setVoucherError] = useState('');
   const [voucherDiscount, setVoucherDiscount] = useState(0);
   const [voucherCashAmount, setVoucherCashAmount] = useState(0);
+  const [voucherKind, setVoucherKind] = useState('');
+  const [voucherCashbackPercent, setVoucherCashbackPercent] = useState(0);
   const [eligibleAfterVoucher, setEligibleAfterVoucher] = useState(0);
   const [cashbackPercent, setCashbackPercent] = useState(0);
   const [cashbackEstimate, setCashbackEstimate] = useState(0);
@@ -167,6 +169,8 @@ export function useCheckout() {
       setRewardLabel(String(quote.rewardLabel || ''));
       setVoucherDiscount(Number(quote.voucherDiscount || 0));
       setVoucherCashAmount(Number(quote.voucherCashAmount || 0));
+      setVoucherKind(String(quote.voucherKind || ''));
+      setVoucherCashbackPercent(Number(quote.voucherCashbackPercent || 0));
       setEligibleAfterVoucher(Number(quote.eligibleAfterVoucher || 0));
       setCashbackPercent(Number(quote.cashbackPercent || 0));
       setCashbackEstimate(Number(quote.cashbackEstimate || 0));
@@ -236,5 +240,5 @@ export function useCheckout() {
       setError(caught instanceof Error ? caught.message : 'Could not prepare your WhatsApp order.');
     }
   };
-  return { items, customer, placing, orderId, reviewProductIds, error, walletPaidReceipt, amountDueReceipt, walletShoppingBalance, walletShoppingApplied, useShoppingCredit, walletBalanceStatus, walletCheckoutReady, amountDue, totalItems, subtotal: discountedSubtotal, rawSubtotal: subtotal, tierDiscount, tierDiscountPercent, resellerTier, cashbackPercent, cashbackEstimate, eligibleAfterVoucher, voucherInput, setVoucherInput, voucherCode, voucherError, voucherDiscount, voucherCashAmount, applyVoucher, rewardLabel, deliveryCharge, wholesaleItems, total, selfCollect, setSelfCollect, update, placeOrder, whatsappOrder };
+  return { items, customer, placing, orderId, reviewProductIds, error, walletPaidReceipt, amountDueReceipt, walletShoppingBalance, walletShoppingApplied, useShoppingCredit, walletBalanceStatus, walletCheckoutReady, amountDue, totalItems, subtotal: discountedSubtotal, rawSubtotal: subtotal, tierDiscount, tierDiscountPercent, resellerTier, cashbackPercent, cashbackEstimate, eligibleAfterVoucher, voucherInput, setVoucherInput, voucherCode, voucherError, voucherDiscount, voucherCashAmount, voucherKind, voucherCashbackPercent, applyVoucher, rewardLabel, deliveryCharge, wholesaleItems, total, selfCollect, setSelfCollect, update, placeOrder, whatsappOrder };
 }

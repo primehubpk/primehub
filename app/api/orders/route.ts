@@ -216,16 +216,18 @@ export async function POST(request: Request) {
     const voucher = submittedVoucher
       ? resolveCheckoutVoucher(await listCheckoutVouchers(), submittedVoucher, eligibleSubtotal)
       : null;
-    if (voucher?.kind === 'cash') {
+    if (voucher?.kind === 'cash' || voucher?.kind === 'cashback') {
       if (!user || !reseller?.userId) {
-        throw new Error('Sign in to your active Prime Family account to use cash vouchers.');
+        throw new Error('Sign in to your active Prime Family account to use cashback vouchers.');
       }
       const claimId = createHash('sha256').update(user.uid + ':' + voucher.code).digest('hex');
       const prior = await getAdminDb().collection('reseller_voucher_claims').doc(claimId).get();
       if (prior.exists) throw new Error('This cash voucher was already used by your account.');
     }
     const voucherDiscount = voucher?.kind === 'discount' ? voucher.amount : 0;
-    const voucherCashAmount = voucher?.kind === 'cash' ? voucher.amount : 0;
+    const exclusiveVoucherReward = voucher?.kind === 'cash' || voucher?.kind === 'cashback';
+    const voucherCashAmount = exclusiveVoucherReward ? voucher.amount : 0;
+    const voucherCashbackPercent = voucher?.kind === 'cashback' ? Number(voucher.percent || 0) : 0;
     const eligibleAfterVoucher = Math.max(0, eligibleSubtotal - voucherDiscount);
     // Discount at checkout has been replaced by CASHBACK only after Admin delivery.
     const tierDiscountPercent = 0, tierDiscount = 0;
@@ -239,7 +241,10 @@ export async function POST(request: Request) {
           cashbackPercent: Math.min(100, Math.max(0, Number(tier.discountPercent || 0))),
         })).sort((a: any, b: any) => a.minMonthlyOrders - b.minMonthlyOrders)
       : [];
-    const cashbackPercent = reseller?.discountPercent || 0;
+    // Any verified voucher replaces the tier benefit: either immediate
+    // checkout discount OR one post-delivery cash reward, never both.
+    const tierCashbackPercent = reseller?.discountPercent || 0;
+    const cashbackPercent = voucher ? 0 : tierCashbackPercent;
     const cashbackEstimate = cashbackPercent > 0 ? cashBackForTier(eligibleAfterVoucher, cashbackPercent) : 0;
     const subtotal = Math.max(0, rawSubtotal - voucherDiscount);
     const calculatedDelivery = selfCollect ? { baseDelivery: 0, wholesaleItems: 0, wholesaleSurcharge: 0, deliveryCharge: 0 } : calculateDeliveryCharge(items);
@@ -260,8 +265,9 @@ export async function POST(request: Request) {
     const amountDue = total - walletShoppingApplied;
     const quote = { items, rawSubtotal, tierDiscount, tierDiscountPercent, resellerTier: reseller?.tierName || '',
       eligibleSubtotal, eligibleAfterVoucher, voucherCode: voucher?.code || '', voucherId: voucher?.id || '',
-      voucherKind: voucher?.kind || '', voucherDiscount, voucherCashAmount,
-      cashbackPercent, cashbackEstimate, cashbackPolicy: 'delivered_only_v1',
+      voucherKind: voucher?.kind || '', voucherDiscount, voucherCashAmount, voucherCashbackPercent,
+      voucherRewardMode: exclusiveVoucherReward ? 'exclusive_v1' : '',
+      tierCashbackPercent, cashbackPercent, cashbackEstimate, cashbackPolicy: 'delivered_only_v1',
       ...(quoteOnly ? { cashbackMemberActive: Boolean(reseller?.userId), cashbackTiers } : {}),
       subtotal, totalItems, ...delivery, total, selfCollect, fulfillment: selfCollect ? 'self_collect' : 'delivery',
       freeDeliveryReward, rewardLabel: freeDeliveryReward ? 'Spin & Win Reward — Free Delivery' : '',
