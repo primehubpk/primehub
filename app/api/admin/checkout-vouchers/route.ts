@@ -27,7 +27,7 @@ export async function POST(request: Request) {
     }
     const clean = body.vouchers.map(cleanVoucher);
     if (clean.some((v: unknown) => v === null)) {
-      return NextResponse.json({ error: 'Voucher codes must be 4-24 characters, amounts Rs 1-100000, and a wallet choice must be set.' }, { status: 400 });
+      return NextResponse.json({ error: 'Invalid code (4-24 characters), fixed rupee amount (1-100000), or cashback percentage (1-100).' }, { status: 400 });
     }
     await saveCheckoutVouchers(clean);
     return NextResponse.json({ success: true, vouchers: clean });

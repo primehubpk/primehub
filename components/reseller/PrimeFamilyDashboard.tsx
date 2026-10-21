@@ -34,6 +34,7 @@ import {
 import { useSettings } from '@/lib/useSettings';
 import type { ResellerProfile, ResellerTier } from '@/lib/resellerTypes';
 import PremiumSpinWheel from '@/components/rewards/PremiumSpinWheel';
+import MemberReferralCodeCard from '@/components/reseller/MemberReferralCodeCard';
 import { orderPremiumWheelPrizes, rewardWheelPrizeLabel } from '@/components/rewards/RewardWheelArtwork';
 
 const outfit = Outfit({ subsets: ['latin'] });
@@ -561,6 +562,8 @@ export default function PrimeFamilyDashboard({
 
           {wheel.active && <RewardWheel settings={wheel} rewardSettings={rewardSettings} wallet={rewardWallet} onWallet={setRewardWallet} />}
           </>}
+
+          {(view === 'home' || view === 'vouchers') && <MemberReferralCodeCard memberUid={memberUser?.uid || ''} />}
 
           {(view === 'home' || view === 'tiers') && !hasAdminTiers && (
             <section className="rounded-[22px] bg-white p-6 text-center text-xs font-bold text-[#6B6A62]" role="status">

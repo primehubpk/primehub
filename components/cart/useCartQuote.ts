@@ -23,9 +23,12 @@ export function useCartQuote(items: CartItem[]) {
 
   useEffect(() => {
     const saved = readCheckoutPreferences();
+    let pendingCode = '';
+    try { pendingCode = String(sessionStorage.getItem('primehub_pending_friend_referral_v1') || '').toUpperCase(); } catch {}
+    const code = saved.voucherCode || (/^PRIMEFAMILY[1-9][0-9]{0,6}$/.test(pendingCode) ? pendingCode : '');
     setSelfCollect(saved.selfCollect);
-    setVoucherCode(saved.voucherCode);
-    setVoucherInput(saved.voucherCode);
+    setVoucherCode(code);
+    setVoucherInput(code);
     setPreferencesReady(true);
   }, []);
   useEffect(() => onAuthStateChanged(auth, user => {

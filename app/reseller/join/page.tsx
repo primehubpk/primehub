@@ -46,7 +46,15 @@ export default function ResellerJoinPage() {
   const [success, setSuccess] = useState(false);
 
   useEffect(() => {
-    if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('mode') === 'signup') setMode('signup');
+    if (typeof window === 'undefined') return;
+    const query = new URLSearchParams(window.location.search);
+    if (query.get('mode') === 'signup' || query.get('ref')) setMode('signup');
+    const candidate = String(query.get('ref') || '').trim().toUpperCase();
+    // Save a verified-looking *candidate only*; the order server must validate
+    // actual code ownership/eligibility when applied at checkout.
+    if (/^PRIMEFAMILY[1-9][0-9]{0,6}$/.test(candidate)) {
+      try { window.sessionStorage.setItem('primehub_pending_friend_referral_v1', candidate); } catch {}
+    }
   }, []);
 
   function switchMode(nextMode: 'signup' | 'signin') {

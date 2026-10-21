@@ -9,6 +9,7 @@ import { isWholesaleProduct } from '@/lib/wholesale';
 import { createShoppingWalletOrder, shoppingWalletBalance } from '@/lib/resellerShoppingCheckout';
 import { cashBackForTier, orderEligibleSubtotal } from '@/lib/orderBenefits';
 import { listCheckoutVouchers, resolveCheckoutVoucher } from '@/lib/checkoutVouchersServer';
+import { referralCode, resolveMemberReferralCode } from '@/lib/primeFamilyReferralsServer';
 import { bigDealConfiguredSlotCount, bigDealRotationIndex } from '@/lib/bigDealRotation';
 
 export const runtime = 'nodejs';
@@ -213,19 +214,30 @@ export async function POST(request: Request) {
     const [reseller, user] = await Promise.all([optionalReseller(request, settings), decodedUser(request)]);
     const eligibleSubtotal = orderEligibleSubtotal(items, settings);
     const submittedVoucher = String(body?.voucherCode || '').trim();
+    // Friend codes are assigned by the server, not editable Admin coupon rows.
+    // They benefit the OTHER member whose code was used, not the buyer.
+    if (referralCode(submittedVoucher) && !reseller?.userId) {
+      throw new Error('Sign in to your active Prime Family account to use a friend code.');
+    }
     const voucher = submittedVoucher
-      ? resolveCheckoutVoucher(await listCheckoutVouchers(), submittedVoucher, eligibleSubtotal)
+      ? (referralCode(submittedVoucher)
+          ? await resolveMemberReferralCode(submittedVoucher, user?.uid || '', eligibleSubtotal)
+          : resolveCheckoutVoucher(await listCheckoutVouchers(), submittedVoucher, eligibleSubtotal))
       : null;
-    if (voucher?.kind === 'cash') {
+    if (voucher?.kind === 'cash' || voucher?.kind === 'cashback') {
       if (!user || !reseller?.userId) {
-        throw new Error('Sign in to your active Prime Family account to use cash vouchers.');
+        throw new Error('Sign in to your active Prime Family account to use cashback vouchers.');
       }
       const claimId = createHash('sha256').update(user.uid + ':' + voucher.code).digest('hex');
       const prior = await getAdminDb().collection('reseller_voucher_claims').doc(claimId).get();
       if (prior.exists) throw new Error('This cash voucher was already used by your account.');
     }
     const voucherDiscount = voucher?.kind === 'discount' ? voucher.amount : 0;
-    const voucherCashAmount = voucher?.kind === 'cash' ? voucher.amount : 0;
+    const exclusiveVoucherReward = voucher?.kind === 'cash' || voucher?.kind === 'cashback';
+    const voucherCashAmount = exclusiveVoucherReward ? voucher.amount : 0;
+    const voucherCashbackPercent = voucher?.kind === 'cashback' ? Number(voucher.percent || 0) : 0;
+    const referralPercent = voucher?.kind === 'referral' ? Number(voucher.percent || 0) : 0;
+    const referralCashEstimate = voucher?.kind === 'referral' ? Number(voucher.referrerEarns || 0) : 0;
     const eligibleAfterVoucher = Math.max(0, eligibleSubtotal - voucherDiscount);
     // Discount at checkout has been replaced by CASHBACK only after Admin delivery.
     const tierDiscountPercent = 0, tierDiscount = 0;
@@ -239,7 +251,10 @@ export async function POST(request: Request) {
           cashbackPercent: Math.min(100, Math.max(0, Number(tier.discountPercent || 0))),
         })).sort((a: any, b: any) => a.minMonthlyOrders - b.minMonthlyOrders)
       : [];
-    const cashbackPercent = reseller?.discountPercent || 0;
+    // Any verified voucher replaces the tier benefit: either immediate
+    // checkout discount OR one post-delivery cash reward, never both.
+    const tierCashbackPercent = reseller?.discountPercent || 0;
+    const cashbackPercent = voucher ? 0 : tierCashbackPercent;
     const cashbackEstimate = cashbackPercent > 0 ? cashBackForTier(eligibleAfterVoucher, cashbackPercent) : 0;
     const subtotal = Math.max(0, rawSubtotal - voucherDiscount);
     const calculatedDelivery = selfCollect ? { baseDelivery: 0, wholesaleItems: 0, wholesaleSurcharge: 0, deliveryCharge: 0 } : calculateDeliveryCharge(items);
@@ -260,8 +275,10 @@ export async function POST(request: Request) {
     const amountDue = total - walletShoppingApplied;
     const quote = { items, rawSubtotal, tierDiscount, tierDiscountPercent, resellerTier: reseller?.tierName || '',
       eligibleSubtotal, eligibleAfterVoucher, voucherCode: voucher?.code || '', voucherId: voucher?.id || '',
-      voucherKind: voucher?.kind || '', voucherDiscount, voucherCashAmount,
-      cashbackPercent, cashbackEstimate, cashbackPolicy: 'delivered_only_v1',
+      voucherKind: voucher?.kind || '', voucherDiscount, voucherCashAmount, voucherCashbackPercent,
+      referralPercent, referralCashEstimate,
+      voucherRewardMode: voucher ? 'exclusive_v1' : '',
+      tierCashbackPercent, cashbackPercent, cashbackEstimate, cashbackPolicy: 'delivered_only_v1',
       ...(quoteOnly ? { cashbackMemberActive: Boolean(reseller?.userId), cashbackTiers } : {}),
       subtotal, totalItems, ...delivery, total, selfCollect, fulfillment: selfCollect ? 'self_collect' : 'delivery',
       freeDeliveryReward, rewardLabel: freeDeliveryReward ? 'Spin & Win Reward — Free Delivery' : '',
@@ -316,7 +333,7 @@ export async function POST(request: Request) {
     const shouldUseWallet = useShoppingCredit && eligibleAfterVoucher > 0 && total > 0;
     const orderId = shouldUseWallet ? String(body?.orderRequestId || '') : crypto.randomUUID();
     const salar = cleanSalarOrderContext(body?.orderContext);
-    const orderData: any = { customer: { name: customer.name.trim(), phone: customer.phone.trim(), email: String(customer.email || '').trim(), address: selfCollect ? 'PrimeHub Shop Pickup' : customer.address.trim(), city: selfCollect ? 'Lahore' : customer.city.trim(), notes: String(customer.notes || '').trim() }, ...quote, idempotencyKey: `${salar ? 'salar' : 'website'}-order:${orderId}`, currency: 'PKR', status: 'pending', source: salar ? 'salar' : 'website', ...(salar ? { salar } : {}), createdAt: new Date() };
+    const orderData: any = { customer: { name: customer.name.trim(), phone: customer.phone.trim(), email: String(customer.email || '').trim(), address: selfCollect ? 'PrimeHub Shop Pickup' : customer.address.trim(), city: selfCollect ? 'Lahore' : customer.city.trim(), notes: String(customer.notes || '').trim() }, ...quote, ...(voucher?.kind === 'referral' ? { referralOwnerUid: voucher.ownerUid } : {}), idempotencyKey: `${salar ? 'salar' : 'website'}-order:${orderId}`, currency: 'PKR', status: 'pending', source: salar ? 'salar' : 'website', ...(salar ? { salar } : {}), createdAt: new Date() };
     if (resellerUserId) orderData.resellerUserId = resellerUserId;
     if (resellerGuestId) orderData.resellerGuestId = resellerGuestId;
 
