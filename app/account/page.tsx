@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useState } from 'react';
 import { createUserWithEmailAndPassword, onAuthStateChanged, signInWithEmailAndPassword, signOut, updateProfile, type User } from 'firebase/auth';
 import { CheckCircle2, LogOut, UserRound } from 'lucide-react';
 import { auth } from '@/lib/firebase';
+import { createResellerProfile } from '@/lib/resellerFirestore';
 
 async function mirrorIdentity(user: User | null) {
   if (!user) return;
@@ -42,7 +43,16 @@ export default function AccountPage() {
         const credential = await createUserWithEmailAndPassword(auth, email.trim(), password);
         if (name.trim()) await updateProfile(credential.user, { displayName: name.trim() });
         await mirrorIdentity(credential.user);
-        setMessage('Account created successfully.');
+        // A normal shop signup is also a Prime Family identity. Provision
+        // the existing profile before asking the server for a numbered code;
+        // this reuses the same Firebase UID and never credits bonus cash.
+        try {
+          await createResellerProfile(credential.user.uid, credential.user.email || email.trim());
+          window.dispatchEvent(new CustomEvent('primehub:reseller-profile-ready', { detail: { newSignup: true } }));
+          setMessage('Account created! Your Prime Family code is being prepared.');
+        } catch {
+          setMessage('Account created. Open Prime Family to finish your referral setup.');
+        }
       } else {
         const credential = await signInWithEmailAndPassword(auth, email.trim(), password);
         await mirrorIdentity(credential.user);
