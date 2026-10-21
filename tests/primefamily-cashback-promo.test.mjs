@@ -54,7 +54,7 @@ test('snapshots enforce one payout and protect legacy pending orders', () => {
   const route=readFileSync(new URL('../app/api/orders/route.ts',import.meta.url),'utf8');
   const delivered=readFileSync(new URL('../lib/deliveredOrderBenefits.ts',import.meta.url),'utf8');
   assert.match(route,/cashbackPercent = voucher \? 0 : tierCashbackPercent/);
-  assert.match(route,/voucherRewardMode: exclusiveVoucherReward \? 'exclusive_v1' : ''/);
+  assert.match(route,/voucherRewardMode: voucher \? 'exclusive_v1' : ''/);
   assert.match(delivered,/tierCash = exclusiveVoucher \? 0 : cashBackForTier/);
   assert.match(delivered,/voucherCash !== cashBackForTier\(eligible, voucherPercent\)/);
   assert.match(delivered,/priorCredit\.exists/);

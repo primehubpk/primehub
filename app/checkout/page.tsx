@@ -42,6 +42,9 @@ export default function CheckoutPage(){
                 </div>
               </div>
             )}
+            {c.voucherKind === 'referral' && c.walletCheckoutReady && (
+              <p className="mt-2 rounded-lg bg-emerald-50 p-2 text-[11px] font-bold text-[#0F6A5F]">Friend invitation code applied: {c.referralPercent}% (estimated Rs. {c.referralCashEstimate.toLocaleString()}) will go to the code OWNER once your qualifying order is Delivered. Your own tier cashback does NOT stack on this order. No discount is taken from your bill.</p>
+            )}
             {(c.voucherKind === 'cashback' || c.voucherKind === 'cash') && c.walletCheckoutReady && (
               <p className="mt-2 rounded-lg bg-emerald-50 p-2 text-[11px] font-bold text-[#0F6A5F]">Promo cashback instead of tier, not additional: {c.voucherKind === 'cashback' ? String(c.voucherCashbackPercent) + '%; ' : 'fixed amount; '}Rs. {c.voucherCashAmount.toLocaleString()} after delivery.</p>
             )}

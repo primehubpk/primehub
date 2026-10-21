@@ -13,6 +13,8 @@ type CartQuote = {
   voucherDiscount?: number;
   voucherCashAmount?: number;
   voucherCashbackPercent?: number;
+  referralPercent?: number;
+  referralCashEstimate?: number;
   voucherKind?: string;
   tierCashbackPercent?: number;
   cashbackEstimate?: number;
@@ -76,7 +78,8 @@ export default function CartSummary({
           </button>
         </div>
         {voucherCode && quote && !loading && (quote.voucherKind === 'cashback' || quote.voucherKind === 'cash') && <p className="mt-2 text-[10px] font-extrabold text-[#0F6A5F]">Promo replaces tier cashback (never stacked): {quote.voucherKind === 'cashback' ? String(quote.voucherCashbackPercent || 0) + '% cashback; ' : 'Fixed cash voucher; '}Rs. {Number(quote.voucherCashAmount || 0).toLocaleString()} Cash Wallet credit after delivery.</p>}
-        {voucherCode && quote && !loading && quote.voucherKind !== 'cashback' && quote.voucherKind !== 'cash' && <p role="status"  className="mt-2 text-[10px] font-extrabold text-[#0F6A5F]">
+        {voucherCode && quote && !loading && quote.voucherKind === 'referral' && <p role="status" className="mt-2 text-[10px] font-extrabold text-[#0F6A5F]">Friend code accepted! The code owner can earn {quote.referralPercent || 0}% (estimated Rs. {Number(quote.referralCashEstimate || 0).toLocaleString()}) after this qualifying order is Delivered. This is the inviter's cashback, NOT an extra buyer discount or tier reward.</p>}
+        {voucherCode && quote && !loading && quote.voucherKind !== 'cashback' && quote.voucherKind !== 'cash' && quote.voucherKind !== 'referral' && <p role="status"  className="mt-2 text-[10px] font-extrabold text-[#0F6A5F]">
           {Number(quote.voucherDiscount || 0) > 0
             ? `Rs. ${Number(quote.voucherDiscount).toLocaleString()} checkout discount applied.`
             : Number(quote.voucherCashAmount || 0) > 0
@@ -107,6 +110,8 @@ export default function CartSummary({
         tierCashbackPercent={Number(quote.tierCashbackPercent || 0)}
         voucherCashbackPercent={Number(quote.voucherCashbackPercent || 0)}
         voucherKind={String(quote.voucherKind || '')}
+        referralPercent={Number(quote.referralPercent || 0)}
+        referralCashEstimate={Number(quote.referralCashEstimate || 0)}
         cashbackEstimate={Number(quote.cashbackEstimate || 0)}
         eligibleSubtotal={Number(quote.eligibleAfterVoucher || 0)}
         voucherCashAmount={Number(quote.voucherCashAmount || 0)}

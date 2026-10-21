@@ -66,6 +66,8 @@ export function useCheckout() {
   const [voucherCashAmount, setVoucherCashAmount] = useState(0);
   const [voucherKind, setVoucherKind] = useState('');
   const [voucherCashbackPercent, setVoucherCashbackPercent] = useState(0);
+  const [referralPercent, setReferralPercent] = useState(0);
+  const [referralCashEstimate, setReferralCashEstimate] = useState(0);
   const [eligibleAfterVoucher, setEligibleAfterVoucher] = useState(0);
   const [cashbackPercent, setCashbackPercent] = useState(0);
   const [cashbackEstimate, setCashbackEstimate] = useState(0);
@@ -78,9 +80,12 @@ export function useCheckout() {
   const [preferencesReady, setPreferencesReady] = useState(false);
   useEffect(() => {
     const values = readCheckoutPreferences();
+    let pendingCode = '';
+    try { pendingCode = String(sessionStorage.getItem('primehub_pending_friend_referral_v1') || '').toUpperCase(); } catch {}
+    const code = values.voucherCode || (/^PRIMEFAMILY[1-9][0-9]{0,6}$/.test(pendingCode) ? pendingCode : '');
     setSelfCollect(values.selfCollect);
-    setVoucherCode(values.voucherCode);
-    setVoucherInput(values.voucherCode);
+    setVoucherCode(code);
+    setVoucherInput(code);
     setPreferencesReady(true);
   }, []);
   const [wholesaleItems, setWholesaleItems] = useState(0);
@@ -171,6 +176,8 @@ export function useCheckout() {
       setVoucherCashAmount(Number(quote.voucherCashAmount || 0));
       setVoucherKind(String(quote.voucherKind || ''));
       setVoucherCashbackPercent(Number(quote.voucherCashbackPercent || 0));
+      setReferralPercent(Number(quote.referralPercent || 0));
+      setReferralCashEstimate(Number(quote.referralCashEstimate || 0));
       setEligibleAfterVoucher(Number(quote.eligibleAfterVoucher || 0));
       setCashbackPercent(Number(quote.cashbackPercent || 0));
       setCashbackEstimate(Number(quote.cashbackEstimate || 0));
@@ -194,7 +201,7 @@ export function useCheckout() {
     setQuoteNonce(value => value + 1);
     // Code is now always revalidated by the server before Place Order.
   };
-  const placeOrder = async (event: FormEvent) => { event.preventDefault(); setError(''); if (!walletCheckoutReady) return setError(walletBalanceStatus === 'unavailable' ? 'Your wallet balance could not be verified. Please refresh this page before ordering so all available cash can be applied.' : 'Checking wallet balance. Please wait a moment.'); if (!items.length) return setError('Your cart is empty. Please add a product first.'); if (!customer.name.trim() || !customer.phone.trim() || (!selfCollect && (!customer.address.trim() || !customer.city.trim()))) return setError(selfCollect ? 'Please fill your name and phone.' : 'Please fill your name, phone, address and city.'); setPlacing(true); try { const response = await fetch('/api/orders', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(await authHeader()) }, body: JSON.stringify({ customer, items, selfCollect, guestId: guestId(), voucherCode, useShoppingCredit, ...(useShoppingCredit ? { orderRequestId: (walletRequestId.current ||= crypto.randomUUID()) } : {}) }) }); const data = await response.json(); if (!response.ok) throw new Error(data.error || 'Order save nahi ho saka.'); const productIds = Array.isArray(data.items) ? data.items.map((item: any) => String(item.productId || item.id || '')).filter(Boolean) : items.map((item: any) => String(item.productId || item.id || '')).filter(Boolean); const completedItems = Array.isArray(data.items) && data.items.length ? data.items : items; const completedContents = tikTokContents(completedItems, items); if (completedContents.length) { trackTikTokEvent('PlaceAnOrder', { contents: completedContents as any, value: Number(data.total ?? total), currency: 'PKR' }, { eventId: `order_${data.orderId}` }); } setReviewProductIds(productIds); rememberReviewOrder(data.orderId, productIds); rememberOrderProgress(data.orderId, Number(data.wholesaleItems || wholesaleItems || 0)); setWalletPaidReceipt(Number(data.walletShoppingApplied || 0)); setAmountDueReceipt(Number(data.amountDue ?? data.total ?? 0)); setOrderId(data.orderId); walletRequestId.current = ''; try { window.PrimeHubNative?.postMessage(JSON.stringify({ action: 'purchase', orderId: data.orderId })); } catch {} clearCheckoutPreferences(); clearCart(); } catch (caught) { console.error(caught); setError(caught instanceof Error ? caught.message : 'Order save nahi ho saka. Please try again.'); } finally { setPlacing(false); } };
+  const placeOrder = async (event: FormEvent) => { event.preventDefault(); setError(''); if (!walletCheckoutReady) return setError(walletBalanceStatus === 'unavailable' ? 'Your wallet balance could not be verified. Please refresh this page before ordering so all available cash can be applied.' : 'Checking wallet balance. Please wait a moment.'); if (!items.length) return setError('Your cart is empty. Please add a product first.'); if (!customer.name.trim() || !customer.phone.trim() || (!selfCollect && (!customer.address.trim() || !customer.city.trim()))) return setError(selfCollect ? 'Please fill your name and phone.' : 'Please fill your name, phone, address and city.'); setPlacing(true); try { const response = await fetch('/api/orders', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(await authHeader()) }, body: JSON.stringify({ customer, items, selfCollect, guestId: guestId(), voucherCode, useShoppingCredit, ...(useShoppingCredit ? { orderRequestId: (walletRequestId.current ||= crypto.randomUUID()) } : {}) }) }); const data = await response.json(); if (!response.ok) throw new Error(data.error || 'Order save nahi ho saka.'); const productIds = Array.isArray(data.items) ? data.items.map((item: any) => String(item.productId || item.id || '')).filter(Boolean) : items.map((item: any) => String(item.productId || item.id || '')).filter(Boolean); const completedItems = Array.isArray(data.items) && data.items.length ? data.items : items; const completedContents = tikTokContents(completedItems, items); if (completedContents.length) { trackTikTokEvent('PlaceAnOrder', { contents: completedContents as any, value: Number(data.total ?? total), currency: 'PKR' }, { eventId: `order_${data.orderId}` }); } setReviewProductIds(productIds); rememberReviewOrder(data.orderId, productIds); rememberOrderProgress(data.orderId, Number(data.wholesaleItems || wholesaleItems || 0)); setWalletPaidReceipt(Number(data.walletShoppingApplied || 0)); setAmountDueReceipt(Number(data.amountDue ?? data.total ?? 0)); setOrderId(data.orderId); walletRequestId.current = ''; try { window.PrimeHubNative?.postMessage(JSON.stringify({ action: 'purchase', orderId: data.orderId })); } catch {} clearCheckoutPreferences(); try { sessionStorage.removeItem('primehub_pending_friend_referral_v1'); } catch {} clearCart(); } catch (caught) { console.error(caught); setError(caught instanceof Error ? caught.message : 'Order save nahi ho saka. Please try again.'); } finally { setPlacing(false); } };
   const whatsappOrder = async () => {
     if (!items.length) return;
     setError('');
@@ -240,5 +247,5 @@ export function useCheckout() {
       setError(caught instanceof Error ? caught.message : 'Could not prepare your WhatsApp order.');
     }
   };
-  return { items, customer, placing, orderId, reviewProductIds, error, walletPaidReceipt, amountDueReceipt, walletShoppingBalance, walletShoppingApplied, useShoppingCredit, walletBalanceStatus, walletCheckoutReady, amountDue, totalItems, subtotal: discountedSubtotal, rawSubtotal: subtotal, tierDiscount, tierDiscountPercent, resellerTier, cashbackPercent, cashbackEstimate, eligibleAfterVoucher, voucherInput, setVoucherInput, voucherCode, voucherError, voucherDiscount, voucherCashAmount, voucherKind, voucherCashbackPercent, applyVoucher, rewardLabel, deliveryCharge, wholesaleItems, total, selfCollect, setSelfCollect, update, placeOrder, whatsappOrder };
+  return { items, customer, placing, orderId, reviewProductIds, error, walletPaidReceipt, amountDueReceipt, walletShoppingBalance, walletShoppingApplied, useShoppingCredit, walletBalanceStatus, walletCheckoutReady, amountDue, totalItems, subtotal: discountedSubtotal, rawSubtotal: subtotal, tierDiscount, tierDiscountPercent, resellerTier, cashbackPercent, cashbackEstimate, eligibleAfterVoucher, voucherInput, setVoucherInput, voucherCode, voucherError, voucherDiscount, voucherCashAmount, voucherKind, voucherCashbackPercent, referralPercent, referralCashEstimate, applyVoucher, rewardLabel, deliveryCharge, wholesaleItems, total, selfCollect, setSelfCollect, update, placeOrder, whatsappOrder };
 }

@@ -59,6 +59,11 @@ export async function saveCheckoutVouchers(vouchers: CheckoutVoucher[]) {
   if (vouchers.length > 100) throw new Error('Only 100 vouchers can be configured.');
   const unique = new Set(vouchers.map(v => v.code));
   if (unique.size !== vouchers.length) throw new Error('Voucher codes must be unique.');
+  // PRIMEFAMILY1, PRIMEFAMILY2, etc belong to verified members and cannot
+  // be silently shadowed by manually authored global checkout coupons.
+  if (vouchers.some(v => /^PRIMEFAMILY[1-9][0-9]{0,6}$/.test(v.code))) {
+    throw new Error('Numbered PRIMEFAMILY codes are reserved for member referrals.');
+  }
   const payload = { vouchers, updatedAt: new Date().toISOString() };
   if (isSupabaseWriteConfigured()) {
     const row = mapDocumentToSupabase('settings', DOCUMENT_ID, payload, 'supabase');

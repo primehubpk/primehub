@@ -16,6 +16,7 @@ import SiteSettingsManager from '@/components/admin/SiteSettingsManager';
 import PremiumRewardsManager from '@/components/admin/PremiumRewardsManager';
 import RewardsTermsManager from '@/components/admin/RewardsTermsManager';
 import CheckoutVoucherManager from '@/components/admin/CheckoutVoucherManager';
+import PrimeFamilyReferralManager from '@/components/admin/PrimeFamilyReferralManager';
 import ResellerWhatsAppRequests from '@/components/admin/ResellerWhatsAppRequests';
 import WhatsAppCoexistenceSetup from '@/components/admin/WhatsAppCoexistenceSetup';
 import WholesaleVideoManager from '@/components/admin/WholesaleVideoManager';
@@ -71,7 +72,7 @@ const SECTIONS: Record<string, SectionDefinition> = {
     title: 'Rewards',
     eyebrow: 'Rewards',
     description: 'Manage the shared premium spin wheel, reward settings and reward terms.',
-    content: <><PremiumRewardsManager /><RewardsTermsManager /><CheckoutVoucherManager /></>,
+    content: <><PremiumRewardsManager /><RewardsTermsManager /><CheckoutVoucherManager /><PrimeFamilyReferralManager /></>,
   },
   'video-hub': {
     title: 'Video Hub',
