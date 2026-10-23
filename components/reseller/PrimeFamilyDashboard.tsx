@@ -26,6 +26,7 @@ import { auth, db } from '@/lib/firebase';
 import {
   DEFAULT_MONTHLY_CHALLENGE,
   DEFAULT_RESELLER_TASKS,
+  shoppingRewardDescription,
   DEFAULT_RESELLER_WHEEL,
   type MonthlyChallengeSettings,
   type ResellerTask,
@@ -689,7 +690,7 @@ function TaskRow({
         ) : (
           <button type="button" onClick={onOpen} className="text-left text-[13px] font-extrabold text-[#14140F]">{task.title}</button>
         )}
-        <p className="mt-0.5 text-[11px] leading-4 text-[#6B6A62]">{task.description}</p>
+        <p className="mt-0.5 text-[11px] leading-4 text-[#6B6A62]">{shoppingRewardDescription(task.description)}</p>
         {isOrderTask && <Progress value={percent}/>}
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <span className="mr-auto text-[10px] font-extrabold text-[#0E7C6F]">{task.id === 'weekly-orders' || task.id === 'monthly-orders' ? `Rs. ${Number(task.reward || 0).toLocaleString()}` : `+${Number(task.reward || 0).toLocaleString()} pts`}</span>

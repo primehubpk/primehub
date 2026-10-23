@@ -9,7 +9,7 @@ import RewardsManager from '@/components/admin/RewardsManagerCatalogBridge';
 import { setAdminDocument, uploadImageToImgBB } from '@/components/admin/shared';
 import { db } from '@/lib/firebase';
 import { DEFAULT_RESELLER_TIERS, type ResellerTier } from '@/lib/resellerTypes';
-import { DEFAULT_MONTHLY_CHALLENGE, DEFAULT_RESELLER_TASKS, type MonthlyChallengeSettings, type ResellerTask } from '@/lib/resellerTasks';
+import { DEFAULT_MONTHLY_CHALLENGE, DEFAULT_RESELLER_TASKS, shoppingRewardDescription, type MonthlyChallengeSettings, type ResellerTask } from '@/lib/resellerTasks';
 
 const settingsRef = doc(db, 'settings', 'main');
 const voucherFields = [
@@ -44,7 +44,7 @@ export default function ResellerTasksAdminPage() {
 
   useEffect(() => onSnapshot(settingsRef, snapshot => {
     const data: any = snapshot.data() || {};
-    if (Array.isArray(data.resellerTasks)) setTasks(data.resellerTasks.map((task: ResellerTask) => ({ ...DEFAULT_RESELLER_TASKS.find(item => item.id === task.id), ...task })));
+    if (Array.isArray(data.resellerTasks)) setTasks(data.resellerTasks.map((task: ResellerTask) => ({ ...DEFAULT_RESELLER_TASKS.find(item => item.id === task.id), ...task, description: shoppingRewardDescription(task.description) })));
     if (data.resellerMonthlyChallenge) setChallenge({ ...DEFAULT_MONTHLY_CHALLENGE, ...data.resellerMonthlyChallenge });
     setVoucherImages(data.resellerVoucherImages || {});
     if (Array.isArray(data.resellerTiers) && data.resellerTiers.length) setTiers(data.resellerTiers);
@@ -71,7 +71,7 @@ export default function ResellerTasksAdminPage() {
   async function save() {
     setSaving(true); setSaved(false); setMessage('');
     try {
-      await setAdminDocument('settings', 'main', { resellerTasks: tasks, resellerMonthlyChallenge: { ...challenge, cashReward: 0 }, resellerVoucherImages: voucherImages, resellerTiers: tiers, updatedAt: new Date().toISOString() });
+      await setAdminDocument('settings', 'main', { resellerTasks: tasks.map(task => ({ ...task, description: shoppingRewardDescription(task.description) })), resellerMonthlyChallenge: { ...challenge, cashReward: 0 }, resellerVoucherImages: voucherImages, resellerTiers: tiers, updatedAt: new Date().toISOString() });
       setSaved(true); setMessage('Reseller settings saved successfully. Home and Reseller Club will read the same settings.');
       window.setTimeout(() => setSaved(false), 1800);
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Could not save reseller settings.'); }

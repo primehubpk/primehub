@@ -28,3 +28,13 @@ Goal: accurate 3+/12+ eligibility, without incorrect Play statements or losing c
 7. Check missing Play Install button separately on affected Android device/account for age restrictions, country and compatibility.
 
 Never change main, customer records or IARC questionnaire merely to make the rating appear lower.
+
+
+## Authoritative audit performed October 23, 2026
+- Inspected Firebase Console project prime-hub-a02f0, Firestore (default) through the owner's connected PrimeHub browser. Six reseller profile documents were present. Two showed legacy available balance Rs 100 each, other four Rs 0; walletPending was Rs 0 on all observed profiles. No customer balance was modified.
+- Inspected Firestore reseller_withdrawals: one historical Rs 500 Easypaisa withdrawal on October 15 marked paid. Transfer proof is not present in Firestore; do not assume a real payout occurred. Account information was not exported.
+- Inspected reseller_reward_ledger: no pending reward documents shown in the console. Supabase reporting tables likewise contained no reseller_reward_ledger entries.
+- Inspected current Firestore settings/main: an active monthly challenge still saved cashReward=1000 and legacy task text 'gift or cash reward'. The feature branch disables exposure/issuance of new cash prizes in code and normalizes old task text; the existing Firebase setting itself has NOT been edited while production is on the old implementation.
+- Supabase settings snapshot: checkout_vouchers contains one active 10% cashback voucher; rewards wheel has try-again, points, coupon, free-delivery and product types. These were checked as configured shopping promotions, not cash transfers.
+- Existing Rs 200 in legacy balances and the previously marked-paid record must be reconciled fairly before anyone treats old entitlements as extinguished.
+- Preview deployment from GitHub was skipped by Vercel's intentionally retained Ignored Build Step. Browser required a fresh Vercel login; no login verification was automatically completed. Production and IARC rating were not changed.

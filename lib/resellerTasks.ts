@@ -48,3 +48,11 @@ export const DEFAULT_RESELLER_WHEEL: ResellerWheelSettings = {
   customPrizeImage: '',
   customPrizeValue: 0,
 };
+
+
+/** Correct legacy task display text without altering the original earned-reward ledger. */
+export function shoppingRewardDescription(value: unknown): string {
+  return String(value ?? '')
+    .replace(/gift or cash reward/gi, 'shopping voucher or gift')
+    .replace(/cash prize|cash payout/gi, 'shopping-only credit');
+}

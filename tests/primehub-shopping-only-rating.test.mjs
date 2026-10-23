@@ -51,3 +51,30 @@ test('customer wallet has no active withdrawal form; existing entitlements remai
   assert.match(s, /Existing reward balance/);
   assert.match(s, /please contact PrimeHub support/);
 });
+
+
+test('cash-prize cards are not exposed on PrimeHub customer surfaces', () => {
+  for (const file of [
+    'components/home/HomeResellerUnified.tsx',
+    'components/home/HomeResellerLiveRail.tsx',
+    'components/reseller/PrimeFamilyDashboard.tsx',
+  ]) {
+    const s = src(file);
+    for (const id of ['cash-500', 'challenge-cash', 'elite-cash', 'jazzcash-300', 'easypaisa-300']) {
+      assert.ok(!s.includes("id: '" + id + "'") && !s.includes('id: "' + id + '"'),
+        file + ': cash-convertible card remains: ' + id);
+    }
+  }
+  assert.match(src('lib/resellerTasks.ts'), /cashReward: 0/);
+  assert.doesNotMatch(src('app/admin/reseller-tasks/page.tsx'), /label="Cash option \(Rs\.\)"/);
+});
+
+test('legacy Firebase task descriptions display as shopping rewards only', () => {
+  assert.match(src('lib/resellerTasks.ts'), /export function shoppingRewardDescription/);
+  for (const file of [
+    'components/home/HomeResellerUnified.tsx',
+    'components/home/HomeResellerLiveRail.tsx',
+    'components/home/HomeResellerTasksDirect.tsx',
+    'components/reseller/PrimeFamilyDashboard.tsx',
+  ]) assert.match(src(file), /shoppingRewardDescription\(task\.description\)/);
+});

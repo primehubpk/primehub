@@ -31,7 +31,7 @@ import {
 } from "lucide-react";
 import HomeHeading from "./HomeHeading";
 import { useSettings } from "@/lib/useSettings";
-import { DEFAULT_RESELLER_TASKS, type ResellerTask } from "@/lib/resellerTasks";
+import { DEFAULT_RESELLER_TASKS, shoppingRewardDescription, type ResellerTask } from "@/lib/resellerTasks";
 import { getResellerTiers } from "@/lib/resellerTiers";
 import type { ResellerProfile, ResellerTier } from "@/lib/resellerTypes";
 import { normalizeImageUrl } from "@/lib/imageUrl";
@@ -863,7 +863,7 @@ export default function HomeResellerTasksDirect() {
                 </span>
                 <div>
                   <h3>{task.title}</h3>
-                  <p>{task.description}</p>
+                  <p>{shoppingRewardDescription(task.description)}</p>
                   <strong>
                     {Number(task.reward || 0) > 0
                       ? `+${Number(task.reward).toLocaleString()} points${social ? " after approval" : ""}`
