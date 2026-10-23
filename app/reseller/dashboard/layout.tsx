@@ -23,7 +23,7 @@ function InstantDashboardShell() {
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div className="rounded-2xl border border-white/10 bg-white/[.07] p-3">
-                <p className="text-[8px] font-extrabold uppercase tracking-wider text-white/45">Cash Wallet</p>
+                <p className="text-[8px] font-extrabold uppercase tracking-wider text-white/45">Shopping Wallet</p>
                 <p className="mt-2 h-4 w-16 rounded-full bg-white/20" />
               </div>
               <div className="rounded-2xl border border-white/10 bg-white/[.07] p-3">

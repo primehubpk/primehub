@@ -380,30 +380,7 @@ export default function PrimeFamilyDashboard({
         art: '#1D4E89',
         minOrders: 2,
       },
-      {
-        id: 'jazzcash-300',
-        imageUrl: voucherImages['jazzcash-300'] || '',
-        type: 'brand',
-        title: 'JazzCash Rs. 300',
-        description: 'Payout voucher',
-        requirement: '8 orders',
-        icon: '📱',
-        art: '#C1121F',
-        minOrders: 8,
-        value: 300,
-      },
-      {
-        id: 'easypaisa-300',
-        imageUrl: voucherImages['easypaisa-300'] || '',
-        type: 'brand',
-        title: 'EasyPaisa Rs. 300',
-        description: 'Payout voucher',
-        requirement: '8 orders',
-        icon: '📱',
-        art: '#2A9D8F',
-        minOrders: 8,
-        value: 300,
-      },
+
       {
         id: 'kids-gift',
         imageUrl: voucherImages['kids-gift'] || '',
@@ -545,7 +522,7 @@ export default function PrimeFamilyDashboard({
       <div className={`relative mx-auto max-w-[1180px] overflow-hidden bg-[#F6F1E8] ${embedded ? 'min-h-0 shadow-none' : 'min-h-screen shadow-2xl lg:my-6 lg:min-h-[calc(100vh-3rem)] lg:rounded-[32px]'}`}>
         <header className={`relative bg-[linear-gradient(165deg,#16332E_0%,#0C1C19_70%)] px-4 pb-[22px] text-white sm:px-6 lg:px-8 lg:pb-7 ${embedded ? 'pt-3 lg:pt-5' : 'pt-12 lg:pt-5'}`}>
           <div id="club-home" className="flex items-center justify-between gap-3"><button type="button" onClick={goBackFromFamily} aria-label="Back from Prime Family" className="inline-flex min-h-10 items-center gap-1.5 rounded-lg px-1 py-2 text-xs font-semibold text-white/80 touch-manipulation hover:text-white"><ArrowLeft size={16} aria-hidden="true" /> Prime Family</button><div className="flex items-center gap-2">{memberUser ? <><Link href="/reseller/wallet" aria-label="Reward history" className="grid h-9 w-9 place-items-center rounded-full bg-white/10 text-white"><History size={16}/></Link><a href="#club-tasks" aria-label="Notifications" className="relative grid h-9 w-9 place-items-center rounded-full bg-white/10 text-white"><Bell size={16}/><span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-[#FF9A3C] ring-2 ring-[#16332E]"/></a></> : <Link href="/reseller/join" className="rounded-full bg-[#FFCF68] px-3 py-2 text-[10px] font-extrabold text-[#14140F]">Sign In / Join</Link>}</div></div>
-          <div className="mt-4 grid gap-3 sm:grid-cols-[1.3fr_.7fr]"><div className="flex min-w-0 items-center gap-3 rounded-2xl border border-white/10 bg-white/[.07] p-3"><div className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-[#FFCF68] text-lg font-extrabold text-[#14140F]">{(profile?.displayName||profile?.email||'P').charAt(0).toUpperCase()}</div><div className="min-w-0"><p className="text-[9px] font-extrabold uppercase tracking-[.2em] text-[#FFCF68]">{memberUser ? 'Profile' : 'Guest access'}</p><h1 className="truncate text-lg font-extrabold">{profile?.displayName||profile?.email||'Prime Family Guest'}</h1><p className="truncate text-[10px] text-white/55">{profile?.email || (memberUser ? 'Member account' : 'Browse tasks & rewards — sign in to claim')}</p></div></div><div className="grid grid-cols-2 gap-2"><div className="rounded-2xl border border-white/10 bg-white/[.07] p-3"><p className="text-[8px] font-extrabold uppercase tracking-wider text-white/45">Withdrawable</p><p className="mt-1 text-base font-extrabold">Rs. {walletAvailable.toLocaleString()}</p><p className="text-[8px] text-white/45">Shopping Rs. {walletSpendable.toLocaleString()}</p></div><div className="rounded-2xl border border-white/10 bg-white/[.07] p-3"><p className="text-[8px] font-extrabold uppercase tracking-wider text-white/45">Points Wallet</p><p className="mt-1 text-base font-extrabold">{Number(rewardWallet.points||0).toLocaleString()}</p></div></div></div>
+          <div className="mt-4 grid gap-3 sm:grid-cols-[1.3fr_.7fr]"><div className="flex min-w-0 items-center gap-3 rounded-2xl border border-white/10 bg-white/[.07] p-3"><div className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-[#FFCF68] text-lg font-extrabold text-[#14140F]">{(profile?.displayName||profile?.email||'P').charAt(0).toUpperCase()}</div><div className="min-w-0"><p className="text-[9px] font-extrabold uppercase tracking-[.2em] text-[#FFCF68]">{memberUser ? 'Profile' : 'Guest access'}</p><h1 className="truncate text-lg font-extrabold">{profile?.displayName||profile?.email||'Prime Family Guest'}</h1><p className="truncate text-[10px] text-white/55">{profile?.email || (memberUser ? 'Member account' : 'Browse tasks & rewards — sign in to claim')}</p></div></div><div className="grid grid-cols-2 gap-2"><div className="rounded-2xl border border-white/10 bg-white/[.07] p-3"><p className="text-[8px] font-extrabold uppercase tracking-wider text-white/45">Existing rewards</p><p className="mt-1 text-base font-extrabold">Rs. {walletAvailable.toLocaleString()}</p><p className="text-[8px] text-white/45">Shopping Rs. {walletSpendable.toLocaleString()}</p></div><div className="rounded-2xl border border-white/10 bg-white/[.07] p-3"><p className="text-[8px] font-extrabold uppercase tracking-wider text-white/45">Points Wallet</p><p className="mt-1 text-base font-extrabold">{Number(rewardWallet.points||0).toLocaleString()}</p></div></div></div>
         </header>
 
         <nav className="sticky top-0 z-30 flex gap-1.5 overflow-x-auto border-b border-black/5 bg-[#F6F1E8]/95 px-4 py-3 backdrop-blur sm:px-6 lg:justify-center lg:px-8 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -623,9 +600,9 @@ export default function PrimeFamilyDashboard({
                 <span className="text-[10px] font-extrabold uppercase tracking-[.14em] text-[#E85D04]">Reward wallet</span>
                 <div className="mt-3 grid grid-cols-2 gap-2">
                   <div className="rounded-2xl bg-[#F1ECE3] p-3">
-                    <p className="text-[9px] font-extrabold uppercase tracking-wider text-[#6B6A62]">Withdrawal Balance</p>
+                    <p className="text-[9px] font-extrabold uppercase tracking-wider text-[#6B6A62]">Existing reward balance</p>
                     <h2 className="mt-1 text-2xl font-extrabold">Rs. {walletAvailable.toLocaleString()}</h2>
-                    <p className="text-[10px] text-[#6B6A62]">Min withdraw Rs. 500 · Pending Rs. {walletPending.toLocaleString()}</p>
+                    <p className="text-[10px] text-[#6B6A62]">Previous rewards · Pending Rs. {walletPending.toLocaleString()}</p>
                   </div>
                   <div className="rounded-2xl bg-[#E7F6F3] p-3">
                     <p className="text-[9px] font-extrabold uppercase tracking-wider text-[#0E7C6F]">Points Wallet</p>
@@ -635,21 +612,21 @@ export default function PrimeFamilyDashboard({
                 </div>
                 <div className="mt-2 rounded-2xl border border-[#0E7C6F]/10 bg-[#F0FAF6] p-3">
                   <div className="flex items-end justify-between gap-2">
-                    <div><p className="text-[9px] font-extrabold uppercase tracking-wider text-[#0E7C6F]">Total Cash for Shopping</p><p className="mt-0.5 text-[10px] text-[#0E7C6F]/80">Shopping-only Rs. {walletShopping.toLocaleString()} + withdrawable Rs. {walletAvailable.toLocaleString()}</p></div>
+                    <div><p className="text-[9px] font-extrabold uppercase tracking-wider text-[#0E7C6F]">Total Shopping Credit</p><p className="mt-0.5 text-[10px] text-[#0E7C6F]/80">Shopping-only Rs. {walletShopping.toLocaleString()} + existing Rs. {walletAvailable.toLocaleString()}</p></div>
                     <strong className="whitespace-nowrap text-xl font-extrabold text-[#0E7C6F]">Rs. {walletSpendable.toLocaleString()}</strong>
                   </div>
-                  <p className="mt-2 text-[10px] text-[#586D64]">On checkout, shopping credit is used first. Any remaining amount can use your withdrawable cash. Cash spent on orders is no longer available to withdraw.</p>
+                  <p className="mt-2 text-[10px] text-[#586D64]">On checkout, PrimeHub shopping credit is used first. Previously earned balances remain available for eligible orders. New rewards cannot be withdrawn or transferred.</p>
                 </div>
                 <div className="mt-3 rounded-2xl border border-[#0E7C6F]/15 bg-white p-3">
                   <p className="text-[10px] font-extrabold uppercase tracking-wider text-[#0E7C6F]">Play Store App Bonus · Rs. 100</p>
-                  <p className="mt-1 text-[10px] leading-5 text-[#6B6A62]">One-time welcome cash for PrimeHub app users. No Claim button or additional login: it applies automatically after regular email/password sign-in, when the offer is active. Minimum withdrawal stays Rs. 500.</p>
-                  {playBonusClaimed && <p className="mt-2 text-[10px] font-black text-[#0E7C6F]">✓ Rs. 100 has been credited to your Withdrawal Balance.</p>}
+                  <p className="mt-1 text-[10px] leading-5 text-[#6B6A62]">One-time shopping credit for eligible PrimeHub app users. It applies after verified email/password sign-in when the offer is active. Not withdrawable as cash.</p>
+                  {playBonusClaimed && <p className="mt-2 text-[10px] font-black text-[#0E7C6F]">✓ Rs. 100 shopping credit has been added.</p>}
                 </div>
-                <Link href="/reseller/wallet" className="mt-3 block w-full rounded-xl bg-[#14140F] px-3 py-3 text-center text-xs font-extrabold text-white">Request withdrawal</Link>
+                <Link href="/reseller/wallet" className="mt-3 block w-full rounded-xl bg-[#14140F] px-3 py-3 text-center text-xs font-extrabold text-white">View shopping wallet</Link>
               </section>
               <section className="mt-3 rounded-[18px] bg-[#FFFDF8] p-3.5 shadow-[0_8px_24px_rgba(20,20,15,.05)]">
                 <span className="text-[10px] font-extrabold uppercase tracking-[.14em] text-[#E85D04]">My vouchers</span>
-                <p className="mt-2 text-xs leading-relaxed text-[#6B6A62]">Claimed gift vouchers appear here. JazzCash and EasyPaisa payouts are released after verification.</p>
+                <p className="mt-2 text-xs leading-relaxed text-[#6B6A62]">Eligible PrimeHub shopping rewards are shown here. No JazzCash or Easypaisa cash payout is offered for new rewards.</p>
                 <button type="button" onClick={() => setView('vouchers')} className="mt-3 rounded-xl bg-[#0E7C6F] px-3 py-2.5 text-xs font-extrabold text-white">Browse vouchers</button>
               </section>
             </>

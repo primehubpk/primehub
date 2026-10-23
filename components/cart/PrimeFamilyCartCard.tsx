@@ -51,7 +51,7 @@ export default function PrimeFamilyCartCard({
 
       {!signedIn ? (
         <div className="mt-3">
-          <p className="text-[11px] leading-5 text-[#355C50]">Join PrimeHub Family and earn cashback on eligible purchases. Your reward goes into your withdrawable Cash Wallet after delivery.</p>
+          <p className="text-[11px] leading-5 text-[#355C50]">Join PrimeHub Family and earn cashback on eligible purchases. Your reward becomes shopping-only credit for eligible PrimeHub purchases after delivery.</p>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <Link href="/reseller/join?mode=signup&redirect=%2Fcart" className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#0F6A5F] px-4 text-xs font-extrabold text-white">Sign Up & Earn <ArrowRight size={14}/></Link>
             <Link href="/reseller/join?mode=signin&redirect=%2Fcart" className="rounded-xl border border-[#0F6A5F]/20 bg-white px-3 py-2.5 text-[11px] font-bold text-[#0F6A5F]">Already a member? Sign In</Link>
@@ -76,10 +76,10 @@ export default function PrimeFamilyCartCard({
           </div>
           <p className="mt-2 flex items-start gap-1.5 text-[10px] font-semibold leading-4 text-[#276C5C]">
             <CheckCircle2 size={14} className="mt-0.5 shrink-0" />
-            {voucherKind === 'referral' ? 'This order uses a friend code. Your tier cashback is replaced; the code owner can earn an inviter reward after delivery.' : eligible > 0 ? 'This cashback will be credited to your withdrawable Cash Wallet after Admin marks your order Delivered.' : 'This cart has no cashback-eligible products. Big Deal and Weekly Deal items are excluded.'}
+            {voucherKind === 'referral' ? 'This order uses a friend code. Your tier cashback is replaced; the code owner can earn an inviter reward after delivery.' : eligible > 0 ? 'This cashback becomes shopping-only PrimeHub credit after Admin marks your order Delivered.' : 'This cart has no cashback-eligible products. Big Deal and Weekly Deal items are excluded.'}
           </p>
           {voucherKind === 'referral' && <p className="mt-1 text-[10px] font-bold text-[#0F6A5F]">Friend code: {referralPercent}% (estimated Rs. {money(referralCashEstimate)}) goes to the code OWNER once this buyer's qualifying order is Delivered; not to buyer. No double cashback.</p>}
-          {voucherKind === 'cashback' && <p className="mt-1 text-[10px] font-bold text-[#0F6A5F]">Promo {voucherCashbackPercent}% replaces tier cashback: Rs. {money(cashVoucher)} Cash Wallet credit on delivery (not extra).</p>}
+          {voucherKind === 'cashback' && <p className="mt-1 text-[10px] font-bold text-[#0F6A5F]">Promo {voucherCashbackPercent}% replaces tier cashback: Rs. {money(cashVoucher)} shopping credit on delivery (not extra).</p>}
           {voucherKind === 'cash' && <p className="mt-1 text-[10px] font-bold text-[#0F6A5F]">Fixed cash voucher replaces tier cashback: Rs. {money(cashVoucher)} after delivery.</p>}
           {voucherKind === 'discount' && <p className="mt-1 text-[10px] font-bold text-[#0F6A5F]">Checkout discount voucher applied instead of tier cashback on this order.</p>}
         </div>

@@ -63,6 +63,8 @@ export async function creditDeliveredOrderBenefits(orderId: string, authoritativ
   }
   const db = getAdminDb(), profileRef = db.collection('reseller_profiles').doc(userId);
   const creditRef = db.collection('reseller_rewards').doc(orderId);
+  const shoppingRef = db.collection('reseller_shopping_wallets').doc(userId);
+  const referralShoppingRef = isReferral ? db.collection('reseller_shopping_wallets').doc(referralOwnerUid) : null;
   const orderRef = db.collection('orders').doc(orderId);
   const claimId = voucherCash > 0
     ? createHash('sha256').update(userId + ':' + voucherCode).digest('hex') : '';
@@ -72,11 +74,13 @@ export async function creditDeliveredOrderBenefits(orderId: string, authoritativ
   const referralCreditRef = isReferral ? db.collection('reseller_referral_credits').doc(orderId) : null;
 
   const result = await db.runTransaction(async tx => {
-    const [profileSnap, priorCredit, orderSnap, priorVoucher, referralOwner, referralMapping] = await Promise.all([
+    const [profileSnap, priorCredit, orderSnap, priorVoucher, referralOwner, referralMapping, shoppingDoc, referralShoppingDoc] = await Promise.all([
       tx.get(profileRef), tx.get(creditRef), tx.get(orderRef),
       voucherClaimRef ? tx.get(voucherClaimRef) : Promise.resolve(null),
       referralOwnerRef ? tx.get(referralOwnerRef) : Promise.resolve(null),
       referralCodeRef ? tx.get(referralCodeRef) : Promise.resolve(null),
+      tx.get(shoppingRef),
+      referralShoppingRef ? tx.get(referralShoppingRef) : Promise.resolve(null),
     ]);
     if (priorCredit.exists) {
       const recorded = priorCredit.data() || {};
@@ -93,8 +97,10 @@ export async function creditDeliveredOrderBenefits(orderId: string, authoritativ
     }
     const profile = profileSnap.data() || {};
     const existingCash = Number(profile.walletAvailable || 0);
+    const oldShopping = Number(shoppingDoc.data()?.balance || 0);
+    const shoppingOnly = authoritativeOrder.rewardSettlementMode === 'shopping_only_v1';
     const monthlyOrders = Number(profile.monthlyOrders || 0);
-    if (![existingCash, monthlyOrders].every(x => Number.isSafeInteger(x) && x >= 0)) {
+    if (![existingCash, oldShopping, monthlyOrders].every(x => Number.isSafeInteger(x) && x >= 0)) {
       throw new Error('Invalid existing reseller wallet balance.');
     }
     if (isReferral && (!referralMapping?.exists ||
@@ -108,8 +114,10 @@ export async function creditDeliveredOrderBenefits(orderId: string, authoritativ
       referralOwner?.exists && referralOwner.data()?.status === 'active'
       ? cashBackForTier(eligible, referralPercent) : 0;
     const referralExisting = Number(referralOwner?.data()?.walletAvailable ?? 0);
+    const referralShopping = Number(referralShoppingDoc?.data()?.balance ?? 0);
     if (isReferral && (!Number.isSafeInteger(referralExisting) || referralExisting < 0 ||
-      !Number.isSafeInteger(referralExisting + referralPayable))) {
+      !Number.isSafeInteger(referralExisting + referralPayable) || !Number.isSafeInteger(referralShopping) ||
+      !Number.isSafeInteger(referralShopping + referralPayable))) {
       throw new Error('Invalid inviter wallet balance.');
     }
     // A cash voucher can pay each real member once. Cashback still pays on
@@ -117,17 +125,20 @@ export async function creditDeliveredOrderBenefits(orderId: string, authoritativ
     const voucherAwarded = voucherClaimRef && !priorVoucher?.exists
       ? Math.min(voucherCash, Math.max(0, eligible - tierCash)) : 0;
     const reward = tierCash + voucherAwarded;
-    if (!Number.isSafeInteger(existingCash + reward)) throw new Error('Wallet limit exceeded.');
+    if (!Number.isSafeInteger(existingCash + reward) || !Number.isSafeInteger(oldShopping + reward)) throw new Error('Wallet limit exceeded.');
     tx.update(profileRef, {
-      walletAvailable: existingCash + reward, monthlyOrders: monthlyOrders + 1,
+      ...(shoppingOnly ? { walletShopping: oldShopping + reward } : { walletAvailable: existingCash + reward }),
+      monthlyOrders: monthlyOrders + 1,
       updatedAt: FieldValue.serverTimestamp(),
     });
+    if (shoppingOnly) tx.set(shoppingRef, { userId, balance: oldShopping + reward, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
     tx.create(creditRef, {
       resellerUserId: userId, orderId, amount: reward, cashback: tierCash,
       voucherCash: voucherAwarded, referralCash: referralPayable,
       referralOwnerUid: isReferral ? referralOwnerUid : '',
       rewardPercent: percent,
       tierId: String(authoritativeOrder.resellerTier || ''),
+      rewardSettlementMode: shoppingOnly ? 'shopping_only_v1' : 'legacy_cash_v1',
       status: 'approved', source: 'admin_delivered', createdAt: FieldValue.serverTimestamp(),
     });
     if (voucherClaimRef && voucherAwarded > 0) {
@@ -138,9 +149,13 @@ export async function creditDeliveredOrderBenefits(orderId: string, authoritativ
     }
     if (referralPayable > 0 && referralOwnerRef && referralCreditRef) {
       tx.update(referralOwnerRef, {
-        walletAvailable: referralExisting + referralPayable,
+        ...(shoppingOnly ? { walletShopping: referralShopping + referralPayable } : { walletAvailable: referralExisting + referralPayable }),
         updatedAt: FieldValue.serverTimestamp(),
       });
+      if (shoppingOnly && referralShoppingRef) tx.set(referralShoppingRef, {
+        userId: referralOwnerUid, balance: referralShopping + referralPayable,
+        updatedAt: FieldValue.serverTimestamp(),
+      }, { merge: true });
       tx.create(referralCreditRef, {
         ownerUid: referralOwnerUid, buyerUid: userId, code: referralCodeValue,
         orderId, amount: referralPayable, percent: referralPercent,

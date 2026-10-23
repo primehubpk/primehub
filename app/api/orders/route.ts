@@ -278,7 +278,7 @@ export async function POST(request: Request) {
       voucherKind: voucher?.kind || '', voucherDiscount, voucherCashAmount, voucherCashbackPercent,
       referralPercent, referralCashEstimate,
       voucherRewardMode: voucher ? 'exclusive_v1' : '',
-      tierCashbackPercent, cashbackPercent, cashbackEstimate, cashbackPolicy: 'delivered_only_v1',
+      tierCashbackPercent, cashbackPercent, cashbackEstimate, cashbackPolicy: 'delivered_only_v1', rewardSettlementMode: 'shopping_only_v1',
       ...(quoteOnly ? { cashbackMemberActive: Boolean(reseller?.userId), cashbackTiers } : {}),
       subtotal, totalItems, ...delivery, total, selfCollect, fulfillment: selfCollect ? 'self_collect' : 'delivery',
       freeDeliveryReward, rewardLabel: freeDeliveryReward ? 'Spin & Win Reward — Free Delivery' : '',

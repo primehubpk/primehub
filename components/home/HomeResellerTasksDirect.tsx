@@ -744,7 +744,7 @@ export default function HomeResellerTasksDirect() {
               <WalletCards />
             </span>
             <div>
-              <h3>Cash wallet</h3>
+              <h3>Shopping wallet</h3>
               <p>Available reseller cash plus pending earnings.</p>
               <div className="home-wallet-chip cash">
                 <WalletCards size={13} />
@@ -757,7 +757,7 @@ export default function HomeResellerTasksDirect() {
                   : "Join Reseller Club to activate"}
               </strong>
               <Link className="home-task-button" href={profile ? "/reseller/wallet" : "/reseller/join"}>
-                {profile ? "Open cash wallet" : "Join now"} <ArrowRight size={13} />
+                {profile ? "Open shopping wallet" : "Join now"} <ArrowRight size={13} />
               </Link>
             </div>
           </article>

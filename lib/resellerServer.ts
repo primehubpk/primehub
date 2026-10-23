@@ -24,7 +24,7 @@ export async function createPendingResellerReward(orderId: string) {
     const monthlyOrders = Math.max(0, Math.floor(n(profile.monthlyOrders))), tier = getTierForMonthlyOrders(monthlyOrders + 1), baseAmount = Math.max(0, n(order.subtotal));
     if (!baseAmount) throw new Error('Order subtotal is invalid.');
     const rewardAmount = Math.round(baseAmount * tier.rewardPercent / 100), deliveredAt = order.deliveredAt?.toDate?.() || order.updatedAt?.toDate?.() || new Date(), availableAt = new Date(deliveredAt.getTime() + HOLD_DAYS * 86400000);
-    tx.create(ledgerRef, { id: orderId, userId, orderId, tierId: tier.id, rewardPercent: tier.rewardPercent, baseAmount, rewardAmount, status: 'pending', createdAt: FieldValue.serverTimestamp(), availableAt: Timestamp.fromDate(availableAt) });
+    tx.create(ledgerRef, { id: orderId, userId, orderId, tierId: tier.id, rewardPercent: tier.rewardPercent, baseAmount, rewardAmount, rewardMode: 'shopping', status: 'pending', createdAt: FieldValue.serverTimestamp(), availableAt: Timestamp.fromDate(availableAt) });
     tx.update(profileRef, { monthlyOrders: monthlyOrders + 1, tierId: tier.id, updatedAt: FieldValue.serverTimestamp() });
     return { created: true, rewardAmount, tierId: tier.id, availableAt: availableAt.toISOString() };
   });
@@ -41,8 +41,21 @@ export async function releaseMaturedResellerRewards(userId?: string) {
       const data = ledger.data() || {}, profileRef = db.collection('reseller_profiles').doc(String(data.userId)), profile = await tx.get(profileRef);
       if (!profile.exists) return;
       const amount = Math.max(0, n(data.rewardAmount));
+      const newShoppingReward = data.rewardMode === 'shopping';
+      const shoppingRef = db.collection('reseller_shopping_wallets').doc(String(data.userId));
+      const shopping = newShoppingReward ? await tx.get(shoppingRef) : null;
+      const existingShopping = Number(shopping?.data()?.balance || 0);
+      if (newShoppingReward && (!Number.isSafeInteger(existingShopping) || existingShopping < 0 ||
+          !Number.isSafeInteger(existingShopping + amount))) throw new Error('Invalid shopping balance.');
       tx.update(doc.ref, { status: 'available', updatedAt: FieldValue.serverTimestamp() });
-      tx.update(profileRef, { walletAvailable: FieldValue.increment(amount), updatedAt: FieldValue.serverTimestamp() });
+      if (newShoppingReward) {
+        tx.set(shoppingRef, { userId: String(data.userId), balance: existingShopping + amount, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+        tx.update(profileRef, { walletShopping: existingShopping + amount, updatedAt: FieldValue.serverTimestamp() });
+      } else {
+        // Legacy pending rewards remain in their original ledger; do not silently
+        // convert a previously promised cash balance into shopping-only credit.
+        tx.update(profileRef, { walletAvailable: FieldValue.increment(amount), updatedAt: FieldValue.serverTimestamp() });
+      }
       released++;
     });
   }
@@ -50,6 +63,9 @@ export async function releaseMaturedResellerRewards(userId?: string) {
 }
 
 export async function createResellerWithdrawal(userId: string, amount: number, method: string, accountTitle: string, accountNumber: string, bankName = '') {
+  // Historical withdrawals are still retained for support and admin settlement.
+  // Never accept a new cash-out while shopping-only rewards are active.
+  throw new Error('New withdrawal requests are disabled. Contact PrimeHub support about any pre-existing balance.');
   if (!['easypaisa', 'jazzcash', 'bank'].includes(method)) throw new Error('Unsupported withdrawal method.');
   if (!Number.isInteger(amount) || amount < 500) throw new Error('Minimum withdrawal is Rs. 500.');
   if (!accountTitle.trim() || !accountNumber.trim()) throw new Error('Payout account details are required.');

@@ -51,7 +51,7 @@ export default function MemberReferralCodeCard({ memberUid }: { memberUid: strin
   return <section className="rounded-[24px] border border-[#0F6A5F]/15 bg-gradient-to-br from-[#F2FBF7] to-white p-4 shadow-sm">
     <p className="flex items-center gap-1 text-[9px] font-black uppercase tracking-[.15em] text-[#0F6A5F]"><Users size={13}/> Prime Family Referral</p>
     <h3 className="mt-1 text-lg font-black">Your personal invitation code</h3>
-    <p className="mt-2 text-xs text-black/60">Share with interested friends and family. If they use it on an eligible order, you earn {percent}% in your Cash Wallet when the order is verified Delivered. No stacking with their own tier reward. New app users may separately qualify for a one-time Rs100 Play Store welcome reward after verified login.</p>
+    <p className="mt-2 text-xs text-black/60">Share with interested friends and family. If they use it on an eligible order, you earn {percent}% PrimeHub shopping credit when the order is verified Delivered. No stacking with their own tier reward. New app users may separately qualify for a one-time Rs100 Play Store welcome reward after verified login.</p>
     {loading ? <p className="mt-3 text-xs">Checking your permanent member code…</p> : code ? <>
       <div className="mt-3 rounded-xl border border-dashed border-[#0F6A5F]/35 bg-white px-4 py-3 text-center text-xl font-black tracking-[.12em] text-[#0F6A5F]">{code}</div>
       <p className="mt-1 text-[10px] font-bold text-[#8A6200]">{active ? `Live: ${percent}% referrer reward on qualifying orders` : 'Referral rewards are not active yet. Please check back after Admin enables them.'}</p>

@@ -36,7 +36,7 @@ test('app welcome bonus popup never falsely reports cash without verified native
   assert.match(logic,/credited\.add\(uid\)/);
   assert.match(popup,/reward\.credited\s*\?/);
   assert.match(popup,/Website signup par cash credit nahi hua/);
-  assert.match(popup,/Cash withdrawal minimum Rs\.500/);
+  assert.match(popup,/Reward PrimeHub shopping par use hota hai/);
   assert.match(popup,/order.*Delivered/);
   assert.match(popup,/reward\.code/);
   assert.match(logic,/primehub_welcome_popup_shown_v1/);

@@ -9,7 +9,7 @@ const money = (n: number | undefined) => `Rs. ${Number(n || 0).toLocaleString()}
 
 export default function AdminResellerCreditsPanel({ members, onCredited }: { members: Member[]; onCredited: () => Promise<void> }) {
   const [userId, setUserId] = useState('');
-  const [purpose, setPurpose] = useState<'shopping' | 'withdrawable'>('shopping');
+  const purpose: 'shopping' = 'shopping';
   const [amount, setAmount] = useState('');
   const [reason, setReason] = useState('');
   const [history, setHistory] = useState<Credit[]>([]);
@@ -59,7 +59,7 @@ export default function AdminResellerCreditsPanel({ members, onCredited }: { mem
     <div className="flex items-start gap-3"><span className="rounded-xl bg-[#DDF5F0] p-2.5 text-[#0F6A5F]"><WalletCards size={20}/></span><div>
       <p className="text-[9px] font-black uppercase tracking-widest text-[#0F6A5F]">Reseller Club · Admin Wallet</p>
       <h2 className="mt-1 text-xl font-black">Add wallet credit</h2>
-      <p className="mt-1 text-[10px] leading-5 text-black/50">Shopping credit pays only for website orders. Withdrawable credit joins the reward cash wallet (minimum withdrawal Rs. 500). Every adjustment is atomic and logged against the member UID.</p>
+      <p className="mt-1 text-[10px] leading-5 text-black/50">New credits are shopping-only. Historical balances and credit entries remain intact for support.</p>
     </div></div>
     <form onSubmit={submit} className="mt-4 grid gap-3">
       <label className="text-[10px] font-bold">Reseller account (verify email and UID)
@@ -68,10 +68,9 @@ export default function AdminResellerCreditsPanel({ members, onCredited }: { mem
           {members.filter(row => row.status === 'active').map(row => <option key={row.id || row.userId} value={row.userId || row.id}>{row.email || row.displayName || 'Reseller'} — {(row.userId || row.id || '').slice(-8)}</option>)}
         </select>
       </label>
-      {member ? <div className="rounded-xl bg-[#F4F4F1] p-3 text-[10px] leading-5"><p className="break-all font-black">{member.email}</p><p className="break-all text-black/40">Account UID: {userId}</p><p className="text-black/60">Shopping: {money(member.walletShopping)} · Withdrawable: {money(member.walletAvailable)}</p></div> : null}
+      {member ? <div className="rounded-xl bg-[#F4F4F1] p-3 text-[10px] leading-5"><p className="break-all font-black">{member.email}</p><p className="break-all text-black/40">Account UID: {userId}</p><p className="text-black/60">Shopping: {money(member.walletShopping)} · Historical cash: {money(member.walletAvailable)}</p></div> : null}
       <fieldset className="grid grid-cols-2 gap-2"><legend className="mb-2 text-[10px] font-bold">Credit type</legend>
-        <label className={`rounded-xl border p-3 text-[10px] font-bold ${purpose === 'shopping' ? 'border-[#0F6A5F] bg-[#DDF5F0]' : 'border-black/10'}`}><input type="radio" name="purpose" checked={purpose === 'shopping'} onChange={() => { setPurpose('shopping'); operationId.current = ''; }}/> Shopping only</label>
-        <label className={`rounded-xl border p-3 text-[10px] font-bold ${purpose === 'withdrawable' ? 'border-[#0F6A5F] bg-[#DDF5F0]' : 'border-black/10'}`}><input type="radio" name="purpose" checked={purpose === 'withdrawable'} onChange={() => { setPurpose('withdrawable'); operationId.current = ''; }}/> Withdrawable</label>
+        <label className={`rounded-xl border p-3 text-[10px] font-bold ${purpose === 'shopping' ? 'border-[#0F6A5F] bg-[#DDF5F0]' : 'border-black/10'}`}><input type="radio" name="purpose" checked={purpose === 'shopping'} onChange={() => { operationId.current = ''; }}/> Shopping only</label>
       </fieldset>
       <label className="text-[10px] font-bold">Amount (Rs.)<input required type="number" min="1" step="1" value={amount} onChange={e => { setAmount(e.target.value); operationId.current = ''; }} className="mt-1 w-full rounded-xl border border-black/10 bg-[#F8F8F5] p-3 text-sm" placeholder="e.g. 1500"/></label>
       <label className="text-[10px] font-bold">Reason / reference (required for audit)<input required maxLength={240} value={reason} onChange={e => { setReason(e.target.value); operationId.current = ''; }} className="mt-1 w-full rounded-xl border border-black/10 bg-[#F8F8F5] p-3 text-sm" placeholder="Why is this money being credited?"/></label>
