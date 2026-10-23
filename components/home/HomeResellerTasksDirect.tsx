@@ -31,7 +31,7 @@ import {
 } from "lucide-react";
 import HomeHeading from "./HomeHeading";
 import { useSettings } from "@/lib/useSettings";
-import { DEFAULT_RESELLER_TASKS, type ResellerTask } from "@/lib/resellerTasks";
+import { DEFAULT_RESELLER_TASKS, shoppingRewardDescription, type ResellerTask } from "@/lib/resellerTasks";
 import { getResellerTiers } from "@/lib/resellerTiers";
 import type { ResellerProfile, ResellerTier } from "@/lib/resellerTypes";
 import { normalizeImageUrl } from "@/lib/imageUrl";
@@ -744,7 +744,7 @@ export default function HomeResellerTasksDirect() {
               <WalletCards />
             </span>
             <div>
-              <h3>Cash wallet</h3>
+              <h3>Shopping wallet</h3>
               <p>Available reseller cash plus pending earnings.</p>
               <div className="home-wallet-chip cash">
                 <WalletCards size={13} />
@@ -757,7 +757,7 @@ export default function HomeResellerTasksDirect() {
                   : "Join Reseller Club to activate"}
               </strong>
               <Link className="home-task-button" href={profile ? "/reseller/wallet" : "/reseller/join"}>
-                {profile ? "Open cash wallet" : "Join now"} <ArrowRight size={13} />
+                {profile ? "Open shopping wallet" : "Join now"} <ArrowRight size={13} />
               </Link>
             </div>
           </article>
@@ -863,7 +863,7 @@ export default function HomeResellerTasksDirect() {
                 </span>
                 <div>
                   <h3>{task.title}</h3>
-                  <p>{task.description}</p>
+                  <p>{shoppingRewardDescription(task.description)}</p>
                   <strong>
                     {Number(task.reward || 0) > 0
                       ? `+${Number(task.reward).toLocaleString()} points${social ? " after approval" : ""}`

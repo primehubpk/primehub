@@ -18,7 +18,7 @@ export async function creditResellerWallet(input: {
   const { userId, purpose, reason, operationId } = input;
   const amount = exactRupees(input.amount);
   if (!/^[A-Za-z0-9_-]{20,128}$/.test(userId)) throw new Error('Select a valid reseller UID.');
-  if (purpose !== 'shopping' && purpose !== 'withdrawable') throw new Error('Select Shopping or Withdrawable.');
+  if (purpose !== 'shopping') throw new Error('Only shopping credit can be issued. Legacy cash credits remain in history.');
   if (!reason.trim() || reason.trim().length > 240) throw new Error('An audit reason (max 240 characters) is required.');
   if (!/^[0-9a-f-]{36}$/i.test(operationId)) throw new Error('Invalid credit operation ID.');
 

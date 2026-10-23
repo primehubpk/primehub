@@ -8,7 +8,7 @@ import { doc, onSnapshot } from "firebase/firestore";
 import { CheckCircle2, ChevronRight, Gift, Users } from "lucide-react";
 import HomeRailFrame from './HomeRailFrame';
 import { auth, db } from "@/lib/firebase";
-import { DEFAULT_MONTHLY_CHALLENGE, DEFAULT_RESELLER_TASKS, type ResellerTask } from "@/lib/resellerTasks";
+import { DEFAULT_MONTHLY_CHALLENGE, DEFAULT_RESELLER_TASKS, shoppingRewardDescription, type ResellerTask } from "@/lib/resellerTasks";
 import { getResellerTiers } from "@/lib/resellerTiers";
 import type { ResellerProfile, ResellerTier } from "@/lib/resellerTypes";
 import { useSettings } from "@/lib/useSettings";
@@ -89,21 +89,16 @@ export default function HomeResellerLiveRail({initialProducts=[]}:{initialProduc
   const prizes=orderPremiumWheelPrizes((rewardSettings.spinWheelSlots||[]).filter(p=>p.active!==false&&Number(p.stock??1)>0));
   const today=dayKey(); const guestWallet=typeof window!=="undefined"?readGuestWallet():{}; const usedSpin=wallet.lastSpin===today||guestWallet.lastSpin===today;
   const streak=Math.max(0,Math.min(7,Number(wallet.streak||0))); const monthlyOrders=Math.max(0,Number(profile?.monthlyOrders||0));
-  const cashAvailable=Math.max(0,Number(profile?.walletAvailable||0)); const cashPending=Math.max(0,Number(profile?.walletPending||0));
+  const cashAvailable=Math.max(0,Number(profile?.walletAvailable||0))+Math.max(0,Number(profile?.walletShopping||0)); const cashPending=Math.max(0,Number(profile?.walletPending||0));
   const currentTier=tiers.reduce((selected,tier)=>monthlyOrders>=Number(tier.minMonthlyOrders||0)?tier:selected,tiers[0]);
   const resellerName=cleanResellerName(profile,user);
   const challenge={...DEFAULT_MONTHLY_CHALLENGE,...(source.resellerMonthlyChallenge||{})}; const target=Math.max(1,Number(challenge.targetOrders||10)); const vi=source.resellerVoucherImages||{};
   const vouchers:Voucher[]=[
-    {id:"cash-500",title:"Rs. 500 Cash",description:"Credit to wallet",requirement:"5 orders",icon:"₨",art:"#0E7C6F",minOrders:5,imageUrl:vi["cash-500"]},
-    {id:"challenge-cash",title:`Rs. ${Number(challenge.cashReward||0).toLocaleString()} Cash`,description:"Monthly challenge",requirement:`${target} orders`,icon:"₨",art:"#127C6A",minOrders:target,imageUrl:vi["challenge-cash"]},
     {id:"challenge-gift",title:challenge.giftTitle||"PrimeHub Gift Box",description:"Surprise bangles gift",requirement:`${target} orders`,icon:"🎁",art:"#D94B3D",minOrders:target,imageUrl:vi["challenge-gift"]},
     {id:"bridal-gift",title:"Bridal Gift Voucher",description:"Free bridal pouch",requirement:"Gold tier",icon:"💍",art:"#9B2C4A",minOrders:8,imageUrl:vi["bridal-gift"]},
     {id:"wholesale-off",title:"10% Wholesale Off",description:"Next wholesale order",requirement:"3 orders",icon:"%",art:"#E85D04",minOrders:3,imageUrl:vi["wholesale-off"]},
     {id:"free-delivery",title:"Free Delivery",description:"On any one order",requirement:"2 orders",icon:"📦",art:"#1D4E89",minOrders:2,imageUrl:vi["free-delivery"]},
-    {id:"jazzcash-300",title:"JazzCash Rs. 300",description:"Payout voucher",requirement:"8 orders",icon:"📱",art:"#C1121F",minOrders:8,imageUrl:vi["jazzcash-300"]},
-    {id:"easypaisa-300",title:"EasyPaisa Rs. 300",description:"Payout voucher",requirement:"8 orders",icon:"📱",art:"#2A9D8F",minOrders:8,imageUrl:vi["easypaisa-300"]},
     {id:"kids-gift",title:"Kids Deal Box Gift",description:"Kids gift voucher",requirement:"6 orders",icon:"🎀",art:"#7B4B94",minOrders:6,imageUrl:vi["kids-gift"]},
-    {id:"elite-cash",title:"Rs. 2,000 Elite",description:"Elite members only",requirement:"Elite 40+",icon:"👑",art:"#C9A227",minOrders:40,imageUrl:vi["elite-cash"]},
   ];
   if(source.resellerHomeEnabled===false)return null;
 
@@ -157,7 +152,7 @@ ${url||location.origin}`)}`,"_blank","noopener,noreferrer");return;}if(url)windo
       <div className="ph-live-row">
         <article className="ph-card ph-check" id="reseller-rewards"><small>WEEKLY STREAK</small><div className="ph-title"><h3>7-Day Check-in</h3><b>{streak}/7</b></div><div className="ph-days">{Array.from({length:7},(_,i)=><span key={i} className={i<streak?"done":""}>D{i+1}<b>+{rewardSettings.checkInRewards?.[i]||0}</b></span>)}</div><button onClick={()=>void checkIn()} disabled={busy||wallet.lastCheckIn===today}><CheckCircle2 size={14}/>{wallet.lastCheckIn===today?"Done today":"Check in"}</button></article>
         <article className="ph-card ph-wheel"><PremiumSpinWheel prizes={prizes} rotation={rotation} compact /><button onClick={()=>void spin()} disabled={busy||usedSpin||!prizes.length}>{usedSpin?"Come tomorrow":busy?"Spinning…":"Spin the wheel"}</button></article>
-        {tasks.map((task,index)=><article className="ph-card ph-task" id={index===0?"reseller-tasks":undefined} key={task.id}><div className="ph-task-head"><span>{task.icon||"✓"}</span><b>+{Number(task.reward||0)}</b></div><h4>{task.title}</h4><p>{task.description}</p><div className="ph-task-state">{events.includes(task.id)?"Completed — login to claim":"Admin task"}</div><button onClick={()=>openTask(task)}>{events.includes(task.id)&&!user?"Login to claim":"Start task"}<ChevronRight size={12}/></button></article>)}
+        {tasks.map((task,index)=><article className="ph-card ph-task" id={index===0?"reseller-tasks":undefined} key={task.id}><div className="ph-task-head"><span>{task.icon||"✓"}</span><b>+{Number(task.reward||0)}</b></div><h4>{task.title}</h4><p>{shoppingRewardDescription(task.description)}</p><div className="ph-task-state">{events.includes(task.id)?"Completed — login to claim":"Admin task"}</div><button onClick={()=>openTask(task)}>{events.includes(task.id)&&!user?"Login to claim":"Start task"}<ChevronRight size={12}/></button></article>)}
         {topGifts.map(g=><GiftCard key={g.id} gift={g}/>) }
       </div>
       <div className="ph-live-row">
@@ -166,8 +161,8 @@ ${url||location.origin}`)}`,"_blank","noopener,noreferrer");return;}if(url)windo
             <div className="ph-wallet-profile-icon"><Users size={18}/></div>
             {user?<div className="ph-wallet-profile-copy"><strong>{resellerName}</strong><span>{currentTier?.name||"Starter"} · {Number(currentTier?.discountPercent||0)}% CASHBACK · {monthlyOrders} orders</span></div>:<div className="ph-wallet-profile-copy"><strong>Reseller profile</strong><span>Login to see tier & cashback</span></div>}
           </div>
-          <div className="ph-wallet-grid"><div><span>CASH WALLET</span><strong>Rs. {cashAvailable.toLocaleString()}</strong><b>Pending Rs. {cashPending.toLocaleString()}</b></div><div><span>POINTS WALLET</span><strong>{Number(wallet.points||0).toLocaleString()}</strong><b>Reward points</b></div></div>
-          <Link href={user?"/reseller/wallet":"/reseller/dashboard"} prefetch={false}>{user?"History & withdrawal":"Login to wallet"}</Link>
+          <div className="ph-wallet-grid"><div><span>SHOPPING WALLET</span><strong>Rs. {cashAvailable.toLocaleString()}</strong><b>Pending Rs. {cashPending.toLocaleString()}</b></div><div><span>POINTS WALLET</span><strong>{Number(wallet.points||0).toLocaleString()}</strong><b>Reward points</b></div></div>
+          <Link href={user?"/reseller/wallet":"/reseller/dashboard"} prefetch={false}>{user?"Wallet details":"Login to wallet"}</Link>
         </article>
         {tiers.map((tier,index)=>{const current=monthlyOrders>=tier.minMonthlyOrders&&(index===tiers.length-1||monthlyOrders<tiers[index+1].minMonthlyOrders);const need=Math.max(0,tier.minMonthlyOrders-monthlyOrders);return <article className={`ph-card ph-tier ph-tier-${Math.min(index+1,4)} ${current?"current":""}`} id={index===0?"reseller-tiers":undefined} key={tier.id}><div className="ph-tier-top"><span>{index+1}</span>{current?<em>CURRENT</em>:null}</div><h4>{tier.name}</h4><small>{tier.minMonthlyOrders}+ monthly orders</small><div className="ph-tier-discount"><strong>{Number(tier.discountPercent||0)}%</strong><i> CASHBACK</i></div><ul>{(tier.benefits||[]).slice(0,3).map(x=><li key={x}>✓ {x}</li>)}</ul><div className="ph-tier-status">{current?"Your current tier":need?`Need ${need} orders`:"Unlocked"}</div></article>})}
         {vouchers.map(v=>{const unlocked=monthlyOrders>=v.minOrders;const image=v.imageUrl||premiumVoucherImage(v.title,v.art,v.icon);return <article className="ph-card ph-voucher" key={v.id}><div className="ph-voucher-art"><img src={image} alt={v.title}/><span className={unlocked?"unlocked":""}>{unlocked?"Unlocked":"🔒 Locked"}</span></div><div className="ph-voucher-copy"><h4>{v.title}</h4><p>{v.description}</p><b>{v.requirement}</b></div></article>})}

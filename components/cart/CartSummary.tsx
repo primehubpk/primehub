@@ -77,13 +77,13 @@ export default function CartSummary({
             Apply
           </button>
         </div>
-        {voucherCode && quote && !loading && (quote.voucherKind === 'cashback' || quote.voucherKind === 'cash') && <p className="mt-2 text-[10px] font-extrabold text-[#0F6A5F]">Promo replaces tier cashback (never stacked): {quote.voucherKind === 'cashback' ? String(quote.voucherCashbackPercent || 0) + '% cashback; ' : 'Fixed cash voucher; '}Rs. {Number(quote.voucherCashAmount || 0).toLocaleString()} Cash Wallet credit after delivery.</p>}
+        {voucherCode && quote && !loading && (quote.voucherKind === 'cashback' || quote.voucherKind === 'cash') && <p className="mt-2 text-[10px] font-extrabold text-[#0F6A5F]">Promo replaces tier cashback (never stacked): {quote.voucherKind === 'cashback' ? String(quote.voucherCashbackPercent || 0) + '% cashback; ' : 'Fixed cash voucher; '}Rs. {Number(quote.voucherCashAmount || 0).toLocaleString()} shopping credit after delivery.</p>}
         {voucherCode && quote && !loading && quote.voucherKind === 'referral' && <p role="status" className="mt-2 text-[10px] font-extrabold text-[#0F6A5F]">Friend code accepted! The code owner can earn {quote.referralPercent || 0}% (estimated Rs. {Number(quote.referralCashEstimate || 0).toLocaleString()}) after this qualifying order is Delivered. This is the inviter's cashback, NOT an extra buyer discount or tier reward.</p>}
         {voucherCode && quote && !loading && quote.voucherKind !== 'cashback' && quote.voucherKind !== 'cash' && quote.voucherKind !== 'referral' && <p role="status"  className="mt-2 text-[10px] font-extrabold text-[#0F6A5F]">
           {Number(quote.voucherDiscount || 0) > 0
             ? `Rs. ${Number(quote.voucherDiscount).toLocaleString()} checkout discount applied.`
             : Number(quote.voucherCashAmount || 0) > 0
-              ? `Rs. ${Number(quote.voucherCashAmount).toLocaleString()} cash wallet credit after Delivered.`
+              ? `Rs. ${Number(quote.voucherCashAmount).toLocaleString()} shopping credit after Delivered.`
               : 'Voucher not applied.'}
         </p>}
         <p className="mt-2 text-[9px] leading-4 text-black/50">

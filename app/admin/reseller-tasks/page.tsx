@@ -9,13 +9,13 @@ import RewardsManager from '@/components/admin/RewardsManagerCatalogBridge';
 import { setAdminDocument, uploadImageToImgBB } from '@/components/admin/shared';
 import { db } from '@/lib/firebase';
 import { DEFAULT_RESELLER_TIERS, type ResellerTier } from '@/lib/resellerTypes';
-import { DEFAULT_MONTHLY_CHALLENGE, DEFAULT_RESELLER_TASKS, type MonthlyChallengeSettings, type ResellerTask } from '@/lib/resellerTasks';
+import { DEFAULT_MONTHLY_CHALLENGE, DEFAULT_RESELLER_TASKS, shoppingRewardDescription, type MonthlyChallengeSettings, type ResellerTask } from '@/lib/resellerTasks';
 
 const settingsRef = doc(db, 'settings', 'main');
 const voucherFields = [
-  ['cash-500', 'Rs. 500 Cash'], ['challenge-cash', 'Monthly Cash'], ['challenge-gift', 'PrimeHub Gift Box'],
+  ['challenge-gift', 'PrimeHub Gift Box'],
   ['bridal-gift', 'Bridal Gift'], ['wholesale-off', 'Wholesale Discount'], ['free-delivery', 'Free Delivery'],
-  ['jazzcash-300', 'JazzCash Rs. 300'], ['easypaisa-300', 'EasyPaisa Rs. 300'], ['kids-gift', 'Kids Gift Box'], ['elite-cash', 'Elite Cash'],
+  ['kids-gift', 'Kids Gift Box'],
 ] as const;
 
 type AdminView = 'tasks' | 'rewards';
@@ -44,7 +44,7 @@ export default function ResellerTasksAdminPage() {
 
   useEffect(() => onSnapshot(settingsRef, snapshot => {
     const data: any = snapshot.data() || {};
-    if (Array.isArray(data.resellerTasks)) setTasks(data.resellerTasks.map((task: ResellerTask) => ({ ...DEFAULT_RESELLER_TASKS.find(item => item.id === task.id), ...task })));
+    if (Array.isArray(data.resellerTasks)) setTasks(data.resellerTasks.map((task: ResellerTask) => ({ ...DEFAULT_RESELLER_TASKS.find(item => item.id === task.id), ...task, description: shoppingRewardDescription(task.description) })));
     if (data.resellerMonthlyChallenge) setChallenge({ ...DEFAULT_MONTHLY_CHALLENGE, ...data.resellerMonthlyChallenge });
     setVoucherImages(data.resellerVoucherImages || {});
     if (Array.isArray(data.resellerTiers) && data.resellerTiers.length) setTiers(data.resellerTiers);
@@ -71,7 +71,7 @@ export default function ResellerTasksAdminPage() {
   async function save() {
     setSaving(true); setSaved(false); setMessage('');
     try {
-      await setAdminDocument('settings', 'main', { resellerTasks: tasks, resellerMonthlyChallenge: challenge, resellerVoucherImages: voucherImages, resellerTiers: tiers, updatedAt: new Date().toISOString() });
+      await setAdminDocument('settings', 'main', { resellerTasks: tasks.map(task => ({ ...task, description: shoppingRewardDescription(task.description) })), resellerMonthlyChallenge: { ...challenge, cashReward: 0 }, resellerVoucherImages: voucherImages, resellerTiers: tiers, updatedAt: new Date().toISOString() });
       setSaved(true); setMessage('Reseller settings saved successfully. Home and Reseller Club will read the same settings.');
       window.setTimeout(() => setSaved(false), 1800);
     } catch (error) { setMessage(error instanceof Error ? error.message : 'Could not save reseller settings.'); }
@@ -158,7 +158,7 @@ export default function ResellerTasksAdminPage() {
               <Field label="Icon / emoji"><input value={task.icon || ''} onChange={e => updateTask(task.id, { icon: e.target.value })} className="admin-input"/></Field>
               <Field label="Description" wide><textarea rows={3} value={task.description} onChange={e => updateTask(task.id, { description: e.target.value })} className="admin-input resize-none"/></Field>
               <Field label={task.id === 'refer-reseller' ? 'Destination link (optional)' : 'Task link'}><input value={task.url || ''} onChange={e => updateTask(task.id, { url: e.target.value })} placeholder="https://..." className="admin-input"/>{task.id === 'refer-reseller' ? <small className="mt-1 block text-[9px] leading-4 text-black/40">Leave empty for automatic referral link.</small> : null}</Field>
-              <Field label="Reward points / cash"><input type="number" min="0" value={task.reward} onChange={e => updateTask(task.id, { reward: Math.max(0, Number(e.target.value) || 0) })} className="admin-input"/></Field>
+              <Field label="Reward points (no cash transfer)"><input type="number" min="0" value={task.reward} onChange={e => updateTask(task.id, { reward: Math.max(0, Number(e.target.value) || 0) })} className="admin-input"/></Field>
               <Field label="Share message" wide><textarea rows={2} value={task.shareText || ''} onChange={e => updateTask(task.id, { shareText: e.target.value })} placeholder="Message customer will share..." className="admin-input resize-none"/></Field>
               <Field label="Verification"><select value={task.verification} onChange={e => updateTask(task.id, { verification: e.target.value as ResellerTask['verification'] })} className="admin-input"><option value="manual">Manual / proof</option><option value="link">Link/open</option></select></Field>
               <div className="flex items-end gap-2"><button type="button" onClick={() => updateTask(task.id, { active: !task.active })} className={`flex-1 rounded-xl py-3 text-[9px] font-black ${task.active ? 'bg-[#DDF5F0] text-[#0F806E]' : 'bg-black/5 text-black/45'}`}>{task.active ? 'Task ON' : 'Task OFF'}</button><button type="button" onClick={() => removeTask(task.id)} className="rounded-xl bg-red-50 p-3 text-red-700" aria-label="Delete task"><Trash2 size={14}/></button></div>
@@ -173,7 +173,6 @@ export default function ResellerTasksAdminPage() {
           <div className="mt-4 space-y-3">
             <Field label="Target orders"><input type="number" min="1" value={challenge.targetOrders} onChange={e => setChallenge(value => ({ ...value, targetOrders: Math.max(1, Number(e.target.value) || 1) }))} className="admin-input"/></Field>
             <Field label="Gift title"><input value={challenge.giftTitle} onChange={e => setChallenge(value => ({ ...value, giftTitle: e.target.value }))} className="admin-input"/></Field>
-            <Field label="Cash option (Rs.)"><input type="number" min="0" value={challenge.cashReward} onChange={e => setChallenge(value => ({ ...value, cashReward: Math.max(0, Number(e.target.value) || 0) }))} className="admin-input"/></Field>
             <button type="button" onClick={() => setChallenge(value => ({ ...value, active: !value.active }))} className={`w-full rounded-xl py-3 text-[10px] font-black ${challenge.active ? 'bg-[#DDF5F0] text-[#0F806E]' : 'bg-black/5 text-black/45'}`}>Challenge {challenge.active ? 'ON' : 'OFF'}</button>
           </div>
         </section>

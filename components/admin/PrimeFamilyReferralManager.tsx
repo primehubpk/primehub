@@ -53,7 +53,7 @@ export default function PrimeFamilyReferralManager() {
     <p className="mt-1 text-xs leading-5 text-black/55">
       Each active member gets a permanent unique code such as PRIMEFAMILY1, PRIMEFAMILY2, etc.
       When another signed-in customer uses that code on a qualifying order,
-      the <b>code owner</b> earns a percent of eligible items in their Cash Wallet, only once the order is marked Delivered.
+      the <b>code owner</b> earns a percent of eligible items in PrimeHub shopping credits, only once the order is marked Delivered.
       The buyer does not receive a second tier/promo cashback on that order. Self-referrals and duplicate payment for the same order are blocked.
       Big Deal and Weekly Deal products are excluded.
     </p>
@@ -62,7 +62,7 @@ export default function PrimeFamilyReferralManager() {
         ? report.welcomeBonus.enabled ? 'Enabled' : 'Not enabled'
         : 'Checking…'} · Rs. {report?.welcomeBonus.rupees ?? 100}.
       The Rs100 is credited only after eligible verified native-app sign-in and one-device/account checks.
-      Downloading alone does not credit cash. Withdrawal requires the published minimum and approval.
+      Downloading alone does not credit a reward. New referral rewards are shopping-only and non-withdrawable.
     </div>
     <div className="mt-4 flex flex-wrap items-center gap-4 rounded-xl bg-[#F2FAF7] p-4">
       <label className="flex items-center gap-2 text-xs font-black">

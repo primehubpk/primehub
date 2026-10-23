@@ -27,7 +27,7 @@ export async function GET(request: Request) {
       : codes.exists ? [codes] : [];
     return NextResponse.json({
       settings,
-      welcomeBonus: { enabled: bonusIsEnabled(), rupees: PLAY_INSTALL_BONUS_RUPEES, note: 'Google Play native-app installation and verified login only; one per account/device. Cash withdrawal has conditions.' },
+      welcomeBonus: { enabled: bonusIsEnabled(), rupees: PLAY_INSTALL_BONUS_RUPEES, note: 'Google Play native-app installation and verified login only; one per account/device. Shopping-only credit; no withdrawal for new rewards.' },
       codes: shownCodes.map(d => ({
         code: String(d.data()?.code || ''),
         ownerEmail: String(d.data()?.ownerEmail || ''),

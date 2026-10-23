@@ -61,12 +61,12 @@ export default function PrimeFamilyWelcomePopup({
             <p className="flex items-center gap-2 text-[12px] font-black text-[#785210]"><Wallet size={16}/> Rs. 100 Welcome Reward</p>
             <p className="mt-1 text-[11px] leading-5 text-[#6C5E44]">
               {reward.credited
-                ? <>🎉 <b>Rs.100 aapke Cash Wallet mein credit ho gaye!</b></>
+                ? <>🎉 <b>Rs.100 shopping reward aapke PrimeHub wallet mein add ho gaya!</b></>
                 : reward.nativeApp
                   ? <>Eligible Play Store app signup/login aur device verification ke baad <b>Rs.100 mil sakte hain.</b> Wallet mein credit hone par confirmation milegi.</>
-                  : <>Play Store wali PrimeHub app mein eligible pehli login aur verification par <b>Rs.100 welcome reward</b> mil sakta hai. Website signup par cash credit nahi hua.</>}
+                  : <>Play Store wali PrimeHub app mein eligible pehli login aur verification par <b>Rs.100 shopping reward</b> mil sakta hai. Website signup par cash credit nahi hua.</>}
             </p>
-            <p className="mt-1 text-[10px] text-[#897A5F]">Cash withdrawal minimum Rs.500, verification aur approval ke baad.</p>
+            <p className="mt-1 text-[10px] text-[#897A5F]">Reward PrimeHub shopping par use hota hai; cash withdrawal ya transfer nahi.</p>
           </div>
           <p className="mt-4 text-center text-[10px] font-black uppercase tracking-[.13em] text-[#0F6A5F]">Aapka unique referral code</p>
           <div className="mt-2 rounded-[18px] border border-dashed border-[#1A8A79]/50 bg-[#F1FAF6] px-4 py-3.5 text-center">
@@ -75,7 +75,7 @@ export default function PrimeFamilyWelcomePopup({
           </div>
           <div className="mt-3 rounded-xl bg-[#F6F7F5] p-3 text-[11px] leading-[1.65] text-[#35433D]">
             <p className="font-black">Family aur friends ko invite karein 👇</p>
-            <p>Jab koi doosra customer aapka code qualifying order mein use kare aur order <b>Delivered</b> ho, aapko {reward.percent}% cashback Cash Wallet mein milega. {reward.enabled ? '' : 'Offer Admin activation ke baad valid hoga.'}</p>
+            <p>Jab koi doosra customer aapka code qualifying order mein use kare aur order <b>Delivered</b> ho, aapko {reward.percent}% cashback PrimeHub shopping wallet mein milega. {reward.enabled ? '' : 'Offer Admin activation ke baad valid hoga.'}</p>
             <p className="mt-1 text-[10px] text-[#7A817A]">Friend ko is referral order par extra tier cashback nahi milta. Weekly aur Big Deal items excluded hain.</p>
           </div>
           <div className="mt-4 flex gap-2">

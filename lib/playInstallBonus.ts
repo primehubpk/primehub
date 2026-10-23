@@ -24,7 +24,7 @@ export function deviceDigest(androidId: string) {
 }
 
 export type PlayBonusResult =
-  | { credited: true; amount: number; walletAvailable: number }
+  | { credited: true; amount: number; walletShopping: number; walletAvailable: number }
   | { credited: false; alreadyClaimed: true; reason: 'account' | 'device' };
 
 /** Firebase transaction guarantees at most one bonus per UID and submitted
@@ -43,47 +43,52 @@ export async function claimPlayInstallBonus(
   const accountRef = db.collection('reseller_play_install_claims').doc(uid);
   const deviceRef = db.collection('reseller_play_install_devices').doc(hash);
   const auditRef = db.collection('reseller_wallet_credits').doc('play-install:' + uid);
+  const shoppingRef = db.collection('reseller_shopping_wallets').doc(uid);
 
   const outcome = await db.runTransaction(async tx => {
-    const [profile, accountClaim, deviceClaim, audit] = await Promise.all([
-      tx.get(profileRef), tx.get(accountRef), tx.get(deviceRef), tx.get(auditRef),
+    const [profile, accountClaim, deviceClaim, audit, shoppingDoc] = await Promise.all([
+      tx.get(profileRef), tx.get(accountRef), tx.get(deviceRef), tx.get(auditRef), tx.get(shoppingRef),
     ]);
     // The ledger also prevents repayment if account marker was manually removed.
     if (accountClaim.exists || audit.exists) return { credited: false, alreadyClaimed: true, reason: 'account' } as const;
     if (deviceClaim.exists) return { credited: false, alreadyClaimed: true, reason: 'device' } as const;
     const current = profile.data();
     if (profile.exists && current?.status !== 'active') throw new Error('Your account is not active.');
-    const available = Number(current?.walletAvailable ?? 0);
-    if (!Number.isSafeInteger(available) || available < 0 ||
-      !Number.isSafeInteger(available + PLAY_INSTALL_BONUS_RUPEES)) throw new Error('Invalid cash wallet balance.');
+    const legacyAvailable = Number(current?.walletAvailable ?? 0);
+    const shopping = Number(shoppingDoc.data()?.balance ?? 0);
+    if (!Number.isSafeInteger(shopping) || shopping < 0 ||
+        !Number.isSafeInteger(shopping + PLAY_INSTALL_BONUS_RUPEES)) throw new Error('Invalid shopping wallet balance.');
 
     if (!profile.exists) {
       // Reuse the existing reseller profile/wallet for an already-signed-in
       // email/password account. No separate signup or new auth provider.
       tx.create(profileRef, {
         userId: uid, email, displayName: '', status: 'active', tierId: 'starter',
-        monthlyOrders: 0, walletAvailable: PLAY_INSTALL_BONUS_RUPEES,
-        walletPending: 0, walletShopping: 0,
+        monthlyOrders: 0, walletAvailable: 0,
+        walletPending: 0, walletShopping: shopping + PLAY_INSTALL_BONUS_RUPEES,
         createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp(),
       });
     } else {
       tx.update(profileRef, {
-        walletAvailable: available + PLAY_INSTALL_BONUS_RUPEES,
+        walletShopping: shopping + PLAY_INSTALL_BONUS_RUPEES,
         updatedAt: FieldValue.serverTimestamp(),
       });
     }
+    tx.set(shoppingRef, { userId: uid, balance: shopping + PLAY_INSTALL_BONUS_RUPEES,
+      updatedAt: FieldValue.serverTimestamp() }, { merge: true });
     const record = { uid, amount: PLAY_INSTALL_BONUS_RUPEES, createdAt: FieldValue.serverTimestamp() };
     tx.create(accountRef, record);
     tx.create(deviceRef, record);
     tx.create(auditRef, {
       userId: uid, amount: PLAY_INSTALL_BONUS_RUPEES,
-      type: 'play_install_bonus', purpose: 'withdrawable',
+      type: 'play_install_bonus', purpose: 'shopping',
       reason: 'PrimeHub Google Play app welcome reward (one time)',
       createdAt: FieldValue.serverTimestamp(),
     });
     return {
       credited: true, amount: PLAY_INSTALL_BONUS_RUPEES,
-      walletAvailable: available + PLAY_INSTALL_BONUS_RUPEES,
+      walletShopping: shopping + PLAY_INSTALL_BONUS_RUPEES,
+      walletAvailable: legacyAvailable, // backward-compatible response field; never credits cash
     } as const;
   });
 

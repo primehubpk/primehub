@@ -7,7 +7,7 @@ import { collection, doc, onSnapshot } from "firebase/firestore";
 import { ArrowRight, CheckCircle2, ChevronRight, Gift, History, Instagram, Music2, PlayCircle, Share2, WalletCards } from "lucide-react";
 import { auth, db } from "@/lib/firebase";
 import { normalizeImageUrl } from "@/lib/imageUrl";
-import { DEFAULT_MONTHLY_CHALLENGE, DEFAULT_RESELLER_TASKS, type MonthlyChallengeSettings, type ResellerTask } from "@/lib/resellerTasks";
+import { DEFAULT_MONTHLY_CHALLENGE, DEFAULT_RESELLER_TASKS, shoppingRewardDescription, type MonthlyChallengeSettings, type ResellerTask } from "@/lib/resellerTasks";
 import { getResellerTiers } from "@/lib/resellerTiers";
 import type { ResellerProfile, ResellerTier } from "@/lib/resellerTypes";
 import { useSettings } from "@/lib/useSettings";
@@ -40,7 +40,7 @@ function readOrders(): OrderProgress[] { try { const parsed = JSON.parse(window.
 function readTaskEvents(): string[] { try { const parsed = JSON.parse(window.localStorage.getItem(TASK_EVENT_KEY) || "[]"); return Array.isArray(parsed) ? parsed.map(String) : []; } catch { return []; } }
 function saveTaskEvent(taskId: string) { try { const list = readTaskEvents(); if (!list.includes(taskId)) window.localStorage.setItem(TASK_EVENT_KEY, JSON.stringify([...list, taskId])); window.dispatchEvent(new Event("primehub:reseller-progress")); } catch {} }
 function taskIcon(id: string) { if (id === "youtube") return PlayCircle; if (id === "instagram") return Instagram; if (id === "tiktok") return Music2; if (id === "whatsapp-share" || id === "refer-reseller") return Share2; return CheckCircle2; }
-function taskRewardLabel(task: ResellerTask) { return CASH_TASK_IDS.has(task.id) ? `Rs. ${Number(task.reward || 0).toLocaleString()}` : `+${Number(task.reward || 0)}`; }
+function taskRewardLabel(task: ResellerTask) { return '+' + String(Number(task.reward || 0)) + ' points'; }
 function premiumVoucherImage(title: string, art: string, icon: string) { const safe = title.replace(/[<>&]/g, ""); const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='640' height='360'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop stop-color='${art}'/><stop offset='1' stop-color='#14140F'/></linearGradient></defs><rect width='640' height='360' rx='36' fill='url(#g)'/><text x='52' y='142' font-size='78'>${icon}</text><text x='52' y='230' fill='white' font-size='34' font-weight='800'>${safe}</text><text x='52' y='276' fill='white' opacity='.72' font-size='18'>PRIMEHUB PREMIUM REWARD</text></svg>`; return `data:image/svg+xml,${encodeURIComponent(svg)}`; }
 function localProgress(orders: OrderProgress[]) {
   const now = new Date();
@@ -116,16 +116,11 @@ export default function HomeResellerUnified() {
   const target = Math.max(1, Number(challenge.targetOrders || 10));
   const voucherImages = homeSettings.resellerVoucherImages || {};
   const vouchers: Voucher[] = [
-    { id: "cash-500", title: "Rs. 500 Cash", description: "Credit to wallet", requirement: "5 orders", icon: "₨", art: "#0E7C6F", minOrders: 5, imageUrl: voucherImages["cash-500"] },
-    { id: "challenge-cash", title: `Rs. ${Number(challenge.cashReward || 0).toLocaleString()} Cash`, description: "Monthly challenge", requirement: `${target} orders`, icon: "₨", art: "#127C6A", minOrders: target, imageUrl: voucherImages["challenge-cash"] },
     { id: "challenge-gift", title: challenge.giftTitle || "PrimeHub Gift Box", description: "Surprise bangles gift", requirement: `${target} orders`, icon: "🎁", art: "#D94B3D", minOrders: target, imageUrl: voucherImages["challenge-gift"] },
     { id: "bridal-gift", title: "Bridal Gift Voucher", description: "Free bridal pouch", requirement: "Gold tier", icon: "💍", art: "#9B2C4A", minOrders: 25, imageUrl: voucherImages["bridal-gift"] },
     { id: "wholesale-off", title: "10% Wholesale Off", description: "Next wholesale order", requirement: "3 orders", icon: "%", art: "#E85D04", minOrders: 3, imageUrl: voucherImages["wholesale-off"] },
     { id: "free-delivery", title: "Free Delivery", description: "On any one order", requirement: "2 orders", icon: "📦", art: "#1D4E89", minOrders: 2, imageUrl: voucherImages["free-delivery"] },
-    { id: "jazzcash-300", title: "JazzCash Rs. 300", description: "Payout voucher", requirement: "8 orders", icon: "📱", art: "#C1121F", minOrders: 8, imageUrl: voucherImages["jazzcash-300"] },
-    { id: "easypaisa-300", title: "EasyPaisa Rs. 300", description: "Payout voucher", requirement: "8 orders", icon: "📱", art: "#2A9D8F", minOrders: 8, imageUrl: voucherImages["easypaisa-300"] },
     { id: "kids-gift", title: "Kids Deal Box Gift", description: "Kids gift voucher", requirement: "6 orders", icon: "🎀", art: "#7B4B94", minOrders: 6, imageUrl: voucherImages["kids-gift"] },
-    { id: "elite-cash", title: "Rs. 2,000 Elite", description: "Elite members only", requirement: "Elite 40+", icon: "👑", art: "#C9A227", minOrders: 40, imageUrl: voucherImages["elite-cash"] },
   ];
 
   const topBaseCount = 3 + tasks.length; const bottomBaseCount = tiers.length + vouchers.length;
@@ -207,9 +202,9 @@ export default function HomeResellerUnified() {
             {pendingGuestPrize ? <button className="hru-claim-button" type="button" onClick={() => void claimGuestPrize()}>{user ? "Claim reward" : "Login to claim"}</button> : null}
           </article>
 
-          {tasks.map((task, index) => { const Icon = taskIcon(task.id); const progress = taskProgress(task); const complete = progress.value >= progress.target; return <article className="hru-rail-card hru-task" id={index === 0 ? "reseller-tasks" : undefined} key={task.id}><div className="hru-task-top"><div className="hru-task-icon"><Icon size={18} /></div><span>{taskRewardLabel(task)}</span></div><h4>{task.title}</h4><p>{task.description}</p><b className={`hru-auto-task ${complete ? "complete" : ""}`}><CheckCircle2 size={12} />{Math.min(progress.value, progress.target)}/{progress.target} {complete ? "— reward unlocked" : "completed"}</b><button className="hru-task-open" type="button" onClick={() => void startTask(task)}>{complete && CASH_TASK_IDS.has(task.id) ? (user ? "Reward unlocked" : "Login to claim") : task.id === "whatsapp-share" ? "Share now" : task.id === "refer-reseller" ? "Share referral" : "Start task"}<ChevronRight size={12} /></button></article>; })}
+          {tasks.map((task, index) => { const Icon = taskIcon(task.id); const progress = taskProgress(task); const complete = progress.value >= progress.target; return <article className="hru-rail-card hru-task" id={index === 0 ? "reseller-tasks" : undefined} key={task.id}><div className="hru-task-top"><div className="hru-task-icon"><Icon size={18} /></div><span>{taskRewardLabel(task)}</span></div><h4>{task.title}</h4><p>{shoppingRewardDescription(task.description)}</p><b className={`hru-auto-task ${complete ? "complete" : ""}`}><CheckCircle2 size={12} />{Math.min(progress.value, progress.target)}/{progress.target} {complete ? "— reward unlocked" : "completed"}</b><button className="hru-task-open" type="button" onClick={() => void startTask(task)}>{complete && CASH_TASK_IDS.has(task.id) ? (user ? "Reward unlocked" : "Login to claim") : task.id === "whatsapp-share" ? "Share now" : task.id === "refer-reseller" ? "Share referral" : "Start task"}<ChevronRight size={12} /></button></article>; })}
 
-          <article className="hru-rail-card hru-wallet-card" id="reseller-wallet"><div className="hru-wallet-head"><WalletCards size={20} /><div><small>Withdrawal balance</small><strong>Rs. {cashAvailable.toLocaleString()}</strong></div></div><div className="hru-wallet-stats"><span>Shopping cash <b>Rs. {totalShoppingCash.toLocaleString()}</b></span><span>Pending withdrawal <b>Rs. {cashPending.toLocaleString()}</b></span><span>Points <b>{Number(wallet.points || 0).toLocaleString()}</b></span></div>{Number(wallet.freeDeliveryCredits || 0) > 0 ? <div className="hru-free-delivery">🎁 Free Delivery × {Number(wallet.freeDeliveryCredits || 0)}</div> : null}<div className="hru-wallet-actions"><Link href="/reseller/wallet"><History size={13} /> History</Link><Link href="/reseller/wallet">Withdraw <ArrowRight size={13} /></Link></div></article>
+          <article className="hru-rail-card hru-wallet-card" id="reseller-wallet"><div className="hru-wallet-head"><WalletCards size={20} /><div><small>Shopping balance</small><strong>Rs. {cashAvailable.toLocaleString()}</strong></div></div><div className="hru-wallet-stats"><span>Shopping cash <b>Rs. {totalShoppingCash.toLocaleString()}</b></span><span>Pending historical requests <b>Rs. {cashPending.toLocaleString()}</b></span><span>Points <b>{Number(wallet.points || 0).toLocaleString()}</b></span></div>{Number(wallet.freeDeliveryCredits || 0) > 0 ? <div className="hru-free-delivery">🎁 Free Delivery × {Number(wallet.freeDeliveryCredits || 0)}</div> : null}<div className="hru-wallet-actions"><Link href="/reseller/wallet"><History size={13} /> History</Link><Link href="/reseller/wallet">Wallet details <ArrowRight size={13} /></Link></div></article>
           {topGifts.map((gift, index) => renderGift(gift, index, index === 0))}
         </div>
 
