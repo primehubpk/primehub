@@ -62,24 +62,9 @@ export async function releaseMaturedResellerRewards(userId?: string) {
   return { released };
 }
 
-export async function createResellerWithdrawal(userId: string, amount: number, method: string, accountTitle: string, accountNumber: string, bankName = '') {
-  // Historical withdrawals are still retained for support and admin settlement.
-  // Never accept a new cash-out while shopping-only rewards are active.
+export async function createResellerWithdrawal(): Promise<never> {
+  // Historical records remain for admin settlement; do not recreate customer cash-outs.
   throw new Error('New withdrawal requests are disabled. Contact PrimeHub support about any pre-existing balance.');
-  if (!['easypaisa', 'jazzcash', 'bank'].includes(method)) throw new Error('Unsupported withdrawal method.');
-  if (!Number.isInteger(amount) || amount < 500) throw new Error('Minimum withdrawal is Rs. 500.');
-  if (!accountTitle.trim() || !accountNumber.trim()) throw new Error('Payout account details are required.');
-  if (method === 'bank' && !bankName.trim()) throw new Error('Bank name is required.');
-  const db = getAdminDb(), profileRef = db.collection('reseller_profiles').doc(userId), withdrawalRef = db.collection('reseller_withdrawals').doc();
-  await db.runTransaction(async tx => {
-    const profile = await tx.get(profileRef);
-    if (!profile.exists || profile.data()?.status !== 'active') throw new Error('Active reseller profile not found.');
-    const available = Math.max(0, Math.floor(n(profile.data()?.walletAvailable)));
-    if (amount > available) throw new Error('Withdrawal amount exceeds available balance.');
-    tx.update(profileRef, { walletAvailable: available - amount, updatedAt: FieldValue.serverTimestamp() });
-    tx.create(withdrawalRef, { id: withdrawalRef.id, userId, amount, method, bankName: method === 'bank' ? bankName.trim() : '', accountTitle: accountTitle.trim(), accountNumber: accountNumber.trim(), status: 'pending', createdAt: FieldValue.serverTimestamp() });
-  });
-  return { withdrawalId: withdrawalRef.id, status: 'pending' as const };
 }
 
 export async function reviewResellerWithdrawal(withdrawalId: string, action: 'approve' | 'reject' | 'paid', adminNote = '') {

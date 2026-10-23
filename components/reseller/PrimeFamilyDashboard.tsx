@@ -312,30 +312,7 @@ export default function PrimeFamilyDashboard({
 
   const vouchers = useMemo<Voucher[]>(
     () => [
-      {
-        id: 'cash-500',
-        imageUrl: voucherImages['cash-500'] || '',
-        type: 'cash',
-        title: 'Rs. 500 Cash',
-        description: 'Credit to wallet',
-        requirement: '5 orders',
-        icon: '₨',
-        art: '#0E7C6F',
-        minOrders: 5,
-        value: 500,
-      },
-      {
-        id: 'challenge-cash',
-        imageUrl: voucherImages['challenge-cash'] || '',
-        type: 'cash',
-        title: `Rs. ${Number(challenge.cashReward || 0).toLocaleString()} Cash`,
-        description: 'Monthly challenge',
-        requirement: `${target} orders`,
-        icon: '₨',
-        art: '#127C6A',
-        minOrders: target,
-        value: Number(challenge.cashReward || 0),
-      },
+
       {
         id: 'challenge-gift',
         imageUrl: voucherImages['challenge-gift'] || '',
@@ -392,20 +369,9 @@ export default function PrimeFamilyDashboard({
         art: '#7B4B94',
         minOrders: 6,
       },
-      {
-        id: 'elite-cash',
-        imageUrl: voucherImages['elite-cash'] || '',
-        type: 'cash',
-        title: 'Rs. 2,000 Elite',
-        description: 'Elite members only',
-        requirement: 'Elite 40+',
-        icon: '👑',
-        art: '#C9A227',
-        minOrders: 40,
-        value: 2000,
-      },
+
     ],
-    [challenge.cashReward, challenge.giftTitle, target, voucherImages],
+    [challenge.giftTitle, target, voucherImages],
   );
 
   const taskDestination = (task: ResellerTask): string => {
@@ -550,8 +516,8 @@ export default function PrimeFamilyDashboard({
           {(view === 'home' || view === 'tiers') && hasAdminTiers && <section className="rounded-[28px] border border-black/[.06] bg-[#FFFDF8] p-4 shadow-[0_16px_40px_rgba(20,20,15,.08)]"><div className="flex items-end justify-between gap-3"><div><p className="text-[9px] font-extrabold uppercase tracking-[.2em] text-[#B4871D]">Prime Loyalty Program</p><h2 className="mt-1 text-xl font-extrabold">Your reseller tiers</h2><p className="mt-1 text-[10px] text-black/45">Current tier: <b className="text-[#0E7C6F]">{tier.name}</b></p></div><span className="rounded-full bg-[#14140F] px-3 py-2 text-[9px] font-extrabold text-white">4 TIERS</span></div><div className="mt-4 grid grid-cols-2 gap-2.5 lg:grid-cols-4">{sortedTiers.map((item,index)=>{const active=item.id===tier.id;const colors=[['#7B3F1D','#F6D6B5'],['#59636E','#F1F5F8'],['#8A5A00','#FFE7A3'],['#171B2D','#B8C5FF']][index];const benefits=item.benefits?.length?item.benefits:['Cashback after delivery','Earn bonus rewards','Special tier offers'];return <article key={item.id} className={`relative overflow-hidden rounded-[20px] border p-3 transition ${active?'border-[#14140F] shadow-[0_12px_26px_rgba(20,20,15,.16)]':'border-black/[.07]'}`} style={{background:'linear-gradient(145deg,#FFFDF8,'+colors[1]+')'}}><div className="absolute -right-7 -top-8 h-24 w-24 rounded-full opacity-20" style={{backgroundColor:colors[1]}}/><div className="relative flex items-center justify-between"><div className="grid h-9 w-9 place-items-center rounded-xl text-xs font-extrabold text-white shadow-md" style={{background:'linear-gradient(145deg,'+colors[0]+','+colors[1]+')'}}>{index+1}</div>{active&&<span className="rounded-full bg-[#14140F] px-2.5 py-1 text-[8px] font-extrabold text-white">CURRENT</span>}</div><h3 className="relative mt-3 text-base font-extrabold">{item.name}</h3><p className="mt-1 text-[10px] font-bold text-black/40">{item.minMonthlyOrders}+ monthly orders</p><p className="mt-2 text-xl font-extrabold" style={{color:colors[0]}}>{Number(item.discountPercent||0)}% <span className="text-[10px] text-black/35">CASHBACK</span></p><div className="mt-3 space-y-1.5">{benefits.slice(0,4).map((benefit,n)=><p key={n} className="flex items-start gap-2 text-[9px] font-bold text-black/55"><span className="mt-0.5 grid h-3.5 w-3.5 shrink-0 place-items-center rounded-full bg-[#0E7C6F] text-[8px] text-white">✓</span>{/discount|member-only prices/i.test(benefit) ? 'Cashback credited after Delivered' : benefit}</p>)}</div><div className={`mt-3 rounded-xl py-2 text-center text-[9px] font-extrabold ${active?'bg-[#14140F] text-white':'bg-white text-black/45'}`}>{active?'Your current tier':index<=tierIndex?'Unlocked':`Need ${Math.max(0,item.minMonthlyOrders-monthlyOrders)} orders`}</div></article>})}</div></section>}
 
           {(view === 'home' || view === 'tasks') && <section id="club-tasks" className="rounded-[18px] bg-[#FFFDF8] p-3.5 shadow-[0_8px_24px_rgba(20,20,15,.05)]">
-            <div className="flex items-center justify-between"><div><span className="text-[10px] font-extrabold uppercase tracking-[.14em] text-[#E85D04]">Tasks</span><h2 className="mt-1 text-lg font-extrabold">Earn points & cash</h2></div><span className="rounded-full bg-[#E7F6F3] px-2 py-1 text-[11px] font-extrabold text-[#0E7C6F]">{activeTasks.length} live</span></div>
-            {challenge.active && <div className="mt-3 rounded-2xl bg-[#F6F1E8] p-3"><div className="flex items-center justify-between"><p className="text-xs font-extrabold">{target} orders = gift or cash</p><span className="text-[10px] font-extrabold text-[#0E7C6F]">{monthlyOrders}/{target}</span></div><Progress value={challengePercent}/><p className="text-[10px] text-[#6B6A62]">{remaining ? `${remaining} eligible orders remaining` : 'Challenge complete — choose your reward.'}</p></div>}
+            <div className="flex items-center justify-between"><div><span className="text-[10px] font-extrabold uppercase tracking-[.14em] text-[#E85D04]">Tasks</span><h2 className="mt-1 text-lg font-extrabold">Earn points & shopping rewards</h2></div><span className="rounded-full bg-[#E7F6F3] px-2 py-1 text-[11px] font-extrabold text-[#0E7C6F]">{activeTasks.length} live</span></div>
+            {challenge.active && <div className="mt-3 rounded-2xl bg-[#F6F1E8] p-3"><div className="flex items-center justify-between"><p className="text-xs font-extrabold">{target} orders = shopping reward or gift</p><span className="text-[10px] font-extrabold text-[#0E7C6F]">{monthlyOrders}/{target}</span></div><Progress value={challengePercent}/><p className="text-[10px] text-[#6B6A62]">{remaining ? `${remaining} eligible orders remaining` : 'Challenge complete — choose your reward.'}</p></div>}
             <div className="mt-2">{activeTasks.length ? activeTasks.map(task => <TaskRow
               key={task.id}
               task={task}
@@ -567,7 +533,7 @@ export default function PrimeFamilyDashboard({
 
           {(view === 'home' || view === 'vouchers') && <section>
             <div className="mb-2.5 flex items-center justify-between"><div><p className="text-[10px] font-extrabold uppercase tracking-[.14em] text-[#E85D04]">Vouchers</p><h2 className="mt-1 text-lg font-extrabold">Unlock your rewards</h2></div><span className="rounded-full bg-white px-3 py-2 text-[10px] font-extrabold shadow-sm">{vouchers.length} rewards</span></div>
-            <div className="mb-2.5 flex gap-1.5 overflow-x-auto pb-1">{(['all','cash','gift','discount','brand'] as VoucherFilter[]).map(item=><button key={item} type="button" onClick={()=>setFilter(item)} className={`whitespace-nowrap rounded-full px-3 py-2 text-[11px] font-bold capitalize ${filter===item?'bg-[#14140F] text-white':'bg-white text-[#6B6A62]'}`}>{item}</button>)}</div>
+            <div className="mb-2.5 flex gap-1.5 overflow-x-auto pb-1">{(['all','gift','discount','brand'] as VoucherFilter[]).map(item=><button key={item} type="button" onClick={()=>setFilter(item)} className={`whitespace-nowrap rounded-full px-3 py-2 text-[11px] font-bold capitalize ${filter===item?'bg-[#14140F] text-white':'bg-white text-[#6B6A62]'}`}>{item}</button>)}</div>
             <div className="grid grid-cols-2 gap-2.5 md:grid-cols-4">{filteredVouchers.map(voucher=><VoucherCard key={voucher.id} voucher={voucher} orders={monthlyOrders} onOpen={setSelectedVoucher}/>)}</div>
           </section>}
 

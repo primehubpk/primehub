@@ -116,14 +116,11 @@ export default function HomeResellerUnified() {
   const target = Math.max(1, Number(challenge.targetOrders || 10));
   const voucherImages = homeSettings.resellerVoucherImages || {};
   const vouchers: Voucher[] = [
-    { id: "cash-500", title: "Rs. 500 Cash", description: "Credit to wallet", requirement: "5 orders", icon: "₨", art: "#0E7C6F", minOrders: 5, imageUrl: voucherImages["cash-500"] },
-    { id: "challenge-cash", title: `Rs. ${Number(challenge.cashReward || 0).toLocaleString()} Cash`, description: "Monthly challenge", requirement: `${target} orders`, icon: "₨", art: "#127C6A", minOrders: target, imageUrl: voucherImages["challenge-cash"] },
     { id: "challenge-gift", title: challenge.giftTitle || "PrimeHub Gift Box", description: "Surprise bangles gift", requirement: `${target} orders`, icon: "🎁", art: "#D94B3D", minOrders: target, imageUrl: voucherImages["challenge-gift"] },
     { id: "bridal-gift", title: "Bridal Gift Voucher", description: "Free bridal pouch", requirement: "Gold tier", icon: "💍", art: "#9B2C4A", minOrders: 25, imageUrl: voucherImages["bridal-gift"] },
     { id: "wholesale-off", title: "10% Wholesale Off", description: "Next wholesale order", requirement: "3 orders", icon: "%", art: "#E85D04", minOrders: 3, imageUrl: voucherImages["wholesale-off"] },
     { id: "free-delivery", title: "Free Delivery", description: "On any one order", requirement: "2 orders", icon: "📦", art: "#1D4E89", minOrders: 2, imageUrl: voucherImages["free-delivery"] },
     { id: "kids-gift", title: "Kids Deal Box Gift", description: "Kids gift voucher", requirement: "6 orders", icon: "🎀", art: "#7B4B94", minOrders: 6, imageUrl: voucherImages["kids-gift"] },
-    { id: "elite-cash", title: "Rs. 2,000 Elite", description: "Elite members only", requirement: "Elite 40+", icon: "👑", art: "#C9A227", minOrders: 40, imageUrl: voucherImages["elite-cash"] },
   ];
 
   const topBaseCount = 3 + tasks.length; const bottomBaseCount = tiers.length + vouchers.length;
