@@ -57,3 +57,45 @@ test('admin and reseller screens emit no analytics and blocked scripts never bre
   b.window.fbq.callMethod = () => { throw new Error('blocked'); };
   assert.doesNotThrow(() => b.api.trackMetaStoreEvent('AddToCart', {value: 99, currency: 'PKR'}));
 });
+
+test('configured Android bridge receives catalog events without duplicating browser conversions', () => {
+  const b = browser('/product/p1');
+  const native = [];
+  b.window.PrimeHubMeta = { postMessage: data => native.push(JSON.parse(data)) };
+  b.api.trackMetaPageView();
+  b.api.trackMetaStoreEvent('ViewContent', {
+    contents: [{ content_id: 'p1', num_items: 2, price: 299 }], value: 598, currency: 'PKR',
+    customer: { phone: 'private', address: 'private' },
+  });
+  assert.equal(b.scripts.length, 0);
+  assert.equal(native.length, 1);
+  assert.equal(native[0].event, 'ViewContent');
+  assert.equal(native[0].contents[0].id, 'p1');
+  assert.equal(native[0].contents[0].quantity, 2);
+  assert.equal(native[0].value, 598);
+  assert.equal(JSON.stringify(native).includes('private'), false);
+});
+
+test('native successful-order tracking is once per order and respects protected routes', () => {
+  const b = browser('/checkout');
+  const native = [];
+  b.window.PrimeHubMeta = { postMessage: data => native.push(JSON.parse(data)) };
+  const id = 'order_550e8400-e29b-41d4-a716-446655440000';
+  b.api.trackMetaStoreEvent('PlaceAnOrder', { value: 299, currency: 'PKR' }, id);
+  b.api.trackMetaStoreEvent('PlaceAnOrder', { value: 299, currency: 'PKR' }, id);
+  b.window.location.pathname = '/admin/orders';
+  b.api.trackMetaStoreEvent('AddToCart', { value: 100 });
+  assert.equal(native.length, 1);
+  assert.equal(native[0].event, 'Purchase');
+  assert.equal(native[0].eventId, id);
+});
+
+test('older app bridge keeps website tracking and failed native delivery falls back safely', () => {
+  const b = browser('/product/p1');
+  b.window.PrimeHubNative = { postMessage: () => {} };
+  b.api.trackMetaStoreEvent('AddToCart', { value: 99, currency: 'PKR' });
+  assert.equal(b.events().at(-1)[2], 'AddToCart');
+  b.window.PrimeHubMeta = { postMessage: () => { throw new Error('bridge closed'); } };
+  assert.doesNotThrow(() => b.api.trackMetaStoreEvent('InitiateCheckout', { value: 99 }));
+  assert.equal(b.events().at(-1)[2], 'InitiateCheckout');
+});

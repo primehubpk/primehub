@@ -15,7 +15,10 @@ type MetaTracker = {
 };
 
 declare global {
-  interface Window { fbq?: MetaTracker; _fbq?: MetaTracker }
+  interface Window {
+    fbq?: MetaTracker; _fbq?: MetaTracker;
+    PrimeHubMeta?: { postMessage(message: string): void };
+  }
 }
 
 let initialized = false;
@@ -46,11 +49,28 @@ function tracker() {
   return window.fbq;
 }
 
+function nativeEvent(event: string, contents: { id: string; quantity: number }[],
+  payload?: TikTokEventPayload, eventId?: string) {
+  if (!window.PrimeHubMeta) return false;
+  try {
+    window.PrimeHubMeta.postMessage(JSON.stringify({
+      event, contents: contents.slice(0, 100),
+      ...(payload?.value != null && Number.isFinite(payload.value) ? { value: payload.value } : {}),
+      currency: payload?.currency || 'PKR',
+      ...(eventId ? { eventId } : {}),
+    }));
+    return true;
+  } catch { return false; }
+}
+
 export function trackMetaPageView() {
   try {
     if (typeof window === 'undefined') return;
     const page = window.location.pathname;
     if (page === lastPage || /^\/(admin|api|reseller)(\/|$)/.test(page)) return;
+    // The configured Android SDK logs app activation itself. Do not double count
+    // storefront WebView visits as a second website conversion source.
+    if (window.PrimeHubMeta) { lastPage = page; return; }
     const fbq = tracker();
     if (!fbq) return;
     fbq('trackSingle', META_PIXEL_ID, 'PageView');
@@ -70,12 +90,16 @@ export function trackMetaStoreEvent(name: string, payload?: TikTokEventPayload, 
     if (!event || typeof window === 'undefined') return;
     if (/^\/(admin|api|reseller)(\/|$)/.test(window.location.pathname)) return;
     if (event === 'Purchase' && eventId && purchaseIds.has(eventId)) return;
-    const fbq = tracker();
-    if (!fbq) return;
     const contents = (payload?.contents || []).filter(item => item.content_id).map(item => ({
       id: item.content_id, quantity: item.num_items || 1,
       ...(item.price != null ? { item_price: item.price } : {}),
     }));
+    if (nativeEvent(event, contents, payload, eventId)) {
+      if (event === 'Purchase' && eventId) purchaseIds.add(eventId);
+      return;
+    }
+    const fbq = tracker();
+    if (!fbq) return;
     fbq('trackSingle', META_PIXEL_ID, event, {
       ...(contents.length ? { content_type: 'product', content_ids: contents.map(item => item.id), contents,
         num_items: contents.reduce((sum, item) => sum + item.quantity, 0) } : {}),
