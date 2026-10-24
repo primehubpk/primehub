@@ -1,0 +1,73 @@
+name: PrimeHubMall MCP Connector QA
+
+on:
+  push:
+    branches:
+      - feat/primehub-chatgpt-mcp-connector-oct16
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  connector-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Use Node 22
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Validate TypeScript
+        run: npx tsc --noEmit
+      - name: Build Next.js
+        run: npm run build
+        env:
+          CI: 'true'
+
+      - name: Run MCP HTTP protocol smoke tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run start -- -p 3217 > /tmp/primehub-mcp-start.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" || true' EXIT
+          for i in $(seq 1 40); do
+            if curl -fsS http://localhost:3217/robots.txt >/dev/null 2>&1; then break; fi
+            sleep 1
+          done
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          const base = 'http://127.0.0.1:3217/api/mcp';
+          const request = async (method, params = {}, extras = {}) => {
+            const response = await fetch(base, {
+              method: 'POST',
+              headers: {'content-type': 'application/json', 'accept': 'application/json,text/event-stream', ...extras},
+              body: JSON.stringify({jsonrpc: '2.0', id: 1, method, params}),
+            });
+            return {status: response.status, data: await response.json()};
+          };
+          const old = await request('initialize', {protocolVersion:'2025-11-25', capabilities:{}, clientInfo:{name:'smoke',version:'1'}});
+          assert.equal(old.status, 200);
+          assert.equal(old.data.result.serverInfo.name, 'primehubmall-store');
+          const tools = await request('tools/list');
+          assert.deepEqual(tools.data.result.tools.map(t => t.name), ['search_products','list_categories','get_product']);
+          const modern = await request('server/discover', {
+            _meta:{'io.modelcontextprotocol/clientInfo':{name:'smoke',version:'1'}},
+          }, {'mcp-protocol-version':'2026-07-28', 'mcp-method':'server/discover'});
+          assert.equal(modern.status, 200);
+          assert.equal(modern.data.result.resultType, 'complete');
+          assert.ok(modern.data.result.supportedVersions.includes('2026-07-28'));
+          const invalidTool = await request('tools/call',{name:'delete_orders',arguments:{}});
+          assert.equal(invalidTool.data.error.code, -32602);
+          const blockedOrigin = await request('tools/list', {}, { origin:'https://unrelated.example' });
+          assert.equal(blockedOrigin.status, 403);
+          console.log('MCP initialize, tools, modern discovery and safety smoke tests passed');
+          NODE
