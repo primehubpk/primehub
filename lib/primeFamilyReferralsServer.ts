@@ -110,7 +110,6 @@ export async function resolveMemberReferralCode(
   const codeSnap = await db.collection(CODE_COLLECTION).doc(code).get();
   if (!codeSnap.exists || codeSnap.data()?.code !== code) throw new Error('Referral code is not available.');
   const ownerUid = String(codeSnap.data()?.ownerUid || '');
-  if (ownerUid === buyerUid) throw new Error('You cannot apply your own referral code.');
   if (!/^[A-Za-z0-9_-]{20,128}$/.test(ownerUid)) throw new Error('Referral owner not valid.');
   const owner = await db.collection('reseller_profiles').doc(ownerUid).get();
   if (!owner.exists || owner.data()?.status !== 'active') throw new Error('Referral member is not active.');
