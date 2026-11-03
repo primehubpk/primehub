@@ -76,7 +76,7 @@ test('unique sequential PRIMEFAMILY1, PRIMEFAMILY2 codes stable on retries',asyn
   assert.equal(data.get(key('reseller_referral_counter','primary')).nextSequence,3);
   assert.equal(data.get(key('reseller_referral_codes','PRIMEFAMILY1')).ownerUid,owner);
 });
-test('default referral disabled; 10% admin validates range, self referral blocked',async()=>{
+test('default referral disabled; 10% admin validates range, own code allowed',async()=>{
   assert.equal(referrals.cleanReferralSettings({}).enabled,false);
   assert.equal(referrals.cleanReferralSettings({percent:10,enabled:true}).percent,10);
   assert.throws(()=>referrals.cleanReferralSettings({percent:50}),/between 1% and 20%/);
@@ -85,7 +85,9 @@ test('default referral disabled; 10% admin validates range, self referral blocke
   assert.equal(referrals.referralCode('PRIMEFAMILY1x'),'');
   await assert.rejects(referrals.resolveMemberReferralCode('PRIMEFAMILY1',buyer,1000),/not yet active/);
   data.set(key('settings','primefamily_referrals'),{enabled:true,percent:10});
-  await assert.rejects(referrals.resolveMemberReferralCode('PRIMEFAMILY1',owner,1000),/own referral code/);
+  const own=await referrals.resolveMemberReferralCode('PRIMEFAMILY1',owner,1000);
+  assert.equal(own.referrerEarns,100);
+  assert.equal(own.ownerUid,owner);
   const result=await referrals.resolveMemberReferralCode('PRIMEFAMILY1',buyer,1000);
   assert.equal(result.referrerEarns,100);
   assert.equal(result.kind,'referral');
@@ -123,13 +125,43 @@ test('second distinct delivered order rewards inviter again; same order cannot d
   const validAgain=await referrals.resolveMemberReferralCode('PRIMEFAMILY1',buyer,1000);
   assert.equal(validAgain.referrerEarns,100);
 });
-test('tampered self-credit referral snapshot rejects before side effects',async()=>{
-  const oid='order-20261021-bad';
+test('own referral delivers 10% shopping credit once without stacking tier or overwriting order count',async()=>{
+  const oid='order-20261021-self';
   const order={status:'pending',source:'website',cashbackPolicy:'delivered_only_v1',
-    resellerUserId:owner,eligibleAfterVoucher:1000,total:1500,cashbackPercent:0,
+    rewardSettlementMode:'shopping_only_v1',resellerUserId:owner,
+    eligibleAfterVoucher:1000,total:1500,cashbackPercent:5,
     voucherKind:'referral',voucherRewardMode:'exclusive_v1',voucherCode:'PRIMEFAMILY1',
     referralOwnerUid:owner,referralPercent:10,referralCashEstimate:100};
   data.set(key('orders',oid),order);
-  await assert.rejects(delivered.creditDeliveredOrderBenefits(oid,order),/Invalid referral reward snapshot/);
-  assert.equal(data.has(key('reseller_rewards',oid)),false);
+  const before=data.get(key('reseller_profiles',owner));
+  const beforeShopping=data.get(key('reseller_shopping_wallets',owner))?.balance || 0;
+  const beforeCash=before.walletAvailable;
+  const beforeOrders=before.monthlyOrders;
+  const first=await delivered.creditDeliveredOrderBenefits(oid,order);
+  assert.equal(first.reward,0); // Tier 5% must not stack with the referral 10%.
+  assert.equal(first.cashback,0);
+  assert.equal(first.referralCash,100);
+  assert.equal(data.get(key('reseller_shopping_wallets',owner)).balance,beforeShopping+100);
+  assert.equal(data.get(key('reseller_profiles',owner)).walletShopping,beforeShopping+100);
+  assert.equal(data.get(key('reseller_profiles',owner)).walletAvailable,beforeCash);
+  assert.equal(data.get(key('reseller_profiles',owner)).monthlyOrders,beforeOrders+1);
+  assert.equal(data.get(key('reseller_referral_credits',oid)).buyerUid,owner);
+  const second=await delivered.creditDeliveredOrderBenefits(oid,order);
+  assert.equal(second.alreadyCredited,true);
+  assert.equal(data.get(key('reseller_shopping_wallets',owner)).balance,beforeShopping+100);
+  assert.equal(data.get(key('reseller_profiles',owner)).monthlyOrders,beforeOrders+1);
+});
+test('without a referral voucher the same member gets normal tier-only cashback',async()=>{
+  const oid='order-20261021-tier';
+  const order={status:'pending',source:'website',cashbackPolicy:'delivered_only_v1',
+    rewardSettlementMode:'shopping_only_v1',resellerUserId:owner,
+    eligibleAfterVoucher:1000,total:1500,cashbackPercent:5,voucherKind:''};
+  data.set(key('orders',oid),order);
+  const beforeShopping=data.get(key('reseller_shopping_wallets',owner)).balance;
+  const first=await delivered.creditDeliveredOrderBenefits(oid,order);
+  assert.equal(first.reward,50);
+  assert.equal(first.cashback,50);
+  assert.equal(first.referralCash,0);
+  assert.equal(data.get(key('reseller_shopping_wallets',owner)).balance,beforeShopping+50);
+  assert.equal(data.has(key('reseller_referral_credits',oid)),false);
 });
