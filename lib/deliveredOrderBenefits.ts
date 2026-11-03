@@ -36,10 +36,11 @@ export async function creditDeliveredOrderBenefits(orderId: string, authoritativ
   const isReferral = authoritativeOrder.voucherRewardMode === 'exclusive_v1' &&
     authoritativeOrder.voucherKind === 'referral';
   const referralOwnerUid = isReferral ? String(authoritativeOrder.referralOwnerUid || '') : '';
+  const isOwnReferral = isReferral && referralOwnerUid === userId;
   const referralPercent = isReferral ? Number(authoritativeOrder.referralPercent) : 0;
   const referralCodeValue = isReferral ? referralCode(authoritativeOrder.voucherCode) : '';
   if (isReferral && (!referralCodeValue || !/^[A-Za-z0-9_-]{20,128}$/.test(referralOwnerUid) ||
-    referralOwnerUid === userId || !Number.isSafeInteger(referralPercent) ||
+    !Number.isSafeInteger(referralPercent) ||
     referralPercent < 1 || referralPercent > 20 ||
     Number(authoritativeOrder.referralCashEstimate) !== cashBackForTier(eligible, referralPercent))) {
     throw new Error('Invalid referral reward snapshot.');
@@ -125,13 +126,17 @@ export async function creditDeliveredOrderBenefits(orderId: string, authoritativ
     const voucherAwarded = voucherClaimRef && !priorVoucher?.exists
       ? Math.min(voucherCash, Math.max(0, eligible - tierCash)) : 0;
     const reward = tierCash + voucherAwarded;
-    if (!Number.isSafeInteger(existingCash + reward) || !Number.isSafeInteger(oldShopping + reward)) throw new Error('Wallet limit exceeded.');
+    // When buyer and referral owner are the same member, credit the wallet once.
+    // A separate referral update to the same document would overwrite order counts or balances.
+    const walletReward = reward + (isOwnReferral ? referralPayable : 0);
+    if (!Number.isSafeInteger(walletReward) || !Number.isSafeInteger(existingCash + walletReward) ||
+      !Number.isSafeInteger(oldShopping + walletReward)) throw new Error('Wallet limit exceeded.');
     tx.update(profileRef, {
-      ...(shoppingOnly ? { walletShopping: oldShopping + reward } : { walletAvailable: existingCash + reward }),
+      ...(shoppingOnly ? { walletShopping: oldShopping + walletReward } : { walletAvailable: existingCash + walletReward }),
       monthlyOrders: monthlyOrders + 1,
       updatedAt: FieldValue.serverTimestamp(),
     });
-    if (shoppingOnly) tx.set(shoppingRef, { userId, balance: oldShopping + reward, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
+    if (shoppingOnly) tx.set(shoppingRef, { userId, balance: oldShopping + walletReward, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
     tx.create(creditRef, {
       resellerUserId: userId, orderId, amount: reward, cashback: tierCash,
       voucherCash: voucherAwarded, referralCash: referralPayable,
@@ -148,14 +153,16 @@ export async function creditDeliveredOrderBenefits(orderId: string, authoritativ
       });
     }
     if (referralPayable > 0 && referralOwnerRef && referralCreditRef) {
-      tx.update(referralOwnerRef, {
-        ...(shoppingOnly ? { walletShopping: referralShopping + referralPayable } : { walletAvailable: referralExisting + referralPayable }),
-        updatedAt: FieldValue.serverTimestamp(),
-      });
-      if (shoppingOnly && referralShoppingRef) tx.set(referralShoppingRef, {
-        userId: referralOwnerUid, balance: referralShopping + referralPayable,
-        updatedAt: FieldValue.serverTimestamp(),
-      }, { merge: true });
+      if (!isOwnReferral) {
+        tx.update(referralOwnerRef, {
+          ...(shoppingOnly ? { walletShopping: referralShopping + referralPayable } : { walletAvailable: referralExisting + referralPayable }),
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+        if (shoppingOnly && referralShoppingRef) tx.set(referralShoppingRef, {
+          userId: referralOwnerUid, balance: referralShopping + referralPayable,
+          updatedAt: FieldValue.serverTimestamp(),
+        }, { merge: true });
+      }
       tx.create(referralCreditRef, {
         ownerUid: referralOwnerUid, buyerUid: userId, code: referralCodeValue,
         orderId, amount: referralPayable, percent: referralPercent,
@@ -177,7 +184,7 @@ export async function creditDeliveredOrderBenefits(orderId: string, authoritativ
 
   try { await mirrorResellerFirestoreDoc('reseller_profiles', userId); }
   catch (error) { console.error('Delivered cashback wallet mirror deferred', error); }
-  if (isReferral && result.referralCash > 0) {
+  if (isReferral && !isOwnReferral && result.referralCash > 0) {
     try { await mirrorResellerFirestoreDoc('reseller_profiles', referralOwnerUid); }
     catch (error) { console.error('Referral inviter wallet mirror deferred', error); }
   }
