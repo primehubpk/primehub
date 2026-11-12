@@ -60,7 +60,7 @@ export default function GlassOffersLanding({
         <div className="glass-offers-landing__price relative z-10">
           <small>Deals starting at</small>
           <strong>Rs. {fromPrice.toLocaleString('en-PK')}</strong>
-          <small>Choose size / colour on product page</small>
+          <small>Select size directly from each product card</small>
         </div>
       </header>
 
