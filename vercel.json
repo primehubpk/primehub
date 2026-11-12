@@ -1,6 +1,5 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "ignoreCommand": "exit 1",
   "env": {
     "PRIMEHUB_DATA_READ_MODE": "supabase-primary"
   },
