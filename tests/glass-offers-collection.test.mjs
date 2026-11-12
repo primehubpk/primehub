@@ -5,134 +5,163 @@ import path from 'node:path';
 import ts from 'typescript';
 
 const root = process.cwd();
-const source = await fs.readFile(path.join(root, 'lib/glassOffers.ts'), 'utf8');
-const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText;
-const catalog = await import('data:text/javascript;charset=utf-8,' + encodeURIComponent(compiled));
-const { STARTER_GLASS_OFFERS, resolveGlassOffers, resolveGlassOfferProducts, isExclusiveGlassDealProduct } = catalog;
+const compile = text => ts.transpileModule(text, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText;
+const text = await fs.readFile(path.join(root, 'lib/glassOffers.ts'), 'utf8');
+const moduleUrl = 'data:text/javascript;charset=utf-8,' + encodeURIComponent(compile(text));
+const { STARTER_GLASS_OFFERS, resolveGlassOffers, resolveGlassOfferProducts, isExclusiveGlassDealProduct, resolveUnifiedDealCollection, unifyStorefrontDeals, applyCollectionPrice } = await import(moduleUrl);
+const benefits = compile(await fs.readFile(path.join(root, 'lib/orderBenefits.ts'), 'utf8')).replace("from './glassOffers'", 'from ' + JSON.stringify(moduleUrl));
+const { orderEligibleSubtotal } = await import('data:text/javascript;charset=utf-8,' + encodeURIComponent(benefits));
+const legacy = {
+  weeklyDeals: [{ productId: 'weekly', active: true, day: 'friday', dealPrice: 190, originalPrice: 299 }],
+  bigDeal: { active: true, productIds: ['watch', 'bag'], dealPrices: [999, 500], originalPrices: [3000, 1500], productId: 'watch' },
+};
+const products = [
+  { id: 'weekly', title: 'Weekly product', price: 299, originalPrice: 299, category: 'Jewellery', active: true },
+  { id: 'watch', title: 'Watch', price: 3000, originalPrice: 3000, category: 'Watches', active: true, variantMatrix: [{ size: 'One size', price: 3000, stock: 4 }] },
+  { id: 'bag', title: 'Bag', price: 1500, originalPrice: 1500, category: 'Bags', active: true },
+];
 
-test('the original featured collection has 12 real unique product IDs', () => {
+test('original twelve IDs stay unique and preserve their documented references', () => {
   assert.equal(STARTER_GLASS_OFFERS.length, 12);
   assert.equal(new Set(STARTER_GLASS_OFFERS.map(item => item.productId)).size, 12);
-  assert.ok(STARTER_GLASS_OFFERS.every(item => item.referencePrice === 3000));
+  assert.ok(STARTER_GLASS_OFFERS.every(item => item.referencePrice === 3000 && isExclusiveGlassDealProduct(item.productId)));
 });
 
-test('deal cards use real product prices, not a hardcoded Rs. 999 cap', () => {
-  const products = [
-    { id: 'premium', title: 'Gold Wedding Set', price: 2499, originalPrice: 3999, active: true },
-    { id: 'budget', title: 'Rainbow Box', price: 999, originalPrice: 999, active: true },
-    { id: 'disabled', title: 'Hidden', price: 99, active: false },
-  ];
-  const opts = { enabled: true, heading: 'Offers', subtitle: '', badge: 'Offers', items: [
-    { productId: 'premium' }, { productId: 'budget', referencePrice: 3000 }, { productId: 'disabled' },
-  ] };
-  const offers = resolveGlassOfferProducts(products, opts);
-  assert.equal(offers.length, 2);
-  assert.equal(offers[0].price, 2499);
-  assert.equal(offers[0].referencePrice, 3999);
-  assert.equal(offers[1].price, 999);
+test('migration includes all Weekly and Big slots at their exact advertised prices without rotation', () => {
+  const config = resolveUnifiedDealCollection(legacy);
+  assert.equal(config.collectionVersion, 2);
+  const offers = resolveGlassOfferProducts(products, config);
+  assert.deepEqual(offers.map(item => [item.product.id, item.price]), [['weekly', 190], ['watch', 999], ['bag', 500]]);
+  assert.equal(offers[0].savingPercent, 36);
   assert.equal(offers[1].savingPercent, 67);
 });
 
-test('admin settings can hide the collection and remove products without fallback', () => {
-  const config = resolveGlassOffers({ enabled: false, items: [] });
-  assert.equal(config.enabled, false);
+test('normalization is idempotent, retires all schedules, and never mutates source documents', () => {
+  const before = structuredClone(legacy);
+  const normalized = unifyStorefrontDeals(legacy);
+  assert.deepEqual(normalized.weeklyDeals, []);
+  assert.equal(normalized.bigDeal.active, false);
+  assert.deepEqual(unifyStorefrontDeals(normalized), normalized);
+  assert.deepEqual(legacy, before);
+  assert.equal(normalized.glassDealShowcase.items.find(item => item.productId === 'bag').dealPrice, 500);
+});
+
+test('dedicated Big Deal wins over an obsolete daily alias; no duplicate IDs', () => {
+  const config = resolveUnifiedDealCollection({ ...legacy, dailyDeal: { active: true, productId: 'obsolete', dealPrice: 1 } });
+  assert.equal(new Set(config.items.map(item => item.productId)).size, config.items.length);
+  assert.ok(!config.items.some(item => item.productId === 'obsolete'));
+});
+
+test('legacy daily-only settings are migrated and inactive old selections are omitted', () => {
+  const config = resolveUnifiedDealCollection({ weeklyDeals: [{ productId: 'hidden', active: false }], dailyDeal: { active: true, productId: 'daily', dealPrice: 99, originalPrice: 499 } });
+  assert.equal(config.items.find(item => item.productId === 'daily').dealPrice, 99);
+  assert.ok(!config.items.some(item => item.productId === 'hidden'));
+});
+
+test('explicit saved lists can remove migrated products and stay empty without reappearing', () => {
+  const config = resolveUnifiedDealCollection({ ...legacy, glassDealShowcase: { collectionVersion: 2, enabled: true, items: [] } });
   assert.deepEqual(config.items, []);
-  assert.deepEqual(resolveGlassOfferProducts([{ id: 'x', price: 100 }], config), []);
 });
 
-test('duplicated IDs are removed and invalid references are not shown as discounts', () => {
-  const config = resolveGlassOffers({ items: [{ productId: 'a', referencePrice: 200 }, { productId: 'a', referencePrice: 400 }] });
+test('disabled collection leaves actual catalog and variant prices untouched', () => {
+  const config = { ...resolveUnifiedDealCollection(legacy), enabled: false };
+  assert.deepEqual(resolveGlassOfferProducts(products, config), []);
+  assert.equal(applyCollectionPrice(products[1], config), products[1]);
+});
+
+test('all selected variants keep migrated selling price without modifying original stock or IDs', () => {
+  const before = structuredClone(products[1]);
+  const priced = applyCollectionPrice(products[1], resolveUnifiedDealCollection(legacy));
+  assert.equal(priced.price, 999);
+  assert.equal(priced.variantMatrix[0].price, 999);
+  assert.equal(priced.variantMatrix[0].stock, 4);
+  assert.equal(priced.id, 'watch');
+  assert.deepEqual(products[1], before);
+});
+
+test('new collection products may use catalog prices or an explicit selling price', () => {
+  const config = { collectionVersion: 2, items: [{ productId: 'bag' }, { productId: 'watch', dealPrice: 799 }] };
+  assert.equal(applyCollectionPrice(products[2], config).price, 1500);
+  assert.equal(applyCollectionPrice(products[1], config).price, 799);
+  assert.equal(applyCollectionPrice({ id: 'regular', price: 200 }, config).price, 200);
+});
+
+test('invalid references, prices and duplicate IDs cannot create fake discounts', () => {
+  const config = resolveGlassOffers({ items: [{ productId: 'watch', dealPrice: Infinity, referencePrice: -1 }, { productId: 'watch', referencePrice: 10000 }] });
   assert.equal(config.items.length, 1);
-  const offers = resolveGlassOfferProducts([{ id: 'a', title: 'Bangles', price: 450, originalPrice: 450 }], config);
-  assert.equal(offers[0].referencePrice, 0);
+  assert.equal(config.items[0].dealPrice, undefined);
+  const offers = resolveGlassOfferProducts([{ id: 'watch', price: 450, originalPrice: 450 }], config);
   assert.equal(offers[0].savingPercent, 0);
+  assert.equal(offers[0].referencePrice, 0);
 });
 
-test('home placement stays after weekly deals and before Big Deal', async () => {
-  const home = await fs.readFile(path.join(root, 'components/HeroFlashBanner.tsx'), 'utf8');
-  const weekly = home.indexOf('id="weekly-deals"');
-  const showcase = home.indexOf('<HomeGlassOfferRail');
-  const big = home.indexOf('{bigDeal?.active && bigDeal.title && (() => {');
-  assert.ok(weekly >= 0 && showcase > weekly && big > showcase);
+test('unpublished and inactive products never appear as orderable deals', () => {
+  const config = resolveUnifiedDealCollection(legacy);
+  assert.deepEqual(resolveGlassOfferProducts(products.map(item => ({ ...item, published: false })), config), []);
+  assert.deepEqual(resolveGlassOfferProducts(products.map(item => ({ ...item, active: false })), config), []);
 });
 
-test('landing page and admin manager are wired to the same collection setting', async () => {
-  const page = await fs.readFile(path.join(root, 'app/deals/glass-bangles/page.tsx'), 'utf8');
+test('unified deals cannot stack benefits; mixed-cart benefits apply to regular products only', () => {
+  const settings = unifyStorefrontDeals(legacy);
+  assert.equal(orderEligibleSubtotal([{ productId: 'weekly', price: 190, quantity: 2 }, { productId: 'bag', price: 500, quantity: 1 }, { productId: 'regular', price: 300, quantity: 2 }], settings), 600);
+});
+
+test('homepage has one campaign with banner above swipe row and shared six-second pause', async () => {
+  const home = await fs.readFile(path.join(root, 'components/HomePageClient.tsx'), 'utf8');
+  const rail = await fs.readFile(path.join(root, 'components/home/HomeGlassOfferRail.tsx'), 'utf8');
+  const hook = await fs.readFile(path.join(root, 'lib/useContinuousHomeRail.ts'), 'utf8');
+  assert.doesNotMatch(home, /<HeroFlashBanner|<BigDealNextPreviewSync/);
+  assert.match(home, /<HomeGlassOfferRail/);
+  assert.ok(rail.indexOf('<MegaDealsHero') < rail.indexOf('className="glass-offers-home__viewport"'));
+  assert.match(hook, /resumeAfterMs = 6000/);
+});
+
+test('old customer links all reach the unified deals page', async () => {
+  for (const file of ['app/weekly-deals/page.tsx', 'app/deals/big/page.tsx', 'app/deals/[day]/page.tsx', 'app/deals/glass-bangles/page.tsx']) {
+    assert.match(await fs.readFile(path.join(root, file), 'utf8'), /redirect\('\/deals'\)/);
+  }
+});
+
+test('new admin collection edits retain migrated deal prices on save', async () => {
   const admin = await fs.readFile(path.join(root, 'components/admin/settings/GlassDealShowcaseSettings.tsx'), 'utf8');
-  assert.match(page, /glassDealShowcase/);
-  assert.match(admin, /glassDealShowcase/);
+  assert.match(admin, /resolveUnifiedDealCollection/);
+  assert.match(admin, /collectionVersion: 2/);
+  assert.match(admin, /dealPrice:/);
   assert.match(admin, /setAdminDocument\('settings', 'main'/);
 });
 
-test('all twelve original offer listings are exclusive to the offers page', () => {
-  assert.equal(STARTER_GLASS_OFFERS.filter(item => isExclusiveGlassDealProduct(item.productId)).length, 12);
-  assert.equal(isExclusiveGlassDealProduct({ id: STARTER_GLASS_OFFERS[0].productId }), true);
-  assert.equal(isExclusiveGlassDealProduct('unrelated-product'), false);
-});
-
-test('normal Shop, category, New Arrivals, and Sale Mela exclude exclusive offers', async () => {
-  const [category, catalogHook, arrivals, collections, home] = await Promise.all([
-    fs.readFile(path.join(root, 'lib/categoryUtils.ts'), 'utf8'),
-    fs.readFile(path.join(root, 'components/shop/useShopCatalog.ts'), 'utf8'),
-    fs.readFile(path.join(root, 'components/NewArrivalsRail.tsx'), 'utf8'),
-    fs.readFile(path.join(root, 'components/home/HomeCollections.tsx'), 'utf8'),
-    fs.readFile(path.join(root, 'components/HomePageClient.tsx'), 'utf8'),
-  ]);
-  for (const source of [category, catalogHook, arrivals, collections, home]) {
-    assert.match(source, /isExclusiveGlassDealProduct/);
-  }
-  assert.match(home, /initialProducts=\{regularProducts\}/);
-  assert.match(home, /<HomeCategoryDealsLazy products=\{regularProducts\}/);
-  assert.match(home, /<HomeDiscoverDealsLazy products=\{regularProducts\}/);
-});
-
-test('mobile deal rail begins directly after Weekly Deals and places premium CTA within the left promo tile', async () => {
-  const rail = await fs.readFile(path.join(root, 'components/home/HomeGlassOfferRail.tsx'), 'utf8');
-  const css = await fs.readFile(path.join(root, 'components/home/glass-offers.css'), 'utf8');
-  assert.match(rail, /className="glass-offers-home sm:mx-4"/);
-  assert.doesNotMatch(rail, /glass-offers-home__toolbar|glass-offers-home__more|\bmt-3\b/);
-  assert.ok(rail.indexOf('glass-offers-home__promo-cta') > rail.indexOf('<strong>{config.badge}</strong>'));
-  assert.ok(rail.indexOf('glass-offers-home__promo-cta') < rail.indexOf('glass-offers-home__viewport'));
-  assert.match(rail, /SHOP MORE/);
-  assert.match(rail, /DEALS <ArrowRight/);
-  assert.match(css, /\.glass-offers-home__promo-cta\s*\{/);
-  assert.match(css, /\.glass-offers-home__row\{gap:6px;padding:3px/);
-  assert.match(css, /width:88px;min-width:88px/);
-  assert.match(css, /width:100px;min-width:100px/);
-});
-
-test('Select Size verifies live product and opens existing modal, with five second swipe pause', async () => {
-  const card = await fs.readFile(path.join(root, 'components/home/GlassOfferCard.tsx'), 'utf8');
-  const hook = await fs.readFile(path.join(root, 'lib/useContinuousHomeRail.ts'), 'utf8');
-  assert.match(card, /getVerifiedDealProduct\(product.id\)/);
-  assert.match(card, /openVariantModal\(\{ \.\.\.fresh/);
-  assert.match(card, /Select Size/);
-  assert.match(hook, /resumeAfterMs = 6000/);
-  assert.match(hook, /onPointerDown/);
-});
-
-test('70 percent mobile tile restores DEAL BOX COLLECTION over the icon', async () => {
-  const rail = await fs.readFile(path.join(root, 'components/home/HomeGlassOfferRail.tsx'), 'utf8');
-  const css = await fs.readFile(path.join(root, 'components/home/glass-offers.css'), 'utf8');
-  const kicker = rail.indexOf('DEAL BOX COLLECTION');
-  const icon = rail.indexOf('glass-offers-home__badge-icon');
-  const percent = rail.indexOf('<strong>{config.badge}</strong>');
-  assert.ok(kicker >= 0 && icon > kicker && percent > icon);
-  assert.match(css, /font-size:20px;line-height:1.08/);
-  assert.doesNotMatch(rail, /glass-offers-home__hint/);
-});
-
-test('visible rails start immediately, reset the initial partial card and hold six seconds after manual touch', async () => {
-  const hook = await fs.readFile(path.join(root, 'lib/useContinuousHomeRail.ts'), 'utf8');
-  assert.match(hook, /let visible = false/);
-  assert.match(hook, /rail.scrollLeft = 0/);
-  assert.match(hook, /new IntersectionObserver\(onIntersection/);
-  assert.match(hook, /pausedUntil = 0/);
-  assert.match(hook, /time >= pausedUntil/);
-  assert.match(hook, /!pointerHolding && !touchHolding/);
-  assert.match(hook, /touchstart/);
-  assert.match(hook, /touchmove/);
-  assert.match(hook, /touchend/);
-  assert.match(hook, /resumeAfterMs = 6000/);
-  assert.doesNotMatch(hook, /1700/);
+test('slow auto-scroll accumulates subpixel motion and respects hold plus six seconds idle', async () => {
+  const vm = await import('node:vm');
+  const callbacks = [], events = new Map();
+  let clock = 0, scroll = 0, cleanup;
+  const rail = { clientWidth: 300,
+    querySelector: selector => ({ offsetLeft: selector.includes('original') ? 0 : 1000 }),
+    addEventListener: (name, fn) => events.set(name, fn), removeEventListener() {},
+  };
+  Object.defineProperty(rail, 'scrollLeft', { get: () => scroll, set: value => { scroll = Math.round(value); } });
+  const exports = {};
+  const code = ts.transpileModule(await fs.readFile(path.join(root, 'lib/useContinuousHomeRail.ts'), 'utf8'), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+  }).outputText;
+  vm.runInNewContext(code, { exports,
+    require: () => ({ useRef: value => ({ current: value }), useEffect: callback => { cleanup = callback(); } }),
+    window: { matchMedia: () => ({ matches: false }), requestAnimationFrame: fn => { callbacks.push(fn); return callbacks.length; }, cancelAnimationFrame() {},
+      addEventListener: (name, fn) => events.set(name, fn), removeEventListener() {} },
+    document: { visibilityState: 'visible' }, performance: { now: () => clock },
+    IntersectionObserver: class { constructor(fn) { this.fn = fn; } observe() { this.fn([{ isIntersecting: true }]); } disconnect() {} },
+  });
+  exports.useContinuousHomeRail({ current: rail }, { itemCount: 26, speed: 24 });
+  const frames = count => { for (let i = 0; i < count; i++) { clock += 1000 / 60; callbacks.shift()(clock); } };
+  frames(60);
+  assert.ok(scroll >= 20, '24px/s must move even when each native assignment rounds to whole pixels');
+  events.get('pointerdown')();
+  const held = scroll;
+  frames(60);
+  assert.equal(scroll, held);
+  events.get('pointerup')();
+  frames(180);
+  assert.equal(scroll, held);
+  frames(240);
+  assert.ok(scroll > held);
+  cleanup();
 });

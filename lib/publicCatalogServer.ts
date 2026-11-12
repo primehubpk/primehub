@@ -4,6 +4,7 @@ import { STOREFRONT_REVALIDATE_SECONDS, publicProductCacheTag } from '@/lib/stor
 import { getDualCatalog, getDualCategories, getDualProduct, getDualStorefrontSettings, getDualSkills } from '@/lib/dualReadServer';
 import { getStorefrontSettingsWithBigDealRecovery } from '@/lib/storefrontSettingsServer';
 import { getCachedWholesaleVideosSnapshot } from '@/lib/wholesaleVideosServer';
+import { applyCollectionPrice } from '@/lib/glassOffers';
 
 const CATALOG_RETRY_DELAYS_MS = [0];
 const SETTINGS_RETRY_DELAYS_MS = [0];
@@ -59,12 +60,12 @@ async function loadPublicCatalog() {
 
   for (const delay of CATALOG_RETRY_DELAYS_MS) {
     await wait(delay);
-    const result = await getDualCatalog(CATALOG_READ_CACHE);
+    const [result, settings] = await Promise.all([getDualCatalog(CATALOG_READ_CACHE), getStorefrontSettingsSnapshot()]);
     lastSource = result.source;
 
     if (result.source !== 'empty' && result.products.length > 0) {
       return {
-        products: result.products,
+        products: result.products.map(product => applyCollectionPrice(product, settings.glassDealShowcase)),
         categories: result.categories,
         source: result.source,
       };
@@ -76,8 +77,8 @@ async function loadPublicCatalog() {
 
 export const getPublicCatalogSnapshot = unstable_cache(
   loadPublicCatalog,
-  ['primehub-public-catalog-dual-v8'],
-  { revalidate: STOREFRONT_REVALIDATE_SECONDS, tags: ['public-catalog'] },
+  ['primehub-public-catalog-dual-v9-unified'],
+  { revalidate: STOREFRONT_REVALIDATE_SECONDS, tags: ['public-catalog', 'storefront-settings'] },
 );
 
 export const getPublicCategoriesSnapshot = unstable_cache(
@@ -129,20 +130,22 @@ export function compactPublicCatalogSnapshot<
 }
 
 export async function getFreshPublicCatalogSnapshot() {
-  const result = await getDualCatalog({ cache: 'no-store', timeoutMs: PUBLIC_PRIMARY_TIMEOUT_MS });
+  const [result, settings] = await Promise.all([
+    getDualCatalog({ cache: 'no-store', timeoutMs: PUBLIC_PRIMARY_TIMEOUT_MS }), getStorefrontSettingsSnapshot(),
+  ]);
   if (result.source === 'empty' || result.products.length === 0) {
     throw new Error(`Fresh public catalog unavailable (source: ${result.source}).`);
   }
-  return result;
+  return { ...result, products: result.products.map(product => applyCollectionPrice(product, settings.glassDealShowcase)) };
 }
 
 async function loadPublicProduct(productId: string) {
   const id = String(productId || '').trim();
   if (!id) return { product: null, source: 'empty' as const };
-  const result = await getDualProduct(id, PRODUCT_READ_CACHE);
+  const [result, settings] = await Promise.all([getDualProduct(id, PRODUCT_READ_CACHE), getStorefrontSettingsSnapshot()]);
   // An upstream outage must not replace a last-good cached product with null.
   if (result.source === 'empty') throw new Error('Public product unavailable.');
-  return result;
+  return { ...result, product: result.product ? applyCollectionPrice(result.product, settings.glassDealShowcase) : null };
 }
 
 export async function getPublicProductSnapshot(productId: string) {
@@ -150,11 +153,11 @@ export async function getPublicProductSnapshot(productId: string) {
   if (!id) return { product: null, source: 'empty' as const };
   return unstable_cache(
     () => loadPublicProduct(id),
-    ['primehub-public-product-dual-v3', id],
+    ['primehub-public-product-dual-v4-unified', id],
     {
       revalidate: STOREFRONT_REVALIDATE_SECONDS,
       // Keep the roll-up tag for the explicitly requested full catalog refresh.
-      tags: ['public-products', publicProductCacheTag(id)],
+      tags: ['public-products', publicProductCacheTag(id), 'storefront-settings'],
     },
   )();
 }
@@ -162,7 +165,10 @@ export async function getPublicProductSnapshot(productId: string) {
 export async function getFreshPublicProductSnapshot(productId: string) {
   const id = String(productId || '').trim();
   if (!id) return { product: null, source: 'empty' as const };
-  return getDualProduct(id, { cache: 'no-store', timeoutMs: PUBLIC_PRIMARY_TIMEOUT_MS });
+  const [result, settings] = await Promise.all([
+    getDualProduct(id, { cache: 'no-store', timeoutMs: PUBLIC_PRIMARY_TIMEOUT_MS }), getStorefrontSettingsSnapshot(),
+  ]);
+  return { ...result, product: result.product ? applyCollectionPrice(result.product, settings.glassDealShowcase) : null };
 }
 
 async function loadStorefrontSettingsResult() {
@@ -180,7 +186,7 @@ async function loadStorefrontSettingsResult() {
 
 export const getStorefrontSettingsResultSnapshot = unstable_cache(
   loadStorefrontSettingsResult,
-  ['primehub-storefront-settings-dual-v5'],
+  ['primehub-storefront-settings-dual-v6-unified'],
   { revalidate: STOREFRONT_REVALIDATE_SECONDS, tags: ['storefront-settings'] },
 );
 

@@ -1,6 +1,8 @@
+import { resolveUnifiedDealCollection, type DealCollectionSource } from './glassOffers';
+
 /** Calculations for cash wallet and vouchers. Never trust cart-supplied deal flags. */
 export type BenefitItem = { productId: string; price: number; quantity: number; weeklyDealDay?: string | null; rewardExcluded?: boolean };
-export type BenefitSettings = { bigDeal?: any; dailyDeal?: any; weeklyDeals?: any[] };
+export type BenefitSettings = DealCollectionSource;
 
 export function orderEligibleSubtotal(items: BenefitItem[], settings: BenefitSettings) {
   // Every product *assigned* to an active Admin Big Deal or Weekly Deal is
@@ -8,6 +10,8 @@ export function orderEligibleSubtotal(items: BenefitItem[], settings: BenefitSet
   // deductions, cashback or checkout vouchers, even at the regular price.
   // IDs are sourced from server-side Admin settings, not cart-supplied flags.
   const excluded = new Set<string>();
+  const collection = resolveUnifiedDealCollection(settings);
+  if (collection.enabled) for (const item of collection.items) excluded.add(item.productId);
   for (const deal of Array.isArray(settings.weeklyDeals) ? settings.weeklyDeals : []) {
     if (deal?.active !== false && deal?.productId) excluded.add(String(deal.productId));
   }

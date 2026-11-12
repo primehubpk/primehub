@@ -3,6 +3,7 @@ import { unstable_cache } from 'next/cache';
 import { STOREFRONT_REVALIDATE_SECONDS } from '@/lib/storefrontCachePolicy';
 import { getAdminDb } from '@/lib/firebaseAdmin';
 import { getDualStorefrontSettings, type DualReadCacheOptions } from '@/lib/dualReadServer';
+import { unifyStorefrontDeals } from '@/lib/glassOffers';
 
 const SLOT_COUNT = 7;
 
@@ -88,7 +89,7 @@ async function getFirebaseBigDealCandidates(_cacheOptions?: DualReadCacheOptions
   return getCachedFirebaseBigDealCandidates();
 }
 
-export async function getStorefrontSettingsWithBigDealRecovery(cacheOptions?: DualReadCacheOptions) {
+async function getLegacyStorefrontSettingsWithBigDealRecovery(cacheOptions?: DualReadCacheOptions) {
   const result = await getDualStorefrontSettings(cacheOptions);
   const main = result.documents?.main && typeof result.documents.main === 'object'
     ? result.documents.main
@@ -120,4 +121,13 @@ export async function getStorefrontSettingsWithBigDealRecovery(cacheOptions?: Du
   }
 
   return withStorefrontBigDeal(result, null);
+}
+
+export async function getStorefrontSettingsWithBigDealRecovery(cacheOptions?: DualReadCacheOptions) {
+  const result = await getLegacyStorefrontSettingsWithBigDealRecovery(cacheOptions);
+  if (result.source === 'empty') return result;
+  const documents: Record<string, any> = result.documents;
+  return { ...result, documents: { ...documents,
+    main: unifyStorefrontDeals({ ...(documents.general || {}), ...(documents.main || {}) }),
+  } };
 }

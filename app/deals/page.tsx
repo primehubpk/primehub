@@ -1,5 +1,20 @@
-'use client';
-import DealsHeader from '@/components/deals/DealsHeader';
-import DealGrid from '@/components/deals/DealGrid';
-import useDeals from '@/components/deals/useDeals';
-export default function DealsPage(){const {loading,today,products,weeklyDeals,addingId,addToCart,actionError}=useDeals();return <main className="min-h-screen bg-neutral-50 pb-28"><div className="mx-auto max-w-6xl px-4 py-5 md:px-6 md:py-7"><DealsHeader/>{actionError?<p role="alert" className="mt-3 rounded-xl bg-rose-50 p-3 text-sm font-semibold text-rose-800">{actionError}</p>:null}{loading ? <div className="mt-5 h-28 animate-pulse rounded-[30px] bg-black/5"/> : <DealGrid weeklyDeals={weeklyDeals} products={products} today={today} addingId={addingId} onAdd={addToCart}/>}</div></main>}
+import type { Metadata } from 'next';
+import Link from 'next/link';
+import Header from '@/components/home/HomeHeader';
+import '@/components/home/home.css';
+import GlassOffersLanding from '@/components/home/GlassOffersLanding';
+import { compactPublicCatalogSnapshot, getPublicCatalogSnapshot, getStorefrontSettingsSnapshot } from '@/lib/publicCatalogServer';
+import type { Product, Category } from '@/lib/types';
+
+export const revalidate = 600;
+export const metadata: Metadata = { title: 'Mega Deals | PrimeHubMall', description: 'Shop all PrimeHubMall special offers in one place. Bangles, watches, bags and more, ready to order every day.' };
+
+export default async function DealsPage() {
+  const [catalogResult, settingsResult] = await Promise.allSettled([getPublicCatalogSnapshot(), getStorefrontSettingsSnapshot()]);
+  const catalog = catalogResult.status === 'fulfilled' ? compactPublicCatalogSnapshot(catalogResult.value) : { products: [], categories: [] };
+  const settings = settingsResult.status === 'fulfilled' ? settingsResult.value : {};
+  return <><Header categories={catalog.categories as Category[]} /><main className="glass-offers-landing mx-auto min-h-screen max-w-6xl px-3 pt-4 sm:px-6">
+    <nav aria-label="Breadcrumb" className="mb-3 flex items-center gap-2 text-xs text-black/50"><Link href="/">Home</Link><span>/</span><span>Mega Deals</span></nav>
+    <GlassOffersLanding products={catalog.products as Product[]} categories={catalog.categories as Category[]} config={settings.glassDealShowcase} />
+  </main></>;
+}

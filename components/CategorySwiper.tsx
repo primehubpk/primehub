@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useContinuousHomeRail } from '@/lib/useContinuousHomeRail';
 import { collection, onSnapshot } from 'firebase/firestore';
-import { BadgePercent, ChevronRight, Package } from 'lucide-react';
+import { BadgePercent, Grid2X2, Package } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { categoryHref } from '@/lib/categoryUtils';
 import { normalizeImageUrl } from '@/lib/imageUrl';
@@ -52,7 +52,7 @@ export default function CategorySwiper({
 
   return (
     <section className="home-categories mx-auto mt-7 max-w-6xl px-4">
-      <div className="mb-3 grid grid-cols-[68px_minmax(0,1fr)_68px] items-center gap-1 sm:grid-cols-[76px_minmax(0,1fr)_76px] sm:gap-2" style={{ display: 'grid' }}>
+      <div className="mb-3 grid grid-cols-3 items-center gap-1  sm:gap-2" style={{ display: 'grid' }}>
         <div className="flex justify-center">
           <Link
           href="/primehubmall/salemela"
@@ -62,7 +62,7 @@ export default function CategorySwiper({
           aria-label="Open PrimeHubMall Sale Mela"
           className="group flex flex-col items-center gap-1 text-center"
         >
-          <span className="relative flex h-[60px] w-[60px] items-center justify-center overflow-hidden rounded-full border-[3px] border-[#F4C64A] bg-gradient-to-br from-[#FF5A50] via-[#E1352B] to-[#9F1414] text-white shadow-[0_6px_16px_rgba(225,53,43,0.24)] transition-transform group-hover:scale-105 sm:h-[68px] sm:w-[68px]">
+          <span className="category-entry-icon relative flex h-[60px] w-[60px] items-center justify-center overflow-hidden rounded-full border-[3px] border-[#F4C64A] bg-gradient-to-br from-[#FF5A50] via-[#E1352B] to-[#9F1414] text-white shadow-[0_6px_16px_rgba(225,53,43,0.24)] transition-transform group-hover:scale-105 sm:h-[68px] sm:w-[68px]">
             <span className="absolute inset-[3px] rounded-full border border-white/45" aria-hidden="true" />
             <BadgePercent size={27} strokeWidth={2.4} aria-hidden="true" />
           </span>
@@ -70,17 +70,14 @@ export default function CategorySwiper({
           </Link>
         </div>
 
-        <div className="min-w-0 text-center">
-          <p className="text-[8px] font-black uppercase tracking-[0.16em] text-[#0F6A5F] sm:text-[9px] sm:tracking-[0.2em]">Browse the collection</p>
-          <h2 className="mt-0.5 whitespace-nowrap font-[family-name:var(--font-display)] text-[18px] font-black leading-none tracking-tight sm:text-2xl">Shop by Category</h2>
-          <Link
-            href="/category"
-            prefetch={false}
-            onPointerDown={() => router.prefetch('/category')}
-            onFocus={() => router.prefetch('/category')}
-            className="mt-1 inline-flex items-center gap-0.5 rounded-full bg-white px-2 py-1 text-[9px] font-black text-[#0F6A5F] shadow-sm ring-1 ring-black/5"
-          >
-            View all <ChevronRight className="h-3 w-3" aria-hidden="true" />
+        <div className="flex justify-center">
+          <Link href="/category" prefetch={false} onPointerDown={() => router.prefetch('/category')} onFocus={() => router.prefetch('/category')}
+            className="group flex flex-col items-center gap-1 text-center" aria-label="Shop by Category">
+            <span className="category-entry-icon relative flex h-[60px] w-[60px] items-center justify-center overflow-hidden rounded-full border-[3px] border-[#F4C64A] bg-gradient-to-br from-[#1B9A89] via-[#0F6A5F] to-[#07453D] text-white shadow-[0_6px_16px_rgba(15,106,95,0.24)] sm:h-[68px] sm:w-[68px]">
+              <span className="absolute inset-[3px] rounded-full border border-white/45" aria-hidden="true" />
+              <Grid2X2 size={27} strokeWidth={2.25} aria-hidden="true" />
+            </span>
+            <span className="text-[8px] font-black leading-tight text-[#0F6A5F] sm:text-[9px]">Shop by Category</span>
           </Link>
         </div>
 
@@ -93,7 +90,7 @@ export default function CategorySwiper({
           aria-label="Open PrimeHubMall Wholesale Deals"
           className="group flex flex-col items-center gap-1 text-center"
         >
-          <span className="relative flex h-[60px] w-[60px] items-center justify-center overflow-hidden rounded-full border-[3px] border-[#F4C64A] bg-gradient-to-br from-[#1B9A89] via-[#0F6A5F] to-[#07453D] text-white shadow-[0_6px_16px_rgba(15,106,95,0.24)] transition-transform group-hover:scale-105 sm:h-[68px] sm:w-[68px]">
+          <span className="category-entry-icon relative flex h-[60px] w-[60px] items-center justify-center overflow-hidden rounded-full border-[3px] border-[#F4C64A] bg-gradient-to-br from-[#1B9A89] via-[#0F6A5F] to-[#07453D] text-white shadow-[0_6px_16px_rgba(15,106,95,0.24)] transition-transform group-hover:scale-105 sm:h-[68px] sm:w-[68px]">
             <span className="absolute inset-[3px] rounded-full border border-white/45" aria-hidden="true" />
             <Package size={27} strokeWidth={2.25} aria-hidden="true" />
           </span>
@@ -143,4 +140,3 @@ export default function CategorySwiper({
     </section>
   );
 }
-

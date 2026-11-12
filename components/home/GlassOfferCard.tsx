@@ -69,11 +69,11 @@ export default function GlassOfferCard({
   }
 
   return (
-    <article className={compact ? 'glass-offer-card glass-offer-card--compact' : 'glass-offer-card'}>
+    <article data-product-id={product.id} data-price={price} aria-hidden={clone || undefined} className={compact ? 'glass-offer-card glass-offer-card--compact' : 'glass-offer-card'}>
       <Link href={`/product/${encodeURIComponent(product.id)}`} prefetch={false} tabIndex={clone ? -1 : undefined}
         className="glass-offer-card__link" aria-label={`View ${title}, ${money(price)}`}>
         <div className="glass-offer-card__image">
-          {image ? <Image src={image} alt={title} fill sizes={compact ? '180px' : '(max-width: 640px) 45vw, 260px'} quality={74} className="object-cover transition-transform duration-300 group-hover:scale-105" />
+          {image ? <Image src={image} alt={title} fill sizes={compact ? '180px' : '(max-width: 640px) 45vw, 260px'} quality={72} className="object-cover transition-transform duration-300 group-hover:scale-105" />
             : <div className="glass-offer-card__empty">PrimeHubMall</div>}
           {savingPercent > 0 ? <span className="glass-offer-card__discount"><Tag size={11} /> Save {savingPercent}%</span> : null}
         </div>

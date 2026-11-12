@@ -17,6 +17,7 @@ import {
 } from 'react';
 import { SiteSettings } from '@/lib/types';
 import { bigDealConfiguredSlotCount, bigDealRotationIndex } from '@/lib/bigDealRotation';
+import { unifyStorefrontDeals } from '@/lib/glassOffers';
 
 const DEFAULT_SETTINGS: SiteSettings = {
   announcementText: 'PrimeHub Deals', whatsappNumber: '', freeShippingCount: 5,
@@ -92,7 +93,7 @@ function buildSettings(documents: Record<string, any>): SiteSettings {
   const policyData = (documents.policy || {}) as RawPolicy;
   const contactData = (documents.contact || {}) as RawContact;
   const rewardData = documents.rewards || mainData.homeRewardSettings || {};
-  const merged: RawSettings = resolveRotatingBigDeal({ ...DEFAULT_SETTINGS, ...legacyData, ...mainData });
+  const merged: RawSettings = unifyStorefrontDeals(resolveRotatingBigDeal({ ...DEFAULT_SETTINGS, ...legacyData, ...mainData }));
   const mainWhatsApp = typeof mainData.whatsappNumber === 'string' ? mainData.whatsappNumber : '';
   const contactWhatsApp = typeof contactData.whatsappNumber === 'string' ? contactData.whatsappNumber : '';
   const privacyPolicy = typeof policyData.privacyPolicy === 'string' ? policyData.privacyPolicy : DEFAULT_SETTINGS.policies?.privacyPolicy?.content || '';

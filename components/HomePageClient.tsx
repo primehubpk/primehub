@@ -5,16 +5,14 @@ import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import Header from "@/components/home/HomeHeader";
 import HomeCollections from "@/components/home/HomeCollections";
 import HomeCategoryDealsLazy from "@/components/home/HomeCategoryDealsLazy";
-import BigDealNextPreviewSync from "@/components/home/BigDealNextPreviewSync";
+import HomeGlassOfferRail from "@/components/home/HomeGlassOfferRail";
 import {
   HomePrimeSkills,
   HomeWholesaleVideos,
 } from "@/components/home/HomeCommerceRails";
 import "./home/home.css";
-import "./home/WeeklyDealsHomeFix.css";
 import "./home/HomeFeatureRails.css";
 import "./home/HomeCommerceRails.css";
-import HeroFlashBanner from "@/components/HeroFlashBanner";
 import CategorySwiper from "@/components/CategorySwiper";
 import NewArrivalsRail from "@/components/NewArrivalsRail";
 import YouTubeGuide from "@/components/YouTubeGuide";
@@ -260,13 +258,7 @@ export default function HomePageClient({
           </h1>
           <HomeGuideVideo mode="intro" />
           <CategorySwiper initialCategories={categories} liveUpdates={false} />
-          <HeroFlashBanner
-            homeLayout
-            initialProducts={products as SharedProduct[]}
-            liveUpdates={false}
-            initialWeekday={initialWeekday}
-          />
-          <BigDealNextPreviewSync />
+          <HomeGlassOfferRail products={products as SharedProduct[]} />
           <NewArrivalsRail
             homeLayout
             initialProducts={regularProducts}
@@ -318,7 +310,7 @@ export default function HomePageClient({
                   {!recoveringCatalog ? (
                     <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
                       <Link
-                        href="/weekly-deals"
+                        href="/deals"
                         className="rounded-full bg-[#14140F] px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.08em] text-white"
                       >
                         View Today&apos;s Deals

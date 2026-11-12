@@ -90,7 +90,7 @@ export function resolveCheckoutVoucher(vouchers: CheckoutVoucher[], value: unkno
   const part = (type: string) => dayParts.find(row => row.type === type)?.value || '';
   const today = `${part('year')}-${part('month')}-${part('day')}`;
   if (voucher.expiresAt && voucher.expiresAt < today) throw new Error('Voucher has expired.');
-  if (eligibleSubtotal <= 0) throw new Error('This voucher is not applicable to Big Deal or Weekly Deal products.');
+  if (eligibleSubtotal <= 0) throw new Error('This voucher is not applicable to Mega Deals products.');
   const amount = voucher.kind === 'cashback'
     ? Math.min(eligibleSubtotal, Math.round(eligibleSubtotal * Number(voucher.percent) / 100))
     : Math.min(voucher.amount, eligibleSubtotal);

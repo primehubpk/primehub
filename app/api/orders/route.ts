@@ -11,6 +11,7 @@ import { cashBackForTier, orderEligibleSubtotal } from '@/lib/orderBenefits';
 import { listCheckoutVouchers, resolveCheckoutVoucher } from '@/lib/checkoutVouchersServer';
 import { referralCode, resolveMemberReferralCode } from '@/lib/primeFamilyReferralsServer';
 import { bigDealConfiguredSlotCount, bigDealRotationIndex } from '@/lib/bigDealRotation';
+import { applyCollectionPrice, unifyStorefrontDeals } from '@/lib/glassOffers';
 
 export const runtime = 'nodejs';
 const WEEKDAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const;
@@ -72,7 +73,8 @@ async function buildAuthoritativeItems(items: IncomingItem[]) {
     getDualStorefrontSettings({ cache: 'no-store', timeoutMs: 5000 }),
     Promise.all(uniqueIds.map(id => getDualProduct(id, { cache: 'no-store', timeoutMs: 5000 }))),
   ]);
-  const settings = settingsResult.documents.main || {};
+  const settings = unifyStorefrontDeals({ ...(settingsResult.documents.general || {}), ...(settingsResult.documents.main || {}) });
+  const megaDealIds = new Set(settings.glassDealShowcase.enabled ? settings.glassDealShowcase.items.map((item: { productId: string }) => item.productId) : []);
   const weeklyDeals = Array.isArray(settings.weeklyDeals) ? settings.weeklyDeals : [];
   const liveDeal = weeklyDeals.find((deal: any) => deal?.day === currentDay && deal?.active !== false && typeof deal?.productId === 'string' && numberValue(deal?.dealPrice) > 0);
   // Live Big Deal is now administered under main.bigDeal. dailyDeal is a
@@ -93,8 +95,9 @@ async function buildAuthoritativeItems(items: IncomingItem[]) {
 
   const pricedItems = items.map(item => {
     const productId = String(item.productId || item.id || '');
-    const product: any = products.get(productId);
-    if (!product) throw new Error(`Product ${productId} is no longer available.`);
+    const storedProduct: any = products.get(productId);
+    if (!storedProduct) throw new Error(`Product ${productId} is no longer available.`);
+    const product: any = applyCollectionPrice(storedProduct, settings.glassDealShowcase);
     const variant: any = findVariant(product, item);
     const rawStock = variant?.stock ?? product.stock ?? product.quantity;
     const stockProvided = rawStock !== undefined && rawStock !== null && rawStock !== '';
@@ -103,6 +106,7 @@ async function buildAuthoritativeItems(items: IncomingItem[]) {
     const liveDealPrice = liveDeal?.productId === productId ? numberValue(liveDeal.dealPrice) : 0;
     const isLiveDealItem = liveDealPrice > 0 && liveDeal?.productId === productId;
     const isBigDealItem = bigProductId === productId && bigPrice > 0;
+    const isMegaDealItem = megaDealIds.has(productId);
     // Exclude active labelled deals even when product.price is already reduced.
     // Do not charge above the published base price on a scheduled offer.
     const price = isLiveDealItem ? Math.min(liveDealPrice, regularPrice) :
@@ -112,8 +116,8 @@ async function buildAuthoritativeItems(items: IncomingItem[]) {
     const quantity = Math.max(1, Math.min(50, Math.floor(numberValue(item.quantity ?? item.qty ?? 1))));
     const markedImages = trustedMarkedImages(item, productId);
     return { productId, title: String(product.title || product.name || item.title || item.name || 'Product'), price, originalPrice: numberValue(product.originalPrice) > regularPrice ? numberValue(product.originalPrice) : regularPrice, quantity, image: String(markedImages[0]?.markedUrl || variant?.imageUrl || product.imageUrl || product.image || item.imageUrl || item.image || ''), ...(markedImages.length ? { markedImages } : {}), variant: item.variant || null, weeklyDealDay: isLiveDealItem ? currentDay : null,
-      rewardExcluded: isLiveDealItem || isBigDealItem,
-      dealCategory: isLiveDealItem ? 'weekly' : isBigDealItem ? 'big' : '',
+      rewardExcluded: isMegaDealItem || isLiveDealItem || isBigDealItem,
+      dealCategory: isMegaDealItem ? 'mega' : isLiveDealItem ? 'weekly' : isBigDealItem ? 'big' : '',
       isWholesale: isWholesaleProduct(product), category: product.category || '', categoryId: product.categoryId || '' };
   });
   return { items: pricedItems, settings };

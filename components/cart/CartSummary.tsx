@@ -87,7 +87,7 @@ export default function CartSummary({
               : 'Voucher not applied.'}
         </p>}
         <p className="mt-2 text-[9px] leading-4 text-black/50">
-          Big Deal and Weekly Deal products cannot receive voucher reductions or cashback.
+          Mega Deals products cannot receive voucher reductions or cashback.
         </p>
       </div>
 

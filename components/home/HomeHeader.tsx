@@ -176,8 +176,7 @@ export default function HomeHeader({ categories = [] }: { categories?: Category[
           </p>
 
           {[
-            ["Weekly Deals", "/weekly-deals"],
-            ["Big Deal", "/deals/big"],
+            ["Mega Deals", "/deals"],
             ["New Arrivals", "/new-arrivals"],
             ["Sale Mela", "/primehubmall/salemela"],
             ["Reseller Club", "/reseller"],

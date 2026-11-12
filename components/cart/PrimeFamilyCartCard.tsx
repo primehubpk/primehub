@@ -76,7 +76,7 @@ export default function PrimeFamilyCartCard({
           </div>
           <p className="mt-2 flex items-start gap-1.5 text-[10px] font-semibold leading-4 text-[#276C5C]">
             <CheckCircle2 size={14} className="mt-0.5 shrink-0" />
-            {voucherKind === 'referral' ? 'This order uses a friend code. Your tier cashback is replaced; the code owner can earn an inviter reward after delivery.' : eligible > 0 ? 'This cashback becomes shopping-only PrimeHub credit after Admin marks your order Delivered.' : 'This cart has no cashback-eligible products. Big Deal and Weekly Deal items are excluded.'}
+            {voucherKind === 'referral' ? 'This order uses a friend code. Your tier cashback is replaced; the code owner can earn an inviter reward after delivery.' : eligible > 0 ? 'This cashback becomes shopping-only PrimeHub credit after Admin marks your order Delivered.' : 'This cart has no cashback-eligible products. Mega Deals items are excluded.'}
           </p>
           {voucherKind === 'referral' && <p className="mt-1 text-[10px] font-bold text-[#0F6A5F]">Friend code: {referralPercent}% (estimated Rs. {money(referralCashEstimate)}) goes to the code OWNER once this buyer's qualifying order is Delivered; not to buyer. No double cashback.</p>}
           {voucherKind === 'cashback' && <p className="mt-1 text-[10px] font-bold text-[#0F6A5F]">Promo {voucherCashbackPercent}% replaces tier cashback: Rs. {money(cashVoucher)} shopping credit on delivery (not extra).</p>}
@@ -101,7 +101,7 @@ export default function PrimeFamilyCartCard({
           })}
         </div>
       </div>}
-      <p className="mt-2 text-[9px] leading-4 text-[#628177]">Cashback applies to eligible regular products only—not Big Deal or Weekly Deal. No cashback is subtracted from checkout payment.</p>
+      <p className="mt-2 text-[9px] leading-4 text-[#628177]">Cashback applies to eligible regular products only—not Mega Deals. No cashback is subtracted from checkout payment.</p>
     </section>
   );
 }

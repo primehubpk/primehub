@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowDown, ArrowUp, Loader2, Plus, Trash2 } from 'lucide-react';
 import { getAdminDocument, listAdminDocuments, setAdminDocument } from '../shared';
-import { DEFAULT_GLASS_OFFERS, resolveGlassOffers, type GlassOfferSettings } from '@/lib/glassOffers';
+import { DEFAULT_GLASS_OFFERS, resolveGlassOffers, resolveUnifiedDealCollection, type GlassOfferSettings } from '@/lib/glassOffers';
 
 type AdminProduct = { id: string; title: string; price: number; imageUrl?: string; active?: boolean };
 
@@ -26,7 +26,7 @@ export default function GlassDealShowcaseSettings() {
     Promise.all([getAdminDocument('settings', 'main'), listAdminDocuments('products')])
       .then(([settings, catalog]) => {
         if (cancelled) return;
-        setConfig(resolveGlassOffers(settings.exists() ? settings.data()?.glassDealShowcase : undefined));
+        setConfig(resolveUnifiedDealCollection(settings.exists() ? settings.data() : {}));
         setProducts(catalog.docs.map((doc: { id: string; data: () => Record<string, any> }) => {
           const row = doc.data();
           return { id: doc.id, title: String(row.title || row.name || doc.id), price: Number(row.price) || 0,
@@ -53,11 +53,11 @@ export default function GlassDealShowcaseSettings() {
     setSaving(true);
     setNotice('');
     try {
-      const clean = resolveGlassOffers(config);
+      const clean = resolveGlassOffers({ ...config, collectionVersion: 2 });
       if (clean.enabled && clean.items.length === 0) throw new Error('Select at least one product first.');
       if (clean.items.some((item) => !productMap.has(item.productId))) throw new Error('Some selected products no longer exist.');
       await setAdminDocument('settings', 'main', { glassDealShowcase: clean });
-      setNotice('Glass Bangles deal collection saved. Home rail and offers page use the same settings.');
+      setNotice('Mega Deals saved. These prices apply every day on Home, Deals, product pages and checkout.');
       setConfig(clean);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : 'Saving failed.');
@@ -69,8 +69,8 @@ export default function GlassDealShowcaseSettings() {
   return (
     <section className="mt-7 rounded-2xl border border-rose-200 bg-white p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div><h3 className="text-xl font-black">70% OFF &amp; More Deals Collection</h3>
-          <p className="mt-1 text-sm text-black/60">Configure the endless homepage trail and separate landing page. Any product price can be included.</p>
+        <div><h3 className="text-xl font-black">Mega Deals — All Products</h3>
+          <p className="mt-1 text-sm text-black/60">All former Weekly and Big Deal products are here at their same deal prices, available every day. Add products from any category.</p>
         </div>
         <label className="flex cursor-pointer items-center gap-2 text-xs font-bold">
           <input type="checkbox" checked={config.enabled} onChange={(event) => patch({ enabled: event.target.checked })} />
@@ -83,7 +83,6 @@ export default function GlassDealShowcaseSettings() {
             {([
               ['heading', 'Collection heading'],
               ['subtitle', 'Short description'],
-              ['badge', 'Promo badge text'],
             ] as const).map(([field, label]) => (
               <label key={field} className="text-xs font-bold">{label}
                 <input className="mt-1 w-full rounded-xl border border-black/15 p-2.5 text-sm font-medium" value={config[field]}
@@ -92,9 +91,9 @@ export default function GlassDealShowcaseSettings() {
               </label>
             ))}
           </div>
-          <p className="mt-4 text-xs text-amber-800">Reference prices are only for verified previous prices, not checkout price. Rs. 3,000 to Rs. 999 is 67% off when rounded (approximately 70%).</p>
+          <p className="mt-4 text-xs text-amber-800">Selling price is the price customers pay every day. Leave it blank to use the catalog price. Savings on the banner and cards are calculated from verified previous prices.</p>
           <div className="mt-4 rounded-xl border border-black/10 bg-stone-50 p-3">
-            <label className="text-xs font-bold">Search catalog to add future deals
+            <label className="text-xs font-bold">Search any catalog category to add deals
               <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search product title or ID" className="mt-1 w-full rounded-lg border border-black/15 bg-white p-2.5 text-sm" />
             </label>
             <div className="mt-2 grid gap-2 sm:grid-cols-2">
@@ -116,8 +115,12 @@ export default function GlassDealShowcaseSettings() {
                 <div key={item.productId} className="flex flex-wrap items-center gap-2 rounded-xl border border-black/10 bg-white p-2">
                   <span className="w-5 text-center text-xs font-black text-black/45">{index + 1}</span>
                   <span className="min-w-[150px] flex-1 text-xs font-semibold">{product?.title || item.productId}
-                    <span className="block text-[#0f6a5f]">Selling Rs. {(product?.price || 0).toLocaleString('en-PK')}</span>
+                    <span className="block text-[#0f6a5f]">Selling Rs. {(item.dealPrice || product?.price || 0).toLocaleString('en-PK')}</span>
                   </span>
+                  <label className="text-[10px] font-bold text-[#0f6a5f]">Selling price Rs.
+                    <input type="number" min="1" step="1" value={item.dealPrice || ''} placeholder="Catalog price" className="ml-1 w-28 rounded-lg border p-1.5 text-xs"
+                      onChange={(event) => patch({ items: config.items.map((entry, i) => i === index ? { ...entry, dealPrice: event.target.value ? Math.max(1, Number(event.target.value)) : undefined } : entry) })} />
+                  </label>
                   <label className="text-[10px] font-bold text-black/70">Verified previous Rs.
                     <input type="number" min="0" step="1" value={item.referencePrice || ''}
                       placeholder="Optional" className="ml-1 w-24 rounded-lg border p-1.5 text-xs"
@@ -133,7 +136,7 @@ export default function GlassDealShowcaseSettings() {
           </div>
           <button type="button" onClick={save} disabled={saving || config.items.length === 0}
             className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-[#0f6a5f] px-4 py-3 text-sm font-black text-white disabled:opacity-50">
-            {saving ? <Loader2 size={17} className="animate-spin" /> : null} Save Offer Collection
+            {saving ? <Loader2 size={17} className="animate-spin" /> : null} Save Mega Deals
           </button>
           {notice ? <p role="status" className="mt-3 text-sm font-medium">{notice}</p> : null}
         </>

@@ -12,7 +12,7 @@ function loadPureExports(path) {
   const module = {exports: {}};
   vm.runInNewContext(js, {
     module, exports: module.exports,
-    require: () => ({}), console, Intl, Date, Number, String, Set,
+    require: name => name === './glassOffers' ? loadPureExports('lib/glassOffers.ts') : ({}), console, Intl, Date, Number, String, Set,
   }, {filename: path, timeout: 2000});
   return module.exports;
 }

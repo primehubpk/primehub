@@ -15,16 +15,18 @@ function load(path, dependencies, globals = {}) {
     if (name in dependencies) return dependencies[name];
     if (name === 'node:crypto') return require(name);
     throw new Error(`Unexpected dependency ${name}`);
-  }, console, setTimeout, URLSearchParams, AbortSignal, process, ...globals });
+  }, console, setTimeout, URL, URLSearchParams, AbortSignal, process, ...globals });
   return exports;
 }
 const policy = load('lib/storefrontCachePolicy.ts', {});
+const offers = load('lib/glassOffers.ts', {});
 
 function setup() {
   const cache = new Map();
   const reads = new Map();
   const products = new Map(['a', 'b'].map(id => [id, { id, price: 100, title: id }]));
   const invalidated = [];
+  const collection = { collectionVersion: 2, enabled: true, items: [] };
   const nextCache = {
     unstable_cache: (fn, key, options) => async (...args) => {
       const name = JSON.stringify([key, args]);
@@ -49,13 +51,17 @@ function setup() {
   const snapshots = load('lib/publicCatalogServer.ts', {
     'server-only': {}, 'next/cache': nextCache,
     '@/lib/storefrontCachePolicy': policy, '@/lib/dualReadServer': dual,
-    '@/lib/storefrontSettingsServer': {}, '@/lib/wholesaleVideosServer': {},
+    '@/lib/glassOffers': offers,
+    '@/lib/storefrontSettingsServer': { getStorefrontSettingsWithBigDealRecovery: async () => ({ source: 'supabase', documents: { main: { glassDealShowcase: collection } } }) }, '@/lib/wholesaleVideosServer': {},
   });
   const admin = load('app/api/admin/firestore/route.ts', {
     'next/server': { NextResponse: { json: (body, init) => Response.json(body, init) } },
     'next/cache': nextCache, '@/lib/storefrontCachePolicy': policy,
+    '@/lib/walletAdminSession': { authorizedWalletAdmin: () => true },
     '@/lib/firebaseAdmin': { getAdminDb: () => ({ collection: () => ({ doc: () => ({ id: 'new', set: async () => {}, delete: async () => {} }) }) }) },
     '@/lib/dualWriteServer': {
+      isSupabaseWriteConfigured: () => true,
+      recordMirrorFailure: async () => {},
       getSupabasePrimaryPayload: async (name, id) => products.get(id),
       mapDocumentToSupabase: (name, id, data) => ({ id, ...data }),
       supabasePrimaryUpsert: async ({ row }) => products.set(row.id, row),
@@ -64,12 +70,12 @@ function setup() {
   });
   async function write(action, name, id, value) {
     const response = await admin.POST(new Request('https://store.example/api/admin/firestore', {
-      method: 'POST', headers: { cookie: 'primehub_admin_auth=true', 'content-type': 'application/json' },
+      method: 'POST', headers: { origin: 'https://store.example', cookie: 'primehub_admin_auth=true', 'content-type': 'application/json' },
       body: JSON.stringify({ action, name, id, value }),
     }));
     assert.equal(response.status, 200);
   }
-  return { snapshots, reads, products, invalidated, nextCache, write };
+  return { snapshots, reads, products, invalidated, nextCache, write, collection };
 }
 
 test('editing one product refreshes it and catalog, while another product and category directory stay cached', async () => {
@@ -144,4 +150,15 @@ test('a missing primary product is distinguishable from a temporary data outage'
   assert.equal(missing.source, 'supabase');
   fail = true;
   assert.equal((await dual.getDualProduct('existing-product')).source, 'empty');
+});
+
+test('deal settings invalidation updates catalog, product and fresh purchase prices together', async () => {
+  const { snapshots: s, nextCache, collection } = setup();
+  assert.equal((await s.getPublicProductSnapshot('a')).product.price, 100);
+  await s.getPublicCatalogSnapshot();
+  collection.items = [{ productId: 'a', dealPrice: 50, referencePrice: 100 }];
+  nextCache.revalidateTag('storefront-settings');
+  assert.equal((await s.getPublicProductSnapshot('a')).product.price, 50);
+  assert.equal((await s.getPublicCatalogSnapshot()).products.find(item => item.id === 'a').price, 50);
+  assert.equal((await s.getFreshPublicProductSnapshot('a')).product.price, 50);
 });
