@@ -23,18 +23,16 @@ export default function HomeGlassOfferRail({
   if (!offers.length) return null;
 
   return (
-    <section className="glass-offers-home mx-2 mt-3 sm:mx-4 sm:mt-5" aria-label="70% OFF and more special deals">
-      <div className="glass-offers-home__toolbar">
-        <Link href="/deals/glass-bangles" prefetch={false} className="glass-offers-home__more">
-          View More <ArrowRight size={15} />
-        </Link>
-      </div>
-
+    <section className="glass-offers-home sm:mx-4" aria-label="70% OFF and more special deals">
       <div className="glass-offers-home__row">
-        <Link href="/deals/glass-bangles" prefetch={false} className="glass-offers-home__promo" aria-label={`${config.badge} special offers, view all products`}>
+        <Link href="/deals/glass-bangles" prefetch={false} className="glass-offers-home__promo" aria-label={`${config.badge} special offers. Shop more deals`}>
           <span className="glass-offers-home__promo-kicker">DEAL BOX COLLECTION</span>
           <BadgePercent className="glass-offers-home__badge-icon" size={30} aria-hidden="true" />
           <strong>{config.badge}</strong>
+          <span className="glass-offers-home__promo-cta" aria-hidden="true">
+            <span>SHOP MORE</span>
+            <span className="glass-offers-home__promo-cta-bottom">DEALS <ArrowRight size={13} strokeWidth={2.6} /></span>
+          </span>
         </Link>
 
         <div ref={railRef} className="glass-offers-home__viewport" role="region" aria-label="Continuously scrolling product offers" tabIndex={0}>
