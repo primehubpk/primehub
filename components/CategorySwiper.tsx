@@ -6,7 +6,6 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { collection, onSnapshot } from 'firebase/firestore';
-import { BadgePercent, Grid2X2, Package } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { categoryHref } from '@/lib/categoryUtils';
 import { normalizeImageUrl } from '@/lib/imageUrl';
@@ -49,54 +48,7 @@ export default function CategorySwiper({
 
   return (
     <section className="home-categories mx-auto mt-7 max-w-6xl px-4">
-      <div className="mb-3 grid grid-cols-3 items-center gap-1  sm:gap-2" style={{ display: 'grid' }}>
-        <div className="flex justify-center">
-          <Link
-          href="/primehubmall/salemela"
-          prefetch={false}
-          onPointerDown={() => router.prefetch('/primehubmall/salemela')}
-          onFocus={() => router.prefetch('/primehubmall/salemela')}
-          aria-label="Open PrimeHubMall Sale Mela"
-          className="group flex flex-col items-center gap-1 text-center"
-        >
-          <span className="category-entry-icon relative flex h-[60px] w-[60px] items-center justify-center overflow-hidden rounded-full border-[3px] border-[#F4C64A] bg-gradient-to-br from-[#FF5A50] via-[#E1352B] to-[#9F1414] text-white shadow-[0_6px_16px_rgba(225,53,43,0.24)] transition-transform group-hover:scale-105 sm:h-[68px] sm:w-[68px]">
-            <span className="absolute inset-[3px] rounded-full border border-white/45" aria-hidden="true" />
-            <BadgePercent size={27} strokeWidth={2.4} aria-hidden="true" />
-          </span>
-          <span className="max-w-full text-[8px] font-black leading-tight text-[#E1352B] sm:text-[9px]">Sale Mela</span>
-          </Link>
-        </div>
-
-        <div className="flex justify-center">
-          <Link href="/category" prefetch={false} onPointerDown={() => router.prefetch('/category')} onFocus={() => router.prefetch('/category')}
-            className="group flex flex-col items-center gap-1 text-center" aria-label="Shop by Category">
-            <span className="category-entry-icon relative flex h-[60px] w-[60px] items-center justify-center overflow-hidden rounded-full border-[3px] border-[#F4C64A] bg-gradient-to-br from-[#1B9A89] via-[#0F6A5F] to-[#07453D] text-white shadow-[0_6px_16px_rgba(15,106,95,0.24)] sm:h-[68px] sm:w-[68px]">
-              <span className="absolute inset-[3px] rounded-full border border-white/45" aria-hidden="true" />
-              <Grid2X2 size={27} strokeWidth={2.25} aria-hidden="true" />
-            </span>
-            <span className="text-[8px] font-black leading-tight text-[#0F6A5F] sm:text-[9px]">Shop by Category</span>
-          </Link>
-        </div>
-
-        <div className="flex justify-center">
-          <Link
-          href="/primehubmall/salemela#bucket-wholesale"
-          prefetch={false}
-          onPointerDown={() => router.prefetch('/primehubmall/salemela')}
-          onFocus={() => router.prefetch('/primehubmall/salemela')}
-          aria-label="Open PrimeHubMall Wholesale Deals"
-          className="group flex flex-col items-center gap-1 text-center"
-        >
-          <span className="category-entry-icon relative flex h-[60px] w-[60px] items-center justify-center overflow-hidden rounded-full border-[3px] border-[#F4C64A] bg-gradient-to-br from-[#1B9A89] via-[#0F6A5F] to-[#07453D] text-white shadow-[0_6px_16px_rgba(15,106,95,0.24)] transition-transform group-hover:scale-105 sm:h-[68px] sm:w-[68px]">
-            <span className="absolute inset-[3px] rounded-full border border-white/45" aria-hidden="true" />
-            <Package size={27} strokeWidth={2.25} aria-hidden="true" />
-          </span>
-          <span className="max-w-full text-[8px] font-black leading-tight text-[#0F6A5F] sm:text-[9px]">Wholesale</span>
-          </Link>
-        </div>
-      </div>
-
-      <div className="flex gap-3 overflow-x-auto overflow-y-visible touch-pan-x cursor-grab active:cursor-grabbing overscroll-x-contain pb-3 [scrollbar-width:none] lg:[scrollbar-width:thin] lg:[scrollbar-color:#9ca3af_transparent] [&::-webkit-scrollbar]:hidden lg:[&::-webkit-scrollbar]:block lg:[&::-webkit-scrollbar]:h-1.5 lg:[&::-webkit-scrollbar-thumb]:rounded-full lg:[&::-webkit-scrollbar-thumb]:bg-black/25">
+      <div className="home-category-rail flex gap-3 overflow-x-auto overflow-y-visible touch-pan-x cursor-grab active:cursor-grabbing overscroll-x-contain pb-3 [scrollbar-width:none] lg:[scrollbar-width:thin] lg:[scrollbar-color:#9ca3af_transparent] [&::-webkit-scrollbar]:hidden lg:[&::-webkit-scrollbar]:block lg:[&::-webkit-scrollbar]:h-1.5 lg:[&::-webkit-scrollbar-thumb]:rounded-full lg:[&::-webkit-scrollbar-thumb]:bg-black/25">
         {visible.map((category, index) => {
           const aboveTheFold = index < ABOVE_THE_FOLD_CATEGORY_IMAGES;
           const href = categoryHref(category);

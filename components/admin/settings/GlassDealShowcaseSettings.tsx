@@ -1,5 +1,6 @@
 'use client';
 
+import BogoDealSettings from './BogoDealSettings';
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowDown, ArrowUp, Loader2, Plus, Trash2 } from 'lucide-react';
 import { getAdminDocument, listAdminDocuments, setAdminDocument } from '../shared';
@@ -67,6 +68,7 @@ export default function GlassDealShowcaseSettings() {
   }
 
   return (
+    <>
     <section className="mt-7 rounded-2xl border border-rose-200 bg-white p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div><h3 className="text-xl font-black">Mega Deals — All Products</h3>
@@ -142,5 +144,7 @@ export default function GlassDealShowcaseSettings() {
         </>
       )}
     </section>
+    <BogoDealSettings />
+    </>
   );
 }

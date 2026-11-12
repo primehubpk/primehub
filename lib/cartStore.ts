@@ -20,6 +20,7 @@ export interface CartItem {
   productId?: string;
   category?: string;
   variant?: ProductVariantSelection;
+  bogoOffer?: { enabled: boolean; unitsPerOffer: 2; unitLabel: string };
   markedImages?: MarkedProductImage[];
 }
 

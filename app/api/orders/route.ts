@@ -12,6 +12,7 @@ import { listCheckoutVouchers, resolveCheckoutVoucher } from '@/lib/checkoutVouc
 import { referralCode, resolveMemberReferralCode } from '@/lib/primeFamilyReferralsServer';
 import { bigDealConfiguredSlotCount, bigDealRotationIndex } from '@/lib/bigDealRotation';
 import { applyCollectionPrice, unifyStorefrontDeals } from '@/lib/glassOffers';
+import { bogoFulfilment, isBogoProduct, validateBogoOrder } from '@/lib/bogoOffers';
 
 export const runtime = 'nodejs';
 const WEEKDAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const;
@@ -93,6 +94,7 @@ async function buildAuthoritativeItems(items: IncomingItem[]) {
   const bigPrice = bigActive ? numberValue(big.dealPrices?.[bigSlot] ?? big.dealPrice ?? 0) : 0;
   const products = new Map(productResults.filter(result => result.product).map(result => [String(result.product!.id), result.product]));
 
+  const bogoStockUsed = new Map<string, number>();
   const pricedItems = items.map(item => {
     const productId = String(item.productId || item.id || '');
     const storedProduct: any = products.get(productId);
@@ -114,10 +116,13 @@ async function buildAuthoritativeItems(items: IncomingItem[]) {
       (variant && numberValue(variant.price) > 0 ? numberValue(variant.price) : regularPrice);
     if (price <= 0) throw new Error('Product price is not available.');
     const quantity = Math.max(1, Math.min(50, Math.floor(numberValue(item.quantity ?? item.qty ?? 1))));
+    validateBogoOrder(product, item.variant, quantity, (settings as any).bogoDealShowcase, bogoStockUsed);
+    const promotion = bogoFulfilment(product, quantity);
     const markedImages = trustedMarkedImages(item, productId);
     return { productId, title: String(product.title || product.name || item.title || item.name || 'Product'), price, originalPrice: numberValue(product.originalPrice) > regularPrice ? numberValue(product.originalPrice) : regularPrice, quantity, image: String(markedImages[0]?.markedUrl || variant?.imageUrl || product.imageUrl || product.image || item.imageUrl || item.image || ''), ...(markedImages.length ? { markedImages } : {}), variant: item.variant || null, weeklyDealDay: isLiveDealItem ? currentDay : null,
-      rewardExcluded: isMegaDealItem || isLiveDealItem || isBigDealItem,
-      dealCategory: isMegaDealItem ? 'mega' : isLiveDealItem ? 'weekly' : isBigDealItem ? 'big' : '',
+      ...(promotion ? { promotion } : {}),
+      rewardExcluded: isBogoProduct(product) || isMegaDealItem || isLiveDealItem || isBigDealItem,
+      dealCategory: isBogoProduct(product) ? 'bogo' : isMegaDealItem ? 'mega' : isLiveDealItem ? 'weekly' : isBigDealItem ? 'big' : '',
       isWholesale: isWholesaleProduct(product), category: product.category || '', categoryId: product.categoryId || '' };
   });
   return { items: pricedItems, settings };

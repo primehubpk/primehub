@@ -1,4 +1,5 @@
 import 'server-only';
+import { stagedBogoProducts, withStagedBogoCatalog } from '@/lib/stagedBogoCatalogServer';
 import { getAdminDb } from '@/lib/firebaseAdmin';
 
 type ReadMode = 'firebase-primary' | 'supabase-primary' | 'firebase-only' | 'supabase-only';
@@ -520,7 +521,7 @@ export function getDualCatalog(options?: DualReadCacheOptions) {
     (data): CatalogSnapshot | null => Array.isArray(data?.products) && data.products.length > 0
       ? { products: data.products, categories: Array.isArray(data.categories) ? data.categories : [], source: 'supabase' }
       : null,
-  );
+  ).then(withStagedBogoCatalog);
 }
 export function getDualFeedCatalog(options?: DualReadCacheOptions) {
   return withFallback(
@@ -533,6 +534,8 @@ export function getDualFeedCatalog(options?: DualReadCacheOptions) {
 export function getDualProduct(id: string, options?: DualReadCacheOptions) {
   const productId = String(id || '').trim();
   if (!productId) return Promise.resolve({ product: null, source: 'empty' as const });
+  const staged = stagedBogoProducts().find(product => product.id === productId);
+  if (staged) return Promise.resolve({ product: staged, source: 'supabase' as const });
   return withLocalPublishedPreview<ProductSnapshot>(
     withFallback(
       () => firebaseProduct(productId),

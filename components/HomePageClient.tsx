@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import Header from "@/components/home/HomeHeader";
 import HomeCollections from "@/components/home/HomeCollections";
 import HomeCategoryDealsLazy from "@/components/home/HomeCategoryDealsLazy";
+import BogoDeals from '@/components/home/BogoDeals';
 import HomeGlassOfferRail from "@/components/home/HomeGlassOfferRail";
 import {
   HomePrimeSkills,
@@ -39,6 +40,7 @@ import type {
 import type { Product } from "@/components/shop/ShopTypes";
 import { CATALOG_REFRESH_EVENT } from "@/lib/catalogRefreshSignal";
 import { fetchPublicStorefront, invalidatePublicStorefront } from "@/lib/storefrontClient";
+import { isBogoProduct } from '@/lib/bogoOffers';
 import { isExclusiveGlassDealProduct } from "@/lib/glassOffers";
 
 type Props = {
@@ -228,7 +230,7 @@ export default function HomePageClient({
 
   };
 
-  const regularProducts = useMemo(() => products.filter((product) => !isExclusiveGlassDealProduct(product)), [products]);
+  const regularProducts = useMemo(() => products.filter((product) => !isExclusiveGlassDealProduct(product) && !isBogoProduct(product)), [products]);
 
   const selectPrice = (amount: number | null) => {
     setSelectedMaxPrice(amount);
@@ -259,6 +261,7 @@ export default function HomePageClient({
           <HomeGuideVideo mode="intro" />
           <CategorySwiper initialCategories={categories} liveUpdates={false} />
           <HomeGlassOfferRail products={products as SharedProduct[]} />
+          <BogoDeals products={products} />
           <NewArrivalsRail
             homeLayout
             initialProducts={regularProducts}

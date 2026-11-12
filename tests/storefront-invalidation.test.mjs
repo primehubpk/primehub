@@ -20,6 +20,7 @@ function load(path, dependencies, globals = {}) {
 }
 const policy = load('lib/storefrontCachePolicy.ts', {});
 const offers = load('lib/glassOffers.ts', {});
+const bogo = load('lib/bogoOffers.ts', {});
 
 function setup() {
   const cache = new Map();
@@ -51,7 +52,7 @@ function setup() {
   const snapshots = load('lib/publicCatalogServer.ts', {
     'server-only': {}, 'next/cache': nextCache,
     '@/lib/storefrontCachePolicy': policy, '@/lib/dualReadServer': dual,
-    '@/lib/glassOffers': offers,
+    '@/lib/glassOffers': offers, '@/lib/bogoOffers': bogo,
     '@/lib/storefrontSettingsServer': { getStorefrontSettingsWithBigDealRecovery: async () => ({ source: 'supabase', documents: { main: { glassDealShowcase: collection } } }) }, '@/lib/wholesaleVideosServer': {},
   });
   const admin = load('app/api/admin/firestore/route.ts', {
@@ -139,6 +140,7 @@ test('a missing primary product is distinguishable from a temporary data outage'
   let fail = false;
   const dual = load('lib/dualReadServer.ts', {
     'server-only': {},
+    '@/lib/stagedBogoCatalogServer': { stagedBogoProducts: () => [], withStagedBogoCatalog: value => value },
     '@/lib/firebaseAdmin': { getAdminDb: () => { throw new Error('Unexpected Firebase fallback'); } },
   }, {
     process: { env: { SUPABASE_URL: 'https://fixture.invalid', SUPABASE_ANON_KEY: 'fixture', PRIMEHUB_DATA_READ_MODE: 'supabase-only' } },

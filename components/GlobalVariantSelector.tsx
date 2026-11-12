@@ -86,6 +86,7 @@ export default function GlobalVariantSelector() {
         imageUrl: image,
         variant: selection,
         ...(activeDealDay ? { dealDay: activeDealDay as import('@/lib/types').Weekday } : {}),
+        ...(product.bogoOffer ? { bogoOffer: product.bogoOffer as import('@/lib/cartStore').CartItem['bogoOffer'] } : {}),
         markedImages,
       });
     }

@@ -1,0 +1,3160 @@
+[
+  {
+    "id": "bogo-523fa43800337c7ef338",
+    "title": "Fancy Bangle Set 01 — Buy 1 Get 1 Free (2 sets)",
+    "slug": "bogo-523fa43800337c7ef338",
+    "price": 400,
+    "originalPrice": 400,
+    "description": "Buy 1 Get 1 Free: each offer pack includes 1 paid set and 1 identical free set. Same design, colour and selected size. Quantity counts offer packs; one offer pack contains two sets. Daily cycle renews at midnight Pakistan time unless paused by Admin. While stocks last.",
+    "category": "vakVNohIm5ulV5cyidYn",
+    "stock": 30,
+    "active": true,
+    "published": true,
+    "isWholesale": false,
+    "isFlashSale": true,
+    "isWeekendSpecial": false,
+    "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/523fa43800337c7ef338.webp",
+    "images": [
+      "https://images.primehubmall.com/products/bogo-nov12/523fa43800337c7ef338.webp"
+    ],
+    "bogoOffer": {
+      "enabled": true,
+      "unitLabel": "set",
+      "unitsPerOffer": 2
+    },
+    "bogoGroup": "Fancy Bangle Set",
+    "hasVariants": true,
+    "variantColors": [
+      {
+        "name": "Multicolour",
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/523fa43800337c7ef338.webp"
+      }
+    ],
+    "variantSizes": [
+      "2.6",
+      "2.2",
+      "2.8"
+    ],
+    "variantOptions": [
+      {
+        "id": "color",
+        "values": [
+          "Multicolour"
+        ]
+      },
+      {
+        "id": "size",
+        "values": [
+          "2.6",
+          "2.2",
+          "2.8"
+        ]
+      }
+    ],
+    "variantMatrix": [
+      {
+        "id": "bogo-523fa43800337c7ef338-size-26",
+        "color": "Multicolour",
+        "size": "2.6",
+        "stock": 30,
+        "price": 400,
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/523fa43800337c7ef338.webp",
+        "active": true,
+        "hidden": false
+      },
+      {
+        "id": "bogo-523fa43800337c7ef338-size-22",
+        "color": "Multicolour",
+        "size": "2.2",
+        "stock": 30,
+        "price": 400,
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/523fa43800337c7ef338.webp",
+        "active": true,
+        "hidden": false
+      },
+      {
+        "id": "bogo-523fa43800337c7ef338-size-28",
+        "color": "Multicolour",
+        "size": "2.8",
+        "stock": 30,
+        "price": 400,
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/523fa43800337c7ef338.webp",
+        "active": true,
+        "hidden": false
+      }
+    ],
+    "sourceAsset": {
+      "folder": "FANCY SET 26.22.28........400",
+      "file": "file_0000000015f882119f258308d36dbca6.png",
+      "sha256": "523fa43800337c7ef3385a8e8a465ab3d52d64655d106918ce21117977af1dcf",
+      "bytes": 90714
+    },
+    "createdAt": "2026-11-12T00:00:00.000Z"
+  },
+  {
+    "id": "bogo-eaefa3b3d526bc675095",
+    "title": "Fancy Bangle Set 02 — Buy 1 Get 1 Free (2 sets)",
+    "slug": "bogo-eaefa3b3d526bc675095",
+    "price": 400,
+    "originalPrice": 400,
+    "description": "Buy 1 Get 1 Free: each offer pack includes 1 paid set and 1 identical free set. Same design, colour and selected size. Quantity counts offer packs; one offer pack contains two sets. Daily cycle renews at midnight Pakistan time unless paused by Admin. While stocks last.",
+    "category": "vakVNohIm5ulV5cyidYn",
+    "stock": 30,
+    "active": true,
+    "published": true,
+    "isWholesale": false,
+    "isFlashSale": true,
+    "isWeekendSpecial": false,
+    "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/eaefa3b3d526bc675095.webp",
+    "images": [
+      "https://images.primehubmall.com/products/bogo-nov12/eaefa3b3d526bc675095.webp"
+    ],
+    "bogoOffer": {
+      "enabled": true,
+      "unitLabel": "set",
+      "unitsPerOffer": 2
+    },
+    "bogoGroup": "Fancy Bangle Set",
+    "hasVariants": true,
+    "variantColors": [
+      {
+        "name": "Pearl Gold",
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/eaefa3b3d526bc675095.webp"
+      }
+    ],
+    "variantSizes": [
+      "2.6",
+      "2.2",
+      "2.8"
+    ],
+    "variantOptions": [
+      {
+        "id": "color",
+        "values": [
+          "Pearl Gold"
+        ]
+      },
+      {
+        "id": "size",
+        "values": [
+          "2.6",
+          "2.2",
+          "2.8"
+        ]
+      }
+    ],
+    "variantMatrix": [
+      {
+        "id": "bogo-eaefa3b3d526bc675095-size-26",
+        "color": "Pearl Gold",
+        "size": "2.6",
+        "stock": 30,
+        "price": 400,
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/eaefa3b3d526bc675095.webp",
+        "active": true,
+        "hidden": false
+      },
+      {
+        "id": "bogo-eaefa3b3d526bc675095-size-22",
+        "color": "Pearl Gold",
+        "size": "2.2",
+        "stock": 30,
+        "price": 400,
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/eaefa3b3d526bc675095.webp",
+        "active": true,
+        "hidden": false
+      },
+      {
+        "id": "bogo-eaefa3b3d526bc675095-size-28",
+        "color": "Pearl Gold",
+        "size": "2.8",
+        "stock": 30,
+        "price": 400,
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/eaefa3b3d526bc675095.webp",
+        "active": true,
+        "hidden": false
+      }
+    ],
+    "sourceAsset": {
+      "folder": "FANCY SET 26.22.28........400",
+      "file": "file_0000000065b48246beaed529a0fb21de.png",
+      "sha256": "eaefa3b3d526bc67509570102143f22c1150bfa3e39cc76706ddd2bb093739b3",
+      "bytes": 97202
+    },
+    "createdAt": "2026-11-12T00:00:00.000Z"
+  },
+  {
+    "id": "bogo-ec7142d35a946517e019",
+    "title": "Fancy Bangle Set 03 — Buy 1 Get 1 Free (2 sets)",
+    "slug": "bogo-ec7142d35a946517e019",
+    "price": 400,
+    "originalPrice": 400,
+    "description": "Buy 1 Get 1 Free: each offer pack includes 1 paid set and 1 identical free set. Same design, colour and selected size. Quantity counts offer packs; one offer pack contains two sets. Daily cycle renews at midnight Pakistan time unless paused by Admin. While stocks last.",
+    "category": "vakVNohIm5ulV5cyidYn",
+    "stock": 30,
+    "active": true,
+    "published": true,
+    "isWholesale": false,
+    "isFlashSale": true,
+    "isWeekendSpecial": false,
+    "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/ec7142d35a946517e019.webp",
+    "images": [
+      "https://images.primehubmall.com/products/bogo-nov12/ec7142d35a946517e019.webp"
+    ],
+    "bogoOffer": {
+      "enabled": true,
+      "unitLabel": "set",
+      "unitsPerOffer": 2
+    },
+    "bogoGroup": "Fancy Bangle Set",
+    "hasVariants": true,
+    "variantColors": [
+      {
+        "name": "Silver",
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/ec7142d35a946517e019.webp"
+      }
+    ],
+    "variantSizes": [
+      "2.6",
+      "2.2",
+      "2.8"
+    ],
+    "variantOptions": [
+      {
+        "id": "color",
+        "values": [
+          "Silver"
+        ]
+      },
+      {
+        "id": "size",
+        "values": [
+          "2.6",
+          "2.2",
+          "2.8"
+        ]
+      }
+    ],
+    "variantMatrix": [
+      {
+        "id": "bogo-ec7142d35a946517e019-size-26",
+        "color": "Silver",
+        "size": "2.6",
+        "stock": 30,
+        "price": 400,
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/ec7142d35a946517e019.webp",
+        "active": true,
+        "hidden": false
+      },
+      {
+        "id": "bogo-ec7142d35a946517e019-size-22",
+        "color": "Silver",
+        "size": "2.2",
+        "stock": 30,
+        "price": 400,
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/ec7142d35a946517e019.webp",
+        "active": true,
+        "hidden": false
+      },
+      {
+        "id": "bogo-ec7142d35a946517e019-size-28",
+        "color": "Silver",
+        "size": "2.8",
+        "stock": 30,
+        "price": 400,
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/ec7142d35a946517e019.webp",
+        "active": true,
+        "hidden": false
+      }
+    ],
+    "sourceAsset": {
+      "folder": "FANCY SET 26.22.28........400",
+      "file": "file_000000007d488246af486b435c9fd613.png",
+      "sha256": "ec7142d35a946517e0190dab8a55b6949382359171adcfca1791c8f5feff30c1",
+      "bytes": 99620
+    },
+    "createdAt": "2026-11-12T00:00:00.000Z"
+  },
+  {
+    "id": "bogo-4dcd45b1d7107b2a176f",
+    "title": "Fancy Bangle Set 04 — Buy 1 Get 1 Free (2 sets)",
+    "slug": "bogo-4dcd45b1d7107b2a176f",
+    "price": 400,
+    "originalPrice": 400,
+    "description": "Buy 1 Get 1 Free: each offer pack includes 1 paid set and 1 identical free set. Same design, colour and selected size. Quantity counts offer packs; one offer pack contains two sets. Daily cycle renews at midnight Pakistan time unless paused by Admin. While stocks last.",
+    "category": "vakVNohIm5ulV5cyidYn",
+    "stock": 30,
+    "active": true,
+    "published": true,
+    "isWholesale": false,
+    "isFlashSale": true,
+    "isWeekendSpecial": false,
+    "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/4dcd45b1d7107b2a176f.webp",
+    "images": [
+      "https://images.primehubmall.com/products/bogo-nov12/4dcd45b1d7107b2a176f.webp"
+    ],
+    "bogoOffer": {
+      "enabled": true,
+      "unitLabel": "set",
+      "unitsPerOffer": 2
+    },
+    "bogoGroup": "Fancy Bangle Set",
+    "hasVariants": true,
+    "variantColors": [
+      {
+        "name": "Pearl Gold",
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/4dcd45b1d7107b2a176f.webp"
+      }
+    ],
+    "variantSizes": [
+      "2.6",
+      "2.2",
+      "2.8"
+    ],
+    "variantOptions": [
+      {
+        "id": "color",
+        "values": [
+          "Pearl Gold"
+        ]
+      },
+      {
+        "id": "size",
+        "values": [
+          "2.6",
+          "2.2",
+          "2.8"
+        ]
+      }
+    ],
+    "variantMatrix": [
+      {
+        "id": "bogo-4dcd45b1d7107b2a176f-size-26",
+        "color": "Pearl Gold",
+        "size": "2.6",
+        "stock": 30,
+        "price": 400,
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/4dcd45b1d7107b2a176f.webp",
+        "active": true,
+        "hidden": false
+      },
+      {
+        "id": "bogo-4dcd45b1d7107b2a176f-size-22",
+        "color": "Pearl Gold",
+        "size": "2.2",
+        "stock": 30,
+        "price": 400,
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/4dcd45b1d7107b2a176f.webp",
+        "active": true,
+        "hidden": false
+      },
+      {
+        "id": "bogo-4dcd45b1d7107b2a176f-size-28",
+        "color": "Pearl Gold",
+        "size": "2.8",
+        "stock": 30,
+        "price": 400,
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/4dcd45b1d7107b2a176f.webp",
+        "active": true,
+        "hidden": false
+      }
+    ],
+    "sourceAsset": {
+      "folder": "FANCY SET 26.22.28........400",
+      "file": "file_00000000fb3482468dc5d55421cf8d90.png",
+      "sha256": "4dcd45b1d7107b2a176fd07c6e1b972a08dc74821c20cfb1c708007ed3960388",
+      "bytes": 86674
+    },
+    "createdAt": "2026-11-12T00:00:00.000Z"
+  },
+  {
+    "id": "bogo-fec9cb81e5e801c44c5e",
+    "title": "Fancy Bangle Set 05 — Buy 1 Get 1 Free (2 sets)",
+    "slug": "bogo-fec9cb81e5e801c44c5e",
+    "price": 300,
+    "originalPrice": 300,
+    "description": "Buy 1 Get 1 Free: each offer pack includes 1 paid set and 1 identical free set. Same design, colour and selected size. Quantity counts offer packs; one offer pack contains two sets. Daily cycle renews at midnight Pakistan time unless paused by Admin. While stocks last.",
+    "category": "vakVNohIm5ulV5cyidYn",
+    "stock": 30,
+    "active": true,
+    "published": true,
+    "isWholesale": false,
+    "isFlashSale": true,
+    "isWeekendSpecial": false,
+    "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/fec9cb81e5e801c44c5e.webp",
+    "images": [
+      "https://images.primehubmall.com/products/bogo-nov12/fec9cb81e5e801c44c5e.webp"
+    ],
+    "bogoOffer": {
+      "enabled": true,
+      "unitLabel": "set",
+      "unitsPerOffer": 2
+    },
+    "bogoGroup": "Fancy Bangle Set",
+    "hasVariants": true,
+    "variantColors": [
+      {
+        "name": "Multicolour",
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/fec9cb81e5e801c44c5e.webp"
+      }
+    ],
+    "variantSizes": [
+      "2.6",
+      "2.4",
+      "2.2"
+    ],
+    "variantOptions": [
+      {
+        "id": "color",
+        "values": [
+          "Multicolour"
+        ]
+      },
+      {
+        "id": "size",
+        "values": [
+          "2.6",
+          "2.4",
+          "2.2"
+        ]
+      }
+    ],
+    "variantMatrix": [
+      {
+        "id": "bogo-fec9cb81e5e801c44c5e-size-26",
+        "color": "Multicolour",
+        "size": "2.6",
+        "stock": 30,
+        "price": 300,
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/fec9cb81e5e801c44c5e.webp",
+        "active": true,
+        "hidden": false
+      },
+      {
+        "id": "bogo-fec9cb81e5e801c44c5e-size-24",
+        "color": "Multicolour",
+        "size": "2.4",
+        "stock": 30,
+        "price": 300,
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/fec9cb81e5e801c44c5e.webp",
+        "active": true,
+        "hidden": false
+      },
+      {
+        "id": "bogo-fec9cb81e5e801c44c5e-size-22",
+        "color": "Multicolour",
+        "size": "2.2",
+        "stock": 30,
+        "price": 300,
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/fec9cb81e5e801c44c5e.webp",
+        "active": true,
+        "hidden": false
+      }
+    ],
+    "sourceAsset": {
+      "folder": "FANCY SET 26.24.22.....300",
+      "file": "file_0000000018dc8211bdc0aa7fe9c1409e.png",
+      "sha256": "fec9cb81e5e801c44c5ee75cc40047c3b45a4b81c2b609edd2fbf8a0a493813a",
+      "bytes": 96536
+    },
+    "createdAt": "2026-11-12T00:00:00.000Z"
+  },
+  {
+    "id": "bogo-36c958362804f8aff2c3",
+    "title": "Fancy Bangle Set 06 — Buy 1 Get 1 Free (2 sets)",
+    "slug": "bogo-36c958362804f8aff2c3",
+    "price": 300,
+    "originalPrice": 300,
+    "description": "Buy 1 Get 1 Free: each offer pack includes 1 paid set and 1 identical free set. Same design, colour and selected size. Quantity counts offer packs; one offer pack contains two sets. Daily cycle renews at midnight Pakistan time unless paused by Admin. While stocks last.",
+    "category": "vakVNohIm5ulV5cyidYn",
+    "stock": 30,
+    "active": true,
+    "published": true,
+    "isWholesale": false,
+    "isFlashSale": true,
+    "isWeekendSpecial": false,
+    "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/36c958362804f8aff2c3.webp",
+    "images": [
+      "https://images.primehubmall.com/products/bogo-nov12/36c958362804f8aff2c3.webp"
+    ],
+    "bogoOffer": {
+      "enabled": true,
+      "unitLabel": "set",
+      "unitsPerOffer": 2
+    },
+    "bogoGroup": "Fancy Bangle Set",
+    "hasVariants": true,
+    "variantColors": [
+      {
+        "name": "Multicolour",
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/36c958362804f8aff2c3.webp"
+      }
+    ],
+    "variantSizes": [
+      "2.6",
+      "2.4",
+      "2.2"
+    ],
+    "variantOptions": [
+      {
+        "id": "color",
+        "values": [
+          "Multicolour"
+        ]
+      },
+      {
+        "id": "size",
+        "values": [
+          "2.6",
+          "2.4",
+          "2.2"
+        ]
+      }
+    ],
+    "variantMatrix": [
+      {
+        "id": "bogo-36c958362804f8aff2c3-size-26",
+        "color": "Multicolour",
+        "size": "2.6",
+        "stock": 30,
+        "price": 300,
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/36c958362804f8aff2c3.webp",
+        "active": true,
+        "hidden": false
+      },
+      {
+        "id": "bogo-36c958362804f8aff2c3-size-24",
+        "color": "Multicolour",
+        "size": "2.4",
+        "stock": 30,
+        "price": 300,
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/36c958362804f8aff2c3.webp",
+        "active": true,
+        "hidden": false
+      },
+      {
+        "id": "bogo-36c958362804f8aff2c3-size-22",
+        "color": "Multicolour",
+        "size": "2.2",
+        "stock": 30,
+        "price": 300,
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/36c958362804f8aff2c3.webp",
+        "active": true,
+        "hidden": false
+      }
+    ],
+    "sourceAsset": {
+      "folder": "FANCY SET 26.24.22.....300",
+      "file": "file_00000000c2c08207a05e2cfb9ea9cd90.png",
+      "sha256": "36c958362804f8aff2c3cd4067d14fdb8ba5df6c6478f520b390f2ae89fed296",
+      "bytes": 95382
+    },
+    "createdAt": "2026-11-12T00:00:00.000Z"
+  },
+  {
+    "id": "bogo-535128735a194710b081",
+    "title": "Haar Jewellery Set 01 — Buy 1 Get 1 Free (2 sets)",
+    "slug": "bogo-535128735a194710b081",
+    "price": 499,
+    "originalPrice": 499,
+    "description": "Buy 1 Get 1 Free: each offer pack includes 1 paid set and 1 identical free set. Same design, colour. Quantity counts offer packs; one offer pack contains two sets. Daily cycle renews at midnight Pakistan time unless paused by Admin. While stocks last.",
+    "category": "2GG2UxAhDiDeSJLwKQ1S",
+    "stock": 30,
+    "active": true,
+    "published": true,
+    "isWholesale": false,
+    "isFlashSale": true,
+    "isWeekendSpecial": false,
+    "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/535128735a194710b081.webp",
+    "images": [
+      "https://images.primehubmall.com/products/bogo-nov12/535128735a194710b081.webp"
+    ],
+    "bogoOffer": {
+      "enabled": true,
+      "unitLabel": "set",
+      "unitsPerOffer": 2
+    },
+    "bogoGroup": "Haar Jewellery Set",
+    "hasVariants": false,
+    "variantColors": [],
+    "variantSizes": [],
+    "variantOptions": [],
+    "variantMatrix": [],
+    "sourceAsset": {
+      "folder": "HAAR SET 499",
+      "file": "file_0000000021a08246b75ef3b107b7b821.png",
+      "sha256": "535128735a194710b081fcacd6422e3e564fd42ebd7b13a1c9f731127d4b4769",
+      "bytes": 97294
+    },
+    "createdAt": "2026-11-12T00:00:00.000Z"
+  },
+  {
+    "id": "bogo-91b7cd5e6e7539b34a66",
+    "title": "Haar Jewellery Set 02 — Buy 1 Get 1 Free (2 sets)",
+    "slug": "bogo-91b7cd5e6e7539b34a66",
+    "price": 499,
+    "originalPrice": 499,
+    "description": "Buy 1 Get 1 Free: each offer pack includes 1 paid set and 1 identical free set. Same design, colour. Quantity counts offer packs; one offer pack contains two sets. Daily cycle renews at midnight Pakistan time unless paused by Admin. While stocks last.",
+    "category": "2GG2UxAhDiDeSJLwKQ1S",
+    "stock": 30,
+    "active": true,
+    "published": true,
+    "isWholesale": false,
+    "isFlashSale": true,
+    "isWeekendSpecial": false,
+    "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/91b7cd5e6e7539b34a66.webp",
+    "images": [
+      "https://images.primehubmall.com/products/bogo-nov12/91b7cd5e6e7539b34a66.webp"
+    ],
+    "bogoOffer": {
+      "enabled": true,
+      "unitLabel": "set",
+      "unitsPerOffer": 2
+    },
+    "bogoGroup": "Haar Jewellery Set",
+    "hasVariants": false,
+    "variantColors": [],
+    "variantSizes": [],
+    "variantOptions": [],
+    "variantMatrix": [],
+    "sourceAsset": {
+      "folder": "HAAR SET 499",
+      "file": "file_00000000341482468de19f89cb659675.png",
+      "sha256": "91b7cd5e6e7539b34a66351a12b0d18c3f07b960f75fdd5c819724b77905bfce",
+      "bytes": 91080
+    },
+    "createdAt": "2026-11-12T00:00:00.000Z"
+  },
+  {
+    "id": "bogo-763ed16cb70406530950",
+    "title": "Haar Jewellery Set 03 — Buy 1 Get 1 Free (2 sets)",
+    "slug": "bogo-763ed16cb70406530950",
+    "price": 499,
+    "originalPrice": 499,
+    "description": "Buy 1 Get 1 Free: each offer pack includes 1 paid set and 1 identical free set. Same design, colour. Quantity counts offer packs; one offer pack contains two sets. Daily cycle renews at midnight Pakistan time unless paused by Admin. While stocks last.",
+    "category": "2GG2UxAhDiDeSJLwKQ1S",
+    "stock": 30,
+    "active": true,
+    "published": true,
+    "isWholesale": false,
+    "isFlashSale": true,
+    "isWeekendSpecial": false,
+    "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/763ed16cb70406530950.webp",
+    "images": [
+      "https://images.primehubmall.com/products/bogo-nov12/763ed16cb70406530950.webp"
+    ],
+    "bogoOffer": {
+      "enabled": true,
+      "unitLabel": "set",
+      "unitsPerOffer": 2
+    },
+    "bogoGroup": "Haar Jewellery Set",
+    "hasVariants": false,
+    "variantColors": [],
+    "variantSizes": [],
+    "variantOptions": [],
+    "variantMatrix": [],
+    "sourceAsset": {
+      "folder": "HAAR SET 499",
+      "file": "file_00000000a2508246bf61941e2e563bf7.png",
+      "sha256": "763ed16cb70406530950564dad38ecb39bb9571486c4ff9ced29e9b841391365",
+      "bytes": 97400
+    },
+    "createdAt": "2026-11-12T00:00:00.000Z"
+  },
+  {
+    "id": "bogo-32b212c16017e3b56e42",
+    "title": "Haar Jewellery Set 04 — Buy 1 Get 1 Free (2 sets)",
+    "slug": "bogo-32b212c16017e3b56e42",
+    "price": 499,
+    "originalPrice": 499,
+    "description": "Buy 1 Get 1 Free: each offer pack includes 1 paid set and 1 identical free set. Same design, colour. Quantity counts offer packs; one offer pack contains two sets. Daily cycle renews at midnight Pakistan time unless paused by Admin. While stocks last.",
+    "category": "2GG2UxAhDiDeSJLwKQ1S",
+    "stock": 30,
+    "active": true,
+    "published": true,
+    "isWholesale": false,
+    "isFlashSale": true,
+    "isWeekendSpecial": false,
+    "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/32b212c16017e3b56e42.webp",
+    "images": [
+      "https://images.primehubmall.com/products/bogo-nov12/32b212c16017e3b56e42.webp"
+    ],
+    "bogoOffer": {
+      "enabled": true,
+      "unitLabel": "set",
+      "unitsPerOffer": 2
+    },
+    "bogoGroup": "Haar Jewellery Set",
+    "hasVariants": false,
+    "variantColors": [],
+    "variantSizes": [],
+    "variantOptions": [],
+    "variantMatrix": [],
+    "sourceAsset": {
+      "folder": "HAAR SET 499",
+      "file": "file_00000000e96c82468940d17fa4787d28.png",
+      "sha256": "32b212c16017e3b56e42ac5d0e73b6f7e47481e81cad5cd155f55f0b546454de",
+      "bytes": 95312
+    },
+    "createdAt": "2026-11-12T00:00:00.000Z"
+  },
+  {
+    "id": "bogo-e5ae4b2a3acf4c768a8f",
+    "title": "Haar Jewellery Set 05 — Buy 1 Get 1 Free (2 sets)",
+    "slug": "bogo-e5ae4b2a3acf4c768a8f",
+    "price": 499,
+    "originalPrice": 499,
+    "description": "Buy 1 Get 1 Free: each offer pack includes 1 paid set and 1 identical free set. Same design, colour. Quantity counts offer packs; one offer pack contains two sets. Daily cycle renews at midnight Pakistan time unless paused by Admin. While stocks last.",
+    "category": "2GG2UxAhDiDeSJLwKQ1S",
+    "stock": 30,
+    "active": true,
+    "published": true,
+    "isWholesale": false,
+    "isFlashSale": true,
+    "isWeekendSpecial": false,
+    "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/e5ae4b2a3acf4c768a8f.webp",
+    "images": [
+      "https://images.primehubmall.com/products/bogo-nov12/e5ae4b2a3acf4c768a8f.webp"
+    ],
+    "bogoOffer": {
+      "enabled": true,
+      "unitLabel": "set",
+      "unitsPerOffer": 2
+    },
+    "bogoGroup": "Haar Jewellery Set",
+    "hasVariants": false,
+    "variantColors": [],
+    "variantSizes": [],
+    "variantOptions": [],
+    "variantMatrix": [],
+    "sourceAsset": {
+      "folder": "HAAR SET 499",
+      "file": "file_00000000fe1482469f071c25925d373c.png",
+      "sha256": "e5ae4b2a3acf4c768a8f4235654a5bcfd57204469a7f07a78d8355a8dff52342",
+      "bytes": 90922
+    },
+    "createdAt": "2026-11-12T00:00:00.000Z"
+  },
+  {
+    "id": "bogo-bd9e67ca377c3fee2a83",
+    "title": "Kashmiri Four-Bangle Set 01 — Buy 1 Get 1 Free (2 sets)",
+    "slug": "bogo-bd9e67ca377c3fee2a83",
+    "price": 200,
+    "originalPrice": 200,
+    "description": "Buy 1 Get 1 Free: each offer pack includes 1 paid set and 1 identical free set. Same design, colour and selected size. Quantity counts offer packs; one offer pack contains two sets. Daily cycle renews at midnight Pakistan time unless paused by Admin. While stocks last.",
+    "category": "vakVNohIm5ulV5cyidYn",
+    "stock": 30,
+    "active": true,
+    "published": true,
+    "isWholesale": false,
+    "isFlashSale": true,
+    "isWeekendSpecial": false,
+    "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/bd9e67ca377c3fee2a83.webp",
+    "images": [
+      "https://images.primehubmall.com/products/bogo-nov12/bd9e67ca377c3fee2a83.webp"
+    ],
+    "bogoOffer": {
+      "enabled": true,
+      "unitLabel": "set",
+      "unitsPerOffer": 2
+    },
+    "bogoGroup": "Kashmiri Four-Bangle Set",
+    "hasVariants": true,
+    "variantColors": [
+      {
+        "name": "Silver",
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/bd9e67ca377c3fee2a83.webp"
+      }
+    ],
+    "variantSizes": [
+      "2.6",
+      "2.2",
+      "2.8"
+    ],
+    "variantOptions": [
+      {
+        "id": "color",
+        "values": [
+          "Silver"
+        ]
+      },
+      {
+        "id": "size",
+        "values": [
+          "2.6",
+          "2.2",
+          "2.8"
+        ]
+      }
+    ],
+    "variantMatrix": [
+      {
+        "id": "bogo-bd9e67ca377c3fee2a83-size-26",
+        "color": "Silver",
+        "size": "2.6",
+        "stock": 30,
+        "price": 200,
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/bd9e67ca377c3fee2a83.webp",
+        "active": true,
+        "hidden": false
+      },
+      {
+        "id": "bogo-bd9e67ca377c3fee2a83-size-22",
+        "color": "Silver",
+        "size": "2.2",
+        "stock": 30,
+        "price": 200,
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/bd9e67ca377c3fee2a83.webp",
+        "active": true,
+        "hidden": false
+      },
+      {
+        "id": "bogo-bd9e67ca377c3fee2a83-size-28",
+        "color": "Silver",
+        "size": "2.8",
+        "stock": 30,
+        "price": 200,
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/bd9e67ca377c3fee2a83.webp",
+        "active": true,
+        "hidden": false
+      }
+    ],
+    "sourceAsset": {
+      "folder": "KASHMIRI SET 4 BANGLES 26.22.28.....200",
+      "file": "file_00000000a30c8211953f0a0a27ae80c6.png",
+      "sha256": "bd9e67ca377c3fee2a830bf4831856a12b0d92f2bfc165ca7f9803cdc3d6ee5d",
+      "bytes": 98810
+    },
+    "createdAt": "2026-11-12T00:00:00.000Z"
+  },
+  {
+    "id": "bogo-01868f44de090f40c73f",
+    "title": "Kashmiri Four-Bangle Set 02 — Buy 1 Get 1 Free (2 sets)",
+    "slug": "bogo-01868f44de090f40c73f",
+    "price": 200,
+    "originalPrice": 200,
+    "description": "Buy 1 Get 1 Free: each offer pack includes 1 paid set and 1 identical free set. Same design, colour and selected size. Quantity counts offer packs; one offer pack contains two sets. Daily cycle renews at midnight Pakistan time unless paused by Admin. While stocks last.",
+    "category": "vakVNohIm5ulV5cyidYn",
+    "stock": 30,
+    "active": true,
+    "published": true,
+    "isWholesale": false,
+    "isFlashSale": true,
+    "isWeekendSpecial": false,
+    "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/01868f44de090f40c73f.webp",
+    "images": [
+      "https://images.primehubmall.com/products/bogo-nov12/01868f44de090f40c73f.webp"
+    ],
+    "bogoOffer": {
+      "enabled": true,
+      "unitLabel": "set",
+      "unitsPerOffer": 2
+    },
+    "bogoGroup": "Kashmiri Four-Bangle Set",
+    "hasVariants": true,
+    "variantColors": [
+      {
+        "name": "Gold",
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/01868f44de090f40c73f.webp"
+      }
+    ],
+    "variantSizes": [
+      "2.6",
+      "2.2",
+      "2.8"
+    ],
+    "variantOptions": [
+      {
+        "id": "color",
+        "values": [
+          "Gold"
+        ]
+      },
+      {
+        "id": "size",
+        "values": [
+          "2.6",
+          "2.2",
+          "2.8"
+        ]
+      }
+    ],
+    "variantMatrix": [
+      {
+        "id": "bogo-01868f44de090f40c73f-size-26",
+        "color": "Gold",
+        "size": "2.6",
+        "stock": 30,
+        "price": 200,
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/01868f44de090f40c73f.webp",
+        "active": true,
+        "hidden": false
+      },
+      {
+        "id": "bogo-01868f44de090f40c73f-size-22",
+        "color": "Gold",
+        "size": "2.2",
+        "stock": 30,
+        "price": 200,
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/01868f44de090f40c73f.webp",
+        "active": true,
+        "hidden": false
+      },
+      {
+        "id": "bogo-01868f44de090f40c73f-size-28",
+        "color": "Gold",
+        "size": "2.8",
+        "stock": 30,
+        "price": 200,
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/01868f44de090f40c73f.webp",
+        "active": true,
+        "hidden": false
+      }
+    ],
+    "sourceAsset": {
+      "folder": "KASHMIRI SET 4 BANGLES 26.22.28.....200",
+      "file": "file_00000000ef3c82118efc03a4dc1785f7.png",
+      "sha256": "01868f44de090f40c73fb5b8dde4fd563fefc092a93ef0c78cd34ddce51eda23",
+      "bytes": 81660
+    },
+    "createdAt": "2026-11-12T00:00:00.000Z"
+  },
+  {
+    "id": "bogo-d8c71383281770b39c14",
+    "title": "Marble Six-Set Box 01 — Buy 1 Get 1 Free (2 boxes)",
+    "slug": "bogo-d8c71383281770b39c14",
+    "price": 600,
+    "originalPrice": 600,
+    "description": "Buy 1 Get 1 Free: each offer pack includes 1 paid box and 1 identical free box. Same design, colour and selected size. Quantity counts offer packs; one offer pack contains two boxes. Daily cycle renews at midnight Pakistan time unless paused by Admin. While stocks last.",
+    "category": "vakVNohIm5ulV5cyidYn",
+    "stock": 30,
+    "active": true,
+    "published": true,
+    "isWholesale": false,
+    "isFlashSale": true,
+    "isWeekendSpecial": false,
+    "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/d8c71383281770b39c14.webp",
+    "images": [
+      "https://images.primehubmall.com/products/bogo-nov12/d8c71383281770b39c14.webp"
+    ],
+    "bogoOffer": {
+      "enabled": true,
+      "unitLabel": "box",
+      "unitsPerOffer": 2
+    },
+    "bogoGroup": "Marble Six-Set Box",
+    "hasVariants": true,
+    "variantColors": [
+      {
+        "name": "Multicolour",
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/d8c71383281770b39c14.webp"
+      }
+    ],
+    "variantSizes": [
+      "2.6",
+      "2.4",
+      "2.2",
+      "2.8"
+    ],
+    "variantOptions": [
+      {
+        "id": "color",
+        "values": [
+          "Multicolour"
+        ]
+      },
+      {
+        "id": "size",
+        "values": [
+          "2.6",
+          "2.4",
+          "2.2",
+          "2.8"
+        ]
+      }
+    ],
+    "variantMatrix": [
+      {
+        "id": "bogo-d8c71383281770b39c14-size-26",
+        "color": "Multicolour",
+        "size": "2.6",
+        "stock": 30,
+        "price": 600,
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/d8c71383281770b39c14.webp",
+        "active": true,
+        "hidden": false
+      },
+      {
+        "id": "bogo-d8c71383281770b39c14-size-24",
+        "color": "Multicolour",
+        "size": "2.4",
+        "stock": 30,
+        "price": 600,
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/d8c71383281770b39c14.webp",
+        "active": true,
+        "hidden": false
+      },
+      {
+        "id": "bogo-d8c71383281770b39c14-size-22",
+        "color": "Multicolour",
+        "size": "2.2",
+        "stock": 30,
+        "price": 600,
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/d8c71383281770b39c14.webp",
+        "active": true,
+        "hidden": false
+      },
+      {
+        "id": "bogo-d8c71383281770b39c14-size-28",
+        "color": "Multicolour",
+        "size": "2.8",
+        "stock": 30,
+        "price": 600,
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/d8c71383281770b39c14.webp",
+        "active": true,
+        "hidden": false
+      }
+    ],
+    "sourceAsset": {
+      "folder": "MARBEL 6 SET BOX 26..24..22..28..600",
+      "file": "file_000000003fbc821189f3718f388f59bc.png",
+      "sha256": "d8c71383281770b39c14cedf7c2c8d5595227bcfd12b7665ffdf15ed96dbc2ae",
+      "bytes": 72798
+    },
+    "createdAt": "2026-11-12T00:00:00.000Z"
+  },
+  {
+    "id": "bogo-3910b5ba0435da9ce328",
+    "title": "Metal Bangle Set 01 — Buy 1 Get 1 Free (2 sets)",
+    "slug": "bogo-3910b5ba0435da9ce328",
+    "price": 300,
+    "originalPrice": 300,
+    "description": "Buy 1 Get 1 Free: each offer pack includes 1 paid set and 1 identical free set. Same design, colour and selected size. Quantity counts offer packs; one offer pack contains two sets. Daily cycle renews at midnight Pakistan time unless paused by Admin. While stocks last.",
+    "category": "vakVNohIm5ulV5cyidYn",
+    "stock": 30,
+    "active": true,
+    "published": true,
+    "isWholesale": false,
+    "isFlashSale": true,
+    "isWeekendSpecial": false,
+    "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/3910b5ba0435da9ce328.webp",
+    "images": [
+      "https://images.primehubmall.com/products/bogo-nov12/3910b5ba0435da9ce328.webp"
+    ],
+    "bogoOffer": {
+      "enabled": true,
+      "unitLabel": "set",
+      "unitsPerOffer": 2
+    },
+    "bogoGroup": "Metal Bangle Set",
+    "hasVariants": true,
+    "variantColors": [
+      {
+        "name": "Gold",
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/3910b5ba0435da9ce328.webp"
+      }
+    ],
+    "variantSizes": [
+      "2.6",
+      "2.2",
+      "2.8"
+    ],
+    "variantOptions": [
+      {
+        "id": "color",
+        "values": [
+          "Gold"
+        ]
+      },
+      {
+        "id": "size",
+        "values": [
+          "2.6",
+          "2.2",
+          "2.8"
+        ]
+      }
+    ],
+    "variantMatrix": [
+      {
+        "id": "bogo-3910b5ba0435da9ce328-size-26",
+        "color": "Gold",
+        "size": "2.6",
+        "stock": 30,
+        "price": 300,
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/3910b5ba0435da9ce328.webp",
+        "active": true,
+        "hidden": false
+      },
+      {
+        "id": "bogo-3910b5ba0435da9ce328-size-22",
+        "color": "Gold",
+        "size": "2.2",
+        "stock": 30,
+        "price": 300,
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/3910b5ba0435da9ce328.webp",
+        "active": true,
+        "hidden": false
+      },
+      {
+        "id": "bogo-3910b5ba0435da9ce328-size-28",
+        "color": "Gold",
+        "size": "2.8",
+        "stock": 30,
+        "price": 300,
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/3910b5ba0435da9ce328.webp",
+        "active": true,
+        "hidden": false
+      }
+    ],
+    "sourceAsset": {
+      "folder": "METAL SET 26..22.28......300",
+      "file": "file_000000005840821183b8bc5d032bf709.png",
+      "sha256": "3910b5ba0435da9ce328d42a24d4741f80791b86318e6f4be9a0d0aa905e2cb8",
+      "bytes": 93818
+    },
+    "createdAt": "2026-11-12T00:00:00.000Z"
+  },
+  {
+    "id": "bogo-7545fe46334cb5588315",
+    "title": "Metal Bangle Set 02 — Buy 1 Get 1 Free (2 sets)",
+    "slug": "bogo-7545fe46334cb5588315",
+    "price": 300,
+    "originalPrice": 300,
+    "description": "Buy 1 Get 1 Free: each offer pack includes 1 paid set and 1 identical free set. Same design, colour and selected size. Quantity counts offer packs; one offer pack contains two sets. Daily cycle renews at midnight Pakistan time unless paused by Admin. While stocks last.",
+    "category": "vakVNohIm5ulV5cyidYn",
+    "stock": 30,
+    "active": true,
+    "published": true,
+    "isWholesale": false,
+    "isFlashSale": true,
+    "isWeekendSpecial": false,
+    "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/7545fe46334cb5588315.webp",
+    "images": [
+      "https://images.primehubmall.com/products/bogo-nov12/7545fe46334cb5588315.webp"
+    ],
+    "bogoOffer": {
+      "enabled": true,
+      "unitLabel": "set",
+      "unitsPerOffer": 2
+    },
+    "bogoGroup": "Metal Bangle Set",
+    "hasVariants": true,
+    "variantColors": [
+      {
+        "name": "Silver",
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/7545fe46334cb5588315.webp"
+      }
+    ],
+    "variantSizes": [
+      "2.6",
+      "2.2",
+      "2.8"
+    ],
+    "variantOptions": [
+      {
+        "id": "color",
+        "values": [
+          "Silver"
+        ]
+      },
+      {
+        "id": "size",
+        "values": [
+          "2.6",
+          "2.2",
+          "2.8"
+        ]
+      }
+    ],
+    "variantMatrix": [
+      {
+        "id": "bogo-7545fe46334cb5588315-size-26",
+        "color": "Silver",
+        "size": "2.6",
+        "stock": 30,
+        "price": 300,
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/7545fe46334cb5588315.webp",
+        "active": true,
+        "hidden": false
+      },
+      {
+        "id": "bogo-7545fe46334cb5588315-size-22",
+        "color": "Silver",
+        "size": "2.2",
+        "stock": 30,
+        "price": 300,
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/7545fe46334cb5588315.webp",
+        "active": true,
+        "hidden": false
+      },
+      {
+        "id": "bogo-7545fe46334cb5588315-size-28",
+        "color": "Silver",
+        "size": "2.8",
+        "stock": 30,
+        "price": 300,
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/7545fe46334cb5588315.webp",
+        "active": true,
+        "hidden": false
+      }
+    ],
+    "sourceAsset": {
+      "folder": "METAL SET 26..22.28......300",
+      "file": "file_00000000abf08211be13b95a0d79714e.png",
+      "sha256": "7545fe46334cb5588315a7eb43aa7f18dc1f926c1049e07eeb514cbc60af54c8",
+      "bytes": 87628
+    },
+    "createdAt": "2026-11-12T00:00:00.000Z"
+  },
+  {
+    "id": "bogo-fc7d3a11b5c42bcfdab3",
+    "title": "Metal Bangle Set 03 — Buy 1 Get 1 Free (2 sets)",
+    "slug": "bogo-fc7d3a11b5c42bcfdab3",
+    "price": 300,
+    "originalPrice": 300,
+    "description": "Buy 1 Get 1 Free: each offer pack includes 1 paid set and 1 identical free set. Same design, colour and selected size. Quantity counts offer packs; one offer pack contains two sets. Daily cycle renews at midnight Pakistan time unless paused by Admin. While stocks last.",
+    "category": "vakVNohIm5ulV5cyidYn",
+    "stock": 30,
+    "active": true,
+    "published": true,
+    "isWholesale": false,
+    "isFlashSale": true,
+    "isWeekendSpecial": false,
+    "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/fc7d3a11b5c42bcfdab3.webp",
+    "images": [
+      "https://images.primehubmall.com/products/bogo-nov12/fc7d3a11b5c42bcfdab3.webp"
+    ],
+    "bogoOffer": {
+      "enabled": true,
+      "unitLabel": "set",
+      "unitsPerOffer": 2
+    },
+    "bogoGroup": "Metal Bangle Set",
+    "hasVariants": true,
+    "variantColors": [
+      {
+        "name": "Multicolour",
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/fc7d3a11b5c42bcfdab3.webp"
+      }
+    ],
+    "variantSizes": [
+      "2.6",
+      "2.2",
+      "2.8"
+    ],
+    "variantOptions": [
+      {
+        "id": "color",
+        "values": [
+          "Multicolour"
+        ]
+      },
+      {
+        "id": "size",
+        "values": [
+          "2.6",
+          "2.2",
+          "2.8"
+        ]
+      }
+    ],
+    "variantMatrix": [
+      {
+        "id": "bogo-fc7d3a11b5c42bcfdab3-size-26",
+        "color": "Multicolour",
+        "size": "2.6",
+        "stock": 30,
+        "price": 300,
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/fc7d3a11b5c42bcfdab3.webp",
+        "active": true,
+        "hidden": false
+      },
+      {
+        "id": "bogo-fc7d3a11b5c42bcfdab3-size-22",
+        "color": "Multicolour",
+        "size": "2.2",
+        "stock": 30,
+        "price": 300,
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/fc7d3a11b5c42bcfdab3.webp",
+        "active": true,
+        "hidden": false
+      },
+      {
+        "id": "bogo-fc7d3a11b5c42bcfdab3-size-28",
+        "color": "Multicolour",
+        "size": "2.8",
+        "stock": 30,
+        "price": 300,
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/fc7d3a11b5c42bcfdab3.webp",
+        "active": true,
+        "hidden": false
+      }
+    ],
+    "sourceAsset": {
+      "folder": "METAL SET 26..22.28......300",
+      "file": "file_00000000afbc82118d357f0bb31c474e.png",
+      "sha256": "fc7d3a11b5c42bcfdab306f379d0249a5f9f124d7c5ef3adbb222771ea6fc077",
+      "bytes": 87984
+    },
+    "createdAt": "2026-11-12T00:00:00.000Z"
+  },
+  {
+    "id": "bogo-29b512540586f8fc16ed",
+    "title": "Metal Bangle Set 04 — Buy 1 Get 1 Free (2 sets)",
+    "slug": "bogo-29b512540586f8fc16ed",
+    "price": 300,
+    "originalPrice": 300,
+    "description": "Buy 1 Get 1 Free: each offer pack includes 1 paid set and 1 identical free set. Same design, colour and selected size. Quantity counts offer packs; one offer pack contains two sets. Daily cycle renews at midnight Pakistan time unless paused by Admin. While stocks last.",
+    "category": "vakVNohIm5ulV5cyidYn",
+    "stock": 30,
+    "active": true,
+    "published": true,
+    "isWholesale": false,
+    "isFlashSale": true,
+    "isWeekendSpecial": false,
+    "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/29b512540586f8fc16ed.webp",
+    "images": [
+      "https://images.primehubmall.com/products/bogo-nov12/29b512540586f8fc16ed.webp"
+    ],
+    "bogoOffer": {
+      "enabled": true,
+      "unitLabel": "set",
+      "unitsPerOffer": 2
+    },
+    "bogoGroup": "Metal Bangle Set",
+    "hasVariants": true,
+    "variantColors": [
+      {
+        "name": "Gold",
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/29b512540586f8fc16ed.webp"
+      }
+    ],
+    "variantSizes": [
+      "2.6",
+      "2.2",
+      "2.8"
+    ],
+    "variantOptions": [
+      {
+        "id": "color",
+        "values": [
+          "Gold"
+        ]
+      },
+      {
+        "id": "size",
+        "values": [
+          "2.6",
+          "2.2",
+          "2.8"
+        ]
+      }
+    ],
+    "variantMatrix": [
+      {
+        "id": "bogo-29b512540586f8fc16ed-size-26",
+        "color": "Gold",
+        "size": "2.6",
+        "stock": 30,
+        "price": 300,
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/29b512540586f8fc16ed.webp",
+        "active": true,
+        "hidden": false
+      },
+      {
+        "id": "bogo-29b512540586f8fc16ed-size-22",
+        "color": "Gold",
+        "size": "2.2",
+        "stock": 30,
+        "price": 300,
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/29b512540586f8fc16ed.webp",
+        "active": true,
+        "hidden": false
+      },
+      {
+        "id": "bogo-29b512540586f8fc16ed-size-28",
+        "color": "Gold",
+        "size": "2.8",
+        "stock": 30,
+        "price": 300,
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/29b512540586f8fc16ed.webp",
+        "active": true,
+        "hidden": false
+      }
+    ],
+    "sourceAsset": {
+      "folder": "METAL SET 26..22.28......300",
+      "file": "file_00000000e31c82118e9d7dc3abd6714b.png",
+      "sha256": "29b512540586f8fc16eda95f6958e7f2bef00640827547913640f702e367fc78",
+      "bytes": 85560
+    },
+    "createdAt": "2026-11-12T00:00:00.000Z"
+  },
+  {
+    "id": "bogo-f885a51660ab08b0a539",
+    "title": "Metal Bangle Set 05 — Buy 1 Get 1 Free (2 sets)",
+    "slug": "bogo-f885a51660ab08b0a539",
+    "price": 220,
+    "originalPrice": 220,
+    "description": "Buy 1 Get 1 Free: each offer pack includes 1 paid set and 1 identical free set. Same design, colour and selected size. Quantity counts offer packs; one offer pack contains two sets. Daily cycle renews at midnight Pakistan time unless paused by Admin. While stocks last.",
+    "category": "vakVNohIm5ulV5cyidYn",
+    "stock": 30,
+    "active": true,
+    "published": true,
+    "isWholesale": false,
+    "isFlashSale": true,
+    "isWeekendSpecial": false,
+    "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/f885a51660ab08b0a539.webp",
+    "images": [
+      "https://images.primehubmall.com/products/bogo-nov12/f885a51660ab08b0a539.webp"
+    ],
+    "bogoOffer": {
+      "enabled": true,
+      "unitLabel": "set",
+      "unitsPerOffer": 2
+    },
+    "bogoGroup": "Metal Bangle Set",
+    "hasVariants": true,
+    "variantColors": [
+      {
+        "name": "Silver",
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/f885a51660ab08b0a539.webp"
+      }
+    ],
+    "variantSizes": [
+      "2.6",
+      "2.2",
+      "2.8"
+    ],
+    "variantOptions": [
+      {
+        "id": "color",
+        "values": [
+          "Silver"
+        ]
+      },
+      {
+        "id": "size",
+        "values": [
+          "2.6",
+          "2.2",
+          "2.8"
+        ]
+      }
+    ],
+    "variantMatrix": [
+      {
+        "id": "bogo-f885a51660ab08b0a539-size-26",
+        "color": "Silver",
+        "size": "2.6",
+        "stock": 30,
+        "price": 220,
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/f885a51660ab08b0a539.webp",
+        "active": true,
+        "hidden": false
+      },
+      {
+        "id": "bogo-f885a51660ab08b0a539-size-22",
+        "color": "Silver",
+        "size": "2.2",
+        "stock": 30,
+        "price": 220,
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/f885a51660ab08b0a539.webp",
+        "active": true,
+        "hidden": false
+      },
+      {
+        "id": "bogo-f885a51660ab08b0a539-size-28",
+        "color": "Silver",
+        "size": "2.8",
+        "stock": 30,
+        "price": 220,
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/f885a51660ab08b0a539.webp",
+        "active": true,
+        "hidden": false
+      }
+    ],
+    "sourceAsset": {
+      "folder": "METAL SET 26.22.28...220",
+      "file": "file_0000000004648211b79964d76ddccf25.png",
+      "sha256": "f885a51660ab08b0a53937c575da44c0da0cadbd410c669694335a958a3230b3",
+      "bytes": 98948
+    },
+    "createdAt": "2026-11-12T00:00:00.000Z"
+  },
+  {
+    "id": "bogo-86a6a46b9b10afc8f9f0",
+    "title": "Metal Bangle Set 06 — Buy 1 Get 1 Free (2 sets)",
+    "slug": "bogo-86a6a46b9b10afc8f9f0",
+    "price": 220,
+    "originalPrice": 220,
+    "description": "Buy 1 Get 1 Free: each offer pack includes 1 paid set and 1 identical free set. Same design, colour and selected size. Quantity counts offer packs; one offer pack contains two sets. Daily cycle renews at midnight Pakistan time unless paused by Admin. While stocks last.",
+    "category": "vakVNohIm5ulV5cyidYn",
+    "stock": 30,
+    "active": true,
+    "published": true,
+    "isWholesale": false,
+    "isFlashSale": true,
+    "isWeekendSpecial": false,
+    "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/86a6a46b9b10afc8f9f0.webp",
+    "images": [
+      "https://images.primehubmall.com/products/bogo-nov12/86a6a46b9b10afc8f9f0.webp"
+    ],
+    "bogoOffer": {
+      "enabled": true,
+      "unitLabel": "set",
+      "unitsPerOffer": 2
+    },
+    "bogoGroup": "Metal Bangle Set",
+    "hasVariants": true,
+    "variantColors": [
+      {
+        "name": "Multicolour",
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/86a6a46b9b10afc8f9f0.webp"
+      }
+    ],
+    "variantSizes": [
+      "2.6",
+      "2.2",
+      "2.8"
+    ],
+    "variantOptions": [
+      {
+        "id": "color",
+        "values": [
+          "Multicolour"
+        ]
+      },
+      {
+        "id": "size",
+        "values": [
+          "2.6",
+          "2.2",
+          "2.8"
+        ]
+      }
+    ],
+    "variantMatrix": [
+      {
+        "id": "bogo-86a6a46b9b10afc8f9f0-size-26",
+        "color": "Multicolour",
+        "size": "2.6",
+        "stock": 30,
+        "price": 220,
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/86a6a46b9b10afc8f9f0.webp",
+        "active": true,
+        "hidden": false
+      },
+      {
+        "id": "bogo-86a6a46b9b10afc8f9f0-size-22",
+        "color": "Multicolour",
+        "size": "2.2",
+        "stock": 30,
+        "price": 220,
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/86a6a46b9b10afc8f9f0.webp",
+        "active": true,
+        "hidden": false
+      },
+      {
+        "id": "bogo-86a6a46b9b10afc8f9f0-size-28",
+        "color": "Multicolour",
+        "size": "2.8",
+        "stock": 30,
+        "price": 220,
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/86a6a46b9b10afc8f9f0.webp",
+        "active": true,
+        "hidden": false
+      }
+    ],
+    "sourceAsset": {
+      "folder": "METAL SET 26.22.28...220",
+      "file": "file_0000000034ec82079b1d890036609ba0.png",
+      "sha256": "86a6a46b9b10afc8f9f0afcde0a5748c153420efbe05718988308a7f7e5469e1",
+      "bytes": 96782
+    },
+    "createdAt": "2026-11-12T00:00:00.000Z"
+  },
+  {
+    "id": "bogo-c447302a38432ef0eb0d",
+    "title": "Metal Bangle Set 07 — Buy 1 Get 1 Free (2 sets)",
+    "slug": "bogo-c447302a38432ef0eb0d",
+    "price": 220,
+    "originalPrice": 220,
+    "description": "Buy 1 Get 1 Free: each offer pack includes 1 paid set and 1 identical free set. Same design, colour and selected size. Quantity counts offer packs; one offer pack contains two sets. Daily cycle renews at midnight Pakistan time unless paused by Admin. While stocks last.",
+    "category": "vakVNohIm5ulV5cyidYn",
+    "stock": 30,
+    "active": true,
+    "published": true,
+    "isWholesale": false,
+    "isFlashSale": true,
+    "isWeekendSpecial": false,
+    "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/c447302a38432ef0eb0d.webp",
+    "images": [
+      "https://images.primehubmall.com/products/bogo-nov12/c447302a38432ef0eb0d.webp"
+    ],
+    "bogoOffer": {
+      "enabled": true,
+      "unitLabel": "set",
+      "unitsPerOffer": 2
+    },
+    "bogoGroup": "Metal Bangle Set",
+    "hasVariants": true,
+    "variantColors": [
+      {
+        "name": "Silver",
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/c447302a38432ef0eb0d.webp"
+      }
+    ],
+    "variantSizes": [
+      "2.6",
+      "2.2",
+      "2.8"
+    ],
+    "variantOptions": [
+      {
+        "id": "color",
+        "values": [
+          "Silver"
+        ]
+      },
+      {
+        "id": "size",
+        "values": [
+          "2.6",
+          "2.2",
+          "2.8"
+        ]
+      }
+    ],
+    "variantMatrix": [
+      {
+        "id": "bogo-c447302a38432ef0eb0d-size-26",
+        "color": "Silver",
+        "size": "2.6",
+        "stock": 30,
+        "price": 220,
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/c447302a38432ef0eb0d.webp",
+        "active": true,
+        "hidden": false
+      },
+      {
+        "id": "bogo-c447302a38432ef0eb0d-size-22",
+        "color": "Silver",
+        "size": "2.2",
+        "stock": 30,
+        "price": 220,
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/c447302a38432ef0eb0d.webp",
+        "active": true,
+        "hidden": false
+      },
+      {
+        "id": "bogo-c447302a38432ef0eb0d-size-28",
+        "color": "Silver",
+        "size": "2.8",
+        "stock": 30,
+        "price": 220,
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/c447302a38432ef0eb0d.webp",
+        "active": true,
+        "hidden": false
+      }
+    ],
+    "sourceAsset": {
+      "folder": "METAL SET 26.22.28...220",
+      "file": "file_00000000485c8211afa17bedb034d2d8.png",
+      "sha256": "c447302a38432ef0eb0d85d315b0134adeef457f58df2e78019b8faef927a3c0",
+      "bytes": 70848
+    },
+    "createdAt": "2026-11-12T00:00:00.000Z"
+  },
+  {
+    "id": "bogo-1fb5c79fdcbd5ee0953a",
+    "title": "Metal Bangle Set 08 — Buy 1 Get 1 Free (2 sets)",
+    "slug": "bogo-1fb5c79fdcbd5ee0953a",
+    "price": 220,
+    "originalPrice": 220,
+    "description": "Buy 1 Get 1 Free: each offer pack includes 1 paid set and 1 identical free set. Same design, colour and selected size. Quantity counts offer packs; one offer pack contains two sets. Daily cycle renews at midnight Pakistan time unless paused by Admin. While stocks last.",
+    "category": "vakVNohIm5ulV5cyidYn",
+    "stock": 30,
+    "active": true,
+    "published": true,
+    "isWholesale": false,
+    "isFlashSale": true,
+    "isWeekendSpecial": false,
+    "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/1fb5c79fdcbd5ee0953a.webp",
+    "images": [
+      "https://images.primehubmall.com/products/bogo-nov12/1fb5c79fdcbd5ee0953a.webp"
+    ],
+    "bogoOffer": {
+      "enabled": true,
+      "unitLabel": "set",
+      "unitsPerOffer": 2
+    },
+    "bogoGroup": "Metal Bangle Set",
+    "hasVariants": true,
+    "variantColors": [
+      {
+        "name": "Multicolour",
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/1fb5c79fdcbd5ee0953a.webp"
+      }
+    ],
+    "variantSizes": [
+      "2.6",
+      "2.2",
+      "2.8"
+    ],
+    "variantOptions": [
+      {
+        "id": "color",
+        "values": [
+          "Multicolour"
+        ]
+      },
+      {
+        "id": "size",
+        "values": [
+          "2.6",
+          "2.2",
+          "2.8"
+        ]
+      }
+    ],
+    "variantMatrix": [
+      {
+        "id": "bogo-1fb5c79fdcbd5ee0953a-size-26",
+        "color": "Multicolour",
+        "size": "2.6",
+        "stock": 30,
+        "price": 220,
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/1fb5c79fdcbd5ee0953a.webp",
+        "active": true,
+        "hidden": false
+      },
+      {
+        "id": "bogo-1fb5c79fdcbd5ee0953a-size-22",
+        "color": "Multicolour",
+        "size": "2.2",
+        "stock": 30,
+        "price": 220,
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/1fb5c79fdcbd5ee0953a.webp",
+        "active": true,
+        "hidden": false
+      },
+      {
+        "id": "bogo-1fb5c79fdcbd5ee0953a-size-28",
+        "color": "Multicolour",
+        "size": "2.8",
+        "stock": 30,
+        "price": 220,
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/1fb5c79fdcbd5ee0953a.webp",
+        "active": true,
+        "hidden": false
+      }
+    ],
+    "sourceAsset": {
+      "folder": "METAL SET 26.22.28...220",
+      "file": "file_0000000053a48211ab6974d7ea8c0d46.png",
+      "sha256": "1fb5c79fdcbd5ee0953a4d3ebaf1d63e7bbbc6ec4033c9f80306d01ecbf69833",
+      "bytes": 93184
+    },
+    "createdAt": "2026-11-12T00:00:00.000Z"
+  },
+  {
+    "id": "bogo-240f43f948f2bca95e06",
+    "title": "Metal Bangle Set 09 — Buy 1 Get 1 Free (2 sets)",
+    "slug": "bogo-240f43f948f2bca95e06",
+    "price": 220,
+    "originalPrice": 220,
+    "description": "Buy 1 Get 1 Free: each offer pack includes 1 paid set and 1 identical free set. Same design, colour and selected size. Quantity counts offer packs; one offer pack contains two sets. Daily cycle renews at midnight Pakistan time unless paused by Admin. While stocks last.",
+    "category": "vakVNohIm5ulV5cyidYn",
+    "stock": 30,
+    "active": true,
+    "published": true,
+    "isWholesale": false,
+    "isFlashSale": true,
+    "isWeekendSpecial": false,
+    "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/240f43f948f2bca95e06.webp",
+    "images": [
+      "https://images.primehubmall.com/products/bogo-nov12/240f43f948f2bca95e06.webp"
+    ],
+    "bogoOffer": {
+      "enabled": true,
+      "unitLabel": "set",
+      "unitsPerOffer": 2
+    },
+    "bogoGroup": "Metal Bangle Set",
+    "hasVariants": true,
+    "variantColors": [
+      {
+        "name": "Silver",
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/240f43f948f2bca95e06.webp"
+      }
+    ],
+    "variantSizes": [
+      "2.6",
+      "2.2",
+      "2.8"
+    ],
+    "variantOptions": [
+      {
+        "id": "color",
+        "values": [
+          "Silver"
+        ]
+      },
+      {
+        "id": "size",
+        "values": [
+          "2.6",
+          "2.2",
+          "2.8"
+        ]
+      }
+    ],
+    "variantMatrix": [
+      {
+        "id": "bogo-240f43f948f2bca95e06-size-26",
+        "color": "Silver",
+        "size": "2.6",
+        "stock": 30,
+        "price": 220,
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/240f43f948f2bca95e06.webp",
+        "active": true,
+        "hidden": false
+      },
+      {
+        "id": "bogo-240f43f948f2bca95e06-size-22",
+        "color": "Silver",
+        "size": "2.2",
+        "stock": 30,
+        "price": 220,
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/240f43f948f2bca95e06.webp",
+        "active": true,
+        "hidden": false
+      },
+      {
+        "id": "bogo-240f43f948f2bca95e06-size-28",
+        "color": "Silver",
+        "size": "2.8",
+        "stock": 30,
+        "price": 220,
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/240f43f948f2bca95e06.webp",
+        "active": true,
+        "hidden": false
+      }
+    ],
+    "sourceAsset": {
+      "folder": "METAL SET 26.22.28...220",
+      "file": "file_0000000090e882078d82b95edf62da46.png",
+      "sha256": "240f43f948f2bca95e06f1cf16d3e019e78266962bc4a8fbaf9aecc6ad6442d6",
+      "bytes": 92558
+    },
+    "createdAt": "2026-11-12T00:00:00.000Z"
+  },
+  {
+    "id": "bogo-6853c3e54d2a6ec8b09d",
+    "title": "Metal Bangle Set 10 — Buy 1 Get 1 Free (2 sets)",
+    "slug": "bogo-6853c3e54d2a6ec8b09d",
+    "price": 220,
+    "originalPrice": 220,
+    "description": "Buy 1 Get 1 Free: each offer pack includes 1 paid set and 1 identical free set. Same design, colour and selected size. Quantity counts offer packs; one offer pack contains two sets. Daily cycle renews at midnight Pakistan time unless paused by Admin. While stocks last.",
+    "category": "vakVNohIm5ulV5cyidYn",
+    "stock": 30,
+    "active": true,
+    "published": true,
+    "isWholesale": false,
+    "isFlashSale": true,
+    "isWeekendSpecial": false,
+    "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/6853c3e54d2a6ec8b09d.webp",
+    "images": [
+      "https://images.primehubmall.com/products/bogo-nov12/6853c3e54d2a6ec8b09d.webp"
+    ],
+    "bogoOffer": {
+      "enabled": true,
+      "unitLabel": "set",
+      "unitsPerOffer": 2
+    },
+    "bogoGroup": "Metal Bangle Set",
+    "hasVariants": true,
+    "variantColors": [
+      {
+        "name": "Gold",
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/6853c3e54d2a6ec8b09d.webp"
+      }
+    ],
+    "variantSizes": [
+      "2.6",
+      "2.2",
+      "2.8"
+    ],
+    "variantOptions": [
+      {
+        "id": "color",
+        "values": [
+          "Gold"
+        ]
+      },
+      {
+        "id": "size",
+        "values": [
+          "2.6",
+          "2.2",
+          "2.8"
+        ]
+      }
+    ],
+    "variantMatrix": [
+      {
+        "id": "bogo-6853c3e54d2a6ec8b09d-size-26",
+        "color": "Gold",
+        "size": "2.6",
+        "stock": 30,
+        "price": 220,
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/6853c3e54d2a6ec8b09d.webp",
+        "active": true,
+        "hidden": false
+      },
+      {
+        "id": "bogo-6853c3e54d2a6ec8b09d-size-22",
+        "color": "Gold",
+        "size": "2.2",
+        "stock": 30,
+        "price": 220,
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/6853c3e54d2a6ec8b09d.webp",
+        "active": true,
+        "hidden": false
+      },
+      {
+        "id": "bogo-6853c3e54d2a6ec8b09d-size-28",
+        "color": "Gold",
+        "size": "2.8",
+        "stock": 30,
+        "price": 220,
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/6853c3e54d2a6ec8b09d.webp",
+        "active": true,
+        "hidden": false
+      }
+    ],
+    "sourceAsset": {
+      "folder": "METAL SET 26.22.28...220",
+      "file": "file_00000000fedc821187f3a49d19c1f4ab.png",
+      "sha256": "6853c3e54d2a6ec8b09d5853883cf573232fbbddf4350e78d60092e84297a8ed",
+      "bytes": 95592
+    },
+    "createdAt": "2026-11-12T00:00:00.000Z"
+  },
+  {
+    "id": "bogo-87bffa6b27519d397770",
+    "title": "New Kashmiri Set 01 — Buy 1 Get 1 Free (2 sets)",
+    "slug": "bogo-87bffa6b27519d397770",
+    "price": 300,
+    "originalPrice": 300,
+    "description": "Buy 1 Get 1 Free: each offer pack includes 1 paid set and 1 identical free set. Same design, colour and selected size. Quantity counts offer packs; one offer pack contains two sets. Daily cycle renews at midnight Pakistan time unless paused by Admin. While stocks last.",
+    "category": "vakVNohIm5ulV5cyidYn",
+    "stock": 30,
+    "active": true,
+    "published": true,
+    "isWholesale": false,
+    "isFlashSale": true,
+    "isWeekendSpecial": false,
+    "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/87bffa6b27519d397770.webp",
+    "images": [
+      "https://images.primehubmall.com/products/bogo-nov12/87bffa6b27519d397770.webp"
+    ],
+    "bogoOffer": {
+      "enabled": true,
+      "unitLabel": "set",
+      "unitsPerOffer": 2
+    },
+    "bogoGroup": "New Kashmiri Set",
+    "hasVariants": true,
+    "variantColors": [
+      {
+        "name": "Gold",
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/87bffa6b27519d397770.webp"
+      }
+    ],
+    "variantSizes": [
+      "2.6"
+    ],
+    "variantOptions": [
+      {
+        "id": "color",
+        "values": [
+          "Gold"
+        ]
+      },
+      {
+        "id": "size",
+        "values": [
+          "2.6"
+        ]
+      }
+    ],
+    "variantMatrix": [
+      {
+        "id": "bogo-87bffa6b27519d397770-size-26",
+        "color": "Gold",
+        "size": "2.6",
+        "stock": 30,
+        "price": 300,
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/87bffa6b27519d397770.webp",
+        "active": true,
+        "hidden": false
+      }
+    ],
+    "sourceAsset": {
+      "folder": "NEW KASHMIRI SET 26 300",
+      "file": "file_00000000d17082468c744bdf371d6127.png",
+      "sha256": "87bffa6b27519d397770f39865e8271c616599ce96f68e307d5b3e1f5ac54841",
+      "bytes": 85778
+    },
+    "createdAt": "2026-11-12T00:00:00.000Z"
+  },
+  {
+    "id": "bogo-c933d5ac631f62aae7aa",
+    "title": "Openable Bracelet 01 — Buy 1 Get 1 Free (2 bracelets)",
+    "slug": "bogo-c933d5ac631f62aae7aa",
+    "price": 250,
+    "originalPrice": 250,
+    "description": "Buy 1 Get 1 Free: each offer pack includes 1 paid bracelet and 1 identical free bracelet. Same design, colour. Quantity counts offer packs; one offer pack contains two bracelets. Daily cycle renews at midnight Pakistan time unless paused by Admin. While stocks last.",
+    "category": "lipjmjEhNPj03NndyWUa",
+    "stock": 30,
+    "active": true,
+    "published": true,
+    "isWholesale": false,
+    "isFlashSale": true,
+    "isWeekendSpecial": false,
+    "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/c933d5ac631f62aae7aa.webp",
+    "images": [
+      "https://images.primehubmall.com/products/bogo-nov12/c933d5ac631f62aae7aa.webp"
+    ],
+    "bogoOffer": {
+      "enabled": true,
+      "unitLabel": "bracelet",
+      "unitsPerOffer": 2
+    },
+    "bogoGroup": "Openable Bracelet",
+    "hasVariants": false,
+    "variantColors": [],
+    "variantSizes": [],
+    "variantOptions": [],
+    "variantMatrix": [],
+    "sourceAsset": {
+      "folder": "OPEN ABLE BRACLET 250",
+      "file": "file_000000001f988211a0c59d598005f565.png",
+      "sha256": "c933d5ac631f62aae7aa6ec82df1c2586e666da166c11a592dfe3bbe10cfc35d",
+      "bytes": 90438
+    },
+    "createdAt": "2026-11-12T00:00:00.000Z"
+  },
+  {
+    "id": "bogo-37cae15831de45496dea",
+    "title": "Openable Bracelet 02 — Buy 1 Get 1 Free (2 bracelets)",
+    "slug": "bogo-37cae15831de45496dea",
+    "price": 250,
+    "originalPrice": 250,
+    "description": "Buy 1 Get 1 Free: each offer pack includes 1 paid bracelet and 1 identical free bracelet. Same design, colour. Quantity counts offer packs; one offer pack contains two bracelets. Daily cycle renews at midnight Pakistan time unless paused by Admin. While stocks last.",
+    "category": "lipjmjEhNPj03NndyWUa",
+    "stock": 30,
+    "active": true,
+    "published": true,
+    "isWholesale": false,
+    "isFlashSale": true,
+    "isWeekendSpecial": false,
+    "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/37cae15831de45496dea.webp",
+    "images": [
+      "https://images.primehubmall.com/products/bogo-nov12/37cae15831de45496dea.webp"
+    ],
+    "bogoOffer": {
+      "enabled": true,
+      "unitLabel": "bracelet",
+      "unitsPerOffer": 2
+    },
+    "bogoGroup": "Openable Bracelet",
+    "hasVariants": false,
+    "variantColors": [],
+    "variantSizes": [],
+    "variantOptions": [],
+    "variantMatrix": [],
+    "sourceAsset": {
+      "folder": "OPEN ABLE BRACLET 250",
+      "file": "file_0000000034208211bff89266dd349b36.png",
+      "sha256": "37cae15831de45496dea7be8a66b25e2ff7581b498584034aaeafd5f8e9a6975",
+      "bytes": 94156
+    },
+    "createdAt": "2026-11-12T00:00:00.000Z"
+  },
+  {
+    "id": "bogo-6f5f53018f9fa8430e70",
+    "title": "Openable Bracelet 03 — Buy 1 Get 1 Free (2 bracelets)",
+    "slug": "bogo-6f5f53018f9fa8430e70",
+    "price": 250,
+    "originalPrice": 250,
+    "description": "Buy 1 Get 1 Free: each offer pack includes 1 paid bracelet and 1 identical free bracelet. Same design, colour. Quantity counts offer packs; one offer pack contains two bracelets. Daily cycle renews at midnight Pakistan time unless paused by Admin. While stocks last.",
+    "category": "lipjmjEhNPj03NndyWUa",
+    "stock": 30,
+    "active": true,
+    "published": true,
+    "isWholesale": false,
+    "isFlashSale": true,
+    "isWeekendSpecial": false,
+    "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/6f5f53018f9fa8430e70.webp",
+    "images": [
+      "https://images.primehubmall.com/products/bogo-nov12/6f5f53018f9fa8430e70.webp"
+    ],
+    "bogoOffer": {
+      "enabled": true,
+      "unitLabel": "bracelet",
+      "unitsPerOffer": 2
+    },
+    "bogoGroup": "Openable Bracelet",
+    "hasVariants": false,
+    "variantColors": [],
+    "variantSizes": [],
+    "variantOptions": [],
+    "variantMatrix": [],
+    "sourceAsset": {
+      "folder": "OPEN ABLE BRACLET 250",
+      "file": "file_0000000036f4821192388d2bcaddde69.png",
+      "sha256": "6f5f53018f9fa8430e7009d3c9b880d553b7bb43c9bdbe41461b3f5d2f2bd873",
+      "bytes": 91586
+    },
+    "createdAt": "2026-11-12T00:00:00.000Z"
+  },
+  {
+    "id": "bogo-9288c8ff58c70f40a785",
+    "title": "Openable Bracelet 04 — Buy 1 Get 1 Free (2 bracelets)",
+    "slug": "bogo-9288c8ff58c70f40a785",
+    "price": 250,
+    "originalPrice": 250,
+    "description": "Buy 1 Get 1 Free: each offer pack includes 1 paid bracelet and 1 identical free bracelet. Same design, colour. Quantity counts offer packs; one offer pack contains two bracelets. Daily cycle renews at midnight Pakistan time unless paused by Admin. While stocks last.",
+    "category": "lipjmjEhNPj03NndyWUa",
+    "stock": 30,
+    "active": true,
+    "published": true,
+    "isWholesale": false,
+    "isFlashSale": true,
+    "isWeekendSpecial": false,
+    "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/9288c8ff58c70f40a785.webp",
+    "images": [
+      "https://images.primehubmall.com/products/bogo-nov12/9288c8ff58c70f40a785.webp"
+    ],
+    "bogoOffer": {
+      "enabled": true,
+      "unitLabel": "bracelet",
+      "unitsPerOffer": 2
+    },
+    "bogoGroup": "Openable Bracelet",
+    "hasVariants": false,
+    "variantColors": [],
+    "variantSizes": [],
+    "variantOptions": [],
+    "variantMatrix": [],
+    "sourceAsset": {
+      "folder": "OPEN ABLE BRACLET 250",
+      "file": "file_0000000050388211abd689e5253ef30c.png",
+      "sha256": "9288c8ff58c70f40a785beddfc17f8694be6c54300effbf1486f546424378729",
+      "bytes": 95236
+    },
+    "createdAt": "2026-11-12T00:00:00.000Z"
+  },
+  {
+    "id": "bogo-855e61fa19752af31088",
+    "title": "Openable Bracelet 05 — Buy 1 Get 1 Free (2 bracelets)",
+    "slug": "bogo-855e61fa19752af31088",
+    "price": 250,
+    "originalPrice": 250,
+    "description": "Buy 1 Get 1 Free: each offer pack includes 1 paid bracelet and 1 identical free bracelet. Same design, colour. Quantity counts offer packs; one offer pack contains two bracelets. Daily cycle renews at midnight Pakistan time unless paused by Admin. While stocks last.",
+    "category": "lipjmjEhNPj03NndyWUa",
+    "stock": 30,
+    "active": true,
+    "published": true,
+    "isWholesale": false,
+    "isFlashSale": true,
+    "isWeekendSpecial": false,
+    "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/855e61fa19752af31088.webp",
+    "images": [
+      "https://images.primehubmall.com/products/bogo-nov12/855e61fa19752af31088.webp"
+    ],
+    "bogoOffer": {
+      "enabled": true,
+      "unitLabel": "bracelet",
+      "unitsPerOffer": 2
+    },
+    "bogoGroup": "Openable Bracelet",
+    "hasVariants": false,
+    "variantColors": [],
+    "variantSizes": [],
+    "variantOptions": [],
+    "variantMatrix": [],
+    "sourceAsset": {
+      "folder": "OPEN ABLE BRACLET 250",
+      "file": "file_0000000051808211bd5bb2681da53b6d.png",
+      "sha256": "855e61fa19752af31088361e41b3cf3844d856c026ad04f4c9fb11062d2f27e2",
+      "bytes": 75254
+    },
+    "createdAt": "2026-11-12T00:00:00.000Z"
+  },
+  {
+    "id": "bogo-64b38510972089f1e983",
+    "title": "Openable Bracelet 06 — Buy 1 Get 1 Free (2 bracelets)",
+    "slug": "bogo-64b38510972089f1e983",
+    "price": 250,
+    "originalPrice": 250,
+    "description": "Buy 1 Get 1 Free: each offer pack includes 1 paid bracelet and 1 identical free bracelet. Same design, colour. Quantity counts offer packs; one offer pack contains two bracelets. Daily cycle renews at midnight Pakistan time unless paused by Admin. While stocks last.",
+    "category": "lipjmjEhNPj03NndyWUa",
+    "stock": 30,
+    "active": true,
+    "published": true,
+    "isWholesale": false,
+    "isFlashSale": true,
+    "isWeekendSpecial": false,
+    "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/64b38510972089f1e983.webp",
+    "images": [
+      "https://images.primehubmall.com/products/bogo-nov12/64b38510972089f1e983.webp"
+    ],
+    "bogoOffer": {
+      "enabled": true,
+      "unitLabel": "bracelet",
+      "unitsPerOffer": 2
+    },
+    "bogoGroup": "Openable Bracelet",
+    "hasVariants": false,
+    "variantColors": [],
+    "variantSizes": [],
+    "variantOptions": [],
+    "variantMatrix": [],
+    "sourceAsset": {
+      "folder": "OPEN ABLE BRACLET 250",
+      "file": "file_000000005abc821182a7078a90b245e5.png",
+      "sha256": "64b38510972089f1e983d1dde334b2fad494393b35919791a2835045fb966a66",
+      "bytes": 97822
+    },
+    "createdAt": "2026-11-12T00:00:00.000Z"
+  },
+  {
+    "id": "bogo-a1c7a6ba44ef935cd2b0",
+    "title": "Openable Bracelet 07 — Buy 1 Get 1 Free (2 bracelets)",
+    "slug": "bogo-a1c7a6ba44ef935cd2b0",
+    "price": 250,
+    "originalPrice": 250,
+    "description": "Buy 1 Get 1 Free: each offer pack includes 1 paid bracelet and 1 identical free bracelet. Same design, colour. Quantity counts offer packs; one offer pack contains two bracelets. Daily cycle renews at midnight Pakistan time unless paused by Admin. While stocks last.",
+    "category": "lipjmjEhNPj03NndyWUa",
+    "stock": 30,
+    "active": true,
+    "published": true,
+    "isWholesale": false,
+    "isFlashSale": true,
+    "isWeekendSpecial": false,
+    "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/a1c7a6ba44ef935cd2b0.webp",
+    "images": [
+      "https://images.primehubmall.com/products/bogo-nov12/a1c7a6ba44ef935cd2b0.webp"
+    ],
+    "bogoOffer": {
+      "enabled": true,
+      "unitLabel": "bracelet",
+      "unitsPerOffer": 2
+    },
+    "bogoGroup": "Openable Bracelet",
+    "hasVariants": false,
+    "variantColors": [],
+    "variantSizes": [],
+    "variantOptions": [],
+    "variantMatrix": [],
+    "sourceAsset": {
+      "folder": "OPEN ABLE BRACLET 250",
+      "file": "file_000000005af482118280a18f12d5227c.png",
+      "sha256": "a1c7a6ba44ef935cd2b0c7b64eed2b78aa0dbd1c21eb76ad53af1d649a375a5a",
+      "bytes": 97854
+    },
+    "createdAt": "2026-11-12T00:00:00.000Z"
+  },
+  {
+    "id": "bogo-99d251eab86c0d05146f",
+    "title": "Openable Bracelet 08 — Buy 1 Get 1 Free (2 bracelets)",
+    "slug": "bogo-99d251eab86c0d05146f",
+    "price": 250,
+    "originalPrice": 250,
+    "description": "Buy 1 Get 1 Free: each offer pack includes 1 paid bracelet and 1 identical free bracelet. Same design, colour. Quantity counts offer packs; one offer pack contains two bracelets. Daily cycle renews at midnight Pakistan time unless paused by Admin. While stocks last.",
+    "category": "lipjmjEhNPj03NndyWUa",
+    "stock": 30,
+    "active": true,
+    "published": true,
+    "isWholesale": false,
+    "isFlashSale": true,
+    "isWeekendSpecial": false,
+    "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/99d251eab86c0d05146f.webp",
+    "images": [
+      "https://images.primehubmall.com/products/bogo-nov12/99d251eab86c0d05146f.webp"
+    ],
+    "bogoOffer": {
+      "enabled": true,
+      "unitLabel": "bracelet",
+      "unitsPerOffer": 2
+    },
+    "bogoGroup": "Openable Bracelet",
+    "hasVariants": false,
+    "variantColors": [],
+    "variantSizes": [],
+    "variantOptions": [],
+    "variantMatrix": [],
+    "sourceAsset": {
+      "folder": "OPEN ABLE BRACLET 250",
+      "file": "file_000000006ce882119b04d4d5bf2409d4.png",
+      "sha256": "99d251eab86c0d05146ffe394c2861f8c0868e9b88ea1f5b05b226f9e54385a3",
+      "bytes": 81820
+    },
+    "createdAt": "2026-11-12T00:00:00.000Z"
+  },
+  {
+    "id": "bogo-1691bf1c23d38fd56679",
+    "title": "Openable Bracelet 09 — Buy 1 Get 1 Free (2 bracelets)",
+    "slug": "bogo-1691bf1c23d38fd56679",
+    "price": 250,
+    "originalPrice": 250,
+    "description": "Buy 1 Get 1 Free: each offer pack includes 1 paid bracelet and 1 identical free bracelet. Same design, colour. Quantity counts offer packs; one offer pack contains two bracelets. Daily cycle renews at midnight Pakistan time unless paused by Admin. While stocks last.",
+    "category": "lipjmjEhNPj03NndyWUa",
+    "stock": 30,
+    "active": true,
+    "published": true,
+    "isWholesale": false,
+    "isFlashSale": true,
+    "isWeekendSpecial": false,
+    "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/1691bf1c23d38fd56679.webp",
+    "images": [
+      "https://images.primehubmall.com/products/bogo-nov12/1691bf1c23d38fd56679.webp"
+    ],
+    "bogoOffer": {
+      "enabled": true,
+      "unitLabel": "bracelet",
+      "unitsPerOffer": 2
+    },
+    "bogoGroup": "Openable Bracelet",
+    "hasVariants": false,
+    "variantColors": [],
+    "variantSizes": [],
+    "variantOptions": [],
+    "variantMatrix": [],
+    "sourceAsset": {
+      "folder": "OPEN ABLE BRACLET 250",
+      "file": "file_0000000075788211b4dd311c60fa0800.png",
+      "sha256": "1691bf1c23d38fd56679b279f026c86fef76da5aad0030952795bebe5aa4b7fa",
+      "bytes": 89706
+    },
+    "createdAt": "2026-11-12T00:00:00.000Z"
+  },
+  {
+    "id": "bogo-b9aa49e7d8e32a93c3d3",
+    "title": "Openable Bracelet 10 — Buy 1 Get 1 Free (2 bracelets)",
+    "slug": "bogo-b9aa49e7d8e32a93c3d3",
+    "price": 250,
+    "originalPrice": 250,
+    "description": "Buy 1 Get 1 Free: each offer pack includes 1 paid bracelet and 1 identical free bracelet. Same design, colour. Quantity counts offer packs; one offer pack contains two bracelets. Daily cycle renews at midnight Pakistan time unless paused by Admin. While stocks last.",
+    "category": "lipjmjEhNPj03NndyWUa",
+    "stock": 30,
+    "active": true,
+    "published": true,
+    "isWholesale": false,
+    "isFlashSale": true,
+    "isWeekendSpecial": false,
+    "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/b9aa49e7d8e32a93c3d3.webp",
+    "images": [
+      "https://images.primehubmall.com/products/bogo-nov12/b9aa49e7d8e32a93c3d3.webp"
+    ],
+    "bogoOffer": {
+      "enabled": true,
+      "unitLabel": "bracelet",
+      "unitsPerOffer": 2
+    },
+    "bogoGroup": "Openable Bracelet",
+    "hasVariants": false,
+    "variantColors": [],
+    "variantSizes": [],
+    "variantOptions": [],
+    "variantMatrix": [],
+    "sourceAsset": {
+      "folder": "OPEN ABLE BRACLET 250",
+      "file": "file_00000000a3e08207a6987544b0732c26.png",
+      "sha256": "b9aa49e7d8e32a93c3d398c31b62a60846056d4f03cf5b810d8c9140bc8ffbac",
+      "bytes": 86962
+    },
+    "createdAt": "2026-11-12T00:00:00.000Z"
+  },
+  {
+    "id": "bogo-72e32cf42fda03dae4cd",
+    "title": "Openable Bracelet 11 — Buy 1 Get 1 Free (2 bracelets)",
+    "slug": "bogo-72e32cf42fda03dae4cd",
+    "price": 250,
+    "originalPrice": 250,
+    "description": "Buy 1 Get 1 Free: each offer pack includes 1 paid bracelet and 1 identical free bracelet. Same design, colour. Quantity counts offer packs; one offer pack contains two bracelets. Daily cycle renews at midnight Pakistan time unless paused by Admin. While stocks last.",
+    "category": "lipjmjEhNPj03NndyWUa",
+    "stock": 30,
+    "active": true,
+    "published": true,
+    "isWholesale": false,
+    "isFlashSale": true,
+    "isWeekendSpecial": false,
+    "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/72e32cf42fda03dae4cd.webp",
+    "images": [
+      "https://images.primehubmall.com/products/bogo-nov12/72e32cf42fda03dae4cd.webp"
+    ],
+    "bogoOffer": {
+      "enabled": true,
+      "unitLabel": "bracelet",
+      "unitsPerOffer": 2
+    },
+    "bogoGroup": "Openable Bracelet",
+    "hasVariants": false,
+    "variantColors": [],
+    "variantSizes": [],
+    "variantOptions": [],
+    "variantMatrix": [],
+    "sourceAsset": {
+      "folder": "OPEN ABLE BRACLET 250",
+      "file": "file_00000000b3008211b7973e26283a199f.png",
+      "sha256": "72e32cf42fda03dae4cd5130381fad9aa203d9baec2e153018d6bc42bf296856",
+      "bytes": 83758
+    },
+    "createdAt": "2026-11-12T00:00:00.000Z"
+  },
+  {
+    "id": "bogo-9022ad1e1ef0e143ee6f",
+    "title": "Openable Bracelet 12 — Buy 1 Get 1 Free (2 bracelets)",
+    "slug": "bogo-9022ad1e1ef0e143ee6f",
+    "price": 250,
+    "originalPrice": 250,
+    "description": "Buy 1 Get 1 Free: each offer pack includes 1 paid bracelet and 1 identical free bracelet. Same design, colour. Quantity counts offer packs; one offer pack contains two bracelets. Daily cycle renews at midnight Pakistan time unless paused by Admin. While stocks last.",
+    "category": "lipjmjEhNPj03NndyWUa",
+    "stock": 30,
+    "active": true,
+    "published": true,
+    "isWholesale": false,
+    "isFlashSale": true,
+    "isWeekendSpecial": false,
+    "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/9022ad1e1ef0e143ee6f.webp",
+    "images": [
+      "https://images.primehubmall.com/products/bogo-nov12/9022ad1e1ef0e143ee6f.webp"
+    ],
+    "bogoOffer": {
+      "enabled": true,
+      "unitLabel": "bracelet",
+      "unitsPerOffer": 2
+    },
+    "bogoGroup": "Openable Bracelet",
+    "hasVariants": false,
+    "variantColors": [],
+    "variantSizes": [],
+    "variantOptions": [],
+    "variantMatrix": [],
+    "sourceAsset": {
+      "folder": "OPEN ABLE BRACLET 250",
+      "file": "file_00000000dfbc82078215a625db81cee8.png",
+      "sha256": "9022ad1e1ef0e143ee6f89b066b9a70dd817558f1afac067102c19a63eb61778",
+      "bytes": 93108
+    },
+    "createdAt": "2026-11-12T00:00:00.000Z"
+  },
+  {
+    "id": "bogo-1ad66fc5061947469d00",
+    "title": "Openable Bracelet 13 — Buy 1 Get 1 Free (2 bracelets)",
+    "slug": "bogo-1ad66fc5061947469d00",
+    "price": 250,
+    "originalPrice": 250,
+    "description": "Buy 1 Get 1 Free: each offer pack includes 1 paid bracelet and 1 identical free bracelet. Same design, colour. Quantity counts offer packs; one offer pack contains two bracelets. Daily cycle renews at midnight Pakistan time unless paused by Admin. While stocks last.",
+    "category": "lipjmjEhNPj03NndyWUa",
+    "stock": 30,
+    "active": true,
+    "published": true,
+    "isWholesale": false,
+    "isFlashSale": true,
+    "isWeekendSpecial": false,
+    "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/1ad66fc5061947469d00.webp",
+    "images": [
+      "https://images.primehubmall.com/products/bogo-nov12/1ad66fc5061947469d00.webp"
+    ],
+    "bogoOffer": {
+      "enabled": true,
+      "unitLabel": "bracelet",
+      "unitsPerOffer": 2
+    },
+    "bogoGroup": "Openable Bracelet",
+    "hasVariants": false,
+    "variantColors": [],
+    "variantSizes": [],
+    "variantOptions": [],
+    "variantMatrix": [],
+    "sourceAsset": {
+      "folder": "OPEN ABLE BRACLET 250",
+      "file": "file_00000000f68c8207ae94827ec67c667f.png",
+      "sha256": "1ad66fc5061947469d008902f5032f46982850995417f2c84b15c6c924714c70",
+      "bytes": 91290
+    },
+    "createdAt": "2026-11-12T00:00:00.000Z"
+  },
+  {
+    "id": "bogo-93f007c17aa4215b64d5",
+    "title": "Openable Bracelet Pair 01 — Buy 1 Get 1 Free (2 pairs)",
+    "slug": "bogo-93f007c17aa4215b64d5",
+    "price": 250,
+    "originalPrice": 250,
+    "description": "Buy 1 Get 1 Free: each offer pack includes 1 paid pair and 1 identical free pair. Same design, colour. Quantity counts offer packs; one offer pack contains two pairs. Daily cycle renews at midnight Pakistan time unless paused by Admin. While stocks last.",
+    "category": "lipjmjEhNPj03NndyWUa",
+    "stock": 30,
+    "active": true,
+    "published": true,
+    "isWholesale": false,
+    "isFlashSale": true,
+    "isWeekendSpecial": false,
+    "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/93f007c17aa4215b64d5.webp",
+    "images": [
+      "https://images.primehubmall.com/products/bogo-nov12/93f007c17aa4215b64d5.webp"
+    ],
+    "bogoOffer": {
+      "enabled": true,
+      "unitLabel": "pair",
+      "unitsPerOffer": 2
+    },
+    "bogoGroup": "Openable Bracelet Pair",
+    "hasVariants": false,
+    "variantColors": [],
+    "variantSizes": [],
+    "variantOptions": [],
+    "variantMatrix": [],
+    "sourceAsset": {
+      "folder": "OPEN ABLE BRACLET 250 PAIR",
+      "file": "file_0000000026188211b384ea016fdd3e13.png",
+      "sha256": "93f007c17aa4215b64d56d4876c3d2f0eb25b04074af28304145551fec8f99ef",
+      "bytes": 98702
+    },
+    "createdAt": "2026-11-12T00:00:00.000Z"
+  },
+  {
+    "id": "bogo-ce915ade5605062df977",
+    "title": "Openable Bracelet Pair 02 — Buy 1 Get 1 Free (2 pairs)",
+    "slug": "bogo-ce915ade5605062df977",
+    "price": 250,
+    "originalPrice": 250,
+    "description": "Buy 1 Get 1 Free: each offer pack includes 1 paid pair and 1 identical free pair. Same design, colour. Quantity counts offer packs; one offer pack contains two pairs. Daily cycle renews at midnight Pakistan time unless paused by Admin. While stocks last.",
+    "category": "lipjmjEhNPj03NndyWUa",
+    "stock": 30,
+    "active": true,
+    "published": true,
+    "isWholesale": false,
+    "isFlashSale": true,
+    "isWeekendSpecial": false,
+    "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/ce915ade5605062df977.webp",
+    "images": [
+      "https://images.primehubmall.com/products/bogo-nov12/ce915ade5605062df977.webp"
+    ],
+    "bogoOffer": {
+      "enabled": true,
+      "unitLabel": "pair",
+      "unitsPerOffer": 2
+    },
+    "bogoGroup": "Openable Bracelet Pair",
+    "hasVariants": false,
+    "variantColors": [],
+    "variantSizes": [],
+    "variantOptions": [],
+    "variantMatrix": [],
+    "sourceAsset": {
+      "folder": "OPEN ABLE BRACLET 250 PAIR",
+      "file": "file_0000000053d882118b952a789bed53d1.png",
+      "sha256": "ce915ade5605062df977ce498eea6befd6b88edb7a696a34fbe4b565a8071bcb",
+      "bytes": 94568
+    },
+    "createdAt": "2026-11-12T00:00:00.000Z"
+  },
+  {
+    "id": "bogo-efa4058de8517fd1c830",
+    "title": "Openable Bracelet Pair 03 — Buy 1 Get 1 Free (2 pairs)",
+    "slug": "bogo-efa4058de8517fd1c830",
+    "price": 250,
+    "originalPrice": 250,
+    "description": "Buy 1 Get 1 Free: each offer pack includes 1 paid pair and 1 identical free pair. Same design, colour. Quantity counts offer packs; one offer pack contains two pairs. Daily cycle renews at midnight Pakistan time unless paused by Admin. While stocks last.",
+    "category": "lipjmjEhNPj03NndyWUa",
+    "stock": 30,
+    "active": true,
+    "published": true,
+    "isWholesale": false,
+    "isFlashSale": true,
+    "isWeekendSpecial": false,
+    "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/efa4058de8517fd1c830.webp",
+    "images": [
+      "https://images.primehubmall.com/products/bogo-nov12/efa4058de8517fd1c830.webp"
+    ],
+    "bogoOffer": {
+      "enabled": true,
+      "unitLabel": "pair",
+      "unitsPerOffer": 2
+    },
+    "bogoGroup": "Openable Bracelet Pair",
+    "hasVariants": false,
+    "variantColors": [],
+    "variantSizes": [],
+    "variantOptions": [],
+    "variantMatrix": [],
+    "sourceAsset": {
+      "folder": "OPEN ABLE BRACLET 250 PAIR",
+      "file": "file_0000000076cc821189ee7ef7fa719ad6.png",
+      "sha256": "efa4058de8517fd1c830b8997d7896fabbb2900652310edff116a00920eb291d",
+      "bytes": 95176
+    },
+    "createdAt": "2026-11-12T00:00:00.000Z"
+  },
+  {
+    "id": "bogo-675a19d252d512c9d576",
+    "title": "Openable Bracelet Pair 04 — Buy 1 Get 1 Free (2 pairs)",
+    "slug": "bogo-675a19d252d512c9d576",
+    "price": 250,
+    "originalPrice": 250,
+    "description": "Buy 1 Get 1 Free: each offer pack includes 1 paid pair and 1 identical free pair. Same design, colour. Quantity counts offer packs; one offer pack contains two pairs. Daily cycle renews at midnight Pakistan time unless paused by Admin. While stocks last.",
+    "category": "lipjmjEhNPj03NndyWUa",
+    "stock": 30,
+    "active": true,
+    "published": true,
+    "isWholesale": false,
+    "isFlashSale": true,
+    "isWeekendSpecial": false,
+    "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/675a19d252d512c9d576.webp",
+    "images": [
+      "https://images.primehubmall.com/products/bogo-nov12/675a19d252d512c9d576.webp"
+    ],
+    "bogoOffer": {
+      "enabled": true,
+      "unitLabel": "pair",
+      "unitsPerOffer": 2
+    },
+    "bogoGroup": "Openable Bracelet Pair",
+    "hasVariants": false,
+    "variantColors": [],
+    "variantSizes": [],
+    "variantOptions": [],
+    "variantMatrix": [],
+    "sourceAsset": {
+      "folder": "OPEN ABLE BRACLET 250 PAIR",
+      "file": "file_0000000085288211841cf142c1568cf4.png",
+      "sha256": "675a19d252d512c9d57649d3f0b601dae178ae615080c0ebe4ad19322bb805e5",
+      "bytes": 96152
+    },
+    "createdAt": "2026-11-12T00:00:00.000Z"
+  },
+  {
+    "id": "bogo-c4363c88a25d7c208179",
+    "title": "Openable Bracelet Pair 05 — Buy 1 Get 1 Free (2 pairs)",
+    "slug": "bogo-c4363c88a25d7c208179",
+    "price": 250,
+    "originalPrice": 250,
+    "description": "Buy 1 Get 1 Free: each offer pack includes 1 paid pair and 1 identical free pair. Same design, colour. Quantity counts offer packs; one offer pack contains two pairs. Daily cycle renews at midnight Pakistan time unless paused by Admin. While stocks last.",
+    "category": "lipjmjEhNPj03NndyWUa",
+    "stock": 30,
+    "active": true,
+    "published": true,
+    "isWholesale": false,
+    "isFlashSale": true,
+    "isWeekendSpecial": false,
+    "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/c4363c88a25d7c208179.webp",
+    "images": [
+      "https://images.primehubmall.com/products/bogo-nov12/c4363c88a25d7c208179.webp"
+    ],
+    "bogoOffer": {
+      "enabled": true,
+      "unitLabel": "pair",
+      "unitsPerOffer": 2
+    },
+    "bogoGroup": "Openable Bracelet Pair",
+    "hasVariants": false,
+    "variantColors": [],
+    "variantSizes": [],
+    "variantOptions": [],
+    "variantMatrix": [],
+    "sourceAsset": {
+      "folder": "OPEN ABLE BRACLET 250 PAIR",
+      "file": "file_0000000090048207a1daacadb208c221.png",
+      "sha256": "c4363c88a25d7c208179627ba344241b159fbab3bf64182fb80bacdceb069eac",
+      "bytes": 99458
+    },
+    "createdAt": "2026-11-12T00:00:00.000Z"
+  },
+  {
+    "id": "bogo-8143c3ddad61407ccad2",
+    "title": "Openable Bracelet Pair 06 — Buy 1 Get 1 Free (2 pairs)",
+    "slug": "bogo-8143c3ddad61407ccad2",
+    "price": 250,
+    "originalPrice": 250,
+    "description": "Buy 1 Get 1 Free: each offer pack includes 1 paid pair and 1 identical free pair. Same design, colour. Quantity counts offer packs; one offer pack contains two pairs. Daily cycle renews at midnight Pakistan time unless paused by Admin. While stocks last.",
+    "category": "lipjmjEhNPj03NndyWUa",
+    "stock": 30,
+    "active": true,
+    "published": true,
+    "isWholesale": false,
+    "isFlashSale": true,
+    "isWeekendSpecial": false,
+    "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/8143c3ddad61407ccad2.webp",
+    "images": [
+      "https://images.primehubmall.com/products/bogo-nov12/8143c3ddad61407ccad2.webp"
+    ],
+    "bogoOffer": {
+      "enabled": true,
+      "unitLabel": "pair",
+      "unitsPerOffer": 2
+    },
+    "bogoGroup": "Openable Bracelet Pair",
+    "hasVariants": false,
+    "variantColors": [],
+    "variantSizes": [],
+    "variantOptions": [],
+    "variantMatrix": [],
+    "sourceAsset": {
+      "folder": "OPEN ABLE BRACLET 250 PAIR",
+      "file": "file_00000000a6548211ad527371812309ed.png",
+      "sha256": "8143c3ddad61407ccad255ae00d80e0e9ee44f98ccb419adae5bf0a8359c989c",
+      "bytes": 80908
+    },
+    "createdAt": "2026-11-12T00:00:00.000Z"
+  },
+  {
+    "id": "bogo-5664d354a1e6c4f099d9",
+    "title": "Openable Fancy Bracelet 01 — Buy 1 Get 1 Free (2 bracelets)",
+    "slug": "bogo-5664d354a1e6c4f099d9",
+    "price": 350,
+    "originalPrice": 350,
+    "description": "Buy 1 Get 1 Free: each offer pack includes 1 paid bracelet and 1 identical free bracelet. Same design, colour. Quantity counts offer packs; one offer pack contains two bracelets. Daily cycle renews at midnight Pakistan time unless paused by Admin. While stocks last.",
+    "category": "lipjmjEhNPj03NndyWUa",
+    "stock": 30,
+    "active": true,
+    "published": true,
+    "isWholesale": false,
+    "isFlashSale": true,
+    "isWeekendSpecial": false,
+    "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/5664d354a1e6c4f099d9.webp",
+    "images": [
+      "https://images.primehubmall.com/products/bogo-nov12/5664d354a1e6c4f099d9.webp"
+    ],
+    "bogoOffer": {
+      "enabled": true,
+      "unitLabel": "bracelet",
+      "unitsPerOffer": 2
+    },
+    "bogoGroup": "Openable Fancy Bracelet",
+    "hasVariants": false,
+    "variantColors": [],
+    "variantSizes": [],
+    "variantOptions": [],
+    "variantMatrix": [],
+    "sourceAsset": {
+      "folder": "OPEN ABLE FANCY BRACLET 350",
+      "file": "file_000000000aac82119025e031a506a9c0.png",
+      "sha256": "5664d354a1e6c4f099d997465bd0ae9ca59e0ecf493eca9d7b0d386cae0db861",
+      "bytes": 53756
+    },
+    "createdAt": "2026-11-12T00:00:00.000Z"
+  },
+  {
+    "id": "bogo-89b3c92ed858cb0a3c89",
+    "title": "Openable Fancy Bracelet 02 — Buy 1 Get 1 Free (2 bracelets)",
+    "slug": "bogo-89b3c92ed858cb0a3c89",
+    "price": 350,
+    "originalPrice": 350,
+    "description": "Buy 1 Get 1 Free: each offer pack includes 1 paid bracelet and 1 identical free bracelet. Same design, colour. Quantity counts offer packs; one offer pack contains two bracelets. Daily cycle renews at midnight Pakistan time unless paused by Admin. While stocks last.",
+    "category": "lipjmjEhNPj03NndyWUa",
+    "stock": 30,
+    "active": true,
+    "published": true,
+    "isWholesale": false,
+    "isFlashSale": true,
+    "isWeekendSpecial": false,
+    "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/89b3c92ed858cb0a3c89.webp",
+    "images": [
+      "https://images.primehubmall.com/products/bogo-nov12/89b3c92ed858cb0a3c89.webp"
+    ],
+    "bogoOffer": {
+      "enabled": true,
+      "unitLabel": "bracelet",
+      "unitsPerOffer": 2
+    },
+    "bogoGroup": "Openable Fancy Bracelet",
+    "hasVariants": false,
+    "variantColors": [],
+    "variantSizes": [],
+    "variantOptions": [],
+    "variantMatrix": [],
+    "sourceAsset": {
+      "folder": "OPEN ABLE FANCY BRACLET 350",
+      "file": "file_0000000037ec8211b11c02cead29ac1f.png",
+      "sha256": "89b3c92ed858cb0a3c89e700e981cff11262dccf4b7e90ac629c914c0463c72b",
+      "bytes": 55576
+    },
+    "createdAt": "2026-11-12T00:00:00.000Z"
+  },
+  {
+    "id": "bogo-7f58438dbb37eeb52770",
+    "title": "Pearl Chain Bangle Set 01 — Buy 1 Get 1 Free (2 sets)",
+    "slug": "bogo-7f58438dbb37eeb52770",
+    "price": 400,
+    "originalPrice": 400,
+    "description": "Buy 1 Get 1 Free: each offer pack includes 1 paid set and 1 identical free set. Same design, colour and selected size. Quantity counts offer packs; one offer pack contains two sets. Daily cycle renews at midnight Pakistan time unless paused by Admin. While stocks last.",
+    "category": "vakVNohIm5ulV5cyidYn",
+    "stock": 30,
+    "active": true,
+    "published": true,
+    "isWholesale": false,
+    "isFlashSale": true,
+    "isWeekendSpecial": false,
+    "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/7f58438dbb37eeb52770.webp",
+    "images": [
+      "https://images.primehubmall.com/products/bogo-nov12/7f58438dbb37eeb52770.webp"
+    ],
+    "bogoOffer": {
+      "enabled": true,
+      "unitLabel": "set",
+      "unitsPerOffer": 2
+    },
+    "bogoGroup": "Pearl Chain Bangle Set",
+    "hasVariants": true,
+    "variantColors": [
+      {
+        "name": "Pearl Gold",
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/7f58438dbb37eeb52770.webp"
+      }
+    ],
+    "variantSizes": [
+      "2.6",
+      "2.2",
+      "2.8"
+    ],
+    "variantOptions": [
+      {
+        "id": "color",
+        "values": [
+          "Pearl Gold"
+        ]
+      },
+      {
+        "id": "size",
+        "values": [
+          "2.6",
+          "2.2",
+          "2.8"
+        ]
+      }
+    ],
+    "variantMatrix": [
+      {
+        "id": "bogo-7f58438dbb37eeb52770-size-26",
+        "color": "Pearl Gold",
+        "size": "2.6",
+        "stock": 30,
+        "price": 400,
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/7f58438dbb37eeb52770.webp",
+        "active": true,
+        "hidden": false
+      },
+      {
+        "id": "bogo-7f58438dbb37eeb52770-size-22",
+        "color": "Pearl Gold",
+        "size": "2.2",
+        "stock": 30,
+        "price": 400,
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/7f58438dbb37eeb52770.webp",
+        "active": true,
+        "hidden": false
+      },
+      {
+        "id": "bogo-7f58438dbb37eeb52770-size-28",
+        "color": "Pearl Gold",
+        "size": "2.8",
+        "stock": 30,
+        "price": 400,
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/7f58438dbb37eeb52770.webp",
+        "active": true,
+        "hidden": false
+      }
+    ],
+    "sourceAsset": {
+      "folder": "PEARL CHAIN 26.22.28 ...400",
+      "file": "file_00000000c4808246a5b60b1273e978e9.png",
+      "sha256": "7f58438dbb37eeb5277062912250ac876348d312b5386c3196f66a2badcf5304",
+      "bytes": 90586
+    },
+    "createdAt": "2026-11-12T00:00:00.000Z"
+  },
+  {
+    "id": "bogo-a9b3352c422e66753164",
+    "title": "Pearl Bangle Pair 01 — Buy 1 Get 1 Free (2 pairs)",
+    "slug": "bogo-a9b3352c422e66753164",
+    "price": 200,
+    "originalPrice": 200,
+    "description": "Buy 1 Get 1 Free: each offer pack includes 1 paid pair and 1 identical free pair. Same design, colour and selected size. Quantity counts offer packs; one offer pack contains two pairs. Daily cycle renews at midnight Pakistan time unless paused by Admin. While stocks last.",
+    "category": "vakVNohIm5ulV5cyidYn",
+    "stock": 30,
+    "active": true,
+    "published": true,
+    "isWholesale": false,
+    "isFlashSale": true,
+    "isWeekendSpecial": false,
+    "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/a9b3352c422e66753164.webp",
+    "images": [
+      "https://images.primehubmall.com/products/bogo-nov12/a9b3352c422e66753164.webp"
+    ],
+    "bogoOffer": {
+      "enabled": true,
+      "unitLabel": "pair",
+      "unitsPerOffer": 2
+    },
+    "bogoGroup": "Pearl Bangle Pair",
+    "hasVariants": true,
+    "variantColors": [
+      {
+        "name": "Gold",
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/a9b3352c422e66753164.webp"
+      }
+    ],
+    "variantSizes": [
+      "2.6",
+      "2.2",
+      "2.8"
+    ],
+    "variantOptions": [
+      {
+        "id": "color",
+        "values": [
+          "Gold"
+        ]
+      },
+      {
+        "id": "size",
+        "values": [
+          "2.6",
+          "2.2",
+          "2.8"
+        ]
+      }
+    ],
+    "variantMatrix": [
+      {
+        "id": "bogo-a9b3352c422e66753164-size-26",
+        "color": "Gold",
+        "size": "2.6",
+        "stock": 30,
+        "price": 200,
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/a9b3352c422e66753164.webp",
+        "active": true,
+        "hidden": false
+      },
+      {
+        "id": "bogo-a9b3352c422e66753164-size-22",
+        "color": "Gold",
+        "size": "2.2",
+        "stock": 30,
+        "price": 200,
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/a9b3352c422e66753164.webp",
+        "active": true,
+        "hidden": false
+      },
+      {
+        "id": "bogo-a9b3352c422e66753164-size-28",
+        "color": "Gold",
+        "size": "2.8",
+        "stock": 30,
+        "price": 200,
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/a9b3352c422e66753164.webp",
+        "active": true,
+        "hidden": false
+      }
+    ],
+    "sourceAsset": {
+      "folder": "PEARL PAIR 26.22.28 .....200",
+      "file": "file_000000007c9c8211b48fb61c626b2554.png",
+      "sha256": "a9b3352c422e6675316467eeb5ac150910919b6abc2b592f94b32e2227abb16e",
+      "bytes": 68200
+    },
+    "createdAt": "2026-11-12T00:00:00.000Z"
+  },
+  {
+    "id": "bogo-1caca5f62d08bc10d8ea",
+    "title": "Pearl Bangle Pair 02 — Buy 1 Get 1 Free (2 pairs)",
+    "slug": "bogo-1caca5f62d08bc10d8ea",
+    "price": 200,
+    "originalPrice": 200,
+    "description": "Buy 1 Get 1 Free: each offer pack includes 1 paid pair and 1 identical free pair. Same design, colour and selected size. Quantity counts offer packs; one offer pack contains two pairs. Daily cycle renews at midnight Pakistan time unless paused by Admin. While stocks last.",
+    "category": "vakVNohIm5ulV5cyidYn",
+    "stock": 30,
+    "active": true,
+    "published": true,
+    "isWholesale": false,
+    "isFlashSale": true,
+    "isWeekendSpecial": false,
+    "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/1caca5f62d08bc10d8ea.webp",
+    "images": [
+      "https://images.primehubmall.com/products/bogo-nov12/1caca5f62d08bc10d8ea.webp"
+    ],
+    "bogoOffer": {
+      "enabled": true,
+      "unitLabel": "pair",
+      "unitsPerOffer": 2
+    },
+    "bogoGroup": "Pearl Bangle Pair",
+    "hasVariants": true,
+    "variantColors": [
+      {
+        "name": "Silver",
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/1caca5f62d08bc10d8ea.webp"
+      }
+    ],
+    "variantSizes": [
+      "2.6",
+      "2.2",
+      "2.8"
+    ],
+    "variantOptions": [
+      {
+        "id": "color",
+        "values": [
+          "Silver"
+        ]
+      },
+      {
+        "id": "size",
+        "values": [
+          "2.6",
+          "2.2",
+          "2.8"
+        ]
+      }
+    ],
+    "variantMatrix": [
+      {
+        "id": "bogo-1caca5f62d08bc10d8ea-size-26",
+        "color": "Silver",
+        "size": "2.6",
+        "stock": 30,
+        "price": 200,
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/1caca5f62d08bc10d8ea.webp",
+        "active": true,
+        "hidden": false
+      },
+      {
+        "id": "bogo-1caca5f62d08bc10d8ea-size-22",
+        "color": "Silver",
+        "size": "2.2",
+        "stock": 30,
+        "price": 200,
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/1caca5f62d08bc10d8ea.webp",
+        "active": true,
+        "hidden": false
+      },
+      {
+        "id": "bogo-1caca5f62d08bc10d8ea-size-28",
+        "color": "Silver",
+        "size": "2.8",
+        "stock": 30,
+        "price": 200,
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/1caca5f62d08bc10d8ea.webp",
+        "active": true,
+        "hidden": false
+      }
+    ],
+    "sourceAsset": {
+      "folder": "PEARL PAIR 26.22.28 .....200",
+      "file": "file_0000000091d88207888bb198d35e3363.png",
+      "sha256": "1caca5f62d08bc10d8ea8181e55f6365f0445b70dd986b2fbd8597e96af7b912",
+      "bytes": 89708
+    },
+    "createdAt": "2026-11-12T00:00:00.000Z"
+  },
+  {
+    "id": "bogo-7bc0702a3b143ba7539c",
+    "title": "Pearl Bangle Pair 03 — Buy 1 Get 1 Free (2 pairs)",
+    "slug": "bogo-7bc0702a3b143ba7539c",
+    "price": 200,
+    "originalPrice": 200,
+    "description": "Buy 1 Get 1 Free: each offer pack includes 1 paid pair and 1 identical free pair. Same design, colour and selected size. Quantity counts offer packs; one offer pack contains two pairs. Daily cycle renews at midnight Pakistan time unless paused by Admin. While stocks last.",
+    "category": "vakVNohIm5ulV5cyidYn",
+    "stock": 30,
+    "active": true,
+    "published": true,
+    "isWholesale": false,
+    "isFlashSale": true,
+    "isWeekendSpecial": false,
+    "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/7bc0702a3b143ba7539c.webp",
+    "images": [
+      "https://images.primehubmall.com/products/bogo-nov12/7bc0702a3b143ba7539c.webp"
+    ],
+    "bogoOffer": {
+      "enabled": true,
+      "unitLabel": "pair",
+      "unitsPerOffer": 2
+    },
+    "bogoGroup": "Pearl Bangle Pair",
+    "hasVariants": true,
+    "variantColors": [
+      {
+        "name": "Gold",
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/7bc0702a3b143ba7539c.webp"
+      }
+    ],
+    "variantSizes": [
+      "2.6",
+      "2.2",
+      "2.8"
+    ],
+    "variantOptions": [
+      {
+        "id": "color",
+        "values": [
+          "Gold"
+        ]
+      },
+      {
+        "id": "size",
+        "values": [
+          "2.6",
+          "2.2",
+          "2.8"
+        ]
+      }
+    ],
+    "variantMatrix": [
+      {
+        "id": "bogo-7bc0702a3b143ba7539c-size-26",
+        "color": "Gold",
+        "size": "2.6",
+        "stock": 30,
+        "price": 200,
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/7bc0702a3b143ba7539c.webp",
+        "active": true,
+        "hidden": false
+      },
+      {
+        "id": "bogo-7bc0702a3b143ba7539c-size-22",
+        "color": "Gold",
+        "size": "2.2",
+        "stock": 30,
+        "price": 200,
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/7bc0702a3b143ba7539c.webp",
+        "active": true,
+        "hidden": false
+      },
+      {
+        "id": "bogo-7bc0702a3b143ba7539c-size-28",
+        "color": "Gold",
+        "size": "2.8",
+        "stock": 30,
+        "price": 200,
+        "imageUrl": "https://images.primehubmall.com/products/bogo-nov12/7bc0702a3b143ba7539c.webp",
+        "active": true,
+        "hidden": false
+      }
+    ],
+    "sourceAsset": {
+      "folder": "PEARL PAIR 26.22.28 .....200",
+      "file": "file_00000000c5bc8211b04219387d0c21f0.png",
+      "sha256": "7bc0702a3b143ba7539cee42b1716aa6eddd49e2eb986beaac195e69ad90e12c",
+      "bytes": 88364
+    },
+    "createdAt": "2026-11-12T00:00:00.000Z"
+  }
+]
