@@ -22,6 +22,8 @@ import { getEffectivePrice } from "@/lib/dealPricing";
 import { getVerifiedDealProduct } from "@/lib/verifiedDealProduct";
 import { isWholesaleProduct } from "@/lib/wholesale";
 import HomeRailFrame from './HomeRailFrame';
+import { useContinuousHomeRail } from '@/lib/useContinuousHomeRail';
+import { isExclusiveGlassDealProduct } from '@/lib/glassOffers';
 import { orderHomeProducts, sessionRailSeed } from '@/lib/homeRailOrder';
 import {
   isWholesalePriceBucket,
@@ -374,6 +376,7 @@ function ProgressiveHomeSaleProducts({
   const batchSize = standalone ? HOME_GRID_PRODUCT_BATCH : HOME_RAIL_PRODUCT_BATCH;
   const [limit, setLimit] = useState(initialLimit);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
+  const movingRailRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setLimit(initialLimit);
@@ -398,9 +401,14 @@ function ProgressiveHomeSaleProducts({
   }, [batchSize, limit, products.length, standalone]);
 
   const visibleProducts = products.slice(0, limit);
+  // Keep two-row grid copies aligned even with an odd source length.
+  const loopProducts = !standalone && visibleProducts.length % 2 === 1 && visibleProducts.length > 1
+    ? [...visibleProducts, visibleProducts[0]] : visibleProducts;
+  useContinuousHomeRail(movingRailRef, { enabled: !standalone, itemCount: loopProducts.length, speed: 24 });
 
   return (
     <div
+      ref={movingRailRef}
       className="home-sale-products [scrollbar-width:none]"
       style={standalone ? standaloneGridStyle : {
         display: "grid",
@@ -412,7 +420,7 @@ function ProgressiveHomeSaleProducts({
         overflowX: "auto",
         overscrollBehaviorX: "contain",
         paddingBottom: "3px",
-        scrollSnapType: "x mandatory",
+        scrollSnapType: "none",
       }}
       aria-label={label}
       onScroll={standalone ? undefined : (event) => {
@@ -426,15 +434,13 @@ function ProgressiveHomeSaleProducts({
       }}
     >
       {visibleProducts.length ? (
-        visibleProducts.map((product) => (
+        (standalone ? visibleProducts.map((product, index) => ({ product, index, copy: 0 }))
+          : (loopProducts.length > 1 ? [0, 1] : [0]).flatMap((copy) => loopProducts.map((product, index) => ({ product, index, copy })))).map(({ product, index, copy }) => (
           <div
-            key={product.id}
-            style={standalone ? {
-              minWidth: 0,
-            } : {
-              minWidth: 0,
-              scrollSnapAlign: "start",
-            }}
+            key={`${copy}:${index}:${product.id}`}
+            data-loop-original={!standalone && copy === 0 && index === 0 ? '' : undefined}
+            data-loop-copy={!standalone && copy === 1 && index === 0 ? '' : undefined}
+            style={{ minWidth: 0 }}
           >
             <HomeProductCard
               product={product}
@@ -474,7 +480,7 @@ export default function HomeCollections({
   onWholesaleSelect?: () => void;
 }) {
   const { settings } = useSettings();
-  const liveCatalog = products.filter((p) => p.published !== false);
+  const liveCatalog = products.filter((p) => p.published !== false && !isExclusiveGlassDealProduct(p));
   const [homeSaleCatalog, setHomeSaleCatalog] = useState<Product[]>(
     () => (standalone ? [] : liveCatalog),
   );

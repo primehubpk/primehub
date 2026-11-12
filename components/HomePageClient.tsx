@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState, type MouseEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import Header from "@/components/home/HomeHeader";
 import HomeCollections from "@/components/home/HomeCollections";
 import HomeCategoryDealsLazy from "@/components/home/HomeCategoryDealsLazy";
@@ -41,6 +41,7 @@ import type {
 import type { Product } from "@/components/shop/ShopTypes";
 import { CATALOG_REFRESH_EVENT } from "@/lib/catalogRefreshSignal";
 import { fetchPublicStorefront, invalidatePublicStorefront } from "@/lib/storefrontClient";
+import { isExclusiveGlassDealProduct } from "@/lib/glassOffers";
 
 type Props = {
   initialProducts: Product[];
@@ -229,6 +230,8 @@ export default function HomePageClient({
 
   };
 
+  const regularProducts = useMemo(() => products.filter((product) => !isExclusiveGlassDealProduct(product)), [products]);
+
   const selectPrice = (amount: number | null) => {
     setSelectedMaxPrice(amount);
     setWholesaleSelected(false);
@@ -266,17 +269,17 @@ export default function HomePageClient({
           <BigDealNextPreviewSync />
           <NewArrivalsRail
             homeLayout
-            initialProducts={products}
+            initialProducts={regularProducts}
             liveUpdates={false}
           />
           <HomeCollections
-            products={products}
+            products={regularProducts}
             onSelect={selectPrice}
             onWholesaleSelect={selectWholesale}
           />
           <HomeWholesaleVideos />
           <HomePrimeSkills initialItems={initialSkills} />
-          <HomeCategoryDealsLazy products={products} categories={categories} />
+          <HomeCategoryDealsLazy products={regularProducts} categories={categories} />
           <div id="discover-deals-section">
             {(selectedMaxPrice !== null || wholesaleSelected) && (
               <div className="home-filter-status">
@@ -333,7 +336,7 @@ export default function HomePageClient({
                 </div>
               </section>
             ) : (
-              <HomeDiscoverDealsLazy products={products} />
+              <HomeDiscoverDealsLazy products={regularProducts} />
             )}
           </div>
           <SkillsShowcase

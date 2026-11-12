@@ -9,6 +9,42 @@ import { HomeProductCard } from '@/components/home/HomeCollections';
 import type { Product } from '@/components/shop/ShopTypes';
 import type { Category } from '@/lib/types';
 import { orderHomeProducts, sessionRailSeed } from '@/lib/homeRailOrder';
+import { useContinuousHomeRail } from '@/lib/useContinuousHomeRail';
+
+function MovingCategoryProductRail({ products }: { products: Product[] }) {
+  const railRef = useRef<HTMLDivElement>(null);
+  // Keep both two-row loops aligned even when the category has an odd count.
+  const loopProducts = products.length > 1 && products.length % 2 === 1
+    ? [...products, products[0]] : products;
+  useContinuousHomeRail(railRef, { itemCount: loopProducts.length, speed: 23 });
+
+  return (
+    <div
+      ref={railRef}
+      data-home-category-rail
+      className="overflow-x-auto px-4 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      style={{
+        display: 'grid',
+        gridTemplateColumns: 'none',
+        gridAutoFlow: 'column',
+        gridTemplateRows: 'repeat(2, auto)',
+        gridAutoColumns: 'calc((100% - 10px) / 2)',
+        gap: '8px 10px',
+        direction: 'ltr',
+        overscrollBehaviorX: 'contain',
+        scrollPaddingInlineStart: 0,
+      }}
+    >
+      {(loopProducts.length > 1 ? [0, 1] : [0]).flatMap((copy) => loopProducts.map((product, index) => (
+        <div key={`${copy}:${index}:${product.id}`} className="min-w-0"
+          data-loop-original={copy === 0 && index === 0 ? '' : undefined}
+          data-loop-copy={copy === 1 && index === 0 ? '' : undefined}>
+          <HomeProductCard product={product} />
+        </div>
+      )))}
+    </div>
+  );
+}
 
 export default function HomeCategoryDeals({ products, categories }: { products: Product[]; categories: Category[] }) {
   const [refreshSeed, setRefreshSeed] = useState(0);
@@ -69,27 +105,7 @@ export default function HomeCategoryDeals({ products, categories }: { products: 
             <span><span className="block text-[9px] font-black uppercase tracking-widest text-[#A26D13]">Browse category</span>
               <span className="block text-base font-black text-[#14140F] group-hover:text-[#0F6A5F]">{category.title} →</span></span>
           </Link>
-          <div
-            data-home-category-rail
-            className="snap-x snap-mandatory overflow-x-auto px-4 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'none',
-              gridAutoFlow: 'column',
-              gridTemplateRows: 'repeat(2, auto)',
-              gridAutoColumns: 'calc((100% - 10px) / 2)',
-              gap: '8px 10px',
-              direction: 'ltr',
-              overscrollBehaviorX: 'none',
-              scrollPaddingInlineStart: 0,
-            }}
-          >
-            {matches.map((product) => (
-              <div key={product.id} className="min-w-0 snap-start">
-                <HomeProductCard product={product} />
-              </div>
-            ))}
-          </div>
+          <MovingCategoryProductRail products={matches} />
         </div>;
       })}
     </section>

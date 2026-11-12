@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import HomeHeading from "@/components/home/HomeHeading";
+import HomeGlassOfferRail from '@/components/home/HomeGlassOfferRail';
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -293,6 +294,7 @@ export default function HeroFlashBanner({ initialProducts = [], liveUpdates = tr
             })}
           </div>
         </section>
+        <HomeGlassOfferRail products={Object.values(products)} settings={settings.glassDealShowcase} />
         {bigDeal?.active && bigDeal.title && (
           <section className="home-big-deal">
             <HomeHeading>PrimeHubMall Big Deal of the Day</HomeHeading>
