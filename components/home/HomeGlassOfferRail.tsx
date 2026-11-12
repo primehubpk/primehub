@@ -32,6 +32,7 @@ export default function HomeGlassOfferRail({
 
       <div className="glass-offers-home__row">
         <Link href="/deals/glass-bangles" prefetch={false} className="glass-offers-home__promo" aria-label={`${config.badge} special offers, view all products`}>
+          <span className="glass-offers-home__promo-kicker">DEAL BOX COLLECTION</span>
           <BadgePercent className="glass-offers-home__badge-icon" size={30} aria-hidden="true" />
           <strong>{config.badge}</strong>
         </Link>
@@ -46,7 +47,6 @@ export default function HomeGlassOfferRail({
           </div>
         </div>
       </div>
-      <p className="glass-offers-home__hint">Swipe or tap to pause the trail for a few seconds. Select Size opens the size popup.</p>
     </section>
   );
 }
