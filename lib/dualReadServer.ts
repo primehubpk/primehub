@@ -468,14 +468,60 @@ async function withFallback<T>(firebaseRead: () => Promise<T>, supabaseRead: () 
   return empty;
 }
 
-export function getDualCatalog(options?: DualReadCacheOptions) {
-  return withFallback(
-    firebaseCatalog,
-    () => supabaseCatalog(options),
-    { products: [], categories: [], source: 'empty' as const },
-  );
+// Local, read-only UI preview of real published storefront data. A separate
+// Git worktree has no production server credentials; never put service keys in
+// that worktree or copy browser sessions. This cannot run on Vercel builds.
+type PublishedPublicRead = 'catalog' | 'categories' | 'settings' | 'skills' | 'product';
+function allowLocalPublishedPreview() {
+  return process.env.NODE_ENV === 'development' && !process.env.VERCEL && !process.env.VERCEL_ENV;
 }
 
+async function withLocalPublishedPreview<T extends { source: 'firebase' | 'supabase' | 'empty' }>(
+  primary: Promise<T>,
+  type: PublishedPublicRead,
+  normalize: (data: any) => T | null,
+  productId?: string,
+): Promise<T> {
+  const result = await primary;
+  if (result.source !== 'empty' || !allowLocalPublishedPreview()) return result;
+
+  try {
+    const url = new URL('https://www.primehubmall.com/api/storefront/read');
+    url.searchParams.set('type', type);
+    if (type === 'product' && productId) url.searchParams.set('id', productId);
+    // Fetch only existing public GET endpoints, without cookies, API tokens or
+    // customer credentials. No proxy of cart, wallet or Admin actions.
+    const response = await fetch(url.toString(), {
+      method: 'GET',
+      cache: 'no-store',
+      redirect: 'error',
+      signal: AbortSignal.timeout(12000),
+    });
+    if (!response.ok) throw new Error(`Published public ${type} response: ${response.status}`);
+    const normalized = normalize(await response.json());
+    if (normalized) {
+      console.info(`[local-preview] Published public ${type} read used; no server credentials copied.`);
+      return normalized;
+    }
+  } catch (error) {
+    console.warn(`[local-preview] Published public ${type} read unavailable`, error);
+  }
+  return result;
+}
+
+export function getDualCatalog(options?: DualReadCacheOptions) {
+  return withLocalPublishedPreview<CatalogSnapshot>(
+    withFallback(
+      firebaseCatalog,
+      () => supabaseCatalog(options),
+      { products: [], categories: [], source: 'empty' as const },
+    ),
+    'catalog',
+    (data): CatalogSnapshot | null => Array.isArray(data?.products) && data.products.length > 0
+      ? { products: data.products, categories: Array.isArray(data.categories) ? data.categories : [], source: 'supabase' }
+      : null,
+  );
+}
 export function getDualFeedCatalog(options?: DualReadCacheOptions) {
   return withFallback(
     firebaseCatalog,
@@ -487,18 +533,31 @@ export function getDualFeedCatalog(options?: DualReadCacheOptions) {
 export function getDualProduct(id: string, options?: DualReadCacheOptions) {
   const productId = String(id || '').trim();
   if (!productId) return Promise.resolve({ product: null, source: 'empty' as const });
-  return withFallback(
-    () => firebaseProduct(productId),
-    () => supabaseProduct(productId, options),
-    { product: null, source: 'empty' as const },
+  return withLocalPublishedPreview<ProductSnapshot>(
+    withFallback(
+      () => firebaseProduct(productId),
+      () => supabaseProduct(productId, options),
+      { product: null, source: 'empty' as const },
+    ),
+    'product',
+    (data): ProductSnapshot | null => data?.product && typeof data.product === 'object'
+      ? { product: data.product, source: 'supabase' }
+      : null,
+    productId,
   );
 }
 
 export function getDualCategories(options?: DualReadCacheOptions) {
-  return withFallback(
-    firebaseCategories,
-    () => supabaseCategories(options),
-    { categories: [], source: 'empty' as const },
+  return withLocalPublishedPreview<CategoriesSnapshot>(
+    withFallback(
+      firebaseCategories,
+      () => supabaseCategories(options),
+      { categories: [], source: 'empty' as const },
+    ),
+    'categories',
+    (data): CategoriesSnapshot | null => Array.isArray(data?.categories) && data.categories.length > 0
+      ? { categories: data.categories, source: 'supabase' }
+      : null,
   );
 }
 
@@ -511,18 +570,30 @@ export function getDualSettings(options?: DualReadCacheOptions) {
 }
 
 export function getDualStorefrontSettings(options?: DualReadCacheOptions) {
-  return withFallback(
-    firebaseStorefrontSettings,
-    () => supabaseStorefrontSettings(options),
-    { documents: {}, source: 'empty' as const },
+  return withLocalPublishedPreview<SettingsSnapshot>(
+    withFallback(
+      firebaseStorefrontSettings,
+      () => supabaseStorefrontSettings(options),
+      { documents: {}, source: 'empty' as const },
+    ),
+    'settings',
+    (data): SettingsSnapshot | null => data?.documents && typeof data.documents === 'object' && Object.keys(data.documents).length > 0
+      ? { documents: data.documents, source: 'supabase' }
+      : null,
   );
 }
 
 export function getDualSkills(options?: DualReadCacheOptions) {
-  return withFallback(
-    firebaseSkills,
-    () => supabaseSkills(options),
-    { skills: [], source: 'empty' as const },
+  return withLocalPublishedPreview<SkillsSnapshot>(
+    withFallback(
+      firebaseSkills,
+      () => supabaseSkills(options),
+      { skills: [], source: 'empty' as const },
+    ),
+    'skills',
+    (data): SkillsSnapshot | null => Array.isArray(data?.skills)
+      ? { skills: data.skills, source: 'supabase' }
+      : null,
   );
 }
 

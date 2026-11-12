@@ -41,3 +41,15 @@ test('invalid read types and missing product IDs cannot trigger a catalog fetch'
   assert.equal((await read('type=products&ids=invalid')).status, 400);
   assert.equal((await read('type=product')).status, 400);
 });
+
+test('published public data fallback is development-only and read-only', async () => {
+  const dual = (await readFile(new URL('../lib/dualReadServer.ts', import.meta.url), 'utf8')).replace(/\r\n/g, '\n');
+  assert.match(dual, /process\.env\.NODE_ENV === 'development'/);
+  assert.match(dual, /!process\.env\.VERCEL && !process\.env\.VERCEL_ENV/);
+  assert.match(dual, /https:\/\/www\.primehubmall\.com\/api\/storefront\/read/);
+  assert.match(dual, /method: 'GET'/);
+  assert.match(dual, /redirect: 'error'/);
+  assert.match(dual, /cache: 'no-store'/);
+  assert.match(dual, /result\.source !== 'empty'/);
+  assert.doesNotMatch(dual, /withLocalPublishedPreview\(\s*withFallback\(\s*firebaseSettings/);
+});
