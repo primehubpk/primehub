@@ -4,7 +4,8 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useContinuousHomeRail } from '@/lib/useContinuousHomeRail';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { BadgePercent, ChevronRight, Package } from 'lucide-react';
 import { db } from '@/lib/firebase';
@@ -23,6 +24,7 @@ export default function CategorySwiper({
   liveUpdates?: boolean;
 }) {
   const router = useRouter();
+  const categoryRailRef = useRef<HTMLDivElement>(null);
   const [categories, setCategories] = useState<Category[]>(initialCategories);
 
   useEffect(() => {
@@ -45,6 +47,7 @@ export default function CategorySwiper({
     [categories],
   );
 
+  useContinuousHomeRail(categoryRailRef, { itemCount: visible.length, speed: 20 });
   if (!visible.length) return null;
 
   return (
@@ -99,19 +102,21 @@ export default function CategorySwiper({
         </div>
       </div>
 
-      <div className="flex gap-3 overflow-x-auto overflow-y-visible touch-pan-x touch-pan-y cursor-grab active:cursor-grabbing snap-x snap-mandatory overscroll-x-contain scroll-smooth pb-3 [scrollbar-width:none] lg:[scrollbar-width:thin] lg:[scrollbar-color:#9ca3af_transparent] [&::-webkit-scrollbar]:hidden lg:[&::-webkit-scrollbar]:block lg:[&::-webkit-scrollbar]:h-1.5 lg:[&::-webkit-scrollbar-thumb]:rounded-full lg:[&::-webkit-scrollbar-thumb]:bg-black/25">
-        {visible.map((category, index) => {
-          const aboveTheFold = index < ABOVE_THE_FOLD_CATEGORY_IMAGES;
+      <div ref={categoryRailRef} className="flex gap-3 overflow-x-auto overflow-y-visible touch-pan-x cursor-grab active:cursor-grabbing overscroll-x-contain pb-3 [scrollbar-width:none] lg:[scrollbar-width:thin] lg:[scrollbar-color:#9ca3af_transparent] [&::-webkit-scrollbar]:hidden lg:[&::-webkit-scrollbar]:block lg:[&::-webkit-scrollbar]:h-1.5 lg:[&::-webkit-scrollbar-thumb]:rounded-full lg:[&::-webkit-scrollbar-thumb]:bg-black/25">
+        {(visible.length > 1 ? [0, 1] : [0]).flatMap((copy) => visible.map((category, index) => {
+          const aboveTheFold = copy === 0 && index < ABOVE_THE_FOLD_CATEGORY_IMAGES;
           const href = categoryHref(category);
           const image = normalizeImageUrl(category.iconUrl || category.imageUrl || '');
           return (
             <Link
-              key={category.id}
+              key={`${copy}:${category.id}`}
+              data-loop-original={copy === 0 && index === 0 ? '' : undefined}
+              data-loop-copy={copy === 1 && index === 0 ? '' : undefined}
               href={href}
               prefetch={false}
               onPointerDown={() => router.prefetch(href)}
               onFocus={() => router.prefetch(href)}
-              className="group w-[92px] shrink-0 snap-start text-center lg:w-[78px]"
+              className="group w-[92px] shrink-0 text-center lg:w-[78px]"
             >
                 <span className="relative mx-auto flex h-20 w-20 items-center justify-center overflow-hidden rounded-full bg-[#F4F4F1] ring-1 ring-black/5 lg:h-[68px] lg:w-[68px]">
                   {image ? (
@@ -133,7 +138,7 @@ export default function CategorySwiper({
                 <span className="mt-2 block truncate text-center text-[10px] font-black text-[#14140F]">{category.title}</span>
             </Link>
           );
-        })}
+        }))}
       </div>
     </section>
   );
