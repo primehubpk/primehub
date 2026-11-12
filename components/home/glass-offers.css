@@ -6,6 +6,7 @@
 .glass-offers-home__promo { position:relative; isolation:isolate; overflow:hidden; background:linear-gradient(145deg,#b51c23,#ed3c1e 62%,#ff972d); color:#fff; border-radius:14px; width:152px; min-width:152px; min-height:220px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; padding:14px 8px; text-align:center; transition:transform .2s; }
 .glass-offers-home__promo::after { content:''; position:absolute; height:160px; width:160px; border:2px solid #ffffff24; border-radius:50%; right:-104px; top:-40px; box-shadow:0 0 0 23px #ffffff12,0 0 0 46px #ffffff0a; z-index:-1; }
 .glass-offers-home__promo:hover { transform:translateY(-2px); }
+.glass-offers-home__promo-kicker { font-size:9px; font-weight:900; color:#fff9f0; letter-spacing:.08em; line-height:1.25; max-width:100%; }
 .glass-offers-home__badge-icon { flex-shrink:0; color:#fff3e9; }
 .glass-offers-home__promo strong { font-size:25px; line-height:1.05; font-weight:1000; letter-spacing:-.045em; text-shadow:0 2px 8px #76090940; }
 .glass-offers-home__viewport { flex:1;min-width:0;overflow-x:auto;overflow-y:hidden; scrollbar-width:none; border-radius:14px; }
@@ -47,9 +48,10 @@
  .glass-offers-home__toolbar{padding:0 3px 3px}
  .glass-offers-home__more{font-size:11px;padding:3px}
  .glass-offers-home__row{gap:6px;padding:5px;border-radius:15px;align-items:stretch}
- .glass-offers-home__promo{width:70px;min-width:70px;min-height:182px;border-radius:11px;padding:8px 3px;gap:7px}
- .glass-offers-home__badge-icon{width:25px;height:25px}
- .glass-offers-home__promo strong{font-size:17px;line-height:1.12;overflow-wrap:normal}
+ .glass-offers-home__promo{width:88px;min-width:88px;min-height:186px;border-radius:11px;padding:8px 5px;gap:8px}
+ .glass-offers-home__badge-icon{width:29px;height:29px}
+ .glass-offers-home__promo-kicker{font-size:8px;letter-spacing:.04em;line-height:1.2}
+ .glass-offers-home__promo strong{font-size:20px;line-height:1.08;overflow-wrap:normal}
  .glass-offers-home__viewport{border-radius:9px}
  .glass-offers-home__group{gap:6px;padding-right:6px}
  .glass-offer-card--compact{width:100px;min-width:100px;border-radius:10px}

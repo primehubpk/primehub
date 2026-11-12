@@ -92,7 +92,7 @@ test('mobile offer header uses compact icon without large heading, with View Mor
   assert.ok(rail.indexOf('glass-offers-home__more') < rail.indexOf('glass-offers-home__row'));
   assert.doesNotMatch(rail, /glass-offers-home__heading-copy/);
   assert.match(rail, /<strong>\{config.badge\}<\/strong>/);
-  assert.match(css, /width:70px;min-width:70px/);
+  assert.match(css, /width:88px;min-width:88px/);
   assert.match(css, /width:100px;min-width:100px/);
 });
 
@@ -102,6 +102,32 @@ test('Select Size verifies live product and opens existing modal, with five seco
   assert.match(card, /getVerifiedDealProduct\(product.id\)/);
   assert.match(card, /openVariantModal\(\{ \.\.\.fresh/);
   assert.match(card, /Select Size/);
-  assert.match(hook, /resumeAfterMs = 5000/);
+  assert.match(hook, /resumeAfterMs = 6000/);
   assert.match(hook, /onPointerDown/);
+});
+
+test('70 percent mobile tile restores DEAL BOX COLLECTION over the icon', async () => {
+  const rail = await fs.readFile(path.join(root, 'components/home/HomeGlassOfferRail.tsx'), 'utf8');
+  const css = await fs.readFile(path.join(root, 'components/home/glass-offers.css'), 'utf8');
+  const kicker = rail.indexOf('DEAL BOX COLLECTION');
+  const icon = rail.indexOf('glass-offers-home__badge-icon');
+  const percent = rail.indexOf('<strong>{config.badge}</strong>');
+  assert.ok(kicker >= 0 && icon > kicker && percent > icon);
+  assert.match(css, /font-size:20px;line-height:1.08/);
+  assert.doesNotMatch(rail, /glass-offers-home__hint/);
+});
+
+test('visible rails start immediately, reset the initial partial card and hold six seconds after manual touch', async () => {
+  const hook = await fs.readFile(path.join(root, 'lib/useContinuousHomeRail.ts'), 'utf8');
+  assert.match(hook, /let visible = false/);
+  assert.match(hook, /rail.scrollLeft = 0/);
+  assert.match(hook, /new IntersectionObserver\(onIntersection/);
+  assert.match(hook, /pausedUntil = 0/);
+  assert.match(hook, /time >= pausedUntil/);
+  assert.match(hook, /!pointerHolding && !touchHolding/);
+  assert.match(hook, /touchstart/);
+  assert.match(hook, /touchmove/);
+  assert.match(hook, /touchend/);
+  assert.match(hook, /resumeAfterMs = 6000/);
+  assert.doesNotMatch(hook, /1700/);
 });
