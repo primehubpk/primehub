@@ -5,7 +5,8 @@ import HomeHeading from '@/components/home/HomeHeading';
 import { HomeProductCard } from '@/components/home/HomeCollections';
 import FastProductLink from '@/components/FastProductLink';
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useContinuousHomeRail } from '@/lib/useContinuousHomeRail';
 import { ArrowRight, ShoppingCart, Sparkles } from 'lucide-react';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -13,6 +14,7 @@ import { useCartStore } from '@/lib/cartStore';
 import { imageCandidatesOf, imageOf, originalOf, priceOf, productHasVariants, titleOf, type Product } from '@/components/shop/ShopTypes';
 import { isDirectStorefrontImage } from '@/lib/imageUrl';
 import { isWholesaleProduct } from '@/lib/wholesale';
+import { isExclusiveGlassDealProduct } from '@/lib/glassOffers';
 import { makeTikTokContent, trackTikTokEvent } from '@/lib/tiktokPixel';
 import { getVerifiedDealProduct } from '@/lib/verifiedDealProduct';
 import '@/components/home/NewArrivalsPremium.css';
@@ -24,7 +26,7 @@ function timeOf(p: Product) {
 
 export function newestFirst(products: Product[], includeWholesale = false) {
   return [...products]
-    .filter((p) => p.published !== false && (includeWholesale || !isWholesaleProduct(p)))
+    .filter((p) => p.published !== false && !isExclusiveGlassDealProduct(p) && (includeWholesale || !isWholesaleProduct(p)))
     .sort((a, b) => timeOf(b) - timeOf(a) || b.id.localeCompare(a.id));
 }
 
@@ -38,6 +40,7 @@ export default function NewArrivalsRail({
   homeLayout?: boolean;
 }) {
   const [products, setProducts] = useState<Product[]>(initialProducts);
+  const homeRailRef = useRef<HTMLDivElement>(null);
   const [addedId, setAddedId] = useState<string | null>(null);
   const [checkingId, setCheckingId] = useState<string | null>(null);
   const [actionError, setActionError] = useState('');
@@ -70,6 +73,7 @@ export default function NewArrivalsRail({
   const visibleNewest = homeLayout
     ? newest.slice(0, homeVisibleCount)
     : newest;
+  useContinuousHomeRail(homeRailRef, { enabled: homeLayout, itemCount: visibleNewest.length, speed: 25 });
 
   const addProduct = async (product: Product) => {
     if (checkingId) return;
@@ -115,7 +119,8 @@ export default function NewArrivalsRail({
       <section className="home-arrivals">
         <HomeHeading>New Arrivals</HomeHeading>
         <div
-          className="grid grid-flow-col grid-rows-2 auto-cols-[calc((100%-7px)/2)] gap-2 overflow-x-auto overscroll-x-contain pb-2 scroll-smooth snap-x snap-mandatory [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          ref={homeRailRef}
+          className="grid grid-flow-col grid-rows-2 auto-cols-[calc((100%-7px)/2)] gap-2 overflow-x-auto overscroll-x-contain pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           onScroll={(event) => {
             if (homeVisibleCount >= newest.length) return;
             const rail = event.currentTarget;
@@ -126,11 +131,12 @@ export default function NewArrivalsRail({
             }
           }}
         >
-          {visibleNewest.map((p) => (
-            <div key={p.id} className="min-w-0 snap-start">
+          {(visibleNewest.length > 1 ? [0, 1] : [0]).flatMap((copy) => visibleNewest.map((p, index) => (
+            <div key={`${copy}:${p.id}`} data-loop-original={copy === 0 && index === 0 ? '' : undefined}
+              data-loop-copy={copy === 1 && index === 0 ? '' : undefined} className="min-w-0">
               <HomeProductCard product={p} horizontal badgeText="New Arrival" />
             </div>
-          ))}
+          )))}
         </div>
       </section>
     );
