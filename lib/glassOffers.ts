@@ -32,6 +32,14 @@ export const STARTER_GLASS_OFFERS: GlassOfferItem[] = [
   { productId: '5Zx0JhTAhX8MaCsn74lY', referencePrice: 3000 }, // 2
 ];
 
+// The twelve owner-designated glass-box listings are exclusive to this promo.
+// Keep database category and product URLs intact to preserve carts/orders.
+const EXCLUSIVE_GLASS_DEAL_IDS = new Set(STARTER_GLASS_OFFERS.map((item) => item.productId));
+
+export function isExclusiveGlassDealProduct(product: { id?: string } | string): boolean {
+  return EXCLUSIVE_GLASS_DEAL_IDS.has(typeof product === 'string' ? product : String(product.id || ''));
+}
+
 export const DEFAULT_GLASS_OFFERS: GlassOfferSettings = {
   enabled: true,
   heading: 'Glass Bangles Mega Deals',
