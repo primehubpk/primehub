@@ -25,7 +25,7 @@ export default function MegaDealsHero({ offers, heading = 'Mega Deals', subtitle
       <span className="mega-deals-hero__eyebrow"><Sparkles size={12} aria-hidden="true" /> ONE PLACE. MORE DEALS.</span>
       <Heading>{heading}</Heading>
       <p>{subtitle || 'More choice. Special prices. Every day.'}</p>
-      {!landing ? <Link href="/deals" prefetch={false} className="mega-deals-hero__cta">Shop all deals <ArrowRight size={15} aria-hidden="true" /></Link>
+      {!landing ? <span className="mega-deals-hero__cta">Shop all deals <ArrowRight size={15} aria-hidden="true" /></span>
         : <span className="mega-deals-hero__available">{offers.length} offers to explore</span>}
     </div>
     <div className="mega-deals-hero__scene" aria-hidden="true">
@@ -37,5 +37,6 @@ export default function MegaDealsHero({ offers, heading = 'Mega Deals', subtitle
       <span className="mega-deals-hero__seal"><small>{discounts.length ? 'UP TO' : 'SPECIAL'}</small><strong>{discounts.length ? discounts[0] + '%' : 'DEALS'}</strong><small>{discounts.length ? 'OFF' : 'EVERY DAY'}</small></span>
       {discounts.length > 1 ? <span className="mega-deals-hero__tag">{discounts[1]}%<small>OFF</small></span> : null}
     </div>
+    {!landing ? <Link href="/deals" prefetch={false} className="mega-deals-hero__link" aria-label="Shop all Mega Deals"><span className="sr-only">Shop all deals</span></Link> : null}
   </header>;
 }

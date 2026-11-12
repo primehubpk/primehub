@@ -26,7 +26,7 @@
 .mega-deals-hero__tag small { display:block; font-size:10px; line-height:1; }
 .glass-offers-home__caption { display:flex; align-items:center; justify-content:space-between; gap:8px; margin:13px 1px 9px; font-size:11px; color:#766c60; }
 .glass-offers-home__caption a { color:#0f6a5f; font-weight:850; white-space:nowrap; }
-.glass-offers-home__viewport { min-width:0; overflow-x:auto; overflow-y:hidden; scrollbar-width:none; border-radius:15px; touch-action:pan-x pan-y; overscroll-behavior-x:contain; }
+.glass-offers-home__viewport { container-type:inline-size; min-width:0; overflow-x:auto; overflow-y:hidden; scrollbar-width:none; border-radius:15px; touch-action:pan-x pan-y; overscroll-behavior-x:contain; }
 .glass-offers-home__viewport::-webkit-scrollbar { display:none; }
 .glass-offers-home__marquee { display:flex; width:max-content; }
 .glass-offers-home__group { display:flex; flex-shrink:0; gap:11px; padding:0 11px 7px 0; }
@@ -90,7 +90,12 @@
  .mega-deals-hero__available { font-size:10px; }
  .glass-offers-home__caption { font-size:10px; margin:11px 1px 8px; }
  .glass-offers-home__group { gap:8px; padding-right:8px; }
- .glass-offer-card--compact { width:clamp(132px,40vw,174px); min-width:clamp(132px,40vw,174px); }
+ .glass-offers-home__viewport { margin-inline:-10px; border-radius:0; }
+ .glass-offer-card--compact { width:calc((100vw - 28px)/2); min-width:calc((100vw - 28px)/2); width:calc((100cqw - 8px)/2); min-width:calc((100cqw - 8px)/2); }
+ .glass-offer-card--compact .glass-offer-card__image { aspect-ratio:4/5; }
+ .glass-offer-card--compact .glass-offer-card__title { font-size:12px; height:34px; }
+ .glass-offer-card--compact .glass-offer-card__prices strong { font-size:17px; }
+ .glass-offer-card--compact .glass-offer-card__action { min-height:42px; font-size:12px; }
  .glass-offer-card__link { padding:5px 5px 0; }
  .glass-offer-card__title { font-size:11px; height:31px; margin-top:6px; }
  .glass-offer-card__prices strong { font-size:15px; }
@@ -109,3 +114,7 @@
 .home-categories > div:first-child a { width:100px; max-width:100%; }
 .home-categories > div:first-child a > span.category-entry-icon { width:64px !important; height:64px !important; flex-shrink:0; }
 @media(min-width:640px) { .home-categories > div:first-child a > span.category-entry-icon { width:72px !important; height:72px !important; } }
+
+.mega-deals-hero__link { position:absolute; inset:0; z-index:5; border-radius:inherit; }
+.mega-deals-hero__link:focus-visible { outline:3px solid #fff; outline-offset:-6px; }
+.mega-deals-hero:hover .mega-deals-hero__cta { background:#095d51; }

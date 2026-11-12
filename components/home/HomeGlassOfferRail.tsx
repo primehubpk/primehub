@@ -14,7 +14,7 @@ export default function HomeGlassOfferRail({ products, settings: supplied }: { p
   const config = supplied || settings.glassDealShowcase;
   const offers = useMemo(() => resolveGlassOfferProducts(products, config), [products, config]);
   const railRef = useRef<HTMLDivElement>(null);
-  useContinuousHomeRail(railRef, { itemCount: offers.length, speed: 24 });
+  useContinuousHomeRail(railRef, { itemCount: offers.length, speed: 14 });
   if (!offers.length) return null;
   return <section id="mega-deals" className="glass-offers-home" aria-label="Mega Deals from every category">
     <MegaDealsHero offers={offers} heading={config?.heading} subtitle={config?.subtitle} />
