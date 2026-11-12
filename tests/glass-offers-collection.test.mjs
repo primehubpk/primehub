@@ -86,12 +86,17 @@ test('normal Shop, category, New Arrivals, and Sale Mela exclude exclusive offer
   assert.match(home, /<HomeDiscoverDealsLazy products=\{regularProducts\}/);
 });
 
-test('mobile offer header uses compact icon without large heading, with View More immediately above the rail', async () => {
+test('mobile deal rail begins directly after Weekly Deals and places premium CTA within the left promo tile', async () => {
   const rail = await fs.readFile(path.join(root, 'components/home/HomeGlassOfferRail.tsx'), 'utf8');
   const css = await fs.readFile(path.join(root, 'components/home/glass-offers.css'), 'utf8');
-  assert.ok(rail.indexOf('glass-offers-home__more') < rail.indexOf('glass-offers-home__row'));
-  assert.doesNotMatch(rail, /glass-offers-home__heading-copy/);
-  assert.match(rail, /<strong>\{config.badge\}<\/strong>/);
+  assert.match(rail, /className="glass-offers-home sm:mx-4"/);
+  assert.doesNotMatch(rail, /glass-offers-home__toolbar|glass-offers-home__more|\bmt-3\b/);
+  assert.ok(rail.indexOf('glass-offers-home__promo-cta') > rail.indexOf('<strong>{config.badge}</strong>'));
+  assert.ok(rail.indexOf('glass-offers-home__promo-cta') < rail.indexOf('glass-offers-home__viewport'));
+  assert.match(rail, /SHOP MORE/);
+  assert.match(rail, /DEALS <ArrowRight/);
+  assert.match(css, /\.glass-offers-home__promo-cta\s*\{/);
+  assert.match(css, /\.glass-offers-home__row\{gap:6px;padding:3px/);
   assert.match(css, /width:88px;min-width:88px/);
   assert.match(css, /width:100px;min-width:100px/);
 });
