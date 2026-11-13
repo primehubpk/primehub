@@ -7,6 +7,7 @@ type Options = {
   speed?: number;
   resumeAfterMs?: number;
   itemCount?: number;
+  startDelayMs?: number;
 };
 
 /**
@@ -16,7 +17,7 @@ type Options = {
  */
 export function useContinuousHomeRail(
   railRef: RefObject<HTMLElement | null>,
-  { enabled = true, speed = 24, resumeAfterMs = 6000, itemCount = 0 }: Options = {},
+  { enabled = true, speed = 24, resumeAfterMs = 6000, startDelayMs = 0, itemCount = 0 }: Options = {},
 ) {
   const pauseRef = useRef<() => void>(() => {});
 
@@ -94,6 +95,8 @@ export function useContinuousHomeRail(
           rail.scrollLeft = 0;
           scrollPosition = 0;
           hasEnteredViewport = true;
+          // Show the first products long enough to read before the subtle rail moves.
+          pausedUntil = Math.max(pausedUntil, performance.now() + startDelayMs);
         }
         lastFrame = 0;
         frame = window.requestAnimationFrame(tick);
@@ -150,7 +153,7 @@ export function useContinuousHomeRail(
       rail.removeEventListener('focusin', pause);
       pauseRef.current = () => {};
     };
-  }, [railRef, enabled, speed, resumeAfterMs, itemCount]);
+  }, [railRef, enabled, speed, resumeAfterMs, startDelayMs, itemCount]);
 
   return pauseRef;
 }

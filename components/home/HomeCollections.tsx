@@ -2,7 +2,7 @@
 
 import RetryableStorefrontImage from '@/components/RetryableStorefrontImage';
 import Link from "next/link";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ChevronRight, Package, ShoppingCart } from "lucide-react";
 import FastProductLink from "@/components/FastProductLink";
 import HomeHeading from "@/components/home/HomeHeading";
@@ -17,14 +17,15 @@ import {
   titleOf,
   type Product,
 } from "@/components/shop/ShopTypes";
-import { isDirectStorefrontImage } from "@/lib/imageUrl";
+import { isDirectStorefrontImage, normalizeImageUrl } from "@/lib/imageUrl";
 import { getEffectivePrice } from "@/lib/dealPricing";
 import { getVerifiedDealProduct } from "@/lib/verifiedDealProduct";
 import { isWholesaleProduct } from "@/lib/wholesale";
 import HomeRailFrame from './HomeRailFrame';
+import { Commerce3DBanner } from './HomeCommerceRails';
 import { useContinuousHomeRail } from '@/lib/useContinuousHomeRail';
 import { isExclusiveGlassDealProduct } from '@/lib/glassOffers';
-import { orderHomeProducts, sessionRailSeed } from '@/lib/homeRailOrder';
+import { orderHomeProducts } from '@/lib/homeRailOrder';
 import {
   isWholesalePriceBucket,
   matchesPriceBucket,
@@ -404,7 +405,7 @@ function ProgressiveHomeSaleProducts({
   // Keep two-row grid copies aligned even with an odd source length.
   const loopProducts = !standalone && visibleProducts.length % 2 === 1 && visibleProducts.length > 1
     ? [...visibleProducts, visibleProducts[0]] : visibleProducts;
-  useContinuousHomeRail(movingRailRef, { enabled: !standalone, itemCount: loopProducts.length, speed: 24 });
+  useContinuousHomeRail(movingRailRef, { enabled: !standalone, itemCount: loopProducts.length, speed: 24, startDelayMs: 8000 });
 
   return (
     <div
@@ -480,17 +481,17 @@ export default function HomeCollections({
   onWholesaleSelect?: () => void;
 }) {
   const { settings } = useSettings();
+  const saleSectionRef = useRef<HTMLElement>(null);
+  const moveHomeSale = (direction: number) => {
+    const rail = saleSectionRef.current?.querySelector<HTMLElement>('.home-sale-home-frame .home-sale-products');
+    if (!rail) return;
+    rail.dispatchEvent(new Event('click'));
+    rail.scrollBy({ left: direction * (rail.clientWidth + 10), behavior: 'smooth' });
+  };
   const liveCatalog = products.filter((p) => p.published !== false && !isExclusiveGlassDealProduct(p));
   const [homeSaleCatalog, setHomeSaleCatalog] = useState<Product[]>(
     () => (standalone ? [] : liveCatalog),
   );
-  const [homeShuffleSeed, setHomeShuffleSeed] = useState(0);
-
-  useLayoutEffect(() => {
-    if (standalone) return;
-    setHomeShuffleSeed(sessionRailSeed());
-  }, [standalone]);
-
   useEffect(() => {
     if (standalone || homeSaleCatalog.length > 0 || liveCatalog.length === 0) return;
     setHomeSaleCatalog(liveCatalog);
@@ -502,9 +503,8 @@ export default function HomeCollections({
       ? homeSaleCatalog
       : liveCatalog;
   const stableCatalogSeed = stableSaleMelaSeed(catalog);
-  const saleShuffleSeed = standalone
-    ? stableCatalogSeed
-    : homeShuffleSeed || stableCatalogSeed;
+  // Keep exactly the same products on SSR and client hydration.
+  const saleShuffleSeed = stableCatalogSeed;
   const buckets = sortPriceBuckets(
     (settings.priceBuckets || []).filter((b) => b.active),
   );
@@ -518,16 +518,19 @@ export default function HomeCollections({
         <section
           className={standalone ? "home-sale" : "home-sale home-sale-home"}
           aria-label="PrimeHubMall Sale Mela"
+          ref={saleSectionRef}
         >
-          <HomeHeading
-            href={standalone ? undefined : "/primehubmall/salemela"}
-            actionLabel={standalone ? undefined : "Open"}
-            title={standalone ? undefined : "Open PrimeHubMall Sale Mela"}
-          >
-            <>
-              PrimeHubMall <span className="text-[#d60707]">Sale Mela</span>
-            </>
-          </HomeHeading>
+          {standalone ? (
+            <HomeHeading>
+              <>PrimeHubMall <span className="text-[#d60707]">Sale Mela</span></>
+            </HomeHeading>
+          ) : (
+            <Commerce3DBanner kind="sale" title="PrimeHubMall Sale Mela"
+              href="/primehubmall/salemela"
+              images={catalog.filter(product => !isWholesaleProduct(product))
+                .slice(0, 2).map(product => normalizeImageUrl(imageOf(product)))}
+              onMove={moveHomeSale}/>
+          )}
 
           {buckets.map((bucket) => {
             const wholesale = isWholesalePriceBucket(bucket);

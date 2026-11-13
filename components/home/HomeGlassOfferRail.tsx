@@ -14,9 +14,9 @@ export default function HomeGlassOfferRail({ products, settings: supplied }: { p
   const { settings } = useSettings();
   const config = supplied || settings.glassDealShowcase;
   const resolvedOffers = useMemo(() => resolveGlassOfferProducts(products, config), [products, config]);
-  const offers = useVisitShuffled(resolvedOffers, 'mega-home', '/');
+  const offers = useVisitShuffled(resolvedOffers, 'mega-home', '/', false);
   const railRef = useRef<HTMLDivElement>(null);
-  const pauseAutoScroll = useContinuousHomeRail(railRef, { itemCount: offers.length, speed: 14 });
+  const pauseAutoScroll = useContinuousHomeRail(railRef, { itemCount: offers.length, speed: 14, startDelayMs: 8000 });
   function move(direction: number) {
     pauseAutoScroll.current();
     railRef.current?.scrollBy({ left: direction * (railRef.current.clientWidth + 8), behavior: 'smooth' });

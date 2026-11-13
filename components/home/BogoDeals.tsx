@@ -75,11 +75,11 @@ export default function BogoDeals({ products, landing = false }: { products: any
     return () => { window.cancelAnimationFrame(frame); window.removeEventListener('pageshow', restore); };
   }, [pathname, landing]);
   const resolvedOffers = useMemo(() => products.filter(product => isBogoProduct(product) && product.active !== false && product.published !== false), [products]);
-  const offers = useVisitShuffled(resolvedOffers, landing ? 'bogo-page' : 'bogo-home', landing ? '/deals/bogo' : '/');
+  const offers = useVisitShuffled(resolvedOffers, landing ? 'bogo-page' : 'bogo-home', landing ? '/deals/bogo' : '/', landing);
   const groups = useMemo(() => [...new Set(offers.map(product => String(product.bogoGroup || 'Other')))], [offers]);
   const filtered = offers.filter(product => (!group || product.bogoGroup === group) &&
     (!search.trim() || String(product.title + ' ' + product.bogoGroup).toLowerCase().includes(search.trim().toLowerCase())));
-  const pauseAutoScroll = useContinuousHomeRail(rail, { enabled: !landing, itemCount: filtered.length, speed: 19 });
+  const pauseAutoScroll = useContinuousHomeRail(rail, { enabled: !landing, itemCount: filtered.length, speed: 19, startDelayMs: 8000 });
   const windowState = bogoWindow(config, now ?? 0);
   const live = now !== null && windowState.live;
   const seconds = windowState.remaining;

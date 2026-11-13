@@ -75,7 +75,7 @@ export default function NewArrivalsRail({
   const visibleNewest = homeLayout
     ? newest.slice(0, homeVisibleCount)
     : newest;
-  const pauseAutoScroll = useContinuousHomeRail(homeRailRef, { enabled: homeLayout, itemCount: visibleNewest.length, speed: 25 });
+  const pauseAutoScroll = useContinuousHomeRail(homeRailRef, { enabled: homeLayout, itemCount: visibleNewest.length, speed: 25, startDelayMs: 8000 });
 
   function moveArrivals(direction: number) {
     pauseAutoScroll.current();

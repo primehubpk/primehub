@@ -190,14 +190,14 @@ test('home Mega, BOGO and New Arrivals rails keep native endless scrolling witho
   assert.match(arrivals, /querySelector<HTMLElement>\('\[data-loop-copy\]'\)/);
 });
 
-test('Wholesale and Skills come directly after arrivals, with real-thumb 3D collection banners', async () => {
+test('Skills and Wholesale come directly after arrivals, with real-thumb 3D collection banners', async () => {
   const [home, commerce, css, share] = await Promise.all([
     'components/HomePageClient.tsx',
     'components/home/HomeCommerceRails.tsx',
     'components/home/HomeCommerceRails.css',
     'components/ProductShareButton.tsx',
   ].map(name => fs.readFile(path.join(root, name), 'utf8')));
-  const order = ['<HomeGlassOfferRail','<BogoDeals','<NewArrivalsRail','<HomeWholesaleVideos','<HomePrimeSkills','<HomeCollections'];
+  const order = ['<HomeGlassOfferRail','<BogoDeals','<NewArrivalsRail','<HomePrimeSkills','<HomeWholesaleVideos','<HomeCollections'];
   const positions = order.map(item => home.indexOf(item));
   assert.ok(positions.every(position => position >= 0));
   assert.deepEqual(positions, [...positions].sort((a, b) => a - b));
@@ -220,4 +220,52 @@ test('home rail spacing is compact without changing BOGO landing margins', async
   assert.match(megaCss, /margin:14px auto 8px/);
   assert.match(bogoCss, /\.bogo-section:not\(\.bogo-section--landing\)\{margin-top:7px;margin-bottom:8px\}/);
   assert.match(arrivalsCss, /\.home-arrivals\{margin-top:8px\}/);
+});
+
+test('home rails never swap their first products during hydration and delay gentle auto-motion', async () => {
+  const names = [
+    'lib/useVisitShuffled.ts',
+    'lib/useContinuousHomeRail.ts',
+    'components/home/HomeGlassOfferRail.tsx',
+    'components/home/BogoDeals.tsx',
+    'components/NewArrivalsRail.tsx',
+    'components/home/HomeCollections.tsx',
+    'components/home/HomeCategoryDeals.tsx',
+  ];
+  const [shuffle, motion, mega, bogo, arrivals, sale, category] = await Promise.all(
+    names.map(name => fs.readFile(path.join(root, name), 'utf8')),
+  );
+  assert.ok(shuffle.includes('shuffleOnEntry = true'));
+  assert.ok(shuffle.includes('!shuffleOnEntry || seed === null'));
+  assert.ok(mega.includes("useVisitShuffled(resolvedOffers, 'mega-home', '/', false)"));
+  assert.ok(bogo.includes("'/deals/bogo' : '/', landing)"));
+  assert.ok(motion.includes('startDelayMs = 0'));
+  for (const source of [mega, bogo, arrivals, sale, category]) {
+    assert.ok(source.includes('startDelayMs: 8000'));
+  }
+  assert.ok(sale.includes('const saleShuffleSeed = stableCatalogSeed'));
+  assert.ok(!sale.includes('setHomeShuffleSeed('));
+  assert.ok(!category.includes('sessionRailSeed()'));
+  assert.ok(!category.includes('setRefreshSeed('));
+});
+
+test('Sale Mela and every product category reuse premium 3D banners with real collection photos', async () => {
+  const [home, sale, category, banner, share, css] = await Promise.all(
+    ['components/HomePageClient.tsx', 'components/home/HomeCollections.tsx',
+      'components/home/HomeCategoryDeals.tsx', 'components/home/HomeCommerceRails.tsx',
+      'components/ProductShareButton.tsx', 'components/home/HomeCommerceRails.css']
+      .map(name => fs.readFile(path.join(root, name), 'utf8')),
+  );
+  assert.ok(home.indexOf('<HomePrimeSkills') < home.indexOf('<HomeWholesaleVideos'));
+  assert.ok(home.indexOf('<HomeWholesaleVideos') < home.indexOf('<HomeCollections'));
+  assert.ok(home.indexOf('<HomeCollections') < home.indexOf('<HomeCategoryDealsLazy'));
+  assert.ok(sale.includes('Commerce3DBanner kind="sale"'));
+  assert.ok(sale.includes('onMove={moveHomeSale}'));
+  assert.ok(category.includes('Commerce3DBanner kind="category"'));
+  assert.ok(category.includes('images={matches.map(product => normalizeImageUrl(imageOf(product)))}'));
+  assert.ok(banner.includes('CollectionBannerActions path={href}'));
+  assert.ok(share.includes("'/primehubmall/salemela'"));
+  assert.ok(share.includes('/category/'));
+  assert.ok(css.includes('.home-commerce-banner--sale'));
+  assert.ok(css.includes('.home-commerce-banner--category'));
 });

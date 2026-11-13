@@ -3,7 +3,7 @@
 import { fetchPublicStorefront } from '@/lib/storefrontClient';
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
-import { ArrowRight, MessageCircle, Package, Play, PlayCircle, Sparkles } from "lucide-react";
+import { ArrowRight, LayoutGrid, MessageCircle, Package, Play, PlayCircle, Sparkles, Tags } from "lucide-react";
 import { CollectionBannerActions } from "./CollectionBannerContent";
 import HomeRailFrame from './HomeRailFrame';
 import { useSettings } from "@/lib/useSettings";
@@ -59,38 +59,43 @@ function skillDisplayPrice(item: PrimeSkillHomeItem) {
   return { value: base > 0 ? base : 0, prefix: "" };
 }
 
-function Commerce3DBanner({ kind, title, href, images, railRef }: {
-  kind: 'wholesale' | 'skills';
+export function Commerce3DBanner({ kind, title, href, images, railRef, onMove, iconImage }: {
+  kind: 'wholesale' | 'skills' | 'sale' | 'category';
   title: string;
-  href: '/wholesale-video-hub' | '/skills';
+  href: '/wholesale-video-hub' | '/skills' | '/primehubmall/salemela' | `/category/${string}`;
   images: string[];
-  railRef: RefObject<HTMLDivElement | null>;
+  railRef?: RefObject<HTMLDivElement | null>;
+  onMove?: (direction: number) => void;
+  iconImage?: string;
 }) {
   const previews = images.filter(Boolean).slice(0, 2);
+  const Symbol = kind === 'wholesale' ? Package : kind === 'skills' ? Sparkles : kind === 'sale' ? Tags : LayoutGrid;
   const move = (direction: number) => {
-    const rail = railRef.current;
+    if (onMove) { onMove(direction); return; }
+    const rail = railRef?.current;
+    rail?.dispatchEvent(new Event('click'));
     rail?.scrollBy({ left: direction * Math.max(140, rail.clientWidth * 0.82), behavior: 'smooth' });
   };
   return <div className={`home-commerce-banner home-commerce-banner--${kind}`}>
     <span className="home-commerce-banner__emblem" aria-hidden="true">
-      {kind === 'wholesale' ? <Package size={29} strokeWidth={1.8}/> : <Sparkles size={29} strokeWidth={1.8}/>}
+      {iconImage ? <img className="home-commerce-banner__emblem-image" src={iconImage} alt="" loading="lazy"/> : <Symbol size={29} strokeWidth={1.8}/>}
     </span>
     <div className="home-commerce-banner__copy">
       <span className="home-commerce-banner__eyebrow">PRIMEHUB COLLECTION</span>
       <h2>{title}</h2>
       <span className="home-commerce-banner__cta">
-        {kind === 'wholesale' ? 'Explore wholesale packs' : 'Explore digital skills'}
+        {kind === 'wholesale' ? 'Explore wholesale packs' : kind === 'skills' ? 'Explore digital skills' : kind === 'sale' ? 'Explore Sale Mela deals' : 'Browse this category'}
         <ArrowRight size={13}/>
       </span>
     </div>
     <div className="home-commerce-banner__photos" aria-hidden="true">
       {previews.length ? previews.map((src, index) =>
         <span className="home-commerce-banner__photo" key={index}>
-          {kind === 'wholesale' ? <Package size={17}/> : <Sparkles size={17}/>}
+          <Symbol size={17}/>
           <img src={src} alt="" loading="lazy" onError={event => { event.currentTarget.hidden = true; }}/>
         </span>,
       ) : <span className="home-commerce-banner__photo home-commerce-banner__photo--empty">
-        {kind === 'wholesale' ? <Package size={25}/> : <Sparkles size={25}/>}
+        <Symbol size={25}/>
       </span>}
     </div>
     <Link href={href} prefetch={false} className="home-commerce-banner__link" aria-label={`Explore ${title}`}>

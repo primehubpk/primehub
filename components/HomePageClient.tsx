@@ -267,8 +267,8 @@ export default function HomePageClient({
             initialProducts={regularProducts}
             liveUpdates={false}
           />
-          <HomeWholesaleVideos />
           <HomePrimeSkills initialItems={initialSkills} />
+          <HomeWholesaleVideos />
           <HomeCollections
             products={regularProducts}
             onSelect={selectPrice}
