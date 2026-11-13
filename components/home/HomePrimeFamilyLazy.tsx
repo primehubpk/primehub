@@ -1,14 +1,30 @@
 'use client';
 
 import dynamic from 'next/dynamic';
+import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
+
+function PrimeFamilyPreview() {
+  return (
+    <div className="mx-3 my-3 rounded-[22px] border border-[#D7C69F] bg-[#F6F1E8] px-5 py-6 text-[#162E28] shadow-sm sm:mx-4">
+      <p className="text-[11px] font-extrabold uppercase tracking-[.14em] text-[#976E20]">PrimeHubMall</p>
+      <h2 className="mt-2 text-2xl font-black">Prime Family</h2>
+      <p className="mt-2 text-sm leading-6 text-[#5B6258]">
+        Apna wallet, cashback aur Prime Family benefits dekhein.
+      </p>
+      <Link href="/reseller/dashboard" className="mt-4 inline-flex rounded-xl bg-[#0F6658] px-5 py-3 text-sm font-extrabold text-white">
+        Prime Family Dekhein →
+      </Link>
+    </div>
+  );
+}
 
 const PrimeFamilyDashboard = dynamic(
   () => import('@/components/reseller/PrimeFamilyDashboard'),
   {
     ssr: false,
     loading: () => (
-      <div className="min-h-[180px] rounded-[24px] bg-[#F6F1E8]" aria-hidden="true" />
+      <PrimeFamilyPreview />
     ),
   },
 );
@@ -35,7 +51,7 @@ export default function HomePrimeFamilyLazy({
           observer.disconnect();
         }
       },
-      { rootMargin: '1200px 0px' },
+      { rootMargin: '1600px 0px' },
     );
 
     observer.observe(node);
@@ -50,7 +66,7 @@ export default function HomePrimeFamilyLazy({
           initialSettings={initialSettings}
         />
       ) : (
-        <div className="min-h-[1px]" aria-hidden="true" />
+        <PrimeFamilyPreview />
       )}
     </section>
   );

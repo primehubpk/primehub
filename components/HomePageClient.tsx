@@ -23,7 +23,6 @@ import SkillsShowcase, {
   type SkillItem,
 } from "@/components/SkillsShowcase";
 import HomePrimeFamilyLazy from "@/components/home/HomePrimeFamilyLazy";
-import HomeDiscoverDealsLazy from "@/components/home/HomeDiscoverDealsLazy";
 import Footer from "@/components/Footer";
 import {
   cacheCatalogForNavigation,
@@ -330,9 +329,7 @@ export default function HomePageClient({
                   ) : null}
                 </div>
               </section>
-            ) : (
-              <HomeDiscoverDealsLazy products={regularProducts} />
-            )}
+            ) : null}
           </div>
           <SkillsShowcase
             embedded

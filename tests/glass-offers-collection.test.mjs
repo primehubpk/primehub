@@ -337,3 +337,29 @@ test('empty or single-photo collections never invent imagery', () => {
   assert.deepEqual(selectBannerPreviews([], 1, 'empty'), []);
   assert.deepEqual(selectBannerPreviews(['only', 'only', ''], 1, 'one', 'only'), ['only']);
 });
+
+test('homepage shows one Sale Mela collection before Skills and Prime Family rather than loading a duplicate below', async () => {
+  const home = await fs.readFile(path.join(root, 'components/HomePageClient.tsx'), 'utf8');
+  const order = ['<HomeCollections', '<HomeCategoryDealsLazy', '<SkillsShowcase', '<HomePrimeFamilyLazy'];
+  const indices = order.map(needle => home.indexOf(needle));
+  assert.ok(indices.every(i => i >= 0), 'all four homepage sections are present');
+  assert.deepEqual(indices, [...indices].sort((a, b) => a - b));
+  assert.equal([...home.matchAll(/<HomeCollections\b/g)].length, 1);
+  assert.doesNotMatch(home, /<HomeDiscoverDealsLazy\b/);
+  assert.match(home, /catalogUnavailable \? \(/);
+  assert.match(home, /<HomePrimeFamilyLazy initialSettings=/);
+});
+
+test('Prime Family has a visible guest-facing section before its dashboard is hydrated', async () => {
+  const family = await fs.readFile(path.join(root, 'components/home/HomePrimeFamilyLazy.tsx'), 'utf8');
+  const categories = await fs.readFile(path.join(root, 'components/home/HomeCategoryDealsLazy.tsx'), 'utf8');
+  assert.match(family, /function PrimeFamilyPreview\(/);
+  assert.match(family, /href="\/reseller\/dashboard"/);
+  assert.match(family, /<PrimeFamilyPreview \/>/);
+  assert.match(family, /<PrimeFamilyDashboard[\s\S]*?embedded/);
+  assert.match(family, /IntersectionObserver/);
+  assert.doesNotMatch(family, /min-h-\[1px\]/);
+  assert.doesNotMatch(family, /aria-hidden="true"/);
+  assert.match(categories, /<HomeCategoryDeals products=\{products\} categories=\{categories\} \/>/);
+  assert.doesNotMatch(categories, /new IntersectionObserver\(/);
+});
