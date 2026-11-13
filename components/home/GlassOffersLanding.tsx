@@ -6,6 +6,8 @@ import type { Product, Category } from '@/lib/types';
 import { resolveGlassOffers, resolveGlassOfferProducts, type GlassOfferSettings } from '@/lib/glassOffers';
 import MegaDealsHero from './MegaDealsHero';
 import GlassOfferCard from './GlassOfferCard';
+import { useVisitShuffled } from '@/lib/useVisitShuffled';
+import ProductShareButton from '@/components/ProductShareButton';
 import './glass-offers.css';
 
 const categoryKey = (product: Product, categories: Category[]) => {
@@ -18,7 +20,8 @@ export default function GlassOffersLanding({ products, config, categories = [] }
   products: Product[]; config?: Partial<GlassOfferSettings> | null; categories?: Category[];
 }) {
   const settings = resolveGlassOffers(config);
-  const offers = useMemo(() => resolveGlassOfferProducts(products, config), [products, config]);
+  const resolvedOffers = useMemo(() => resolveGlassOfferProducts(products, config), [products, config]);
+  const offers = useVisitShuffled(resolvedOffers, 'mega-page', '/deals');
   const [category, setCategory] = useState('all');
   const [maxPrice, setMaxPrice] = useState('');
   const [sort, setSort] = useState('featured');
@@ -43,6 +46,7 @@ export default function GlassOffersLanding({ products, config, categories = [] }
   }, [offers, category, maxPrice, sort, search, categories]);
   return <>
     <MegaDealsHero offers={offers} heading={settings.heading} subtitle={settings.subtitle} landing />
+    <div className="mt-3 flex justify-end"><ProductShareButton path="/deals" title="Mega Deals" showLabel className="inline-flex items-center gap-2 rounded-full border border-[#d7c28e] bg-white px-4 py-2 text-xs font-bold text-[#0f6a5f]"/></div>
     <label className="mega-deals-search"><Search size={18} aria-hidden="true" /><span className="sr-only">Search deals</span><input type="search" value={search} onChange={event => setSearch(event.target.value)} placeholder="Find your favourite deal…" /></label>
     <div className="mega-deals-categories" aria-label="Filter deals by category">
       <button type="button" aria-pressed={category === 'all'} onClick={() => setCategory('all')}>All deals</button>

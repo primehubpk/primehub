@@ -87,3 +87,23 @@ export function shuffleProducts<T>(items: T[]): T[] {
 
   return result;
 }
+
+/** Stable per-visit ranking: refetches/price edits cannot reshuffle existing IDs.
+ * Runs in memory, with no query strings, fetches or database writes. */
+export function shuffleForVisit<T>(items: readonly T[], seed: number, namespace = ''): T[] {
+  const identity = (item: T) => {
+    const value = item as { id?: unknown; product?: { id?: unknown } };
+    return String(value?.product?.id ?? value?.id ?? '');
+  };
+  const rank = (id: string) => {
+    let hash = 2166136261;
+    const text = `${seed}:${namespace}:${id}`;
+    for (let i = 0; i < text.length; i++) hash = Math.imul(hash ^ text.charCodeAt(i), 16777619);
+    hash ^= hash >>> 16; hash = Math.imul(hash, 0x7feb352d);
+    hash ^= hash >>> 15; hash = Math.imul(hash, 0x846ca68b);
+    return (hash ^ (hash >>> 16)) >>> 0;
+  };
+  return items.map((item, index) => ({ item, index, id: identity(item), rank: rank(identity(item)) }))
+    .sort((a, b) => a.rank - b.rank || a.id.localeCompare(b.id) || a.index - b.index)
+    .map(row => row.item);
+}
