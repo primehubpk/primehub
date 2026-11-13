@@ -11,6 +11,7 @@ import { useCartStore, type CartItem } from '@/lib/cartStore';
 import { getVerifiedDealProduct } from '@/lib/verifiedDealProduct';
 import { CollectionBannerActions, CollectionBannerPhotos } from './CollectionBannerContent';
 import { useVisitShuffled } from '@/lib/useVisitShuffled';
+import { useContinuousHomeRail } from '@/lib/useContinuousHomeRail';
 import { normalizeImageUrl } from '@/lib/imageUrl';
 import './bogo-deals.css';
 
@@ -78,6 +79,7 @@ export default function BogoDeals({ products, landing = false }: { products: any
   const groups = useMemo(() => [...new Set(offers.map(product => String(product.bogoGroup || 'Other')))], [offers]);
   const filtered = offers.filter(product => (!group || product.bogoGroup === group) &&
     (!search.trim() || String(product.title + ' ' + product.bogoGroup).toLowerCase().includes(search.trim().toLowerCase())));
+  const pauseAutoScroll = useContinuousHomeRail(rail, { enabled: !landing, itemCount: filtered.length, speed: 19 });
   const windowState = bogoWindow(config, now ?? 0);
   const live = now !== null && windowState.live;
   const seconds = windowState.remaining;
@@ -96,14 +98,16 @@ export default function BogoDeals({ products, landing = false }: { products: any
         <div className="bogo-hero__timer"><div><span className="bogo-live-label"><i className={live ? 'bogo-live-dot' : ''}/>{live ? 'LIVE' : now === null ? 'DAILY' : 'PAUSED'}</span><strong role="timer" aria-label={config.autoRenew ? 'Time until the next daily reset' : 'Time remaining'}>{digits.join(':')}</strong></div><p>{config.autoRenew ? 'Daily reset · PKT' : 'Offer time remaining'}</p></div>
         <CollectionBannerActions path="/deals/bogo" title="Buy 1 Get 1 Free" className="bogo-hero__actions" shareClassName="bogo-share-button"
           previousLabel="Previous offers" nextLabel="Next offers"
-          onPrevious={landing ? undefined : () => rail.current?.scrollBy({left: -(rail.current.clientWidth + 10), behavior: 'smooth'})}
-          onNext={landing ? undefined : () => rail.current?.scrollBy({left: rail.current.clientWidth + 10, behavior: 'smooth'})}>
+          onPrevious={landing ? undefined : () => { pauseAutoScroll.current(); rail.current?.scrollBy({left: -(rail.current.clientWidth + 10), behavior: 'smooth'}); }}
+          onNext={landing ? undefined : () => { pauseAutoScroll.current(); rail.current?.scrollBy({left: rail.current.clientWidth + 10, behavior: 'smooth'}); }}>
           {landing ? <Link className="bogo-home-link" href="/">← Home</Link> : null}
         </CollectionBannerActions>
       </div>
     </div>
     {landing ? <div className="bogo-filters"><label>Find a design<input type="search" placeholder="Search bangles, bracelets…" value={search} onChange={event => setSearch(event.target.value)}/></label><label>Collection<select value={group} onChange={event => setGroup(event.target.value)}><option value="">All collections</option>{groups.map(value => <option key={value}>{value}</option>)}</select></label><span>{filtered.length} offers</span></div> : null}
-    <div ref={rail} dir="ltr" className={landing ? 'bogo-grid' : 'bogo-rail'} tabIndex={landing ? undefined : 0} role={landing ? undefined : 'region'} aria-label={landing ? undefined : 'Swipe Buy 1 Get 1 Free offers'}>{filtered.map(product => <BogoCard key={product.id} product={product} live={live}/>)}</div>
+    <div ref={rail} dir="ltr" className={landing ? 'bogo-grid' : 'bogo-rail'} tabIndex={landing ? undefined : 0} role={landing ? undefined : 'region'} aria-label={landing ? undefined : 'Swipe Buy 1 Get 1 Free offers'}>{landing
+      ? filtered.map(product => <BogoCard key={product.id} product={product} live={live}/>)
+      : [0, 1].map(copy => <div key={copy} className="bogo-rail__group" data-loop-original={copy === 0 ? '' : undefined} data-loop-copy={copy === 1 ? '' : undefined}>{filtered.map(product => <BogoCard key={product.id} product={product} live={live}/>)}</div>)}</div>
     {!filtered.length ? <p className="bogo-empty">No designs match. <button onClick={() => {setSearch('');setGroup('');}}>Clear filters</button></p> : null}
   </section>;
 }

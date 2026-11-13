@@ -2,8 +2,9 @@
 
 import { fetchPublicStorefront } from '@/lib/storefrontClient';
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { MessageCircle, Package, Play, PlayCircle, Sparkles } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import { ArrowRight, MessageCircle, Package, Play, PlayCircle, Sparkles } from "lucide-react";
+import { CollectionBannerActions } from "./CollectionBannerContent";
 import HomeRailFrame from './HomeRailFrame';
 import { useSettings } from "@/lib/useSettings";
 import { PRIME_SKILLS_SEED } from "@/lib/primeSkillsSeed";
@@ -58,9 +59,53 @@ function skillDisplayPrice(item: PrimeSkillHomeItem) {
   return { value: base > 0 ? base : 0, prefix: "" };
 }
 
+function Commerce3DBanner({ kind, title, href, images, railRef }: {
+  kind: 'wholesale' | 'skills';
+  title: string;
+  href: '/wholesale-video-hub' | '/skills';
+  images: string[];
+  railRef: RefObject<HTMLDivElement | null>;
+}) {
+  const previews = images.filter(Boolean).slice(0, 2);
+  const move = (direction: number) => {
+    const rail = railRef.current;
+    rail?.scrollBy({ left: direction * Math.max(140, rail.clientWidth * 0.82), behavior: 'smooth' });
+  };
+  return <div className={`home-commerce-banner home-commerce-banner--${kind}`}>
+    <span className="home-commerce-banner__emblem" aria-hidden="true">
+      {kind === 'wholesale' ? <Package size={29} strokeWidth={1.8}/> : <Sparkles size={29} strokeWidth={1.8}/>}
+    </span>
+    <div className="home-commerce-banner__copy">
+      <span className="home-commerce-banner__eyebrow">PRIMEHUB COLLECTION</span>
+      <h2>{title}</h2>
+      <span className="home-commerce-banner__cta">
+        {kind === 'wholesale' ? 'Explore wholesale packs' : 'Explore digital skills'}
+        <ArrowRight size={13}/>
+      </span>
+    </div>
+    <div className="home-commerce-banner__photos" aria-hidden="true">
+      {previews.length ? previews.map((src, index) =>
+        <span className="home-commerce-banner__photo" key={index}>
+          {kind === 'wholesale' ? <Package size={17}/> : <Sparkles size={17}/>}
+          <img src={src} alt="" loading="lazy" onError={event => { event.currentTarget.hidden = true; }}/>
+        </span>,
+      ) : <span className="home-commerce-banner__photo home-commerce-banner__photo--empty">
+        {kind === 'wholesale' ? <Package size={25}/> : <Sparkles size={25}/>}
+      </span>}
+    </div>
+    <Link href={href} prefetch={false} className="home-commerce-banner__link" aria-label={`Explore ${title}`}>
+      <span className="sr-only">Browse all {title}</span>
+    </Link>
+    <CollectionBannerActions path={href} title={title}
+      onPrevious={() => move(-1)} onNext={() => move(1)}
+      className="home-commerce-banner__controls" shareClassName="home-commerce-banner__share"/>
+  </div>;
+}
+
 export function HomeWholesaleVideos() {
   const { settings, contact } = useSettings();
   const [playingVideo, setPlayingVideo] = useState<WholesaleVideo | null>(null);
+  const wholesaleRailRef = useRef<HTMLDivElement>(null);
   const videos = ((settings as typeof settings & { wholesaleVideos?: WholesaleVideo[] })
     .wholesaleVideos || []).filter((video) => video.active !== false);
 
@@ -73,10 +118,14 @@ export function HomeWholesaleVideos() {
 
   return (
     <section className="home-video-packages home-commerce-section">
-      <HomeRailFrame title="Wholesale Packages" href="/wholesale-video-hub" icon={<Package size={27}/>}>
+      <HomeRailFrame title="Wholesale Packages" href="/wholesale-video-hub" hideHeader className="home-commerce-frame">
+      <Commerce3DBanner kind="wholesale" title="Wholesale Packages" href="/wholesale-video-hub"
+        images={videos.map(video => normalizeImageUrl(thumbnailOf(video)))}
+        railRef={wholesaleRailRef}/>
       <div className="home-commerce-rail-wrap">
         <div
           className="home-two-row-rail home-commerce-rail"
+          ref={wholesaleRailRef}
           aria-label="Wholesale packages. Swipe horizontally for more."
         >
           {videos.map((video) => {
@@ -142,6 +191,7 @@ export function HomeWholesaleVideos() {
 export function HomePrimeSkills({ initialItems = [] }: { initialItems?: PrimeSkillHomeItem[] }) {
   const { settings, contact } = useSettings();
   const sectionRef = useRef<HTMLElement | null>(null);
+  const skillsRailRef = useRef<HTMLDivElement>(null);
   const [items, setItems] = useState<PrimeSkillHomeItem[]>(
     () => initialItems.length ? initialItems : PRIME_SKILLS_SEED as PrimeSkillHomeItem[],
   );
@@ -210,10 +260,14 @@ export function HomePrimeSkills({ initialItems = [] }: { initialItems?: PrimeSki
 
   return (
     <section ref={sectionRef} className="home-prime-skills home-commerce-section">
-      <HomeRailFrame title="Prime Skills" href="/skills" image={normalizeImageUrl(skills[0]?.thumbnailUrl || skills[0]?.imageUrl || '')} icon={<Sparkles size={27}/>}>
+      <HomeRailFrame title="Prime Skills" href="/skills" hideHeader className="home-commerce-frame">
+      <Commerce3DBanner kind="skills" title="Prime Skills" href="/skills"
+        images={skills.map(item => normalizeImageUrl(item.thumbnailUrl || item.imageUrl || ''))}
+        railRef={skillsRailRef}/>
       <div className="home-commerce-rail-wrap">
         <div
           className="home-two-row-rail home-commerce-rail"
+          ref={skillsRailRef}
           aria-label="Prime Skills. Swipe horizontally for more."
         >
           {skills.map((item, index) => {

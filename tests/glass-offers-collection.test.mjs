@@ -165,3 +165,59 @@ test('slow auto-scroll accumulates subpixel motion and respects hold plus six se
   assert.ok(scroll > held);
   cleanup();
 });
+
+test('home Mega, BOGO and New Arrivals rails keep native endless scrolling without a catalogue cap', async () => {
+  const [mega, bogo, arrivals, bogoCss] = await Promise.all([
+    'components/home/HomeGlassOfferRail.tsx',
+    'components/home/BogoDeals.tsx',
+    'components/NewArrivalsRail.tsx',
+    'components/home/bogo-deals.css',
+  ].map(name => fs.readFile(path.join(root, name), 'utf8')));
+  assert.match(mega, /useContinuousHomeRail\(railRef/);
+  assert.match(mega, /data-loop-original/);
+  assert.match(mega, /data-loop-copy/);
+  assert.match(bogo, /useContinuousHomeRail\(rail,\s*\{\s*enabled:\s*!landing/);
+  assert.match(bogo, /\[0, 1\]\.map\(copy/);
+  assert.match(bogo, /data-loop-original/);
+  assert.match(bogo, /data-loop-copy/);
+  assert.match(bogo, /pauseAutoScroll\.current\(\)/);
+  assert.match(bogoCss, /\.bogo-rail__group/);
+  assert.match(bogoCss, /scroll-snap-type:none/);
+  assert.match(arrivals, /useContinuousHomeRail\(homeRailRef/);
+  assert.match(arrivals, /newestFirst\(products, homeLayout\)/);
+  assert.doesNotMatch(arrivals, /homeLayout\s*\?\s*100/);
+  assert.match(arrivals, /setHomeVisibleCount\(\(count\)\s*=>\s*Math\.min\(newest\.length,\s*count\s*\+\s*16\)\)/);
+  assert.match(arrivals, /querySelector<HTMLElement>\('\[data-loop-copy\]'\)/);
+});
+
+test('Wholesale and Skills come directly after arrivals, with real-thumb 3D collection banners', async () => {
+  const [home, commerce, css, share] = await Promise.all([
+    'components/HomePageClient.tsx',
+    'components/home/HomeCommerceRails.tsx',
+    'components/home/HomeCommerceRails.css',
+    'components/ProductShareButton.tsx',
+  ].map(name => fs.readFile(path.join(root, name), 'utf8')));
+  const order = ['<HomeGlassOfferRail','<BogoDeals','<NewArrivalsRail','<HomeWholesaleVideos','<HomePrimeSkills','<HomeCollections'];
+  const positions = order.map(item => home.indexOf(item));
+  assert.ok(positions.every(position => position >= 0));
+  assert.deepEqual(positions, [...positions].sort((a, b) => a - b));
+  assert.match(commerce, /Commerce3DBanner kind="wholesale"/);
+  assert.match(commerce, /Commerce3DBanner kind="skills"/);
+  assert.match(commerce, /videos\.map\(video => normalizeImageUrl\(thumbnailOf\(video\)\)\)/);
+  assert.match(commerce, /skills\.map\(item => normalizeImageUrl\(item\.thumbnailUrl/);
+  assert.match(commerce, /CollectionBannerActions path=\{href\}/);
+  assert.match(css, /\.home-commerce-banner__emblem/);
+  assert.match(css, /rotateY/);
+  assert.match(share, /'\/wholesale-video-hub'\s*\|\s*'\/skills'/);
+});
+
+test('home rail spacing is compact without changing BOGO landing margins', async () => {
+  const [megaCss, bogoCss, arrivalsCss] = await Promise.all([
+    'components/home/glass-offers.css',
+    'components/home/bogo-deals.css',
+    'components/home/NewArrivalsPremium.css',
+  ].map(name => fs.readFile(path.join(root, name), 'utf8')));
+  assert.match(megaCss, /margin:14px auto 8px/);
+  assert.match(bogoCss, /\.bogo-section:not\(\.bogo-section--landing\)\{margin-top:7px;margin-bottom:8px\}/);
+  assert.match(arrivalsCss, /\.home-arrivals\{margin-top:8px\}/);
+});

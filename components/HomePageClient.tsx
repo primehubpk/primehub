@@ -267,13 +267,13 @@ export default function HomePageClient({
             initialProducts={regularProducts}
             liveUpdates={false}
           />
+          <HomeWholesaleVideos />
+          <HomePrimeSkills initialItems={initialSkills} />
           <HomeCollections
             products={regularProducts}
             onSelect={selectPrice}
             onWholesaleSelect={selectWholesale}
           />
-          <HomeWholesaleVideos />
-          <HomePrimeSkills initialItems={initialSkills} />
           <HomeCategoryDealsLazy products={regularProducts} categories={categories} />
           <div id="discover-deals-section">
             {(selectedMaxPrice !== null || wholesaleSelected) && (

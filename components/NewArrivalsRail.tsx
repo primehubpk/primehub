@@ -62,7 +62,8 @@ export default function NewArrivalsRail({
   }, [liveUpdates]);
 
   const newest = useMemo(
-    () => newestFirst(products, homeLayout).slice(0, homeLayout ? 100 : products.length),
+    // Progressive rendering controls DOM cost; never cap actual catalogue choices.
+    () => newestFirst(products, homeLayout),
     [products, homeLayout],
   );
   const [homeVisibleCount, setHomeVisibleCount] = useState(16);
@@ -136,7 +137,7 @@ export default function NewArrivalsRail({
             if (homeVisibleCount >= newest.length) return;
             const rail = event.currentTarget;
             const nearEnd =
-              rail.scrollLeft + rail.clientWidth >= rail.scrollWidth - rail.clientWidth * 1.25;
+              rail.scrollLeft + rail.clientWidth * 2 >= (rail.querySelector<HTMLElement>('[data-loop-copy]')?.offsetLeft ?? rail.scrollWidth / 2);
             if (nearEnd) {
               setHomeVisibleCount((count) => Math.min(newest.length, count + 16));
             }
