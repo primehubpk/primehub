@@ -269,3 +269,38 @@ test('Sale Mela and every product category reuse premium 3D banners with real co
   assert.ok(css.includes('.home-commerce-banner--sale'));
   assert.ok(css.includes('.home-commerce-banner--category'));
 });
+
+test('home Sale Mela price medallions show real full bucket ranges without changing pricing', async () => {
+  const [home, buckets, css] = await Promise.all([
+    'components/home/HomeCollections.tsx',
+    'lib/priceBucketUtils.ts',
+    'components/home/home.css',
+  ].map(name => fs.readFile(path.join(root, name), 'utf8')));
+  assert.match(home, /home-sale-price-range--\$\{amount\}/);
+  assert.match(home, /amount === 99 \? '1–298'/);
+  assert.match(home, /amount === 299 \? '299–998'/);
+  assert.match(home, /amount === 999 \? '999\+'/);
+  assert.match(home, /standalone \? <b className="text-lg">\{amount\}<\/b>/);
+  assert.match(buckets, /amount === 99\) return \{ minInclusive: 1, maxExclusive: 299 \}/);
+  assert.match(buckets, /amount === 299\) return \{ minInclusive: 299, maxExclusive: 999 \}/);
+  assert.match(buckets, /amount === 999\) return \{ minInclusive: 999, maxExclusive: null \}/);
+  assert.match(css, /\.home-sale-price-range--299 strong/);
+  assert.match(css, /\.home-sale-price-range--999 strong/);
+});
+
+test('home Sale Mela and category product photos use full-size 4:5 portrait cards without changing standalone grids', async () => {
+  const [css, mega, category] = await Promise.all([
+    'components/home/home.css',
+    'components/home/glass-offers.css',
+    'components/home/HomeCategoryDeals.tsx',
+  ].map(name => fs.readFile(path.join(root, name), 'utf8')));
+  assert.match(mega, /\.glass-offer-card--compact \.glass-offer-card__image \{ aspect-ratio:4\/5/);
+  assert.match(css, /\.home-sale-home-frame \.home-product-image,\s*\.home-category-3d-frame \.home-product-image\s*\{\s*aspect-ratio:4\/5/);
+  assert.match(css, /\.home-sale-home-frame \.home-add,\s*\.home-category-3d-frame \.home-add/);
+  assert.match(css, /\.home-sale-home-frame \.home-product \.home-price/);
+  assert.match(category, /data-home-category-rail/);
+  const sale = await fs.readFile(path.join(root, 'components/home/HomeCollections.tsx'), 'utf8');
+  assert.ok(sale.includes('gridAutoColumns: "min(calc((100% - 10px) / 2), 208px)"'));
+  assert.ok(category.includes("gridAutoColumns: 'min(calc((100% - 10px) / 2), 208px)'"));
+  assert.match(css, /@media\(min-width:641px\)/);
+});

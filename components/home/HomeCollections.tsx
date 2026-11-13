@@ -416,7 +416,7 @@ function ProgressiveHomeSaleProducts({
         gridTemplateColumns: "none",
         gridAutoFlow: "column",
         gridTemplateRows: "repeat(2, auto)",
-        gridAutoColumns: "calc((100% - 10px) / 2)",
+        gridAutoColumns: "min(calc((100% - 10px) / 2), 208px)",
         gap: "8px 10px",
         overflowX: "auto",
         overscrollBehaviorX: "contain",
@@ -602,7 +602,11 @@ export default function HomeCollections({
                 key={bucket.id}
                 title={wholesale ? 'Wholesale' : `Sale Mela · ${saleMelaBucketLabel(amount)}`}
                 href={href}
-                icon={wholesale ? <Package size={27} /> : <b className="text-lg">{amount}</b>}
+                icon={wholesale ? <Package size={27} /> : standalone ? <b className="text-lg">{amount}</b> :
+                  <span className={`home-sale-price-range home-sale-price-range--${amount}`} aria-label={saleMelaBucketLabel(amount)}>
+                    <small>Rs.</small>
+                    <strong>{amount === 99 ? '1–298' : amount === 299 ? '299–998' : amount === 999 ? '999+' : amount.toLocaleString('en-PK')}</strong>
+                  </span>}
                 className={
                   standalone
                     ? `home-sale-standalone-frame${embeddedHome && !wholesale ? ' home-sale-embedded-retail-frame' : ''}`

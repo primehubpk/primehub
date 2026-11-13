@@ -27,7 +27,7 @@ function MovingCategoryProductRail({ products, railRef }: {
       gridTemplateColumns: 'none',
       gridAutoFlow: 'column',
       gridTemplateRows: 'repeat(2, auto)',
-      gridAutoColumns: 'calc((100% - 10px) / 2)',
+      gridAutoColumns: 'min(calc((100% - 10px) / 2), 208px)',
       gap: '8px 10px',
       direction: 'ltr',
       overscrollBehaviorX: 'contain',
