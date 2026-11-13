@@ -3,7 +3,8 @@
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { ArrowLeft, ArrowRight, Gift, ShoppingBag, Zap } from 'lucide-react';
+import { usePathname } from 'next/navigation';
+import { ArrowLeft, ArrowRight, Gift, ShoppingBag } from 'lucide-react';
 import { useSettings } from '@/lib/useSettings';
 import { bogoWindow, isBogoProduct, resolveBogoSettings } from '@/lib/bogoOffers';
 import { useCartStore, type CartItem } from '@/lib/cartStore';
@@ -41,7 +42,6 @@ const BogoCard = memo(function BogoCard({ product, live }: { product: any; live:
   return <article className="bogo-card" data-bogo-id={product.id}>
     <Link href={`/product/${encodeURIComponent(product.id)}`} prefetch={false} className="bogo-card__link">
       <div className="bogo-card__image"><Image src={image} alt={title} fill sizes="(max-width:640px) 46vw, 240px" className="object-contain" quality={78}/><span className="bogo-card__badge"><Gift size={12}/> 1 + 1 FREE</span></div>
-      <p className="bogo-card__group">{product.bogoGroup || 'Daily offer'}</p>
       <h3>{title}</h3>
       <strong className="bogo-card__price">{money(Number(product.price))}</strong>
       <p className="bogo-card__terms">1 paid + 1 free {product.bogoOffer?.unitLabel || 'pack'}<br/>Same design{product.hasVariants ? ' & size' : ''}</p>
@@ -54,6 +54,7 @@ const BogoCard = memo(function BogoCard({ product, live }: { product: any; live:
 export default function BogoDeals({ products, landing = false }: { products: any[]; landing?: boolean }) {
   const { settings } = useSettings();
   const config = resolveBogoSettings(settings.bogoDealShowcase);
+  const pathname = usePathname();
   const [now, setNow] = useState<number | null>(null);
   const [search, setSearch] = useState('');
   const [group, setGroup] = useState('');
@@ -64,6 +65,14 @@ export default function BogoDeals({ products, landing = false }: { products: any
     document.addEventListener('visibilitychange', tick);
     return () => { window.clearInterval(timer); document.removeEventListener('visibilitychange', tick); };
   }, []);
+  useEffect(() => {
+    if (pathname !== (landing ? '/deals/bogo' : '/')) return;
+    const reset = () => { if (rail.current) rail.current.scrollLeft = 0; };
+    const frame = window.requestAnimationFrame(reset);
+    const restore = (event: PageTransitionEvent) => { if (event.persisted) reset(); };
+    window.addEventListener('pageshow', restore);
+    return () => { window.cancelAnimationFrame(frame); window.removeEventListener('pageshow', restore); };
+  }, [pathname, landing]);
   const resolvedOffers = useMemo(() => products.filter(product => isBogoProduct(product) && product.active !== false && product.published !== false), [products]);
   const offers = useVisitShuffled(resolvedOffers, landing ? 'bogo-page' : 'bogo-home', landing ? '/deals/bogo' : '/');
   const groups = useMemo(() => [...new Set(offers.map(product => String(product.bogoGroup || 'Other')))], [offers]);
@@ -77,21 +86,20 @@ export default function BogoDeals({ products, landing = false }: { products: any
   const Heading = landing ? 'h1' : 'h2';
   return <section className={`bogo-section${landing ? ' bogo-section--landing' : ''}`} aria-label="Buy one get one free offers">
     <div className="bogo-hero">
-      <div className="bogo-hero__copy"><p className="bogo-hero__eyebrow"><Zap size={13} fill="currentColor"/> DAILY DOUBLE DELIGHTS</p>
-        <Heading>{config.heading}</Heading><p>One for you. One extra, on us.</p>
-        <span className="bogo-hero__cta">{landing ? `${offers.length} designs to discover` : 'Explore all offers'} <ArrowRight size={17}/></span>
+      <Image className="bogo-hero__art" src="/bogo/gift-icon.webp" alt="Two emerald gift boxes with gold ribbons" width={512} height={512} sizes="80px"/>
+      <div className="bogo-hero__copy"><Heading>{config.heading}</Heading>
+        <span className="bogo-hero__cta">{landing ? 'Choose your favourite design' : 'Explore all offers'} <ArrowRight size={15}/></span>
       </div>
-      <Image className="bogo-hero__art" src="/bogo/gift-icon.webp" alt="Two emerald gift boxes with gold ribbons" width={512} height={512} sizes="96px"/>
       {!landing ? <Link href="/deals/bogo" prefetch={false} className="bogo-hero__link" aria-label="Shop all Buy 1 Get 1 Free offers"><span className="sr-only">Shop all Buy 1 Get 1 Free offers</span></Link> : null}
+      <div className="bogo-hero__tools">
+        <div className="bogo-hero__timer"><div><span className="bogo-live-label"><i className={live ? 'bogo-live-dot' : ''}/>{live ? 'LIVE' : now === null ? 'DAILY' : 'PAUSED'}</span><strong role="timer" aria-label={config.autoRenew ? 'Time until the next daily reset' : 'Time remaining'}>{digits.join(':')}</strong></div><p>{config.autoRenew ? 'Daily reset · PKT' : 'Offer time remaining'}</p></div>
+        <div className="bogo-hero__actions"><ProductShareButton path="/deals/bogo" title="Buy 1 Get 1 Free" showLabel className="bogo-share-button"/>
+          {landing ? <Link className="bogo-home-link" href="/">← Home</Link> : <><button type="button" aria-label="Previous offers" onClick={() => rail.current?.scrollBy({left: -(rail.current.clientWidth + 10), behavior: 'smooth'})}><ArrowLeft size={16}/></button><button type="button" aria-label="Next offers" onClick={() => rail.current?.scrollBy({left: rail.current.clientWidth + 10, behavior: 'smooth'})}><ArrowRight size={16}/></button></>}
+        </div>
+      </div>
     </div>
-    <div className="bogo-clock"><div><strong><span className={live ? 'bogo-live-dot' : ''}/>{live ? 'LIVE NOW' : now === null ? 'DAILY OFFERS' : 'OFFERS PAUSED'}</strong><p>{config.autoRenew ? 'Daily reset · PKT' : 'Offer ends at the time shown'}</p></div>
-      <div className="bogo-clock__digits" role="timer" aria-label={config.autoRenew ? 'Time until the next daily reset' : 'Time remaining'}>{digits.map((digit, index) => <span key={index}><b>{digit}</b><small>{['HRS', 'MIN', 'SEC'][index]}</small></span>)}</div>
-    </div>
-
-    <div className="bogo-share-row"><ProductShareButton path="/deals/bogo" title="Buy 1 Get 1 Free" showLabel className="bogo-share-button"/>{landing ? <Link href="/">← Home</Link> : null}</div>
-    {landing ? <div className="bogo-filters"><label>Find a design<input type="search" placeholder="Search bangles, bracelets…" value={search} onChange={event => setSearch(event.target.value)}/></label><label>Collection<select value={group} onChange={event => setGroup(event.target.value)}><option value="">All collections</option>{groups.map(value => <option key={value}>{value}</option>)}</select></label><span>{filtered.length} offers</span></div>
-      : <div className="bogo-rail-caption"><span>{offers.length} designs · Swipe to explore</span><div><button aria-label="Previous offers" onClick={() => rail.current?.scrollBy({left: -(rail.current.clientWidth + 10), behavior: 'smooth'})}><ArrowLeft size={17}/></button><button aria-label="Next offers" onClick={() => rail.current?.scrollBy({left: rail.current.clientWidth + 10, behavior: 'smooth'})}><ArrowRight size={17}/></button><Link href="/deals/bogo">View all →</Link></div></div>}
-    <div ref={rail} className={landing ? 'bogo-grid' : 'bogo-rail'} tabIndex={landing ? undefined : 0} role={landing ? undefined : 'region'} aria-label={landing ? undefined : 'Swipe Buy 1 Get 1 Free offers'}>{filtered.map(product => <BogoCard key={product.id} product={product} live={live}/>)}</div>
+    {landing ? <div className="bogo-filters"><label>Find a design<input type="search" placeholder="Search bangles, bracelets…" value={search} onChange={event => setSearch(event.target.value)}/></label><label>Collection<select value={group} onChange={event => setGroup(event.target.value)}><option value="">All collections</option>{groups.map(value => <option key={value}>{value}</option>)}</select></label><span>{filtered.length} offers</span></div> : null}
+    <div ref={rail} dir="ltr" className={landing ? 'bogo-grid' : 'bogo-rail'} tabIndex={landing ? undefined : 0} role={landing ? undefined : 'region'} aria-label={landing ? undefined : 'Swipe Buy 1 Get 1 Free offers'}>{filtered.map(product => <BogoCard key={product.id} product={product} live={live}/>)}</div>
     {!filtered.length ? <p className="bogo-empty">No designs match. <button onClick={() => {setSearch('');setGroup('');}}>Clear filters</button></p> : null}
   </section>;
 }
