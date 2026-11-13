@@ -87,7 +87,7 @@ export default function CartSummary({
               : 'Voucher not applied.'}
         </p>}
         <p className="mt-2 text-[9px] leading-4 text-black/50">
-          Mega Deals products cannot receive voucher reductions or cashback.
+          Mega Deals / 70% off and Buy 1 Get 1 Free: no wallet cash, voucher discount or cashback. In mixed carts, benefits apply only to regular products.
         </p>
       </div>
 

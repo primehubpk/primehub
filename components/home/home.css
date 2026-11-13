@@ -1162,54 +1162,6 @@
 /* Locked mobile visual parity: Sale Mela and home categories use the same
    two-column portrait cards as Mega Deals/BOGO, not tiny square thumbnails.
    Limit to the home sections: standalone Sale Mela and other shop grids stay as-is. */
-.home-sale-home-frame > a.group {
-  min-width:0;
-  max-width:calc(100% - 24px);
-  margin-inline:12px;
-  gap:10px;
-}
-.home-sale-home-frame > a.group > span:first-child {
-  width:74px;
-  height:74px;
-  flex:0 0 74px;
-  border-width:3px;
-  background:linear-gradient(150deg,#fffdf3,#eaf8f0);
-  box-shadow:0 3px 9px #63461a2b,inset 0 0 0 3px #fff9dc;
-}
-.home-sale-home-frame > a.group > span:last-child { min-width:0; }
-.home-sale-home-frame > a.group > span:last-child > span:last-child {
-  display:block;
-  font-size:clamp(14px,3.8vw,18px);
-  line-height:1.18;
-  overflow-wrap:anywhere;
-}
-.home-sale-price-range {
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  justify-content:center;
-  min-width:0;
-  width:100%;
-  line-height:1.08;
-  font-variant-numeric:tabular-nums;
-  color:#0f6a5f;
-  text-align:center;
-}
-.home-sale-price-range small {
-  font-size:12px;
-  font-weight:850;
-  letter-spacing:.015em;
-}
-.home-sale-price-range strong {
-  display:block;
-  max-width:100%;
-  font-size:12px;
-  font-weight:950;
-  letter-spacing:-.35px;
-  white-space:nowrap;
-}
-.home-sale-price-range--299 strong {font-size:10.5px;letter-spacing:-.5px}
-.home-sale-price-range--999 strong {font-size:15px}
 .home-sale-home-frame .home-sale-products {padding:0 9px 10px}
 .home-sale-home-frame .home-product,
 .home-category-3d-frame .home-product {
@@ -1261,8 +1213,6 @@
   background:#08584f;
 }
 @media(max-width:370px) {
-  .home-sale-home-frame > a.group > span:first-child {width:66px;height:66px;flex-basis:66px}
-  .home-sale-home-frame > a.group > span:last-child > span:last-child {font-size:13px}
   .home-sale-price-range strong {font-size:11px}
   .home-sale-price-range--299 strong {font-size:9.5px}
   .home-sale-price-range--999 strong {font-size:14px}

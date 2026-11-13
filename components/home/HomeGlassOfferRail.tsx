@@ -6,7 +6,7 @@ import { useSettings } from '@/lib/useSettings';
 import { useContinuousHomeRail } from '@/lib/useContinuousHomeRail';
 import GlassOfferCard from './GlassOfferCard';
 import MegaDealsHero from './MegaDealsHero';
-import { useVisitShuffled } from '@/lib/useVisitShuffled';
+import { useVisitProductOrder } from '@/lib/useVisitProductOrder';
 import { CollectionBannerActions } from './CollectionBannerContent';
 import './glass-offers.css';
 
@@ -14,8 +14,8 @@ export default function HomeGlassOfferRail({ products, settings: supplied }: { p
   const { settings } = useSettings();
   const config = supplied || settings.glassDealShowcase;
   const resolvedOffers = useMemo(() => resolveGlassOfferProducts(products, config), [products, config]);
-  const offers = useVisitShuffled(resolvedOffers, 'mega-home', '/', false);
   const railRef = useRef<HTMLDivElement>(null);
+  const { items: offers, ready } = useVisitProductOrder(resolvedOffers, 'mega-home', railRef);
   const pauseAutoScroll = useContinuousHomeRail(railRef, { itemCount: offers.length, speed: 14, startDelayMs: 8000 });
   function move(direction: number) {
     pauseAutoScroll.current();
@@ -24,7 +24,7 @@ export default function HomeGlassOfferRail({ products, settings: supplied }: { p
   if (!offers.length) return null;
   return <section id="mega-deals" className="glass-offers-home" aria-label="Mega Deals from every category">
     <MegaDealsHero offers={offers} heading={config?.heading} subtitle={config?.subtitle} controls={<CollectionBannerActions path="/deals" title="Mega Deals" shareClassName="mega-deals-hero__share" onPrevious={() => move(-1)} onNext={() => move(1)}/>} />
-    <div ref={railRef} className="glass-offers-home__viewport" role="region" aria-label="Swipe to explore all deals" tabIndex={0}>
+    <div ref={railRef} aria-busy={!ready} style={{ visibility: ready ? 'visible' : 'hidden' }} className="glass-offers-home__viewport" role="region" aria-label="Swipe to explore all deals" tabIndex={0}>
       <div className="glass-offers-home__marquee">
         {[0, 1].map(copy => <div key={copy} className="glass-offers-home__group" data-loop-original={copy === 0 ? '' : undefined} data-loop-copy={copy === 1 ? '' : undefined}>
           {offers.map(offer => <GlassOfferCard key={offer.product.id} offer={offer} compact clone={copy === 1} />)}

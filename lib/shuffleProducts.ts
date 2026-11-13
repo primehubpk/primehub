@@ -107,3 +107,23 @@ export function shuffleForVisit<T>(items: readonly T[], seed: number, namespace 
     .sort((a, b) => a.rank - b.rank || a.id.localeCompare(b.id) || a.index - b.index)
     .map(row => row.item);
 }
+
+
+/** Owner policy: recent uploads lead each fresh visit; preserve every real item. */
+export function recentProductsForVisit<T>(items: readonly T[], seed: number, namespace: string, previousFirst = ''): T[] {
+  if (items.length < 2) return [...items];
+  const product = (item: T) => (item as { product?: unknown })?.product || item;
+  const id = (item: T) => String((product(item) as { id?: unknown })?.id || '');
+  const dated = [...items].filter(item => productTime(product(item)) > 0)
+    .sort((a, b) => productTime(product(b)) - productTime(product(a)) || id(a).localeCompare(id(b)));
+  const recent = dated.slice(0, Math.min(12, Math.max(2, Math.ceil(items.length / 4))));
+  const recentIds = new Set(recent.map(id));
+  const result = [...shuffleForVisit(recent, seed, namespace + ':new'),
+    ...shuffleForVisit(items.filter(item => !recentIds.has(id(item))), seed, namespace + ':rest')];
+  // A two-product collection also visibly changes on refresh, not just its seed.
+  if (previousFirst && id(result[0]) === previousFirst) {
+    const next = result.findIndex(item => id(item) !== previousFirst);
+    if (next > 0) [result[0], result[next]] = [result[next], result[0]];
+  }
+  return result;
+}

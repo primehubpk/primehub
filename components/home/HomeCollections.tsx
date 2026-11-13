@@ -24,6 +24,7 @@ import { isWholesaleProduct } from "@/lib/wholesale";
 import HomeRailFrame from './HomeRailFrame';
 import { Commerce3DBanner } from './HomeCommerceRails';
 import { useContinuousHomeRail } from '@/lib/useContinuousHomeRail';
+import { useVisitProductOrder } from '@/lib/useVisitProductOrder';
 import { isExclusiveGlassDealProduct } from '@/lib/glassOffers';
 import { orderHomeProducts } from '@/lib/homeRailOrder';
 import {
@@ -378,6 +379,7 @@ function ProgressiveHomeSaleProducts({
   const [limit, setLimit] = useState(initialLimit);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const movingRailRef = useRef<HTMLDivElement>(null);
+  const { items: visitProducts, ready } = useVisitProductOrder(products, `sale-${href}`, movingRailRef, !standalone);
 
   useEffect(() => {
     setLimit(initialLimit);
@@ -403,7 +405,7 @@ function ProgressiveHomeSaleProducts({
 
   // OWNER LOCK: every home product is reachable in one horizontal row.
   // Only the separate standalone page retains its existing progressive grid.
-  const visibleProducts = standalone ? products.slice(0, limit) : products;
+  const visibleProducts = standalone ? products.slice(0, limit) : visitProducts;
   const loopProducts = visibleProducts;
   useContinuousHomeRail(movingRailRef, { enabled: !standalone, itemCount: loopProducts.length, speed: 24, startDelayMs: 8000 });
 
@@ -413,6 +415,7 @@ function ProgressiveHomeSaleProducts({
       className="home-sale-products [scrollbar-width:none]"
       style={standalone ? standaloneGridStyle : {
         display: "grid",
+        visibility: ready ? "visible" : "hidden",
         gridTemplateColumns: "none",
         gridAutoFlow: "column",
         gridTemplateRows: "repeat(1, auto)",
@@ -424,6 +427,7 @@ function ProgressiveHomeSaleProducts({
         scrollSnapType: "none",
       }}
       aria-label={label}
+      aria-busy={!ready}
 
     >
       {visibleProducts.length ? (
@@ -474,8 +478,9 @@ export default function HomeCollections({
 }) {
   const { settings } = useSettings();
   const saleSectionRef = useRef<HTMLElement>(null);
-  const moveHomeSale = (direction: number) => {
-    const rail = saleSectionRef.current?.querySelector<HTMLElement>('.home-sale-home-frame .home-sale-products');
+  const moveHomeSale = (direction: number, anchor?: string) => {
+    const frame = anchor ? document.getElementById(anchor) : saleSectionRef.current;
+    const rail = frame?.querySelector<HTMLElement>('.home-sale-products');
     if (!rail) return;
     rail.dispatchEvent(new Event('click'));
     rail.scrollBy({ left: direction * (rail.clientWidth + 10), behavior: 'smooth' });
@@ -594,18 +599,22 @@ export default function HomeCollections({
                 key={bucket.id}
                 title={wholesale ? 'Wholesale' : `Sale Mela · ${saleMelaBucketLabel(amount)}`}
                 href={href}
-                icon={wholesale ? <Package size={27} /> : standalone ? <b className="text-lg">{amount}</b> :
-                  <span className={`home-sale-price-range home-sale-price-range--${amount}`} aria-label={saleMelaBucketLabel(amount)}>
-                    <small>Rs.</small>
-                    <strong>{amount === 99 ? '1–298' : amount === 299 ? '299–998' : amount === 999 ? '999+' : amount.toLocaleString('en-PK')}</strong>
-                  </span>}
+                icon={wholesale ? <Package size={27} /> : <b className="text-lg">{amount}</b>}
                 className={
                   standalone
                     ? `home-sale-standalone-frame${embeddedHome && !wholesale ? ' home-sale-embedded-retail-frame' : ''}`
                     : `home-sale-home-frame${wholesale ? ' home-sale-wholesale-frame' : ''}`
                 }
-                hideHeader={standalone && embeddedHome && !wholesale}
+                hideHeader={!standalone || (embeddedHome && !wholesale)}
               >
+              {!standalone ? (
+                <Commerce3DBanner kind={wholesale ? 'wholesale' : 'sale'}
+                  title={wholesale ? 'Wholesale Deals' : amount === 999 ? 'Rs. 999+' : saleMelaBucketLabel(amount)}
+                  eyebrow={wholesale ? 'SALE MELA · WHOLESALE' : 'SALE MELA'}
+                  href={bucketHref(bucket.amount ?? null, wholesale) as `/primehubmall/salemela#${string}`}
+                  images={matches.map(product => normalizeImageUrl(imageOf(product)))}
+                  onMove={direction => moveHomeSale(direction, anchor)}/>
+              ) : null}
               <div
                 id={anchor}
                 className={`home-sale-row scroll-mt-24 ${wholesale ? "home-sale-wholesale" : ""}`}

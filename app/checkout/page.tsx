@@ -51,13 +51,14 @@ export default function CheckoutPage(){
             {(c.cashbackPercent > 0 || c.voucherCashAmount > 0) && c.walletCheckoutReady && (
               <div className="mt-3 rounded-xl bg-white px-3 py-3 text-xs font-bold text-[#0F6A5F]">
                 🎁 {c.voucherKind === 'cashback' ? 'Cashback promo ' + c.voucherCashbackPercent + '% (instead of tier)' : c.voucherKind === 'cash' ? 'Cash voucher (instead of tier)' : (c.resellerTier || 'Prime Family') + ' ' + c.cashbackPercent + '% cashback'} · Estimated PrimeHub shopping credit Rs. {Math.min(c.eligibleAfterVoucher, c.cashbackEstimate + c.voucherCashAmount).toLocaleString()}
-                <p className="mt-1 text-[10px] font-medium leading-4 text-black/60">Credited only when Admin marks this order Delivered. Weekly/Big Deals excluded. No deduction from checkout bill.</p>
+                <p className="mt-1 text-[10px] font-medium leading-4 text-black/60">Credited only when Admin marks this order Delivered. Mega Deals and Buy 1 Get 1 Free excluded. No deduction from checkout bill.</p>
               </div>
             )}
             {c.cashbackPercent === 0 && !c.voucherKind && c.walletCheckoutReady && (
               <p className="mt-3 text-[10px] text-[#0F6A5F]">Prime Family Starter cashback starts at 5% for active signed-in members on eligible products.</p>
             )}
           </div>
+          <p className="mt-4 rounded-xl bg-[#F4F4F1] p-3 text-[11px] leading-5 text-black/60">Wallet cash, voucher discounts and cashback apply only to regular products. Mega Deals / 70% off and Buy 1 Get 1 Free are excluded, including in mixed carts.</p>
           <CustomerForm customer={c.customer} update={c.update} selfCollect={c.selfCollect}/>
           <CheckoutActions placing={c.placing} walletCheckoutReady={c.walletCheckoutReady} whatsappOrder={c.whatsappOrder}/>
         </form>

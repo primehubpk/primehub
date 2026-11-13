@@ -8,6 +8,7 @@ import FastProductLink from '@/components/FastProductLink';
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useContinuousHomeRail } from '@/lib/useContinuousHomeRail';
+import { useVisitProductOrder } from '@/lib/useVisitProductOrder';
 import { ArrowRight, ShoppingCart, Sparkles } from 'lucide-react';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -61,11 +62,12 @@ export default function NewArrivalsRail({
     return () => stop();
   }, [liveUpdates]);
 
-  const newest = useMemo(
+  const sortedNewest = useMemo(
     // Progressive rendering controls DOM cost; never cap actual catalogue choices.
     () => newestFirst(products, homeLayout),
     [products, homeLayout],
   );
+  const { items: newest, ready } = useVisitProductOrder(sortedNewest, 'new-arrivals-home', homeRailRef, homeLayout);
   const [homeVisibleCount, setHomeVisibleCount] = useState(16);
 
   useEffect(() => {
@@ -132,6 +134,7 @@ export default function NewArrivalsRail({
         </header>
         <div
           ref={homeRailRef}
+          aria-busy={!ready} style={{ visibility: ready ? 'visible' : 'hidden' }}
           className="home-arrivals__rail" role="region" aria-label="Swipe New Arrivals" tabIndex={0}
           onScroll={(event) => {
             if (homeVisibleCount >= newest.length) return;

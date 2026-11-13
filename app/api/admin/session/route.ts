@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { authorizedWalletAdmin, WALLET_ADMIN_COOKIE, walletAdminCookieOptions } from '@/lib/walletAdminSession';
+import { authorizedWalletAdmin, issueWalletAdminSession, WALLET_ADMIN_COOKIE, walletAdminCookieOptions } from '@/lib/walletAdminSession';
 import { POSTING_SESSION_COOKIE, postingSessionCookieOptions } from '@/lib/integrations/tiktokPostingSession';
 
 export const runtime = 'nodejs';
@@ -10,6 +10,12 @@ const ADMIN_COOKIE = 'primehub_admin_auth';
 export async function GET(request: Request) {
   const authenticated = authorizedWalletAdmin(request);
   const response = NextResponse.json({ authenticated });
+  // Renew only a verified signed session, keeping this device remembered while used.
+  // No password/token is exposed to JavaScript and no database read is added.
+  if (authenticated) {
+    response.cookies.set(WALLET_ADMIN_COOKIE, issueWalletAdminSession(), walletAdminCookieOptions());
+    response.cookies.set(ADMIN_COOKIE, 'true', { ...walletAdminCookieOptions(), sameSite: 'lax' });
+  }
   response.headers.set('Cache-Control', 'no-store');
   return response;
 }

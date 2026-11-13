@@ -60,14 +60,15 @@ function skillDisplayPrice(item: PrimeSkillHomeItem) {
   return { value: base > 0 ? base : 0, prefix: "" };
 }
 
-export function Commerce3DBanner({ kind, title, href, images, railRef, onMove, iconImage }: {
+export function Commerce3DBanner({ kind, title, href, images, railRef, onMove, iconImage, eyebrow }: {
   kind: 'wholesale' | 'skills' | 'sale' | 'category';
   title: string;
-  href: '/wholesale-video-hub' | '/skills' | '/primehubmall/salemela' | `/category/${string}`;
+  href: '/wholesale-video-hub' | '/skills' | '/primehubmall/salemela' | `/primehubmall/salemela#${string}` | `/category/${string}`;
   images: string[];
   railRef?: RefObject<HTMLDivElement | null>;
   onMove?: (direction: number) => void;
   iconImage?: string;
+  eyebrow?: string;
 }) {
   const previews = useVisitBannerImages(images, href);
   const Symbol = kind === 'wholesale' ? Package : kind === 'skills' ? Sparkles : kind === 'sale' ? Tags : LayoutGrid;
@@ -82,12 +83,12 @@ export function Commerce3DBanner({ kind, title, href, images, railRef, onMove, i
       {iconImage ? <img className="home-commerce-banner__emblem-image" src={iconImage} alt="" loading="lazy"/> : <Symbol size={29} strokeWidth={1.8}/>}
     </span>
     <div className="home-commerce-banner__copy">
-      <span className="home-commerce-banner__eyebrow">PRIMEHUB COLLECTION</span>
+      {kind !== 'category' ? <span className="home-commerce-banner__eyebrow">{eyebrow || 'PRIMEHUB COLLECTION'}</span> : null}
       <h2>{title}</h2>
-      <span className="home-commerce-banner__cta">
+      {!eyebrow && kind !== 'category' ? <span className="home-commerce-banner__cta">
         {kind === 'wholesale' ? 'Explore wholesale packs' : kind === 'skills' ? 'Explore digital skills' : kind === 'sale' ? 'Explore Sale Mela deals' : 'Browse this category'}
         <ArrowRight size={13}/>
-      </span>
+      </span> : null}
     </div>
     <div className="home-commerce-banner__photos" aria-hidden="true">
       {previews.length ? previews.map((src, index) =>

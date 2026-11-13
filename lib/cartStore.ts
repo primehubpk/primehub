@@ -221,7 +221,7 @@ export const useCartStore = create<CartState>()(
       addItem: (item) => {
         const resolvedImage = resolveVisibleProductImage(item);
         const normalized = { ...item, id: item.id || `${item.productId || ''}:${variantKey(item.variant)}`, image: item.image || item.imageUrl || resolvedImage, imageUrl: item.imageUrl || item.image || resolvedImage };
-        set((state) => ({ items: state.items.find((current) => current.id === normalized.id) ? state.items.map((current) => current.id === normalized.id ? { ...current, ...normalized, qty: current.qty + 1 } : current) : [...state.items, { ...normalized, qty: 1 }], isDrawerOpen: true, isMiniCollapsed: false }));
+        set((state) => ({ items: state.items.find((current) => current.id === normalized.id) ? state.items.map((current) => current.id === normalized.id ? { ...current, ...normalized, qty: current.qty + 1 } : current) : [...state.items, { ...normalized, qty: 1 }], isDrawerOpen: false, isMiniCollapsed: false }));
         const productId = String(item.productId || String(item.id || '').split(':')[0]).trim();
         if (productId) trackMetaStoreEvent('AddToCart', {
           contents: [{ content_id: productId, content_type: 'product', price: item.price, num_items: 1 }],

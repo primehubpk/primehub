@@ -7,22 +7,26 @@ import { HomeProductCard } from '@/components/home/HomeCollections';
 import { imageOf, type Product } from '@/components/shop/ShopTypes';
 import type { Category } from '@/lib/types';
 import { useContinuousHomeRail } from '@/lib/useContinuousHomeRail';
+import { useVisitProductOrder } from '@/lib/useVisitProductOrder';
 import { Commerce3DBanner } from './HomeCommerceRails';
 
-function MovingCategoryProductRail({ products, railRef }: {
+function MovingCategoryProductRail({ products, railRef, namespace }: {
+  namespace: string;
   products: Product[];
   railRef: RefObject<HTMLDivElement | null>;
 }) {
   // OWNER LOCK: one full-size horizontal row through the entire category.
-  const loopProducts = products;
+  const { items: loopProducts, ready } = useVisitProductOrder(products, namespace, railRef);
   useContinuousHomeRail(railRef, { itemCount: loopProducts.length, speed: 23, startDelayMs: 8000 });
 
   return <div
     ref={railRef}
     data-home-category-rail
+    aria-busy={!ready}
     className="overflow-x-auto px-4 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
     style={{
       display: 'grid',
+      visibility: ready ? 'visible' : 'hidden',
       gridTemplateColumns: 'none',
       gridAutoFlow: 'column',
       gridTemplateRows: 'repeat(1, auto)',
@@ -58,7 +62,7 @@ function CategoryRailCard({ category, matches }: { category: Category; matches: 
     <Commerce3DBanner kind="category" title={category.title} href={href}
       iconImage={iconImage} images={matches.map(product => normalizeImageUrl(imageOf(product)))}
       onMove={move}/>
-    <MovingCategoryProductRail products={matches} railRef={railRef}/>
+    <MovingCategoryProductRail products={matches} railRef={railRef} namespace={`category-${category.id}`}/>
   </div>;
 }
 

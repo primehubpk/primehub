@@ -387,16 +387,32 @@
 }
 .home-commerce-banner--category .home-commerce-banner__copy h2{
   display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
-  overflow:hidden;overflow-wrap:anywhere;font-size:clamp(14px,3.3vw,23px);line-height:1.03;
+  overflow:hidden;overflow-wrap:break-word;font-size:clamp(22px,2.2vw,30px);line-height:1.08;
 }
 .home-sale-home>.home-commerce-banner{margin:4px 0 10px}
 .home-category-3d-frame{overflow:hidden}
 .home-category-3d-frame>.home-commerce-banner{margin:0 0 9px}
 .home-category-3d-frame [data-home-category-rail]{padding-inline:10px}
 @media(max-width:640px){
-  .home-commerce-banner--sale .home-commerce-banner__copy h2{font-size:18px;line-height:1.05}
-  .home-commerce-banner--category .home-commerce-banner__copy h2{font-size:clamp(13px,3.7vw,19px)}
+  .home-commerce-banner--sale .home-commerce-banner__copy h2{font-size:22px;line-height:1.05}
+  .home-commerce-banner--category .home-commerce-banner__copy h2{font-size:clamp(21px,6vw,26px)}
   .home-commerce-banner--category .home-commerce-banner__eyebrow{font-size:6.5px}
   .home-commerce-banner--category .home-commerce-banner__cta{font-size:8px}
   .home-sale-home>.home-commerce-banner{margin-top:3px;margin-bottom:8px}
+}
+
+
+/* Owner setting: each real price range has the same compact clickable 3D header. */
+.home-sale-home-frame{padding-top:0;overflow:hidden}
+.home-sale-home-frame>.home-commerce-banner{margin-bottom:9px;grid-template-rows:minmax(51px,auto) 29px;height:auto;min-height:107px}
+.home-sale-home-frame .home-commerce-banner__eyebrow{font-size:10px;line-height:1.1;letter-spacing:.1em}
+.home-sale-home-frame .home-commerce-banner__copy h2{font-size:clamp(23px,6.3vw,30px);line-height:1.08}
+.home-sale-home-frame .home-commerce-banner__cta{font-size:10px}
+.home-commerce-banner--category .home-commerce-banner__copy{align-self:center}
+@media(max-width:360px){
+ .home-sale-home-frame .home-commerce-banner__copy h2{font-size:22px}
+ .home-commerce-banner--category{grid-template-columns:37px minmax(0,1fr) 55px}
+ .home-commerce-banner--category .home-commerce-banner__photos{width:54px}
+ .home-commerce-banner--category .home-commerce-banner__photo{width:33px}
+ .home-commerce-banner--category .home-commerce-banner__photo:nth-child(2){left:20px}
 }

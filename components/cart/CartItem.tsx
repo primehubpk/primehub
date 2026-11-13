@@ -39,7 +39,7 @@ export default function CartItem({
               <p className="mt-1 font-[family-name:var(--font-mono)] text-sm font-black text-[#14140F]">
                 Rs. {price.toLocaleString()}
               </p>
-              {item.bogoOffer?.enabled && item.variant ? <p className="mt-1 text-xs text-black/60">{[item.variant.color, item.variant.size].filter(Boolean).join(' · ')}</p> : null}
+              {item.variant ? <p className="mt-1 text-xs text-black/60">{[item.variant.color, item.variant.size].filter(Boolean).join(' · ')}</p> : null}
               {item.bogoOffer?.enabled && <p className="mt-2 text-xs font-bold text-[#0F6A5F]">{qty} paid + {qty} free · same design / size</p>}
               {item.dealDay && item.originalPrice > price && (
                 <span className="mt-2 inline-flex rounded-full bg-[#E1352B]/10 px-2 py-1 text-[8px] font-black uppercase tracking-wider text-[#E1352B]">
@@ -61,25 +61,25 @@ export default function CartItem({
               </div>
             </div>
           ) : null}
-          <div className="mt-4 flex items-end justify-between gap-3">
-            <div>
-              <p className="mb-1 text-[8px] font-black uppercase tracking-[0.16em] text-black/35">{item.bogoOffer?.enabled ? 'Offer packs' : 'Quantity'}</p>
-              <CartItemControls
-                id={id}
-                qty={qty}
-                title={title}
-                removeItem={removeItem}
-                updateQty={updateQty}
-              />
-            </div>
+        </div>
+      </div>
+      <div className="mt-4 flex items-end justify-between gap-3">
+        <div>
+          <p className="mb-1 text-[8px] font-black uppercase tracking-[0.16em] text-black/35">{item.bogoOffer?.enabled ? 'Offer packs' : 'Quantity'}</p>
+          <CartItemControls
+            id={id}
+            qty={qty}
+            title={title}
+            removeItem={removeItem}
+            updateQty={updateQty}
+          />
+        </div>
 
-            <div className="text-right">
-              <p className="text-[8px] font-black uppercase tracking-[0.16em] text-black/35">Item total</p>
-              <p className="mt-1 font-[family-name:var(--font-mono)] text-sm font-black text-[#14140F] sm:text-base">
-                Rs. {lineTotal.toLocaleString()}
-              </p>
-            </div>
-          </div>
+        <div className="text-right">
+          <p className="text-[8px] font-black uppercase tracking-[0.16em] text-black/35">Item total</p>
+          <p className="mt-1 font-[family-name:var(--font-mono)] text-sm font-black text-[#14140F] sm:text-base">
+            Rs. {lineTotal.toLocaleString()}
+          </p>
         </div>
       </div>
     </article>

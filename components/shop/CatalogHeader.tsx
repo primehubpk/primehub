@@ -17,7 +17,6 @@ type Props = {
 
 export default function CatalogHeader({ search, count, setSearch }: Props) {
   const cartCount = useCartStore((state) => state.getCartCount());
-  const openDrawer = useCartStore((state) => state.openDrawer);
 
   const searchField = (
     <label className="flex h-11 min-w-0 flex-1 items-center gap-2 rounded-full border border-[#E5DED4] bg-white px-3.5 shadow-[0_7px_24px_rgba(43,36,27,0.06)] sm:h-12 sm:px-4">
@@ -65,9 +64,9 @@ export default function CatalogHeader({ search, count, setSearch }: Props) {
             <UserRound size={20} />
             <span className="hidden text-[10px] font-bold lg:inline">Account</span>
           </Link>
-          <button
-            type="button"
-            onClick={openDrawer}
+          <Link
+            href="/cart"
+            prefetch={false}
             className="relative flex h-10 items-center gap-2 rounded-full px-2.5 text-[#1F1C18] transition hover:bg-[#F5F1EA] sm:h-11 sm:px-3"
             aria-label={`Cart, ${cartCount} items`}
           >
@@ -80,7 +79,7 @@ export default function CatalogHeader({ search, count, setSearch }: Props) {
               )}
             </span>
             <span className="hidden text-[10px] font-bold lg:inline">Cart</span>
-          </button>
+          </Link>
         </nav>
       </div>
 

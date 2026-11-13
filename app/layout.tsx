@@ -9,7 +9,6 @@ import BottomNav from '@/components/BottomNav';
 import StorefrontPageCache from '@/components/StorefrontPageCache';
 import GlobalFooter from '@/components/GlobalFooter';
 import ProductOverlayHost from '@/components/ProductOverlayHost';
-import CartMiniBar from '@/components/CartMiniBar';
 import FloatingCartShortcut from '@/components/FloatingCartShortcut';
 import PWARegister from '@/components/PWARegister';
 import VisitorTracker from '@/components/VisitorTracker';
@@ -164,7 +163,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <ProductOverlayHost />
           <GlobalFooter />
           <GlobalVariantSelector />
-          <CartMiniBar />
+          {/* Owner setting: one floating shortcut opens /cart; no automatic cart drawer. */}
           <FloatingCartShortcut />
           <AdminQuickAccess />
           <PWARegister />

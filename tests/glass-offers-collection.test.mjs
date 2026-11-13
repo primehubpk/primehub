@@ -222,7 +222,7 @@ test('home rail spacing is compact without changing BOGO landing margins', async
   assert.match(arrivalsCss, /\.home-arrivals\{margin-top:8px\}/);
 });
 
-test('home rails never swap their first products during hydration and delay gentle auto-motion', async () => {
+test('home rails prepare per-visit product order before showing cards and delay gentle auto-motion', async () => {
   const names = [
     'lib/useVisitShuffled.ts',
     'lib/useContinuousHomeRail.ts',
@@ -237,8 +237,9 @@ test('home rails never swap their first products during hydration and delay gent
   );
   assert.ok(shuffle.includes('shuffleOnEntry = true'));
   assert.ok(shuffle.includes('!shuffleOnEntry || seed === null'));
-  assert.ok(mega.includes("useVisitShuffled(resolvedOffers, 'mega-home', '/', false)"));
-  assert.ok(bogo.includes("'/deals/bogo' : '/', landing)"));
+  assert.ok(mega.includes("useVisitProductOrder(resolvedOffers, 'mega-home', railRef)"));
+  assert.ok(bogo.includes("useVisitProductOrder(resolvedOffers, 'bogo-home', rail, !landing)"));
+  for (const source of [mega, bogo, arrivals, sale, category]) assert.ok(source.includes('aria-busy={!ready}'));
   assert.ok(motion.includes('startDelayMs = 0'));
   for (const source of [mega, bogo, arrivals, sale, category]) {
     assert.ok(source.includes('startDelayMs: 8000'));
@@ -270,22 +271,17 @@ test('Sale Mela and every product category reuse premium 3D banners with real co
   assert.ok(css.includes('.home-commerce-banner--category'));
 });
 
-test('home Sale Mela price medallions show real full bucket ranges without changing pricing', async () => {
-  const [home, buckets, css] = await Promise.all([
-    'components/home/HomeCollections.tsx',
-    'lib/priceBucketUtils.ts',
-    'components/home/home.css',
+test('home Sale Mela ranges use shared clickable banners without duplicate browse headings', async () => {
+  const [home, buckets] = await Promise.all([
+    'components/home/HomeCollections.tsx', 'lib/priceBucketUtils.ts',
   ].map(name => fs.readFile(path.join(root, name), 'utf8')));
-  assert.match(home, /home-sale-price-range--\$\{amount\}/);
-  assert.match(home, /amount === 99 \? '1–298'/);
-  assert.match(home, /amount === 299 \? '299–998'/);
-  assert.match(home, /amount === 999 \? '999\+'/);
-  assert.match(home, /standalone \? <b className="text-lg">\{amount\}<\/b>/);
+  assert.ok(home.includes("Commerce3DBanner kind={wholesale ? 'wholesale' : 'sale'}"));
+  assert.ok(home.includes('hideHeader={!standalone || (embeddedHome && !wholesale)}'));
+  assert.ok(home.includes('onMove={direction => moveHomeSale(direction, anchor)}'));
+  assert.ok(home.includes("amount === 999 ? 'Rs. 999+' : saleMelaBucketLabel(amount)"));
   assert.match(buckets, /amount === 99\) return \{ minInclusive: 1, maxExclusive: 299 \}/);
   assert.match(buckets, /amount === 299\) return \{ minInclusive: 299, maxExclusive: 999 \}/);
   assert.match(buckets, /amount === 999\) return \{ minInclusive: 999, maxExclusive: null \}/);
-  assert.match(css, /\.home-sale-price-range--299 strong/);
-  assert.match(css, /\.home-sale-price-range--999 strong/);
 });
 
 test('home Sale Mela and category trails have one full-size row through all products without changing standalone grids', async () => {
@@ -302,7 +298,7 @@ test('home Sale Mela and category trails have one full-size row through all prod
   assert.ok(category.includes("gridTemplateRows: 'repeat(1, auto)'"));
   assert.doesNotMatch(category, /products\.length % 2/);
   const sale = await fs.readFile(path.join(root, 'components/home/HomeCollections.tsx'), 'utf8');
-  assert.ok(sale.includes('const visibleProducts = standalone ? products.slice(0, limit) : products;'));
+  assert.ok(sale.includes('const visibleProducts = standalone ? products.slice(0, limit) : visitProducts;'));
   assert.ok(sale.includes('gridTemplateRows: \"repeat(1, auto)\"'));
   assert.ok(sale.includes('gridAutoColumns: "min(calc((100% - 10px) / 2), 208px)"'));
   assert.ok(category.includes("gridAutoColumns: 'min(calc((100% - 10px) / 2), 208px)'"));
