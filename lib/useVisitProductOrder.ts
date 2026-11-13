@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import { recentProductsForVisit } from './shuffleProducts';
 
 /** New visit/reopen only; timer ticks and ordinary browsing never redeal cards.
- * Keep SSR card space reserved until client ordering is ready, avoiding a first-card flash. */
+ * Real SSR cards stay visible even while client ordering or JavaScript is delayed. */
 export function useVisitProductOrder<T>(items: readonly T[], namespace: string,
   railRef: RefObject<HTMLDivElement | null>, enabled = true) {
   const pathname = usePathname();

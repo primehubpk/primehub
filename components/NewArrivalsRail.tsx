@@ -134,7 +134,7 @@ export default function NewArrivalsRail({
         </header>
         <div
           ref={homeRailRef}
-          aria-busy={!ready} style={{ visibility: ready ? 'visible' : 'hidden' }}
+          aria-busy={!ready}
           className="home-arrivals__rail" role="region" aria-label="Swipe New Arrivals" tabIndex={0}
           onScroll={(event) => {
             if (homeVisibleCount >= newest.length) return;

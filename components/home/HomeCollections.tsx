@@ -415,7 +415,6 @@ function ProgressiveHomeSaleProducts({
       className="home-sale-products [scrollbar-width:none]"
       style={standalone ? standaloneGridStyle : {
         display: "grid",
-        visibility: ready ? "visible" : "hidden",
         gridTemplateColumns: "none",
         gridAutoFlow: "column",
         gridTemplateRows: "repeat(1, auto)",
@@ -521,13 +520,7 @@ export default function HomeCollections({
             <HomeHeading>
               <>PrimeHubMall <span className="text-[#d60707]">Sale Mela</span></>
             </HomeHeading>
-          ) : (
-            <Commerce3DBanner kind="sale" title="PrimeHubMall Sale Mela"
-              href="/primehubmall/salemela"
-              images={catalog.filter(product => !isWholesaleProduct(product))
-                .map(product => normalizeImageUrl(imageOf(product)))}
-              onMove={moveHomeSale}/>
-          )}
+          ) : null}
 
           {buckets.map((bucket) => {
             const wholesale = isWholesalePriceBucket(bucket);

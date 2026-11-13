@@ -108,7 +108,7 @@ export default function BogoDeals({ products, landing = false }: { products: any
       </div>
     </div>
     {landing ? <div className="bogo-filters"><label>Find a design<input type="search" placeholder="Search bangles, bracelets…" value={search} onChange={event => setSearch(event.target.value)}/></label><label>Collection<select value={group} onChange={event => setGroup(event.target.value)}><option value="">All collections</option>{groups.map(value => <option key={value}>{value}</option>)}</select></label><span>{filtered.length} offers</span></div> : null}
-    <div ref={rail} aria-busy={!ready} style={{ visibility: ready ? 'visible' : 'hidden' }} dir="ltr" className={landing ? 'bogo-grid' : 'bogo-rail'} tabIndex={landing ? undefined : 0} role={landing ? undefined : 'region'} aria-label={landing ? undefined : 'Swipe Buy 1 Get 1 Free offers'}>{landing
+    <div ref={rail} aria-busy={!ready} dir="ltr" className={landing ? 'bogo-grid' : 'bogo-rail'} tabIndex={landing ? undefined : 0} role={landing ? undefined : 'region'} aria-label={landing ? undefined : 'Swipe Buy 1 Get 1 Free offers'}>{landing
       ? filtered.map(product => <BogoCard key={product.id} product={product} live={live}/>)
       : [0, 1].map(copy => <div key={copy} className="bogo-rail__group" data-loop-original={copy === 0 ? '' : undefined} data-loop-copy={copy === 1 ? '' : undefined}>{filtered.map(product => <BogoCard key={product.id} product={product} live={live}/>)}</div>)}</div>
     {!filtered.length ? <p className="bogo-empty">No designs match. <button onClick={() => {setSearch('');setGroup('');}}>Clear filters</button></p> : null}

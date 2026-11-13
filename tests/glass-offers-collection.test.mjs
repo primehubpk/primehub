@@ -222,7 +222,7 @@ test('home rail spacing is compact without changing BOGO landing margins', async
   assert.match(arrivalsCss, /\.home-arrivals\{margin-top:8px\}/);
 });
 
-test('home rails prepare per-visit product order before showing cards and delay gentle auto-motion', async () => {
+test('home rails retain visible server products while preparing visit order and gentle auto-motion', async () => {
   const names = [
     'lib/useVisitShuffled.ts',
     'lib/useContinuousHomeRail.ts',
@@ -239,7 +239,10 @@ test('home rails prepare per-visit product order before showing cards and delay 
   assert.ok(shuffle.includes('!shuffleOnEntry || seed === null'));
   assert.ok(mega.includes("useVisitProductOrder(resolvedOffers, 'mega-home', railRef)"));
   assert.ok(bogo.includes("useVisitProductOrder(resolvedOffers, 'bogo-home', rail, !landing)"));
-  for (const source of [mega, bogo, arrivals, sale, category]) assert.ok(source.includes('aria-busy={!ready}'));
+  for (const source of [mega, bogo, arrivals, sale, category]) {
+    assert.ok(source.includes('aria-busy={!ready}'));
+    assert.doesNotMatch(source, /visibility:\s*ready\s*\?/);
+  }
   assert.ok(motion.includes('startDelayMs = 0'));
   for (const source of [mega, bogo, arrivals, sale, category]) {
     assert.ok(source.includes('startDelayMs: 8000'));
@@ -260,8 +263,8 @@ test('Sale Mela and every product category reuse premium 3D banners with real co
   assert.ok(home.indexOf('<HomePrimeSkills') < home.indexOf('<HomeWholesaleVideos'));
   assert.ok(home.indexOf('<HomeWholesaleVideos') < home.indexOf('<HomeCollections'));
   assert.ok(home.indexOf('<HomeCollections') < home.indexOf('<HomeCategoryDealsLazy'));
-  assert.ok(sale.includes('Commerce3DBanner kind="sale"'));
-  assert.ok(sale.includes('onMove={moveHomeSale}'));
+  assert.equal((sale.match(/<Commerce3DBanner/g) || []).length, 1);
+  assert.ok(sale.includes('onMove={direction => moveHomeSale(direction, anchor)}'));
   assert.ok(category.includes('Commerce3DBanner kind="category"'));
   assert.ok(category.includes('images={matches.map(product => normalizeImageUrl(imageOf(product)))}'));
   assert.ok(banner.includes('CollectionBannerActions path={href}'));
@@ -279,6 +282,7 @@ test('home Sale Mela ranges use shared clickable banners without duplicate brows
   assert.ok(home.includes('hideHeader={!standalone || (embeddedHome && !wholesale)}'));
   assert.ok(home.includes('onMove={direction => moveHomeSale(direction, anchor)}'));
   assert.ok(home.includes("amount === 999 ? 'Rs. 999+' : saleMelaBucketLabel(amount)"));
+  assert.equal((home.match(/<Commerce3DBanner/g) || []).length, 1);
   assert.match(buckets, /amount === 99\) return \{ minInclusive: 1, maxExclusive: 299 \}/);
   assert.match(buckets, /amount === 299\) return \{ minInclusive: 299, maxExclusive: 999 \}/);
   assert.match(buckets, /amount === 999\) return \{ minInclusive: 999, maxExclusive: null \}/);

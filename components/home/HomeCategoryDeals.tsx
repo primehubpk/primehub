@@ -26,7 +26,6 @@ function MovingCategoryProductRail({ products, railRef, namespace }: {
     className="overflow-x-auto px-4 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
     style={{
       display: 'grid',
-      visibility: ready ? 'visible' : 'hidden',
       gridTemplateColumns: 'none',
       gridAutoFlow: 'column',
       gridTemplateRows: 'repeat(1, auto)',
