@@ -138,7 +138,7 @@ function buildHomeTwoRowProducts(
     return [...exactPrice, ...higherPriceTrail];
   }
 
-  // Wholesale keeps its two-row refresh rotation with newer packs favoured.
+  // Wholesale keeps its stable refresh order with newer packs favoured.
   const priorityOrder = newestHomeRow(products, amount, true);
   const topRowCount = Math.ceil(products.length / 2);
   const topRow = priorityOrder.slice(0, topRowCount);
@@ -401,10 +401,10 @@ function ProgressiveHomeSaleProducts({
     return () => observer.disconnect();
   }, [batchSize, limit, products.length, standalone]);
 
-  const visibleProducts = products.slice(0, limit);
-  // Keep two-row grid copies aligned even with an odd source length.
-  const loopProducts = !standalone && visibleProducts.length % 2 === 1 && visibleProducts.length > 1
-    ? [...visibleProducts, visibleProducts[0]] : visibleProducts;
+  // OWNER LOCK: every home product is reachable in one horizontal row.
+  // Only the separate standalone page retains its existing progressive grid.
+  const visibleProducts = standalone ? products.slice(0, limit) : products;
+  const loopProducts = visibleProducts;
   useContinuousHomeRail(movingRailRef, { enabled: !standalone, itemCount: loopProducts.length, speed: 24, startDelayMs: 8000 });
 
   return (
@@ -415,7 +415,7 @@ function ProgressiveHomeSaleProducts({
         display: "grid",
         gridTemplateColumns: "none",
         gridAutoFlow: "column",
-        gridTemplateRows: "repeat(2, auto)",
+        gridTemplateRows: "repeat(1, auto)",
         gridAutoColumns: "min(calc((100% - 10px) / 2), 208px)",
         gap: "8px 10px",
         overflowX: "auto",
@@ -424,15 +424,7 @@ function ProgressiveHomeSaleProducts({
         scrollSnapType: "none",
       }}
       aria-label={label}
-      onScroll={standalone ? undefined : (event) => {
-        if (limit >= products.length) return;
-        const rail = event.currentTarget;
-        const nearEnd =
-          rail.scrollLeft + rail.clientWidth >= rail.scrollWidth - rail.clientWidth * 1.25;
-        if (nearEnd) {
-          setLimit((count) => Math.min(products.length, count + batchSize));
-        }
-      }}
+
     >
       {visibleProducts.length ? (
         (standalone ? visibleProducts.map((product, index) => ({ product, index, copy: 0 }))
@@ -528,7 +520,7 @@ export default function HomeCollections({
             <Commerce3DBanner kind="sale" title="PrimeHubMall Sale Mela"
               href="/primehubmall/salemela"
               images={catalog.filter(product => !isWholesaleProduct(product))
-                .slice(0, 2).map(product => normalizeImageUrl(imageOf(product)))}
+                .map(product => normalizeImageUrl(imageOf(product)))}
               onMove={moveHomeSale}/>
           )}
 

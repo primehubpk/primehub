@@ -13,9 +13,8 @@ function MovingCategoryProductRail({ products, railRef }: {
   products: Product[];
   railRef: RefObject<HTMLDivElement | null>;
 }) {
-  // Match the existing two-row continuous loop; no delayed client shuffle.
-  const loopProducts = products.length > 1 && products.length % 2 === 1
-    ? [...products, products[0]] : products;
+  // OWNER LOCK: one full-size horizontal row through the entire category.
+  const loopProducts = products;
   useContinuousHomeRail(railRef, { itemCount: loopProducts.length, speed: 23, startDelayMs: 8000 });
 
   return <div
@@ -26,7 +25,7 @@ function MovingCategoryProductRail({ products, railRef }: {
       display: 'grid',
       gridTemplateColumns: 'none',
       gridAutoFlow: 'column',
-      gridTemplateRows: 'repeat(2, auto)',
+      gridTemplateRows: 'repeat(1, auto)',
       gridAutoColumns: 'min(calc((100% - 10px) / 2), 208px)',
       gap: '8px 10px',
       direction: 'ltr',

@@ -288,7 +288,7 @@ test('home Sale Mela price medallions show real full bucket ranges without chang
   assert.match(css, /\.home-sale-price-range--999 strong/);
 });
 
-test('home Sale Mela and category product photos use full-size 4:5 portrait cards without changing standalone grids', async () => {
+test('home Sale Mela and category trails have one full-size row through all products without changing standalone grids', async () => {
   const [css, mega, category] = await Promise.all([
     'components/home/home.css',
     'components/home/glass-offers.css',
@@ -299,8 +299,41 @@ test('home Sale Mela and category product photos use full-size 4:5 portrait card
   assert.match(css, /\.home-sale-home-frame \.home-add,\s*\.home-category-3d-frame \.home-add/);
   assert.match(css, /\.home-sale-home-frame \.home-product \.home-price/);
   assert.match(category, /data-home-category-rail/);
+  assert.ok(category.includes("gridTemplateRows: 'repeat(1, auto)'"));
+  assert.doesNotMatch(category, /products\.length % 2/);
   const sale = await fs.readFile(path.join(root, 'components/home/HomeCollections.tsx'), 'utf8');
+  assert.ok(sale.includes('const visibleProducts = standalone ? products.slice(0, limit) : products;'));
+  assert.ok(sale.includes('gridTemplateRows: \"repeat(1, auto)\"'));
   assert.ok(sale.includes('gridAutoColumns: "min(calc((100% - 10px) / 2), 208px)"'));
   assert.ok(category.includes("gridAutoColumns: 'min(calc((100% - 10px) / 2), 208px)'"));
   assert.match(css, /@media\(min-width:641px\)/);
+});
+
+const previewShuffleCode = compile(await fs.readFile(path.join(root, 'lib/shuffleProducts.ts'), 'utf8')).replace(/^import .*from ['"]@\/lib\/wholesale['"];?\r?$/m, '');
+const previewShuffleUrl = 'data:text/javascript;charset=utf-8,' + encodeURIComponent(previewShuffleCode);
+const previewCode = compile(await fs.readFile(path.join(root, 'lib/bannerPreviewImages.ts'), 'utf8')).replace(/from ['"]\.\/shuffleProducts['"]/, 'from ' + JSON.stringify(previewShuffleUrl));
+const { selectBannerPreviews } = await import('data:text/javascript;charset=utf-8,' + encodeURIComponent(previewCode));
+
+test('banner previews stay deterministic during a visit and never mutate the real image pool', () => {
+  const images = ['a.webp', 'b.webp', 'c.webp', 'a.webp', ''];
+  const original = [...images];
+  const first = selectBannerPreviews(images, 12, 'category-jewellery');
+  assert.deepEqual(selectBannerPreviews(images, 12, 'category-jewellery'), first);
+  assert.equal(new Set(first).size, 2);
+  assert.ok(first.every(src => images.includes(src) && src));
+  assert.deepEqual(images, original);
+});
+
+test('a new opening avoids the previous first photo, including a two-image category', () => {
+  for (const images of [['a', 'b'], ['a', 'b', 'c', 'd']]) {
+    const first = selectBannerPreviews(images, 12, 'sale');
+    const next = selectBannerPreviews(images, 12, 'sale', first[0]);
+    assert.notEqual(next[0], first[0]);
+    assert.equal(new Set(next).size, 2);
+  }
+});
+
+test('empty or single-photo collections never invent imagery', () => {
+  assert.deepEqual(selectBannerPreviews([], 1, 'empty'), []);
+  assert.deepEqual(selectBannerPreviews(['only', 'only', ''], 1, 'one', 'only'), ['only']);
 });

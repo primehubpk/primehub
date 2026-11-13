@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { ArrowRight, LayoutGrid, MessageCircle, Package, Play, PlayCircle, Sparkles, Tags } from "lucide-react";
 import { CollectionBannerActions } from "./CollectionBannerContent";
+import { useVisitBannerImages } from "@/lib/useVisitBannerImages";
 import HomeRailFrame from './HomeRailFrame';
 import { useSettings } from "@/lib/useSettings";
 import { PRIME_SKILLS_SEED } from "@/lib/primeSkillsSeed";
@@ -68,7 +69,7 @@ export function Commerce3DBanner({ kind, title, href, images, railRef, onMove, i
   onMove?: (direction: number) => void;
   iconImage?: string;
 }) {
-  const previews = images.filter(Boolean).slice(0, 2);
+  const previews = useVisitBannerImages(images, href);
   const Symbol = kind === 'wholesale' ? Package : kind === 'skills' ? Sparkles : kind === 'sale' ? Tags : LayoutGrid;
   const move = (direction: number) => {
     if (onMove) { onMove(direction); return; }
@@ -90,7 +91,7 @@ export function Commerce3DBanner({ kind, title, href, images, railRef, onMove, i
     </div>
     <div className="home-commerce-banner__photos" aria-hidden="true">
       {previews.length ? previews.map((src, index) =>
-        <span className="home-commerce-banner__photo" key={index}>
+        <span className="home-commerce-banner__photo" key={src}>
           <Symbol size={17}/>
           <img src={src} alt="" loading="lazy" onError={event => { event.currentTarget.hidden = true; }}/>
         </span>,

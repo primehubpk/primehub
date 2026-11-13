@@ -5,27 +5,16 @@ import Image from 'next/image';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
 import ProductShareButton from '@/components/ProductShareButton';
 import { imageOf, titleOf, type Product } from '@/components/shop/ShopTypes';
+import { useVisitBannerImages } from '@/lib/useVisitBannerImages';
 import './collection-banner-content.css';
 
 // Decorative previews always come from this collection's real products.
 export const CollectionBannerPhotos = memo(function CollectionBannerPhotos({ products, kind = 'new-arrivals' }: {
   products: readonly Product[]; kind?: 'bogo' | 'new-arrivals';
 }) {
-  const photos = useMemo(() => {
-    const chosen: Product[] = [];
-    const add = (product?: Product) => {
-      if (product && imageOf(product) && !chosen.some(item => item.id === product.id)) chosen.push(product);
-    };
-    if (kind === 'bogo') {
-      add(products.find(product => /kashmiri|dangling charm|floral open/i.test(titleOf(product)) && imageOf(product)));
-      add(products.find(product => /bracelet/i.test(titleOf(product)) && imageOf(product)));
-    }
-    for (const product of products) {
-      if (chosen.length >= 2) break;
-      add(product);
-    }
-    return chosen;
-  }, [products, kind]);
+  const candidates = useMemo(() => products.filter(product => imageOf(product)), [products]);
+  const images = useVisitBannerImages(candidates.map(imageOf), `products-${kind}`);
+  const photos = images.map(src => candidates.find(product => imageOf(product) === src)!).filter(Boolean);
   if (!photos.length) return null;
   return <div className="collection-banner-photos" aria-hidden="true">
     {photos.map(product => <div className="collection-banner-photo" key={product.id} data-banner-product={product.id} data-banner-title={titleOf(product)}>
