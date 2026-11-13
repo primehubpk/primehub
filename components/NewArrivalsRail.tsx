@@ -1,13 +1,13 @@
 'use client';
 
 import RetryableStorefrontImage from '@/components/RetryableStorefrontImage';
-import HomeHeading from '@/components/home/HomeHeading';
+import Image from 'next/image';
 import { HomeProductCard } from '@/components/home/HomeCollections';
 import FastProductLink from '@/components/FastProductLink';
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useContinuousHomeRail } from '@/lib/useContinuousHomeRail';
-import { ArrowRight, ShoppingCart, Sparkles } from 'lucide-react';
+import { ArrowLeft, ArrowRight, ShoppingCart, Sparkles } from 'lucide-react';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useCartStore } from '@/lib/cartStore';
@@ -73,8 +73,12 @@ export default function NewArrivalsRail({
   const visibleNewest = homeLayout
     ? newest.slice(0, homeVisibleCount)
     : newest;
-  useContinuousHomeRail(homeRailRef, { enabled: homeLayout, itemCount: visibleNewest.length, speed: 25 });
+  const pauseAutoScroll = useContinuousHomeRail(homeRailRef, { enabled: homeLayout, itemCount: visibleNewest.length, speed: 25 });
 
+  function moveArrivals(direction: number) {
+    pauseAutoScroll.current();
+    homeRailRef.current?.scrollBy({ left: direction * (homeRailRef.current.clientWidth + 10), behavior: 'smooth' });
+  }
   const addProduct = async (product: Product) => {
     if (checkingId) return;
     setCheckingId(product.id);
@@ -117,10 +121,15 @@ export default function NewArrivalsRail({
   if (homeLayout) {
     return (
       <section className="home-arrivals">
-        <HomeHeading>New Arrivals</HomeHeading>
+        <header className="arrivals-hero">
+          <Image src="/new-arrivals-icon.webp" width={256} height={256} sizes="72px" className="arrivals-hero__art" alt="Emerald shopping bag with a gold New badge"/>
+          <div className="arrivals-hero__copy"><h2>New Arrivals</h2><span>Explore new arrivals <ArrowRight size={13}/></span></div>
+          <Link href="/new-arrivals" prefetch={false} className="arrivals-hero__link" aria-label="Shop all New Arrivals"/>
+          <div className="arrivals-hero__controls"><button type="button" aria-label="Previous New Arrivals" onClick={() => moveArrivals(-1)}><ArrowLeft size={16}/></button><button type="button" aria-label="Next New Arrivals" onClick={() => moveArrivals(1)}><ArrowRight size={16}/></button></div>
+        </header>
         <div
           ref={homeRailRef}
-          className="grid grid-flow-col grid-rows-2 auto-cols-[calc((100%-7px)/2)] gap-2 overflow-x-auto overscroll-x-contain pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          className="home-arrivals__rail" role="region" aria-label="Swipe New Arrivals" tabIndex={0}
           onScroll={(event) => {
             if (homeVisibleCount >= newest.length) return;
             const rail = event.currentTarget;
@@ -134,7 +143,7 @@ export default function NewArrivalsRail({
           {(visibleNewest.length > 1 ? [0, 1] : [0]).flatMap((copy) => visibleNewest.map((p, index) => (
             <div key={`${copy}:${p.id}`} data-loop-original={copy === 0 && index === 0 ? '' : undefined}
               data-loop-copy={copy === 1 && index === 0 ? '' : undefined} className="min-w-0">
-              <HomeProductCard product={p} horizontal badgeText="New Arrival" />
+              <HomeProductCard product={p} badgeText="New Arrival" />
             </div>
           )))}
         </div>

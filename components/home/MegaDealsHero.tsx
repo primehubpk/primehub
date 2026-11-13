@@ -1,13 +1,14 @@
 'use client';
 import Image from 'next/image';
+import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { ArrowRight, ShoppingBag, Sparkles } from 'lucide-react';
 import type { GlassOfferDisplay } from '@/lib/glassOffers';
 import { imageOf, titleOf } from '@/components/shop/ShopTypes';
 
 /** Real offer photos and editable text, with lightweight CSS depth. */
-export default function MegaDealsHero({ offers, heading = 'Mega Deals', subtitle, landing = false }: {
-  offers: GlassOfferDisplay[]; heading?: string; subtitle?: string; landing?: boolean;
+export default function MegaDealsHero({ offers, heading = 'Mega Deals', subtitle, landing = false, controls }: {
+  offers: GlassOfferDisplay[]; heading?: string; subtitle?: string; landing?: boolean; controls?: ReactNode;
 }) {
   const photos: GlassOfferDisplay[] = [];
   for (const pattern of [/watch/i, /handbag|\bbag\b/i, /bangle|jewel/i]) {
@@ -20,7 +21,7 @@ export default function MegaDealsHero({ offers, heading = 'Mega Deals', subtitle
   }
   const discounts = [...new Set(offers.map(offer => offer.savingPercent).filter(value => value > 0))].sort((a, b) => b - a);
   const Heading = landing ? 'h1' : 'h2';
-  return <header className={'mega-deals-hero' + (landing ? ' mega-deals-hero--landing' : '')}>
+  return <header className={'mega-deals-hero' + (landing ? ' mega-deals-hero--landing' : '') + (controls ? ' mega-deals-hero--controls' : '')}>
     <div className="mega-deals-hero__copy">
       <span className="mega-deals-hero__eyebrow"><Sparkles size={12} aria-hidden="true" /> ONE PLACE. MORE DEALS.</span>
       <Heading>{heading}</Heading>
@@ -38,5 +39,6 @@ export default function MegaDealsHero({ offers, heading = 'Mega Deals', subtitle
       {discounts.length > 1 ? <span className="mega-deals-hero__tag">{discounts[1]}%<small>OFF</small></span> : null}
     </div>
     {!landing ? <Link href="/deals" prefetch={false} className="mega-deals-hero__link" aria-label="Shop all Mega Deals"><span className="sr-only">Shop all deals</span></Link> : null}
+    {controls ? <div className="mega-deals-hero__controls">{controls}</div> : null}
   </header>;
 }

@@ -1,6 +1,6 @@
 'use client';
 import { useMemo, useRef } from 'react';
-import Link from 'next/link';
+import { ArrowLeft, ArrowRight } from 'lucide-react';
 import type { Product } from '@/lib/types';
 import { resolveGlassOfferProducts, type GlassOfferSettings } from '@/lib/glassOffers';
 import { useSettings } from '@/lib/useSettings';
@@ -17,11 +17,18 @@ export default function HomeGlassOfferRail({ products, settings: supplied }: { p
   const resolvedOffers = useMemo(() => resolveGlassOfferProducts(products, config), [products, config]);
   const offers = useVisitShuffled(resolvedOffers, 'mega-home', '/');
   const railRef = useRef<HTMLDivElement>(null);
-  useContinuousHomeRail(railRef, { itemCount: offers.length, speed: 14 });
+  const pauseAutoScroll = useContinuousHomeRail(railRef, { itemCount: offers.length, speed: 14 });
+  function move(direction: number) {
+    pauseAutoScroll.current();
+    railRef.current?.scrollBy({ left: direction * (railRef.current.clientWidth + 8), behavior: 'smooth' });
+  }
   if (!offers.length) return null;
   return <section id="mega-deals" className="glass-offers-home" aria-label="Mega Deals from every category">
-    <MegaDealsHero offers={offers} heading={config?.heading} subtitle={config?.subtitle} />
-    <div className="glass-offers-home__caption"><ProductShareButton path="/deals" title="Mega Deals" showLabel className="inline-flex items-center gap-1.5 text-xs font-bold text-[#0f6a5f]"/><Link href="/deals" prefetch={false}>View all deals →</Link></div>
+    <MegaDealsHero offers={offers} heading={config?.heading} subtitle={config?.subtitle} controls={<>
+      <ProductShareButton path="/deals" title="Mega Deals" showLabel className="mega-deals-hero__share"/>
+      <button type="button" aria-label="Previous Mega Deals" onClick={() => move(-1)}><ArrowLeft size={15}/></button>
+      <button type="button" aria-label="Next Mega Deals" onClick={() => move(1)}><ArrowRight size={15}/></button>
+    </>} />
     <div ref={railRef} className="glass-offers-home__viewport" role="region" aria-label="Swipe to explore all deals" tabIndex={0}>
       <div className="glass-offers-home__marquee">
         {[0, 1].map(copy => <div key={copy} className="glass-offers-home__group" data-loop-original={copy === 0 ? '' : undefined} data-loop-copy={copy === 1 ? '' : undefined}>
