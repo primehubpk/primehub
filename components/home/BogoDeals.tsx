@@ -4,12 +4,12 @@ import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { ArrowLeft, ArrowRight, Gift, ShoppingBag } from 'lucide-react';
+import { ArrowRight, Gift, ShoppingBag } from 'lucide-react';
 import { useSettings } from '@/lib/useSettings';
 import { bogoWindow, isBogoProduct, resolveBogoSettings } from '@/lib/bogoOffers';
 import { useCartStore, type CartItem } from '@/lib/cartStore';
 import { getVerifiedDealProduct } from '@/lib/verifiedDealProduct';
-import ProductShareButton from '@/components/ProductShareButton';
+import { CollectionBannerActions, CollectionBannerPhotos } from './CollectionBannerContent';
 import { useVisitShuffled } from '@/lib/useVisitShuffled';
 import { normalizeImageUrl } from '@/lib/imageUrl';
 import './bogo-deals.css';
@@ -85,17 +85,21 @@ export default function BogoDeals({ products, landing = false }: { products: any
   if (!config.enabled || !offers.length) return landing ? <section className="bogo-section"><h1>Buy 1 Get 1 Free</h1><p>These offers are currently unavailable. Please check again soon.</p><Link href="/deals">Browse Mega Deals →</Link></section> : null;
   const Heading = landing ? 'h1' : 'h2';
   return <section className={`bogo-section${landing ? ' bogo-section--landing' : ''}`} aria-label="Buy one get one free offers">
-    <div className="bogo-hero">
+    <div className="bogo-hero collection-banner--photos">
       <Image className="bogo-hero__art" src="/bogo/gift-icon.webp" alt="Two emerald gift boxes with gold ribbons" width={512} height={512} sizes="80px"/>
       <div className="bogo-hero__copy"><Heading>{config.heading}</Heading>
-        <span className="bogo-hero__cta">{landing ? 'Choose your favourite design' : 'Explore all offers'} <ArrowRight size={15}/></span>
+        <span className="bogo-hero__cta">{landing ? 'Choose a design' : 'Explore all offers'} <ArrowRight size={15}/></span>
       </div>
+      <CollectionBannerPhotos products={offers} kind="bogo"/>
       {!landing ? <Link href="/deals/bogo" prefetch={false} className="bogo-hero__link" aria-label="Shop all Buy 1 Get 1 Free offers"><span className="sr-only">Shop all Buy 1 Get 1 Free offers</span></Link> : null}
       <div className="bogo-hero__tools">
         <div className="bogo-hero__timer"><div><span className="bogo-live-label"><i className={live ? 'bogo-live-dot' : ''}/>{live ? 'LIVE' : now === null ? 'DAILY' : 'PAUSED'}</span><strong role="timer" aria-label={config.autoRenew ? 'Time until the next daily reset' : 'Time remaining'}>{digits.join(':')}</strong></div><p>{config.autoRenew ? 'Daily reset · PKT' : 'Offer time remaining'}</p></div>
-        <div className="bogo-hero__actions"><ProductShareButton path="/deals/bogo" title="Buy 1 Get 1 Free" showLabel className="bogo-share-button"/>
-          {landing ? <Link className="bogo-home-link" href="/">← Home</Link> : <><button type="button" aria-label="Previous offers" onClick={() => rail.current?.scrollBy({left: -(rail.current.clientWidth + 10), behavior: 'smooth'})}><ArrowLeft size={16}/></button><button type="button" aria-label="Next offers" onClick={() => rail.current?.scrollBy({left: rail.current.clientWidth + 10, behavior: 'smooth'})}><ArrowRight size={16}/></button></>}
-        </div>
+        <CollectionBannerActions path="/deals/bogo" title="Buy 1 Get 1 Free" className="bogo-hero__actions" shareClassName="bogo-share-button"
+          previousLabel="Previous offers" nextLabel="Next offers"
+          onPrevious={landing ? undefined : () => rail.current?.scrollBy({left: -(rail.current.clientWidth + 10), behavior: 'smooth'})}
+          onNext={landing ? undefined : () => rail.current?.scrollBy({left: rail.current.clientWidth + 10, behavior: 'smooth'})}>
+          {landing ? <Link className="bogo-home-link" href="/">← Home</Link> : null}
+        </CollectionBannerActions>
       </div>
     </div>
     {landing ? <div className="bogo-filters"><label>Find a design<input type="search" placeholder="Search bangles, bracelets…" value={search} onChange={event => setSearch(event.target.value)}/></label><label>Collection<select value={group} onChange={event => setGroup(event.target.value)}><option value="">All collections</option>{groups.map(value => <option key={value}>{value}</option>)}</select></label><span>{filtered.length} offers</span></div> : null}

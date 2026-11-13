@@ -1,6 +1,5 @@
 'use client';
 import { useMemo, useRef } from 'react';
-import { ArrowLeft, ArrowRight } from 'lucide-react';
 import type { Product } from '@/lib/types';
 import { resolveGlassOfferProducts, type GlassOfferSettings } from '@/lib/glassOffers';
 import { useSettings } from '@/lib/useSettings';
@@ -8,7 +7,7 @@ import { useContinuousHomeRail } from '@/lib/useContinuousHomeRail';
 import GlassOfferCard from './GlassOfferCard';
 import MegaDealsHero from './MegaDealsHero';
 import { useVisitShuffled } from '@/lib/useVisitShuffled';
-import ProductShareButton from '@/components/ProductShareButton';
+import { CollectionBannerActions } from './CollectionBannerContent';
 import './glass-offers.css';
 
 export default function HomeGlassOfferRail({ products, settings: supplied }: { products: Product[]; settings?: Partial<GlassOfferSettings> | null }) {
@@ -24,11 +23,7 @@ export default function HomeGlassOfferRail({ products, settings: supplied }: { p
   }
   if (!offers.length) return null;
   return <section id="mega-deals" className="glass-offers-home" aria-label="Mega Deals from every category">
-    <MegaDealsHero offers={offers} heading={config?.heading} subtitle={config?.subtitle} controls={<>
-      <ProductShareButton path="/deals" title="Mega Deals" showLabel className="mega-deals-hero__share"/>
-      <button type="button" aria-label="Previous Mega Deals" onClick={() => move(-1)}><ArrowLeft size={15}/></button>
-      <button type="button" aria-label="Next Mega Deals" onClick={() => move(1)}><ArrowRight size={15}/></button>
-    </>} />
+    <MegaDealsHero offers={offers} heading={config?.heading} subtitle={config?.subtitle} controls={<CollectionBannerActions path="/deals" title="Mega Deals" shareClassName="mega-deals-hero__share" onPrevious={() => move(-1)} onNext={() => move(1)}/>} />
     <div ref={railRef} className="glass-offers-home__viewport" role="region" aria-label="Swipe to explore all deals" tabIndex={0}>
       <div className="glass-offers-home__marquee">
         {[0, 1].map(copy => <div key={copy} className="glass-offers-home__group" data-loop-original={copy === 0 ? '' : undefined} data-loop-copy={copy === 1 ? '' : undefined}>

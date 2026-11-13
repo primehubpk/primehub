@@ -2,12 +2,13 @@
 
 import RetryableStorefrontImage from '@/components/RetryableStorefrontImage';
 import Image from 'next/image';
+import { CollectionBannerActions, CollectionBannerPhotos } from '@/components/home/CollectionBannerContent';
 import { HomeProductCard } from '@/components/home/HomeCollections';
 import FastProductLink from '@/components/FastProductLink';
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useContinuousHomeRail } from '@/lib/useContinuousHomeRail';
-import { ArrowLeft, ArrowRight, ShoppingCart, Sparkles } from 'lucide-react';
+import { ArrowRight, ShoppingCart, Sparkles } from 'lucide-react';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useCartStore } from '@/lib/cartStore';
@@ -121,11 +122,12 @@ export default function NewArrivalsRail({
   if (homeLayout) {
     return (
       <section className="home-arrivals">
-        <header className="arrivals-hero">
+        <header className="arrivals-hero collection-banner--photos">
           <Image src="/new-arrivals-icon.webp" width={256} height={256} sizes="72px" className="arrivals-hero__art" alt="Emerald shopping bag with a gold New badge"/>
           <div className="arrivals-hero__copy"><h2>New Arrivals</h2><span>Explore new arrivals <ArrowRight size={13}/></span></div>
+          <CollectionBannerPhotos products={newest}/>
           <Link href="/new-arrivals" prefetch={false} className="arrivals-hero__link" aria-label="Shop all New Arrivals"/>
-          <div className="arrivals-hero__controls"><button type="button" aria-label="Previous New Arrivals" onClick={() => moveArrivals(-1)}><ArrowLeft size={16}/></button><button type="button" aria-label="Next New Arrivals" onClick={() => moveArrivals(1)}><ArrowRight size={16}/></button></div>
+          <CollectionBannerActions path="/new-arrivals" title="New Arrivals" className="arrivals-hero__controls" shareClassName="arrivals-hero__share" onPrevious={() => moveArrivals(-1)} onNext={() => moveArrivals(1)}/>
         </header>
         <div
           ref={homeRailRef}

@@ -8,7 +8,7 @@ type Props = {
   title: string;
   className?: string;
   showLabel?: boolean;
-} & ({ productId: string; path?: never } | { path: '/deals' | '/deals/bogo'; productId?: never });
+} & ({ productId: string; path?: never } | { path: '/deals' | '/deals/bogo' | '/new-arrivals'; productId?: never });
 
 export default function ProductShareButton({ productId, path, title, className = '', showLabel = false }: Props) {
   const [copied, setCopied] = useState(false);
