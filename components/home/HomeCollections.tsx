@@ -408,13 +408,29 @@ function ProgressiveHomeSaleProducts({
   // The final vertical Sale Mela must eventually display EVERY product,
   // even on phones where IntersectionObserver misses a 1px sentinel.
   // Expand in short batches to avoid hydrating hundreds of cards in one frame.
+  // Mobile: do not eagerly mount hundreds of products in all four collections
+  // while the visitor is still looking at Mega Deals. This slows hydration and
+  // makes the visible first images appear unchanged after refresh.
+  // Load the NEXT batch when its own sentinel approaches the viewport.
+  // The scroll listener is a fallback for mobile IntersectionObserver delays.
   useEffect(() => {
     if (!verticalHome || limit >= products.length) return;
-    const timer = window.setTimeout(
-      () => setLimit((count) => Math.min(products.length, count + batchSize)),
-      320,
-    );
-    return () => window.clearTimeout(timer);
+    const checkNearEnd = () => {
+      const node = loadMoreRef.current;
+      if (!node) return;
+      const bounds = node.getBoundingClientRect();
+      if (bounds.top <= window.innerHeight + 1100 && bounds.bottom >= -200) {
+        setLimit((count) => Math.min(products.length, count + batchSize));
+      }
+    };
+    const first = window.setTimeout(checkNearEnd, 180);
+    window.addEventListener('scroll', checkNearEnd, { passive: true });
+    window.addEventListener('resize', checkNearEnd);
+    return () => {
+      window.clearTimeout(first);
+      window.removeEventListener('scroll', checkNearEnd);
+      window.removeEventListener('resize', checkNearEnd);
+    };
   }, [verticalHome, limit, products.length, batchSize]);
 
   // OWNER LOCK: every home product is reachable in one horizontal row.
@@ -477,7 +493,18 @@ function ProgressiveHomeSaleProducts({
             ? { gridColumn: "1 / -1", minHeight: "42px" }
             : { gridColumn: "1 / -1", height: "1px" }}
         >
-          {verticalHome ? `${Math.min(limit, products.length)} / ${products.length} products — baqi load ho rahe hain…` : null}
+          {verticalHome ? (
+            <>
+              <span>{Math.min(limit, products.length)} / {products.length} products</span>
+              <button
+                type="button"
+                className="home-sale-progress__more"
+                onClick={() => setLimit((count) => Math.min(products.length, count + batchSize))}
+              >
+                Agle {Math.min(batchSize, products.length - limit)} products dekhein
+              </button>
+            </>
+          ) : null}
         </div>
       ) : verticalHome && products.length > 0 ? (
         <div className="home-sale-progress home-sale-progress--complete" style={{ gridColumn: "1 / -1" }}>

@@ -470,63 +470,67 @@ test('three final Sale Mela retail price ranges are complete, disjoint and have 
   assert.match(sale, /\(standalone \|\| verticalHome\) && limit < products.length/);
 });
 
-test('local 393px Chrome actually renders Family and all Sale Mela tiers when preview is running', {timeout: 135000}, async t => {
-  if (process.platform !== 'win32') return t.skip('Local Windows-only visual audit');
+test('local Chrome 393px loads full Family and reaches final products in all three Sale Mela tiers plus Wholesale', {timeout: 190000}, async t => {
+  if (process.platform !== 'win32') return t.skip('Windows-local Chrome required');
   let up;
-  try { up = await fetch('http://127.0.0.1:3000/', { signal: AbortSignal.timeout(6500) }); }
-  catch { return t.skip('The local preview is not running'); }
-  if (!up.ok) return t.skip('The local preview is not serving HTTP 200');
-  const { spawnSync } = await import('node:child_process');
-  const script = "from playwright.sync_api import sync_playwright\nimport json\nwith sync_playwright() as p:\n    b=p.chromium.launch(channel=\"chrome\",headless=True,args=[\"--disable-extensions\",\"--no-first-run\"])\n    c=b.new_context(viewport={\"width\":393,\"height\":852},is_mobile=True,has_touch=True)\n    pg=c.new_page()\n    errors=[]\n    pg.on(\"pageerror\",lambda e:errors.append(str(e)[:150]))\n    r=pg.goto(\"http://127.0.0.1:3000/?preview=family-sale-audit\",wait_until=\"domcontentloaded\",timeout=85000)\n    pg.wait_for_selector(\".home-sale-home--vertical\",timeout=30000)\n    pg.locator(\"#home-prime-family\").scroll_into_view_if_needed(timeout=15000)\n    try:\n        pg.wait_for_selector(\"#club-home\",timeout=32000)\n        family=True\n    except Exception:\n        family=False\n    data=pg.evaluate(\"\"\"() => {\n      const frames=[...document.querySelectorAll('.home-sale-home--vertical .home-sale-home-frame')];\n      return {\n        width:innerWidth,scrollWidth:document.documentElement.scrollWidth,\n        banner:document.querySelectorAll('.home-prime-family-banner').length,\n        familyDashboard:!!document.getElementById('club-home'),\n        familyText:document.querySelector('.home-prime-family-lazy')?.textContent?.slice(0,350) || '',\n        loadingCard:document.body.textContent.includes('Prime Family rewards load ho rahe hain'),\n        ranges:frames.map((f)=>({\n          heading:f.querySelector('.home-commerce-banner__copy h2')?.textContent?.trim() || '',\n          cards:f.querySelectorAll('.home-product').length,\n          hasNext:!!f.querySelector('.home-sale-products--vertical > div[aria-hidden=\"true\"]')\n        }))\n      };\n    }\"\"\")\n    data.update({\"http\":r.status if r else 0,\"family\":family,\"errors\":errors[:4]})\n    rows=pg.locator('.home-sale-home--vertical .home-sale-home-frame')\n    for i in range(rows.count()):\n        frame=rows.nth(i)\n        count=frame.locator('.home-product').count()\n        sentinel=frame.locator('.home-sale-products--vertical > div[aria-hidden=\"true\"]')\n        if sentinel.count():\n            sentinel.scroll_into_view_if_needed(timeout=16000)\n            pg.wait_for_timeout(1400)\n            data['progression']={'initial':count,'after':frame.locator('.home-product').count()}\n            break\n    pg.wait_for_function(\"\"\"() => {const frames=[...document.querySelectorAll('.home-sale-home--vertical .home-sale-home-frame')];return frames.length===4 && frames.every(f=>!!f.querySelector('.home-sale-progress--complete'))}\"\"\",timeout=85000)\n    data['finalCounts']=pg.evaluate(\"\"\"() => [...document.querySelectorAll('.home-sale-home--vertical .home-sale-home-frame')].map(f=>f.querySelectorAll('.home-product').length)\"\"\")\n    print(json.dumps(data,ensure_ascii=True),flush=True)\n    c.close();b.close()\n";
-  const result = spawnSync('python', ['-c', script], {
-    cwd:root,encoding:'utf8',shell:false,windowsHide:true,timeout:114000,maxBuffer:50000,
+  try { up=await fetch('http://127.0.0.1:3000/', {signal:AbortSignal.timeout(6500)}); }
+  catch { return t.skip('Local preview is not running'); }
+  if (!up.ok) return t.skip('Local preview not HTTP200');
+  const {spawnSync}=await import('node:child_process');
+  const script="from playwright.sync_api import sync_playwright\nimport json,time\nwith sync_playwright() as p:\n  browser=p.chromium.launch(channel=\"chrome\",headless=True,args=[\"--disable-extensions\",\"--no-first-run\"])\n  c=browser.new_context(viewport={\"width\":393,\"height\":852},is_mobile=True,has_touch=True)\n  page=c.new_page()\n  errors=[]\n  page.on(\"pageerror\",lambda e: errors.append(str(e)[:220]))\n  response=page.goto(\"http://127.0.0.1:3000/?preview=family-sale-scroll-audit\",wait_until=\"domcontentloaded\",timeout=85000)\n  page.wait_for_selector(\".home-sale-home--vertical\",timeout=45000)\n  page.locator(\"#home-prime-family\").scroll_into_view_if_needed()\n  page.wait_for_selector(\"#club-home\",timeout=30000)\n  frames=page.locator(\".home-sale-home--vertical .home-sale-home-frame\")\n  entries=[]\n  for index in range(frames.count()):\n    frame=frames.nth(index)\n    heading=frame.locator(\".home-commerce-banner__copy h2\").inner_text(timeout=8000)\n    total=0\n    manual=0\n    first=frame.locator(\".home-product\").count()\n    autoExpanded=False\n    for n in range(75):\n      if frame.locator(\".home-sale-progress--complete\").count():\n        break\n      more=frame.locator(\".home-sale-progress__more\")\n      if not more.count():\n        page.wait_for_timeout(150)\n        continue\n      more.scroll_into_view_if_needed(timeout=18000)\n      page.wait_for_timeout(250)\n      current=frame.locator(\".home-product\").count()\n      if current>first:\n        autoExpanded=True\n      if frame.locator(\".home-sale-progress--complete\").count():\n        break\n      if current==first and more.count():\n        more.click(timeout=9000)\n        manual+=1\n      first=frame.locator(\".home-product\").count()\n    complete=frame.locator(\".home-sale-progress--complete\").count()>0\n    count=frame.locator(\".home-product\").count()\n    text=frame.locator(\".home-sale-progress--complete\").inner_text(timeout=8000) if complete else \"\"\n    entries.append({\"heading\":heading,\"cards\":count,\"complete\":complete,\"completionText\":text,\"manualClicks\":manual,\"autoExpanded\":autoExpanded})\n  results=page.evaluate(\"\"\"() => ({docWidth:document.documentElement.scrollWidth,width:innerWidth,\n    banner:document.querySelectorAll('.home-prime-family-banner').length,\n    familyDashboard:!!document.getElementById('club-home'),\n    familyFallback:document.body.textContent.includes('Prime Family rewards load ho rahe hain')\n  })\"\"\")\n  results.update({\"http\":response.status if response else 0,\"ranges\":entries,\"errors\":errors[:6]})\n  print(json.dumps(results,ensure_ascii=True),flush=True)\n  c.close()\n  browser.close()\n";
+  const result=spawnSync('python',['-c',script],{
+    cwd:root,encoding:'utf8',windowsHide:true,shell:false,timeout:178000,maxBuffer:75000,
   });
-  assert.equal(result.status,0, String(result.stderr||result.error?.message||result.stdout||'').slice(-1400));
-  const last=String(result.stdout||'').trim().split(/\\r?\\n/).at(-1);
-  const report=JSON.parse(last);
+  assert.equal(result.status,0,String(result.stderr||result.error?.message||result.stdout||'').slice(-1500));
+  const report=JSON.parse(String(result.stdout||'').trim().split(/\r?\n/).at(-1));
   console.log('LOCAL_MOBILE_AUDIT '+JSON.stringify(report));
   assert.equal(report.http,200);
   assert.equal(report.banner,0);
-  assert.equal(report.familyDashboard,true,'actual Prime Family dashboard must render, not loading fallback');
-  assert.equal(report.loadingCard,false);
-  assert.equal(report.ranges.length,4,'Three retail bands and separate wholesale');
-  assert.match(report.ranges[0].heading,/1.?298/);
-  assert.match(report.ranges[1].heading,/299.?998/);
-  assert.match(report.ranges[2].heading,/999/);
-  assert.match(report.ranges[3].heading,/Wholesale/i);
-  assert.ok(report.ranges.every(x=>x.cards>0),'Every populated band must show real product cards');
-  assert.equal(report.scrollWidth,report.width,'No horizontal overflow on mobile');
-  if(report.progression)assert.ok(report.progression.after>report.progression.initial,'Scroll should load more products');
-  assert.equal(report.finalCounts?.length,4,'All four sections must finish loading');
-  assert.ok(report.finalCounts.every(n=>n>0),'Every final collection must finish with real products');
+  assert.equal(report.familyDashboard,true);
+  assert.equal(report.familyFallback,false);
+  assert.equal(report.ranges.length,4);
+  for(const [idx,name] of ['1.?298','299.?998','999','Wholesale'].entries()){
+    assert.match(report.ranges[idx].heading,new RegExp(name,'i'));
+    assert.ok(report.ranges[idx].complete,report.ranges[idx].heading+' must reach last product');
+    assert.ok(report.ranges[idx].cards>0);
+  }
+  assert.equal(report.docWidth,report.width);
+  assert.deepEqual(report.errors,[]);
 });
 
-test('mobile Chrome reload audit compares real product IDs over three fresh visits', {timeout: 145000}, async t => {
-  if (process.platform !== 'win32') return t.skip('Windows-local browser only');
+test('real Chrome reload changes the FIRST VISIBLE product images on each fresh visit', {timeout: 185000}, async t => {
+  if(process.platform!=='win32')return t.skip('Local Windows Chrome only');
   let response;
-  try { response=await fetch('http://127.0.0.1:3000/',{signal:AbortSignal.timeout(6500)}); }
-  catch { return t.skip('Local preview unavailable'); }
-  if (!response.ok) return t.skip('Preview returned non-200');
+  try{response=await fetch('http://127.0.0.1:3000/',{signal:AbortSignal.timeout(6500)});}
+  catch{return t.skip('Local preview unavailable');}
+  if(!response.ok)return t.skip('Local preview not HTTP200');
   const {spawnSync}=await import('node:child_process');
-  const script="from playwright.sync_api import sync_playwright\nimport json\nwith sync_playwright() as p:\n  browser=p.chromium.launch(channel=\"chrome\",headless=True,args=[\"--disable-extensions\",\"--no-first-run\"])\n  context=browser.new_context(viewport={\"width\":393,\"height\":852},is_mobile=True,has_touch=True)\n  page=context.new_page()\n  errors=[]\n  page.on(\"pageerror\",lambda e:errors.append(str(e)[:240]))\n  results=[]\n  for visit in range(3):\n    if visit==0:\n      response=page.goto(\"http://127.0.0.1:3000/?preview=reload-shuffle\",wait_until=\"domcontentloaded\",timeout=70000)\n    else:\n      response=page.reload(wait_until=\"domcontentloaded\",timeout=70000)\n    page.wait_for_selector(\".home-arrivals__rail[aria-busy='false']\",timeout=38000)\n    page.wait_for_selector(\".bogo-rail[aria-busy='false']\",timeout=38000)\n    page.wait_for_selector(\".glass-offers-home__viewport[aria-busy='false']\",timeout=38000)\n    page.wait_for_timeout(750)\n    row=page.evaluate(\"\"\"()=> {\n      const read=(selector,attribute,n=6)=>Array.from(document.querySelectorAll(selector)).slice(0,n).map(x=>attribute==='href'?x.getAttribute('href'):x.getAttribute(attribute));\n      const sale=Array.from(document.querySelectorAll('.home-sale-products--vertical')).slice(0,4).map(x=>Array.from(x.querySelectorAll('a[href^=\"/product/\"]')).slice(0,4).map(y=>y.getAttribute('href')));\n      return {\n        mega:read('.glass-offers-home__group[data-loop-original] article[data-product-id]','data-product-id',8),\n        bogo:read('.bogo-rail__group[data-loop-original] article[data-bogo-id]','data-bogo-id',8),\n        arrivals:read('.home-arrivals__rail > div a[href^=\"/product/\"]','href',8),\n        sale:sale,\n        category:read('[data-home-category-rail] > div a[href^=\"/product/\"]','href',8),\n        headers:read('.home-arrivals .collection-banner-photo','data-banner-product',2),\n        ready:{\n          mega:document.querySelector('.glass-offers-home__viewport')?.getAttribute('aria-busy'),\n          bogo:document.querySelector('.bogo-rail')?.getAttribute('aria-busy'),\n          arrivals:document.querySelector('.home-arrivals__rail')?.getAttribute('aria-busy'),\n        },\n        familyBannerCount:document.querySelectorAll('.home-prime-family-banner').length,\n      };\n    }\"\"\")\n    row[\"visit\"]=visit\n    row[\"http\"]=response.status if response else 0\n    results.append(row)\n  print(json.dumps({\"visits\":results,\"errors\":errors[:6]},ensure_ascii=True),flush=True)\n  context.close()\n  browser.close()\n";
-  const out=spawnSync('python',['-c',script],{cwd:root,encoding:'utf8',windowsHide:true,shell:false,timeout:130000,maxBuffer:52000});
-  assert.equal(out.status,0,String(out.stderr||out.error?.message||out.stdout||'').slice(-1800));
-  const report=JSON.parse(String(out.stdout||'').trim().split(/\\r?\\n/).at(-1));
+  const script="from playwright.sync_api import sync_playwright\nimport json\nwith sync_playwright() as p:\n  browser=p.chromium.launch(channel=\"chrome\",headless=True,args=[\"--disable-extensions\",\"--no-first-run\"])\n  c=browser.new_context(viewport={\"width\":393,\"height\":852},is_mobile=True,has_touch=True)\n  page=c.new_page()\n  errors=[]\n  page.on(\"pageerror\",lambda e: errors.append(str(e)[:240]))\n  snapshots=[]\n  for n in range(3):\n    response=(page.goto(\"http://127.0.0.1:3000/?preview=real-visible-shuffle\",wait_until=\"domcontentloaded\",timeout=80000)\n      if n==0 else page.reload(wait_until=\"domcontentloaded\",timeout=80000))\n    for selector in [\".glass-offers-home__viewport[aria-busy='false']\",\n       \".bogo-rail[aria-busy='false']\",\".home-arrivals__rail[aria-busy='false']\"]:\n      page.wait_for_selector(selector,timeout=40000)\n    page.wait_for_timeout(650)\n    entry=page.evaluate(\"\"\"() => {\n      const card=(node,id)=>{\n        const img=node?.querySelector('img');\n        return {id:id||node?.querySelector('a[href^=\"/product/\"]')?.getAttribute('href')||'',\n          alt:img?.alt||'',src:img?.getAttribute('src')||''};\n      };\n      const collect=(sel,attr) => Array.from(document.querySelectorAll(sel))\n          .slice(0,5).map(el=>card(el,el.getAttribute(attr)));\n      const orig=Array.from(document.querySelectorAll('.home-arrivals__rail > div'));\n      const copied=orig.findIndex(el=>el.hasAttribute('data-loop-copy'));\n      const originalArrivals=copied>0?orig.slice(0,copied):orig.slice(0,16);\n      const category=document.querySelector('[data-home-category-rail]');\n      return {\n        mega:collect('.glass-offers-home__group[data-loop-original] article[data-product-id]','data-product-id'),\n        bogo:collect('.bogo-rail__group[data-loop-original] article[data-bogo-id]','data-bogo-id'),\n        arrivals:originalArrivals.slice(0,5).map(el=>card(el)),\n        category:category?Array.from(category.children).slice(0,5).map(el=>card(el)):[],\n        sale:Array.from(document.querySelectorAll('.home-sale-home--vertical .home-sale-products--vertical'))\n             .slice(0,3).map(grid=>Array.from(grid.querySelectorAll('.home-product')).slice(0,4)\n                .map(el=>card(el))),\n        ready:[\n          document.querySelector('.glass-offers-home__viewport')?.getAttribute('aria-busy'),\n          document.querySelector('.bogo-rail')?.getAttribute('aria-busy'),\n          document.querySelector('.home-arrivals__rail')?.getAttribute('aria-busy')],\n        familyBanner:document.querySelectorAll('.home-prime-family-banner').length,\n      };\n    }\"\"\")\n    entry[\"visit\"]=n\n    entry[\"http\"]=response.status if response else 0\n    snapshots.append(entry)\n  print(json.dumps({\"visits\":snapshots,\"errors\":errors[:6]},ensure_ascii=True),flush=True)\n  c.close()\n  browser.close()\n";
+  const out=spawnSync('python',['-c',script],{
+    cwd:root,encoding:'utf8',windowsHide:true,shell:false,timeout:165000,maxBuffer:95000,
+  });
+  assert.equal(out.status,0,String(out.stderr||out.error?.message||out.stdout||'').slice(-1500));
+  const report=JSON.parse(String(out.stdout||'').trim().split(/\r?\n/).at(-1));
   console.log('RELOAD_PRODUCT_AUDIT '+JSON.stringify(report));
   assert.equal(report.visits.length,3);
-  assert.ok(report.visits.every(x=>x.http===200 && x.ready.arrivals==='false' && x.ready.bogo==='false' && x.ready.mega==='false'));
-  assert.ok(report.visits.every(x=>x.familyBannerCount===0));
-  assert.ok(report.visits.every(v=>v.arrivals.length>1),'New Arrivals must expose multiple real cards in browser');
+  assert.deepEqual(report.errors,[]);
+  assert.ok(report.visits.every(x=>x.http===200&&x.ready.every(v=>v==='false')));
+  assert.ok(report.visits.every(x=>x.familyBanner===0));
   for(const key of ['mega','bogo','arrivals','category']){
-    const items=report.visits.map(v=>v[key]);
-    if(items.every(list=>list.length>1)){
-      assert.notEqual(items[0][0],items[1][0],key+' first product must change on refresh 1');
-      assert.notEqual(items[1][0],items[2][0],key+' first product must change on refresh 2');
+    const seq=report.visits.map(v=>v[key]);
+    if(key==='arrivals')assert.ok(seq.every(v=>v.length>1),'New Arrivals must have visible products');
+    if(!seq.every(v=>v.length>1))continue;
+    assert.notEqual(seq[0][0].id,seq[1][0].id,key+' first visible ID repeated after reload');
+    assert.notEqual(seq[1][0].id,seq[2][0].id,key+' first visible ID repeated again');
+    const differentVisuals=new Set(seq[0].map(card=>card.alt)).size>1;
+    if(differentVisuals){
+      assert.notEqual(seq[0][0].alt,seq[1][0].alt,key+' first visible IMAGE/title repeated');
+      assert.notEqual(seq[1][0].alt,seq[2][0].alt,key+' first visible IMAGE/title repeated again');
     }
   }
-  const sale=report.visits.map(v=>v.sale?.[0] || []);
-  if(sale.every(list=>list.length>1)){
-    assert.notEqual(sale[0][0],sale[1][0],'Sale Mela first recent item must change on refresh');
-    assert.notEqual(sale[1][0],sale[2][0],'Sale Mela shuffle must change every refresh');
+  const sales=report.visits.map(v=>v.sale[0]||[]);
+  if(sales.every(v=>v.length>1)){
+    assert.notEqual(sales[0][0].id,sales[1][0].id,'Sale Mela first visible product not shuffled');
+    assert.notEqual(sales[1][0].id,sales[2][0].id,'Sale Mela first visible product not shuffled again');
   }
 });

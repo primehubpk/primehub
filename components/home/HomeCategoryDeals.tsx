@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, type RefObject } from 'react';
+import { useEffect, useRef, useState, type RefObject } from 'react';
 import { categoryHref, productMatchesCategory } from '@/lib/categoryUtils';
 import { normalizeImageUrl } from '@/lib/imageUrl';
 import { HomeProductCard } from '@/components/home/HomeCollections';
@@ -16,13 +16,27 @@ function MovingCategoryProductRail({ products, railRef, namespace }: {
   railRef: RefObject<HTMLDivElement | null>;
 }) {
   // OWNER LOCK: one full-size horizontal row through the entire category.
-  const { items: loopProducts, ready } = useVisitProductOrder(products, namespace, railRef);
+  const { items: allProducts, ready } = useVisitProductOrder(products, namespace, railRef);
+  // 20+ category sections must not hydrate every card twice on page refresh.
+  // Start with one compact tranche and stream the rest as that rail is swiped.
+  const [visibleCount, setVisibleCount] = useState(12);
+  useEffect(() => setVisibleCount(12), [namespace, products.length]);
+  const loopProducts = allProducts.slice(0, visibleCount);
   useContinuousHomeRail(railRef, { itemCount: loopProducts.length, speed: 23, startDelayMs: 8000 });
+  const revealMore = (rail: HTMLDivElement) => {
+    if (visibleCount >= allProducts.length) return;
+    const copy = rail.querySelector<HTMLElement>('[data-loop-copy]');
+    const boundary = copy?.offsetLeft ?? rail.scrollWidth / 2;
+    if (rail.scrollLeft + rail.clientWidth * 2 >= boundary) {
+      setVisibleCount((count) => Math.min(allProducts.length, count + 12));
+    }
+  };
 
   return <div
     ref={railRef}
     data-home-category-rail
     aria-busy={!ready}
+    onScroll={(event) => revealMore(event.currentTarget)}
     className="overflow-x-auto px-4 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
     style={{
       display: 'grid',

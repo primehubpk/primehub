@@ -1263,6 +1263,8 @@
   display:flex;
   align-items:center;
   justify-content:center;
+  flex-direction:column;
+  gap:8px;
   min-height:42px;
   margin:5px 0;
   padding:8px;
@@ -1282,4 +1284,19 @@
 }
 .home-sale-home--vertical .home-sale-wholesale-frame {
   margin-top:18px;
+}
+.home-sale-home--vertical .home-sale-progress__more {
+  width:min(100%,290px);
+  min-height:42px;
+  padding:10px 15px;
+  color:#fff;
+  background:#0e6a5e;
+  border-radius:10px;
+  font-size:12px;
+  font-weight:850;
+  cursor:pointer;
+}
+.home-sale-home--vertical .home-sale-progress__more:focus-visible {
+  outline:3px solid #d9a643;
+  outline-offset:3px;
 }
