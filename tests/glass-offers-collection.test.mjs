@@ -534,3 +534,33 @@ test('real Chrome reload changes the FIRST VISIBLE product images on each fresh 
     assert.notEqual(sales[1][0].id,sales[2][0].id,'Sale Mela first visible product not shuffled again');
   }
 });
+
+test('first HTML paint uses per-request server visit ordering and distinct dedicated offer pages', async () => {
+  const read = name => fs.readFile(path.join(root, name), 'utf8');
+  const [page, client, visit, shuffle, category, shop, arrivals, offerPage, offerLanding, share, sitemap, bogo] = await Promise.all([
+    read('app/page.tsx'), read('components/HomePageClient.tsx'), read('lib/useVisitProductOrder.ts'),
+    read('lib/shuffleProducts.ts'), read('lib/categoryUtils.ts'),
+    read('components/shop/useShopCatalog.ts'), read('components/NewArrivalsRail.tsx'),
+    read('app/deals/glass-bangles/page.tsx'), read('components/home/GlassOffersLanding.tsx'),
+    read('components/ProductShareButton.tsx'), read('app/sitemap.ts'), read('app/deals/bogo/page.tsx'),
+  ]);
+  assert.match(page, /export const dynamic = 'force-dynamic'/);
+  assert.doesNotMatch(page, /export const revalidate = 21600/);
+  assert.match(page, /randomBytes\(4\)\.readUInt32LE\(0\)/);
+  assert.match(page, /previousFirst=\{previousFirst\}/);
+  assert.match(client, /<HomeVisitProvider seed=\{visitSeed\} previous=\{previousFirst\}>/);
+  assert.match(visit, /bootstrap \? \{ seed: bootstrap\.seed, previous: bootstrap\.previous\[namespace\]/);
+  assert.match(visit, /if \(active && !activeRef\.current && !bootstrap\) enter\(\)/);
+  assert.ok(visit.includes('document.cookie = '));
+  assert.match(shuffle, /namespace\.includes\('new-arrivals'\) \? 12 : 24/);
+  assert.match(category, /isExclusiveGlassDealProduct\(product\) \|\| isBogoProduct\(product\)/);
+  assert.match(shop, /!isBogoProduct\(p\)/);
+  assert.match(arrivals, /!isBogoProduct\(p\)/);
+  assert.doesNotMatch(offerPage, /redirect\('\/deals'\)/);
+  assert.match(offerPage, /activePath="\/deals\/glass-bangles"/);
+  assert.match(offerLanding, /activePath = '\/deals'/);
+  assert.match(share, /'\/deals\/glass-bangles'/);
+  assert.match(bogo, /<BogoDeals products=\{snapshot\.products\} landing\/>/);
+  assert.match(sitemap, /'\/deals\/glass-bangles'/);
+  assert.match(sitemap, /'\/deals\/bogo'/);
+});

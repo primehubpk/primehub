@@ -16,12 +16,13 @@ const categoryKey = (product: Product, categories: Category[]) => {
   const found = categories.find(item => item.id === id || item.id === product.category || item.title.trim().toLowerCase() === name);
   return found?.id || name || id;
 };
-export default function GlassOffersLanding({ products, config, categories = [] }: {
+export default function GlassOffersLanding({ products, config, categories = [], activePath = '/deals', headingOverride }: {
   products: Product[]; config?: Partial<GlassOfferSettings> | null; categories?: Category[];
+  activePath?: '/deals' | '/deals/glass-bangles'; headingOverride?: string;
 }) {
   const settings = resolveGlassOffers(config);
   const resolvedOffers = useMemo(() => resolveGlassOfferProducts(products, config), [products, config]);
-  const offers = useVisitShuffled(resolvedOffers, 'mega-page', '/deals');
+  const offers = useVisitShuffled(resolvedOffers, 'mega-page', activePath);
   const [category, setCategory] = useState('all');
   const [maxPrice, setMaxPrice] = useState('');
   const [sort, setSort] = useState('featured');
@@ -45,8 +46,8 @@ export default function GlassOffersLanding({ products, config, categories = [] }
     return visible;
   }, [offers, category, maxPrice, sort, search, categories]);
   return <>
-    <MegaDealsHero offers={offers} heading={settings.heading} subtitle={settings.subtitle} landing />
-    <div className="mt-3 flex justify-end"><ProductShareButton path="/deals" title="Mega Deals" showLabel className="inline-flex items-center gap-2 rounded-full border border-[#d7c28e] bg-white px-4 py-2 text-xs font-bold text-[#0f6a5f]"/></div>
+    <MegaDealsHero offers={offers} heading={headingOverride || settings.heading} subtitle={settings.subtitle} landing />
+    <div className="mt-3 flex justify-end"><ProductShareButton path={activePath} title={headingOverride || 'Mega Deals'} showLabel className="inline-flex items-center gap-2 rounded-full border border-[#d7c28e] bg-white px-4 py-2 text-xs font-bold text-[#0f6a5f]"/></div>
     <label className="mega-deals-search"><Search size={18} aria-hidden="true" /><span className="sr-only">Search deals</span><input type="search" value={search} onChange={event => setSearch(event.target.value)} placeholder="Find your favourite deal…" /></label>
     <div className="mega-deals-categories" aria-label="Filter deals by category">
       <button type="button" aria-pressed={category === 'all'} onClick={() => setCategory('all')}>All deals</button>

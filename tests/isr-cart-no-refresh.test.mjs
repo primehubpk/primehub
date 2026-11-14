@@ -76,8 +76,9 @@ test('global Buy Now after picking real variants uses client-side checkout navig
   assert.match(source, /normalizeProductVariants\(product\)/);
 });
 
-test('homepage ISR fallback is six hours while admin invalidation stays intact', () => {
-  assert.match(read('app/page.tsx'), /export const revalidate = 21600/);
+test('homepage HTML varies per request while catalog snapshots and admin invalidation stay cached', () => {
+  assert.match(read('app/page.tsx'), /export const dynamic = 'force-dynamic'/);
+  assert.match(read('app/page.tsx'), /const visitSeed = randomBytes\(4\)/);
   assert.match(read('app/api/admin/big-deal/route.ts'), /revalidateTag\('storefront-settings'/);
   assert.match(read('lib/publicCatalogServer.ts'), /tags: \['public-catalog', 'storefront-settings'\]/);
   const config = JSON.parse(read('vercel.json'));

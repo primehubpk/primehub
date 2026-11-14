@@ -10,6 +10,8 @@ const staticRoutes = [
   SALE_MELA_ROUTE,
   '/new-arrivals',
   '/deals',
+  '/deals/glass-bangles',
+  '/deals/bogo',
   '/weekly-deals',
   '/skills',
   '/rewards',

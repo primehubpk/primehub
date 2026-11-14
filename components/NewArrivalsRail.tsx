@@ -17,6 +17,7 @@ import { imageCandidatesOf, imageOf, originalOf, priceOf, productHasVariants, ti
 import { isDirectStorefrontImage } from '@/lib/imageUrl';
 import { isWholesaleProduct } from '@/lib/wholesale';
 import { isExclusiveGlassDealProduct } from '@/lib/glassOffers';
+import { isBogoProduct } from '@/lib/bogoOffers';
 import { makeTikTokContent, trackTikTokEvent } from '@/lib/tiktokPixel';
 import { getVerifiedDealProduct } from '@/lib/verifiedDealProduct';
 import '@/components/home/NewArrivalsPremium.css';
@@ -28,7 +29,7 @@ function timeOf(p: Product) {
 
 export function newestFirst(products: Product[], includeWholesale = false) {
   return [...products]
-    .filter((p) => p.published !== false && !isExclusiveGlassDealProduct(p) && (includeWholesale || !isWholesaleProduct(p)))
+    .filter((p) => p.published !== false && !isExclusiveGlassDealProduct(p) && !isBogoProduct(p) && (includeWholesale || !isWholesaleProduct(p)))
     .sort((a, b) => timeOf(b) - timeOf(a) || b.id.localeCompare(a.id));
 }
 

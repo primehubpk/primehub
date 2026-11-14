@@ -116,7 +116,9 @@ export function recentProductsForVisit<T>(items: readonly T[], seed: number, nam
   const id = (item: T) => String((product(item) as { id?: unknown })?.id || '');
   const dated = [...items].filter(item => productTime(product(item)) > 0)
     .sort((a, b) => productTime(product(b)) - productTime(product(a)) || id(a).localeCompare(id(b)));
-  const recent = dated.slice(0, Math.min(24, Math.max(2, Math.ceil(items.length / 4))));
+  // New Arrivals rotates the very latest 12, not a wide stale 24-item pool.
+  const freshLimit = namespace.includes('new-arrivals') ? 12 : 24;
+  const recent = dated.slice(0, Math.min(freshLimit, Math.max(2, Math.ceil(items.length / 4))));
   const recentIds = new Set(recent.map(id));
   const result = [...shuffleForVisit(recent, seed, namespace + ':new'),
     ...shuffleForVisit(items.filter(item => !recentIds.has(id(item))), seed, namespace + ':rest')];

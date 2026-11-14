@@ -1,5 +1,6 @@
 'use client';
 import { useMemo, useRef } from 'react';
+import Link from 'next/link';
 import type { Product } from '@/lib/types';
 import { resolveGlassOfferProducts, type GlassOfferSettings } from '@/lib/glassOffers';
 import { useSettings } from '@/lib/useSettings';
@@ -24,6 +25,7 @@ export default function HomeGlassOfferRail({ products, settings: supplied }: { p
   if (!offers.length) return null;
   return <section id="mega-deals" className="glass-offers-home" aria-label="Mega Deals from every category">
     <MegaDealsHero offers={offers} heading={config?.heading} subtitle={config?.subtitle} controls={<CollectionBannerActions path="/deals" title="Mega Deals" shareClassName="mega-deals-hero__share" onPrevious={() => move(-1)} onNext={() => move(1)}/>} />
+    <div className="mx-3 mb-2 flex justify-end"><Link href="/deals/glass-bangles" className="rounded-full bg-[#125747] px-4 py-2 text-xs font-bold text-white">70% Deal Collection — View All</Link></div>
     <div ref={railRef} aria-busy={!ready} className="glass-offers-home__viewport" role="region" aria-label="Swipe to explore all deals" tabIndex={0}>
       <div className="glass-offers-home__marquee">
         {[0, 1].map(copy => <div key={copy} className="glass-offers-home__group" data-loop-original={copy === 0 ? '' : undefined} data-loop-copy={copy === 1 ? '' : undefined}>

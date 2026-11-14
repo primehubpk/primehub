@@ -40,9 +40,12 @@ import type { Product } from "@/components/shop/ShopTypes";
 import { CATALOG_REFRESH_EVENT } from "@/lib/catalogRefreshSignal";
 import { fetchPublicStorefront, invalidatePublicStorefront } from "@/lib/storefrontClient";
 import { isBogoProduct } from '@/lib/bogoOffers';
+import { HomeVisitProvider } from '@/lib/useVisitProductOrder';
 import { isExclusiveGlassDealProduct } from "@/lib/glassOffers";
 
 type Props = {
+  visitSeed: number;
+  previousFirst: Record<string, string>;
   initialProducts: Product[];
   initialCategories: Category[];
   initialSettings: Partial<SiteSettings>;
@@ -55,6 +58,8 @@ const RECOVERY_DELAYS_MS = [0];
 const BACKGROUND_REFRESH_INTERVAL_MS = 5 * 60_000;
 
 export default function HomePageClient({
+  visitSeed,
+  previousFirst,
   initialProducts,
   initialCategories,
   initialSettings,
@@ -242,6 +247,7 @@ export default function HomePageClient({
   };
 
   return (
+    <HomeVisitProvider seed={visitSeed} previous={previousFirst}>
     <SettingsProvider initialSettings={initialSettings}>
       <div ref={keptHome.frameRef} className="relative" data-ph-home-frame="1">
       <div
@@ -348,5 +354,6 @@ export default function HomePageClient({
       </div>
       </div>
     </SettingsProvider>
+    </HomeVisitProvider>
   );
 }

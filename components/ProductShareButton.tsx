@@ -8,7 +8,7 @@ type Props = {
   title: string;
   className?: string;
   showLabel?: boolean;
-} & ({ productId: string; path?: never } | { path: '/deals' | '/deals/bogo' | '/new-arrivals' | '/wholesale-video-hub' | '/skills' | '/primehubmall/salemela' | `/primehubmall/salemela#${string}` | `/category/${string}`; productId?: never });
+} & ({ productId: string; path?: never } | { path: '/deals' | '/deals/glass-bangles' | '/deals/bogo' | '/new-arrivals' | '/wholesale-video-hub' | '/skills' | '/primehubmall/salemela' | `/primehubmall/salemela#${string}` | `/category/${string}`; productId?: never });
 
 export default function ProductShareButton({ productId, path, title, className = '', showLabel = false }: Props) {
   const [copied, setCopied] = useState(false);
