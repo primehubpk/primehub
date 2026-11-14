@@ -365,3 +365,25 @@ test('Prime Family has a visible guest-facing section before its dashboard is hy
   assert.match(categories, /<HomeCategoryDeals products=\{products\} categories=\{categories\} \/>/);
   assert.doesNotMatch(categories, /new IntersectionObserver\(/);
 });
+
+test('homepage has unique shopping blocks and one reachable Prime Family dashboard', async () => {
+  const home = await fs.readFile(path.join(root, 'components/HomePageClient.tsx'), 'utf8');
+  const once = [
+    '<CategorySwiper', '<HomeGlassOfferRail', '<BogoDeals', '<NewArrivalsRail',
+    '<HomePrimeSkills', '<HomeWholesaleVideos', '<HomeCategoryDealsLazy',
+    '<SkillsShowcase', '<HomeCollections', '<HomePrimeFamilyLazy',
+  ];
+  for (const tag of once) {
+    assert.equal(home.split(tag).length - 1, 1, `Only one ${tag} should be mounted on home`);
+  }
+  assert.doesNotMatch(home, /<HomeDiscoverDealsLazy/);
+  assert.match(home, /href="#home-prime-family"/);
+  assert.equal(home.split('id="home-prime-family"').length - 1, 1);
+  assert.ok(home.indexOf('<HomeCollections') < home.indexOf('id="home-prime-family"'));
+  assert.ok(home.indexOf('id="home-prime-family"') < home.indexOf('<HomePrimeFamilyLazy'));
+  assert.ok(home.indexOf('<HomePrimeFamilyLazy') < home.indexOf('</main>'));
+  // Featured services near arrivals and the full services showcase lower on the
+  // page serve different navigation purposes; they must not each mount twice.
+  assert.ok(home.indexOf('<HomePrimeSkills') < home.indexOf('<HomeCategoryDealsLazy'));
+  assert.ok(home.indexOf('<HomeCategoryDealsLazy') < home.indexOf('<SkillsShowcase'));
+});

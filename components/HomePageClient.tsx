@@ -331,12 +331,25 @@ export default function HomePageClient({
             initialItems={initialSkills}
             initialPage={initialSkillsPage}
           />
+          {/* One shortcut, not a second Prime Family dashboard. The full
+              embedded Prime Family remains the final homepage section. */}
+          <div className="mx-4 my-3 rounded-2xl border border-[#D7C69F] bg-[#F6F1E8] px-4 py-3">
+            <a href="#home-prime-family" className="flex items-center justify-between gap-3 text-[#124F46]">
+              <span>
+                <span className="block text-sm font-black">Prime Family</span>
+                <span className="block text-xs text-[#5B6258]">Wallet, cashback aur rewards neeche dekhein</span>
+              </span>
+              <span aria-hidden="true" className="shrink-0 text-xl font-bold">↓</span>
+            </a>
+          </div>
           <HomeCollections
             products={regularProducts}
             onSelect={selectPrice}
             onWholesaleSelect={selectWholesale}
           />
-          <HomePrimeFamilyLazy initialSettings={initialSettings as Record<string, unknown>} />
+          <div id="home-prime-family" className="scroll-mt-20">
+            <HomePrimeFamilyLazy initialSettings={initialSettings as Record<string, unknown>} />
+          </div>
         </main>
         <YouTubeGuide />
         <Footer onWholesaleSelect={selectWholesale} />
