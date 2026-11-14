@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { usePathname } from 'next/navigation';
 import { recentProductsForVisit } from './shuffleProducts';
 
@@ -14,7 +14,9 @@ export function useVisitProductOrder<T>(items: readonly T[], namespace: string,
   const lead = useRef('');
   const [visit, setVisit] = useState<{ seed: number; previous: string } | null>(null);
   const storageKey = `ph-home-products-v1:${namespace}`;
-  useEffect(() => {
+  // Shuffle promptly on every fresh hydration, before the browser paints the
+  // hydrated page; SSR cards remain visible until JavaScript is ready.
+  useLayoutEffect(() => {
     const active = enabled && pathname === '/';
     const enter = () => {
       if (!active || performance.now() - lastEntry.current < 300) return;

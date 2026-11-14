@@ -264,7 +264,7 @@ test('Sale Mela and every product category reuse premium 3D banners with real co
   assert.ok(home.indexOf('<HomeWholesaleVideos') < home.indexOf('<HomeCollections'));
   assert.ok(home.indexOf('<HomeCategoryDealsLazy') < home.indexOf('<SkillsShowcase'));
   assert.ok(home.indexOf('<SkillsShowcase') < home.indexOf('<HomeCollections'));
-  assert.ok(home.indexOf('<HomeCollections') < home.indexOf('<HomePrimeFamilyLazy'));
+  assert.ok(home.indexOf('<HomePrimeFamilyLazy') < home.indexOf('<HomeCollections'));
   assert.equal((sale.match(/<Commerce3DBanner/g) || []).length, 1);
   assert.ok(sale.includes('onMove={direction => moveHomeSale(direction, anchor)}'));
   assert.ok(category.includes('Commerce3DBanner kind="category"'));
@@ -290,7 +290,7 @@ test('home Sale Mela ranges use shared clickable banners without duplicate brows
   assert.match(buckets, /amount === 999\) return \{ minInclusive: 999, maxExclusive: null \}/);
 });
 
-test('home Sale Mela and category trails have one full-size row through all products without changing standalone grids', async () => {
+test('home Sale Mela uses a full vertical grid while upper category trails stay horizontally swipeable', async () => {
   const [css, mega, category] = await Promise.all([
     'components/home/home.css',
     'components/home/glass-offers.css',
@@ -304,8 +304,12 @@ test('home Sale Mela and category trails have one full-size row through all prod
   assert.ok(category.includes("gridTemplateRows: 'repeat(1, auto)'"));
   assert.doesNotMatch(category, /products\.length % 2/);
   const sale = await fs.readFile(path.join(root, 'components/home/HomeCollections.tsx'), 'utf8');
-  assert.ok(sale.includes('const visibleProducts = standalone ? products.slice(0, limit) : visitProducts;'));
+  assert.ok(sale.includes('verticalHome ? visitProducts.slice(0, limit) : visitProducts'));
   assert.ok(sale.includes('gridTemplateRows: \"repeat(1, auto)\"'));
+  assert.ok(sale.includes('enabled: !standalone && !verticalHome'));
+  assert.ok(sale.includes("verticalHome ? { display: 'grid'"));
+  assert.ok(sale.includes('{(standalone || verticalHome) && limit < products.length'));
+  assert.match(css, /\.home-sale-home--vertical \.home-sale-products--vertical/);
   assert.ok(sale.includes('gridAutoColumns: "min(calc((100% - 10px) / 2), 208px)"'));
   assert.ok(category.includes("gridAutoColumns: 'min(calc((100% - 10px) / 2), 208px)'"));
   assert.match(css, /@media\(min-width:641px\)/);
@@ -340,9 +344,9 @@ test('empty or single-photo collections never invent imagery', () => {
   assert.deepEqual(selectBannerPreviews(['only', 'only', ''], 1, 'one', 'only'), ['only']);
 });
 
-test('homepage positions the sole Sale Mela after the lower Skills Showcase, with Prime Family last', async () => {
+test('homepage positions full Prime Family before the final vertical Sale Mela', async () => {
   const home = await fs.readFile(path.join(root, 'components/HomePageClient.tsx'), 'utf8');
-  const order = ['<HomeCategoryDealsLazy', '<SkillsShowcase', '<HomeCollections', '<HomePrimeFamilyLazy'];
+  const order = ['<HomeCategoryDealsLazy', '<SkillsShowcase', '<HomePrimeFamilyLazy', '<HomeCollections'];
   const indices = order.map(needle => home.indexOf(needle));
   assert.ok(indices.every(i => i >= 0), 'all four homepage sections are present');
   assert.deepEqual(indices, [...indices].sort((a, b) => a - b));
@@ -379,11 +383,52 @@ test('homepage has unique shopping blocks and one reachable Prime Family dashboa
   assert.doesNotMatch(home, /<HomeDiscoverDealsLazy/);
   assert.match(home, /href="#home-prime-family"/);
   assert.equal(home.split('id="home-prime-family"').length - 1, 1);
-  assert.ok(home.indexOf('<HomeCollections') < home.indexOf('id="home-prime-family"'));
+  assert.ok(home.indexOf('id="home-prime-family"') < home.indexOf('<HomeCollections'));
   assert.ok(home.indexOf('id="home-prime-family"') < home.indexOf('<HomePrimeFamilyLazy'));
-  assert.ok(home.indexOf('<HomePrimeFamilyLazy') < home.indexOf('</main>'));
+  assert.ok(home.indexOf('<HomePrimeFamilyLazy') < home.indexOf('<HomeCollections'));
+  assert.ok(home.indexOf('<HomeCollections') < home.indexOf('</main>'));
   // Featured services near arrivals and the full services showcase lower on the
   // page serve different navigation purposes; they must not each mount twice.
   assert.ok(home.indexOf('<HomePrimeSkills') < home.indexOf('<HomeCategoryDealsLazy'));
   assert.ok(home.indexOf('<HomeCategoryDealsLazy') < home.indexOf('<SkillsShowcase'));
+});
+
+test('homepage connects the full Prime Family before an unbounded vertical Sale Mela', async () => {
+  const [home, sale, css, commerce] = await Promise.all([
+    'components/HomePageClient.tsx', 'components/home/HomeCollections.tsx',
+    'components/home/home.css', 'components/home/HomeCommerceRails.tsx',
+  ].map(f => fs.readFile(path.join(root, f), 'utf8')));
+  assert.ok(home.indexOf('<HomePrimeFamilyLazy') < home.indexOf('<HomeCollections'));
+  assert.match(home, /<HomeCollections[\s\S]*?verticalHome/);
+  assert.equal((home.match(/<HomeCollections\b/g) || []).length, 1);
+  assert.match(sale, /verticalHome \? visitProducts\.slice\(0, limit\)/);
+  assert.match(sale, /\(standalone \|\| verticalHome\) && limit < products\.length/);
+  assert.match(sale, /enabled: !standalone && !verticalHome/);
+  assert.match(sale, /showArrows=\{!verticalHome\}/);
+  assert.match(sale, /standalone \|\| verticalHome \? visibleProducts\.map/);
+  assert.match(css, /\.home-sale-home--vertical \.home-sale-products--vertical/);
+  assert.match(css, /grid-auto-flow:row/);
+  assert.match(css, /grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
+  assert.match(commerce, /onPrevious=\{showArrows \?/);
+});
+
+test('each fresh homepage entry shuffles the newest items but retains all IDs', async () => {
+  const { recentProductsForVisit } = await import(previewShuffleUrl);
+  const items = Array.from({ length: 96 }, (_, i) => ({
+    id: 'item-' + i,
+    createdAt: new Date(Date.UTC(2026, 10, 14) - i * 60000).toISOString(),
+  }));
+  const first = recentProductsForVisit(items, 1201, 'new-arrivals-home');
+  const second = recentProductsForVisit(items, 1202, 'new-arrivals-home', first[0].id);
+  assert.equal(first.length, 96);
+  assert.equal(second.length, 96);
+  assert.equal(new Set(second.map(x => x.id)).size, 96);
+  assert.notEqual(first[0].id, second[0].id);
+  const topIds = new Set(items.slice(0, 24).map(x => x.id));
+  assert.ok(second.slice(0, 24).every(x => topIds.has(x.id)));
+  assert.deepEqual(second, recentProductsForVisit(items, 1202, 'new-arrivals-home', first[0].id));
+  const hook = await fs.readFile(path.join(root, 'lib/useVisitProductOrder.ts'), 'utf8');
+  assert.match(hook, /useLayoutEffect\(\(\) => \{\s*const active = enabled && pathname === '\/'/);
+  assert.match(hook, /setVisit\(\{ seed, previous \}\)/);
+  assert.match(hook, /localStorage\.setItem\(storageKey, firstId\)/);
 });

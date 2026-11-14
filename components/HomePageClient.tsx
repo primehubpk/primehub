@@ -342,14 +342,15 @@ export default function HomePageClient({
               <span aria-hidden="true" className="shrink-0 text-xl font-bold">↓</span>
             </a>
           </div>
-          <HomeCollections
-            products={regularProducts}
-            onSelect={selectPrice}
-            onWholesaleSelect={selectWholesale}
-          />
           <div id="home-prime-family" className="scroll-mt-20">
             <HomePrimeFamilyLazy initialSettings={initialSettings as Record<string, unknown>} />
           </div>
+          <HomeCollections
+            products={regularProducts}
+            verticalHome
+            onSelect={selectPrice}
+            onWholesaleSelect={selectWholesale}
+          />
         </main>
         <YouTubeGuide />
         <Footer onWholesaleSelect={selectWholesale} />

@@ -60,7 +60,7 @@ function skillDisplayPrice(item: PrimeSkillHomeItem) {
   return { value: base > 0 ? base : 0, prefix: "" };
 }
 
-export function Commerce3DBanner({ kind, title, href, images, railRef, onMove, iconImage, eyebrow }: {
+export function Commerce3DBanner({ kind, title, href, images, railRef, onMove, iconImage, eyebrow, showArrows = true }: {
   kind: 'wholesale' | 'skills' | 'sale' | 'category';
   title: string;
   href: '/wholesale-video-hub' | '/skills' | '/primehubmall/salemela' | `/primehubmall/salemela#${string}` | `/category/${string}`;
@@ -69,6 +69,7 @@ export function Commerce3DBanner({ kind, title, href, images, railRef, onMove, i
   onMove?: (direction: number) => void;
   iconImage?: string;
   eyebrow?: string;
+  showArrows?: boolean;
 }) {
   const previews = useVisitBannerImages(images, href);
   const Symbol = kind === 'wholesale' ? Package : kind === 'skills' ? Sparkles : kind === 'sale' ? Tags : LayoutGrid;
@@ -104,7 +105,7 @@ export function Commerce3DBanner({ kind, title, href, images, railRef, onMove, i
       <span className="sr-only">Browse all {title}</span>
     </Link>
     <CollectionBannerActions path={href} title={title}
-      onPrevious={() => move(-1)} onNext={() => move(1)}
+      onPrevious={showArrows ? () => move(-1) : undefined} onNext={showArrows ? () => move(1) : undefined}
       className="home-commerce-banner__controls" shareClassName="home-commerce-banner__share"/>
   </div>;
 }

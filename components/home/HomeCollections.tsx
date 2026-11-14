@@ -362,6 +362,7 @@ const HOME_GRID_PRODUCT_BATCH = 24;
 function ProgressiveHomeSaleProducts({
   products,
   standalone,
+  verticalHome = false,
   wholesale,
   href,
   label,
@@ -369,13 +370,14 @@ function ProgressiveHomeSaleProducts({
 }: {
   products: Product[];
   standalone: boolean;
+  verticalHome?: boolean;
   wholesale: boolean;
   href: string;
   label: string;
   cropImageEdges?: boolean;
 }) {
-  const initialLimit = standalone ? HOME_GRID_INITIAL_PRODUCTS : HOME_RAIL_INITIAL_PRODUCTS;
-  const batchSize = standalone ? HOME_GRID_PRODUCT_BATCH : HOME_RAIL_PRODUCT_BATCH;
+  const initialLimit = standalone || verticalHome ? HOME_GRID_INITIAL_PRODUCTS : HOME_RAIL_INITIAL_PRODUCTS;
+  const batchSize = standalone || verticalHome ? HOME_GRID_PRODUCT_BATCH : HOME_RAIL_PRODUCT_BATCH;
   const [limit, setLimit] = useState(initialLimit);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const movingRailRef = useRef<HTMLDivElement>(null);
@@ -386,7 +388,7 @@ function ProgressiveHomeSaleProducts({
   }, [initialLimit, products.length]);
 
   useEffect(() => {
-    if (!standalone || limit >= products.length) return;
+    if ((!standalone && !verticalHome) || limit >= products.length) return;
     const node = loadMoreRef.current;
     if (!node || typeof IntersectionObserver === "undefined") return;
 
@@ -401,19 +403,19 @@ function ProgressiveHomeSaleProducts({
 
     observer.observe(node);
     return () => observer.disconnect();
-  }, [batchSize, limit, products.length, standalone]);
+  }, [batchSize, limit, products.length, standalone, verticalHome]);
 
   // OWNER LOCK: every home product is reachable in one horizontal row.
   // Only the separate standalone page retains its existing progressive grid.
-  const visibleProducts = standalone ? products.slice(0, limit) : visitProducts;
+  const visibleProducts = standalone ? products.slice(0, limit) : verticalHome ? visitProducts.slice(0, limit) : visitProducts;
   const loopProducts = visibleProducts;
-  useContinuousHomeRail(movingRailRef, { enabled: !standalone, itemCount: loopProducts.length, speed: 24, startDelayMs: 8000 });
+  useContinuousHomeRail(movingRailRef, { enabled: !standalone && !verticalHome, itemCount: loopProducts.length, speed: 24, startDelayMs: 8000 });
 
   return (
     <div
       ref={movingRailRef}
-      className="home-sale-products [scrollbar-width:none]"
-      style={standalone ? standaloneGridStyle : {
+      className={`home-sale-products [scrollbar-width:none]${verticalHome ? " home-sale-products--vertical" : ""}`}
+      style={verticalHome ? { display: 'grid', gap: '10px', overflow: 'visible', paddingBottom: '8px' } : standalone ? standaloneGridStyle : {
         display: "grid",
         gridTemplateColumns: "none",
         gridAutoFlow: "column",
@@ -430,7 +432,7 @@ function ProgressiveHomeSaleProducts({
 
     >
       {visibleProducts.length ? (
-        (standalone ? visibleProducts.map((product, index) => ({ product, index, copy: 0 }))
+        (standalone || verticalHome ? visibleProducts.map((product, index) => ({ product, index, copy: 0 }))
           : (loopProducts.length > 1 ? [0, 1] : [0]).flatMap((copy) => loopProducts.map((product, index) => ({ product, index, copy })))).map(({ product, index, copy }) => (
           <div
             key={`${copy}:${index}:${product.id}`}
@@ -453,7 +455,7 @@ function ProgressiveHomeSaleProducts({
           </Link>
         </p>
       )}
-      {standalone && limit < products.length ? (
+      {(standalone || verticalHome) && limit < products.length ? (
         <div
           ref={loadMoreRef}
           aria-hidden="true"
@@ -468,10 +470,12 @@ export default function HomeCollections({
   products,
   standalone = false,
   embeddedHome = false,
+  verticalHome = false,
 }: {
   products: Product[];
   standalone?: boolean;
   embeddedHome?: boolean;
+  verticalHome?: boolean;
   onSelect?: (amount: number | null) => void;
   onWholesaleSelect?: () => void;
 }) {
@@ -512,7 +516,7 @@ export default function HomeCollections({
     <>
       {buckets.length > 0 && (
         <section
-          className={standalone ? "home-sale" : "home-sale home-sale-home"}
+          className={standalone ? "home-sale" : verticalHome ? "home-sale home-sale-home home-sale-home--vertical" : "home-sale home-sale-home"}
           aria-label="PrimeHubMall Sale Mela"
           ref={saleSectionRef}
         >
@@ -602,6 +606,7 @@ export default function HomeCollections({
               >
               {!standalone ? (
                 <Commerce3DBanner kind={wholesale ? 'wholesale' : 'sale'}
+                  showArrows={!verticalHome}
                   title={wholesale ? 'Wholesale Deals' : amount === 999 ? 'Rs. 999+' : saleMelaBucketLabel(amount)}
                   eyebrow={wholesale ? 'SALE MELA · WHOLESALE' : 'SALE MELA'}
                   href={bucketHref(bucket.amount ?? null, wholesale) as `/primehubmall/salemela#${string}`}
@@ -646,6 +651,7 @@ export default function HomeCollections({
                 <ProgressiveHomeSaleProducts
                   products={matches}
                   standalone={standalone}
+                  verticalHome={verticalHome}
                   wholesale={wholesale}
                   href={href}
                   label={`${bucket.title} products`}
