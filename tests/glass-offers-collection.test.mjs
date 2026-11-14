@@ -262,7 +262,9 @@ test('Sale Mela and every product category reuse premium 3D banners with real co
   );
   assert.ok(home.indexOf('<HomePrimeSkills') < home.indexOf('<HomeWholesaleVideos'));
   assert.ok(home.indexOf('<HomeWholesaleVideos') < home.indexOf('<HomeCollections'));
-  assert.ok(home.indexOf('<HomeCollections') < home.indexOf('<HomeCategoryDealsLazy'));
+  assert.ok(home.indexOf('<HomeCategoryDealsLazy') < home.indexOf('<SkillsShowcase'));
+  assert.ok(home.indexOf('<SkillsShowcase') < home.indexOf('<HomeCollections'));
+  assert.ok(home.indexOf('<HomeCollections') < home.indexOf('<HomePrimeFamilyLazy'));
   assert.equal((sale.match(/<Commerce3DBanner/g) || []).length, 1);
   assert.ok(sale.includes('onMove={direction => moveHomeSale(direction, anchor)}'));
   assert.ok(category.includes('Commerce3DBanner kind="category"'));
@@ -338,9 +340,9 @@ test('empty or single-photo collections never invent imagery', () => {
   assert.deepEqual(selectBannerPreviews(['only', 'only', ''], 1, 'one', 'only'), ['only']);
 });
 
-test('homepage shows one Sale Mela collection before Skills and Prime Family rather than loading a duplicate below', async () => {
+test('homepage positions the sole Sale Mela after the lower Skills Showcase, with Prime Family last', async () => {
   const home = await fs.readFile(path.join(root, 'components/HomePageClient.tsx'), 'utf8');
-  const order = ['<HomeCollections', '<HomeCategoryDealsLazy', '<SkillsShowcase', '<HomePrimeFamilyLazy'];
+  const order = ['<HomeCategoryDealsLazy', '<SkillsShowcase', '<HomeCollections', '<HomePrimeFamilyLazy'];
   const indices = order.map(needle => home.indexOf(needle));
   assert.ok(indices.every(i => i >= 0), 'all four homepage sections are present');
   assert.deepEqual(indices, [...indices].sort((a, b) => a - b));

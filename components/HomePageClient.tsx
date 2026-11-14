@@ -268,11 +268,6 @@ export default function HomePageClient({
           />
           <HomePrimeSkills initialItems={initialSkills} />
           <HomeWholesaleVideos />
-          <HomeCollections
-            products={regularProducts}
-            onSelect={selectPrice}
-            onWholesaleSelect={selectWholesale}
-          />
           <HomeCategoryDealsLazy products={regularProducts} categories={categories} />
           <div id="discover-deals-section">
             {(selectedMaxPrice !== null || wholesaleSelected) && (
@@ -335,6 +330,11 @@ export default function HomePageClient({
             embedded
             initialItems={initialSkills}
             initialPage={initialSkillsPage}
+          />
+          <HomeCollections
+            products={regularProducts}
+            onSelect={selectPrice}
+            onWholesaleSelect={selectWholesale}
           />
           <HomePrimeFamilyLazy initialSettings={initialSettings as Record<string, unknown>} />
         </main>
