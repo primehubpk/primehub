@@ -356,18 +356,25 @@ test('homepage positions full Prime Family before the final vertical Sale Mela',
   assert.match(home, /<HomePrimeFamilyLazy initialSettings=/);
 });
 
-test('Prime Family has a visible guest-facing section before its dashboard is hydrated', async () => {
-  const family = await fs.readFile(path.join(root, 'components/home/HomePrimeFamilyLazy.tsx'), 'utf8');
-  const categories = await fs.readFile(path.join(root, 'components/home/HomeCategoryDealsLazy.tsx'), 'utf8');
-  assert.match(family, /function PrimeFamilyPreview\(/);
+test('Prime Family uses one 3D banner and the real full dashboard without a second preview card', async () => {
+  const [family, css, dashboard, categories] = await Promise.all([
+    'components/home/HomePrimeFamilyLazy.tsx',
+    'components/home/HomeCommerceRails.css',
+    'components/reseller/PrimeFamilyDashboard.tsx',
+    'components/home/HomeCategoryDealsLazy.tsx',
+  ].map(name => fs.readFile(path.join(root, name), 'utf8')));
+  assert.match(family, /export function HomePrimeFamilyBanner\(/);
+  assert.match(family, /home-commerce-banner--family/);
+  assert.match(family, /href="#prime-family-dashboard"/);
+  assert.match(family, /function PrimeFamilyLoading\(/);
+  assert.doesNotMatch(family, /PrimeFamilyPreview|IntersectionObserver/);
+  assert.match(family, /<PrimeFamilyDashboard embedded initialSettings=\{initialSettings\} \/>/);
   assert.match(family, /href="\/reseller\/dashboard"/);
-  assert.match(family, /<PrimeFamilyPreview \/>/);
-  assert.match(family, /<PrimeFamilyDashboard[\s\S]*?embedded/);
-  assert.match(family, /IntersectionObserver/);
-  assert.doesNotMatch(family, /min-h-\[1px\]/);
-  assert.doesNotMatch(family, /aria-hidden="true"/);
+  assert.match(css, /\.home-prime-family-banner/);
+  assert.match(css, /\.home-prime-family-banner__wheel-face/);
+  assert.match(dashboard, /<RewardWheel settings=\{wheel\}/);
+  assert.match(dashboard, /<PremiumSpinWheel prizes=\{prizes\}/);
   assert.match(categories, /<HomeCategoryDeals products=\{products\} categories=\{categories\} \/>/);
-  assert.doesNotMatch(categories, /new IntersectionObserver\(/);
 });
 
 test('homepage has unique shopping blocks and one reachable Prime Family dashboard', async () => {
@@ -381,7 +388,9 @@ test('homepage has unique shopping blocks and one reachable Prime Family dashboa
     assert.equal(home.split(tag).length - 1, 1, `Only one ${tag} should be mounted on home`);
   }
   assert.doesNotMatch(home, /<HomeDiscoverDealsLazy/);
-  assert.match(home, /href="#home-prime-family"/);
+  assert.match(home, /<HomePrimeFamilyBanner \/>/);
+  assert.match(home, /id="prime-family-dashboard"/);
+  assert.equal(home.split('<HomePrimeFamilyBanner').length - 1, 1);
   assert.equal(home.split('id="home-prime-family"').length - 1, 1);
   assert.ok(home.indexOf('id="home-prime-family"') < home.indexOf('<HomeCollections'));
   assert.ok(home.indexOf('id="home-prime-family"') < home.indexOf('<HomePrimeFamilyLazy'));
@@ -431,4 +440,31 @@ test('each fresh homepage entry shuffles the newest items but retains all IDs', 
   assert.match(hook, /useLayoutEffect\(\(\) => \{\s*const active = enabled && pathname === '\/'/);
   assert.match(hook, /setVisit\(\{ seed, previous \}\)/);
   assert.match(hook, /localStorage\.setItem\(storageKey, firstId\)/);
+});
+
+test('three final Sale Mela retail price ranges are complete, disjoint and have no maximum cap', async () => {
+  const source = await fs.readFile(path.join(root, 'lib/priceBucketUtils.ts'), 'utf8');
+  const { matchesSaleMelaBucket, saleMelaPriceRange } = await import(
+    'data:text/javascript;charset=utf-8,' + encodeURIComponent(compile(source))
+  );
+  const amounts = [99, 299, 999];
+  const checks = [
+    [1, 99], [10, 99], [98, 99], [99, 99], [298, 99],
+    [299, 299], [300, 299], [998, 299],
+    [999, 999], [1000, 999], [2499, 999], [19999, 999], [999999, 999],
+  ];
+  for (const [price, expected] of checks) {
+    const actual = amounts.filter(amount => matchesSaleMelaBucket(price, amount));
+    assert.deepEqual(actual, [expected], 'price ' + price + ' should appear in exactly one bucket');
+  }
+  assert.deepEqual(amounts.filter(amount => matchesSaleMelaBucket(0, amount)), []);
+  assert.deepEqual(saleMelaPriceRange(99), { minInclusive: 1, maxExclusive: 299 });
+  assert.deepEqual(saleMelaPriceRange(299), { minInclusive: 299, maxExclusive: 999 });
+  assert.deepEqual(saleMelaPriceRange(999), { minInclusive: 999, maxExclusive: null });
+
+  const sale = await fs.readFile(path.join(root, 'components/home/HomeCollections.tsx'), 'utf8');
+  assert.match(sale, /if \(verticalHome && wholesale\) return null/);
+  assert.match(sale, /const matches = verticalHome[\s\S]*?\? baseMatches/);
+  assert.match(sale, /matchesSaleMelaBucket\(price, amount\)/);
+  assert.match(sale, /\(standalone \|\| verticalHome\) && limit < products.length/);
 });

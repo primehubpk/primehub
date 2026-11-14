@@ -528,6 +528,9 @@ export default function HomeCollections({
 
           {buckets.map((bucket) => {
             const wholesale = isWholesalePriceBucket(bucket);
+            // Home's final Sale Mela has three complete retail price tiers.
+            // Wholesale packs retain their dedicated section above.
+            if (verticalHome && wholesale) return null;
             const amount = Number(bucket.amount || 0);
             const anchor = bucketAnchor(bucket.amount ?? null, wholesale);
             const href = standalone
@@ -546,16 +549,20 @@ export default function HomeCollections({
                       : matchesPriceBucket(price, buckets, amount);
                   }),
                 );
-            const matches = standalone
-              ? wholesale
-                ? shuffleWithNewArrivalPriority(baseMatches, saleShuffleSeed)
-                : baseMatches
-              : buildHomeTwoRowProducts(
-                  baseMatches,
-                  amount,
-                  saleShuffleSeed,
-                  wholesale,
-                );
+            const matches = verticalHome
+              // Include all products in each range: Rs. 1–98 were previously
+              // dropped by the horizontal-only exact-price ordering helper.
+              ? baseMatches
+              : standalone
+                ? wholesale
+                  ? shuffleWithNewArrivalPriority(baseMatches, saleShuffleSeed)
+                  : baseMatches
+                : buildHomeTwoRowProducts(
+                    baseMatches,
+                    amount,
+                    saleShuffleSeed,
+                    wholesale,
+                  );
             const kidsMatches = standalone && wholesale
               ? shuffleWithNewArrivalPriority(
                   sortBySalePrice(kidsPacks),

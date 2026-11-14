@@ -2,18 +2,52 @@
 
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { useEffect, useRef, useState } from 'react';
+import { ChevronDown, Gift, UsersRound } from 'lucide-react';
+import './HomeCommerceRails.css';
 
-function PrimeFamilyPreview() {
+export function HomePrimeFamilyBanner() {
   return (
-    <div className="mx-3 my-3 rounded-[22px] border border-[#D7C69F] bg-[#F6F1E8] px-5 py-6 text-[#162E28] shadow-sm sm:mx-4">
-      <p className="text-[11px] font-extrabold uppercase tracking-[.14em] text-[#976E20]">PrimeHubMall</p>
-      <h2 className="mt-2 text-2xl font-black">Prime Family</h2>
-      <p className="mt-2 text-sm leading-6 text-[#5B6258]">
-        Apna wallet, cashback aur Prime Family benefits dekhein.
-      </p>
-      <Link href="/reseller/dashboard" className="mt-4 inline-flex rounded-xl bg-[#0F6658] px-5 py-3 text-sm font-extrabold text-white">
-        Prime Family Dekhein →
+    <div className="home-commerce-banner home-commerce-banner--family home-prime-family-banner" aria-label="Prime Family rewards collection">
+      <span className="home-commerce-banner__emblem" aria-hidden="true">
+        <UsersRound size={29} strokeWidth={1.9} />
+      </span>
+      <div className="home-commerce-banner__copy">
+        <span className="home-commerce-banner__eyebrow">PRIMEHUBMALL · MEMBERS</span>
+        <h2>Prime Family</h2>
+        <span className="home-commerce-banner__cta">Spin Wheel · Wallet · Cashback</span>
+      </div>
+      <div className="home-commerce-banner__photos home-prime-family-banner__photos" aria-hidden="true">
+        <span className="home-commerce-banner__photo home-prime-family-banner__wheel">
+          <span className="home-prime-family-banner__wheel-face" />
+        </span>
+        <span className="home-commerce-banner__photo home-prime-family-banner__gift">
+          <Gift size={28} strokeWidth={2} />
+        </span>
+      </div>
+      <a
+        href="#prime-family-dashboard"
+        className="home-commerce-banner__link"
+        aria-label="Prime Family full dashboard, Spin Wheel, wallet and rewards neeche dekhein"
+      >
+        <span className="sr-only">View the full Prime Family section below</span>
+      </a>
+      <div className="home-commerce-banner__controls home-prime-family-banner__controls" aria-hidden="true">
+        <span>Full Prime Family neeche dekhein</span>
+        <ChevronDown size={18} />
+      </div>
+    </div>
+  );
+}
+
+// A small loading state, not a duplicate Prime Family heading/card.
+// The real dashboard mounts immediately, including its Admin-driven wheel,
+// check-in, referral, wallet, tiers, tasks and gift sections.
+function PrimeFamilyLoading() {
+  return (
+    <div className="mx-4 my-3 rounded-2xl border border-[#e1d6ba] bg-[#F6F1E8] p-5 text-sm text-[#174F44]" role="status">
+      Prime Family rewards load ho rahe hain…
+      <Link href="/reseller/dashboard" className="mt-2 block font-bold underline underline-offset-2">
+        Prime Family page kholein
       </Link>
     </div>
   );
@@ -23,9 +57,7 @@ const PrimeFamilyDashboard = dynamic(
   () => import('@/components/reseller/PrimeFamilyDashboard'),
   {
     ssr: false,
-    loading: () => (
-      <PrimeFamilyPreview />
-    ),
+    loading: () => <PrimeFamilyLoading />,
   },
 );
 
@@ -34,40 +66,9 @@ export default function HomePrimeFamilyLazy({
 }: {
   initialSettings?: Record<string, unknown>;
 }) {
-  const ref = useRef<HTMLElement | null>(null);
-  const [ready, setReady] = useState(false);
-
-  useEffect(() => {
-    const node = ref.current;
-    if (!node || typeof IntersectionObserver === 'undefined') {
-      setReady(true);
-      return;
-    }
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((entry) => entry.isIntersecting)) {
-          setReady(true);
-          observer.disconnect();
-        }
-      },
-      { rootMargin: '1600px 0px' },
-    );
-
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, []);
-
   return (
-    <section ref={ref} className="home-prime-family-lazy">
-      {ready ? (
-        <PrimeFamilyDashboard
-          embedded
-          initialSettings={initialSettings}
-        />
-      ) : (
-        <PrimeFamilyPreview />
-      )}
+    <section className="home-prime-family-lazy" aria-label="Prime Family full dashboard">
+      <PrimeFamilyDashboard embedded initialSettings={initialSettings} />
     </section>
   );
 }
