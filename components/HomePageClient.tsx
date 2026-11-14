@@ -22,7 +22,7 @@ import SkillsShowcase, {
   type PageSettings as PrimeSkillsPageSettings,
   type SkillItem,
 } from "@/components/SkillsShowcase";
-import HomePrimeFamilyLazy, { HomePrimeFamilyBanner } from "@/components/home/HomePrimeFamilyLazy";
+import HomePrimeFamilyLazy from "@/components/home/HomePrimeFamilyLazy";
 import Footer from "@/components/Footer";
 import {
   cacheCatalogForNavigation,
@@ -332,7 +332,6 @@ export default function HomePageClient({
             initialPage={initialSkillsPage}
           />
           <div id="home-prime-family" className="scroll-mt-20">
-            <HomePrimeFamilyBanner />
             <div id="prime-family-dashboard" className="scroll-mt-20">
               <HomePrimeFamilyLazy initialSettings={initialSettings as Record<string, unknown>} />
             </div>

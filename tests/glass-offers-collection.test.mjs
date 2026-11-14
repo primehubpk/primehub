@@ -356,22 +356,19 @@ test('homepage positions full Prime Family before the final vertical Sale Mela',
   assert.match(home, /<HomePrimeFamilyLazy initialSettings=/);
 });
 
-test('Prime Family uses one 3D banner and the real full dashboard without a second preview card', async () => {
+test('Prime Family displays the real dashboard without a redundant top banner or loading card', async () => {
   const [family, css, dashboard, categories] = await Promise.all([
     'components/home/HomePrimeFamilyLazy.tsx',
     'components/home/HomeCommerceRails.css',
     'components/reseller/PrimeFamilyDashboard.tsx',
     'components/home/HomeCategoryDealsLazy.tsx',
   ].map(name => fs.readFile(path.join(root, name), 'utf8')));
-  assert.match(family, /export function HomePrimeFamilyBanner\(/);
-  assert.match(family, /home-commerce-banner--family/);
-  assert.match(family, /href="#prime-family-dashboard"/);
+  assert.doesNotMatch(family, /HomePrimeFamilyBanner|home-commerce-banner--family/);
   assert.match(family, /import PrimeFamilyDashboard from '@\/components\/reseller\/PrimeFamilyDashboard'/);
   assert.doesNotMatch(family, /PrimeFamilyPreview|PrimeFamilyLoading|next\/dynamic|IntersectionObserver/);
   assert.match(family, /<PrimeFamilyDashboard embedded initialSettings=\{initialSettings\} \/>/);
   assert.match(dashboard, /if \(loading && !embedded\)/);
-  assert.match(css, /\.home-prime-family-banner/);
-  assert.match(css, /\.home-prime-family-banner__wheel-face/);
+  assert.doesNotMatch(css, /\.home-prime-family-banner/);
   assert.match(dashboard, /<RewardWheel settings=\{wheel\}/);
   assert.match(dashboard, /<PremiumSpinWheel prizes=\{prizes\}/);
   assert.match(categories, /<HomeCategoryDeals products=\{products\} categories=\{categories\} \/>/);
@@ -388,9 +385,9 @@ test('homepage has unique shopping blocks and one reachable Prime Family dashboa
     assert.equal(home.split(tag).length - 1, 1, `Only one ${tag} should be mounted on home`);
   }
   assert.doesNotMatch(home, /<HomeDiscoverDealsLazy/);
-  assert.match(home, /<HomePrimeFamilyBanner \/>/);
+  assert.doesNotMatch(home, /<HomePrimeFamilyBanner/);
   assert.match(home, /id="prime-family-dashboard"/);
-  assert.equal(home.split('<HomePrimeFamilyBanner').length - 1, 1);
+  assert.equal(home.split('<HomePrimeFamilyLazy').length - 1, 1);
   assert.equal(home.split('id="home-prime-family"').length - 1, 1);
   assert.ok(home.indexOf('id="home-prime-family"') < home.indexOf('<HomeCollections'));
   assert.ok(home.indexOf('id="home-prime-family"') < home.indexOf('<HomePrimeFamilyLazy'));
@@ -489,7 +486,7 @@ test('local 393px Chrome actually renders Family and all Sale Mela tiers when pr
   const report=JSON.parse(last);
   console.log('LOCAL_MOBILE_AUDIT '+JSON.stringify(report));
   assert.equal(report.http,200);
-  assert.equal(report.banner,1);
+  assert.equal(report.banner,0);
   assert.equal(report.familyDashboard,true,'actual Prime Family dashboard must render, not loading fallback');
   assert.equal(report.loadingCard,false);
   assert.equal(report.ranges.length,4,'Three retail bands and separate wholesale');
@@ -502,4 +499,34 @@ test('local 393px Chrome actually renders Family and all Sale Mela tiers when pr
   if(report.progression)assert.ok(report.progression.after>report.progression.initial,'Scroll should load more products');
   assert.equal(report.finalCounts?.length,4,'All four sections must finish loading');
   assert.ok(report.finalCounts.every(n=>n>0),'Every final collection must finish with real products');
+});
+
+test('mobile Chrome reload audit compares real product IDs over three fresh visits', {timeout: 145000}, async t => {
+  if (process.platform !== 'win32') return t.skip('Windows-local browser only');
+  let response;
+  try { response=await fetch('http://127.0.0.1:3000/',{signal:AbortSignal.timeout(6500)}); }
+  catch { return t.skip('Local preview unavailable'); }
+  if (!response.ok) return t.skip('Preview returned non-200');
+  const {spawnSync}=await import('node:child_process');
+  const script="from playwright.sync_api import sync_playwright\nimport json\nwith sync_playwright() as p:\n  browser=p.chromium.launch(channel=\"chrome\",headless=True,args=[\"--disable-extensions\",\"--no-first-run\"])\n  context=browser.new_context(viewport={\"width\":393,\"height\":852},is_mobile=True,has_touch=True)\n  page=context.new_page()\n  errors=[]\n  page.on(\"pageerror\",lambda e:errors.append(str(e)[:240]))\n  results=[]\n  for visit in range(3):\n    if visit==0:\n      response=page.goto(\"http://127.0.0.1:3000/?preview=reload-shuffle\",wait_until=\"domcontentloaded\",timeout=70000)\n    else:\n      response=page.reload(wait_until=\"domcontentloaded\",timeout=70000)\n    page.wait_for_selector(\".home-arrivals__rail[aria-busy='false']\",timeout=38000)\n    page.wait_for_selector(\".bogo-rail[aria-busy='false']\",timeout=38000)\n    page.wait_for_selector(\".glass-offers-home__viewport[aria-busy='false']\",timeout=38000)\n    page.wait_for_timeout(750)\n    row=page.evaluate(\"\"\"()=> {\n      const read=(selector,attribute,n=6)=>Array.from(document.querySelectorAll(selector)).slice(0,n).map(x=>attribute==='href'?x.getAttribute('href'):x.getAttribute(attribute));\n      const sale=Array.from(document.querySelectorAll('.home-sale-products--vertical')).slice(0,4).map(x=>Array.from(x.querySelectorAll('a[href^=\"/product/\"]')).slice(0,4).map(y=>y.getAttribute('href')));\n      return {\n        mega:read('.glass-offers-home__group[data-loop-original] article[data-product-id]','data-product-id',8),\n        bogo:read('.bogo-rail__group[data-loop-original] article[data-bogo-id]','data-bogo-id',8),\n        arrivals:read('.home-arrivals__rail > div a[href^=\"/product/\"]','href',8),\n        sale:sale,\n        category:read('[data-home-category-rail] > div a[href^=\"/product/\"]','href',8),\n        headers:read('.home-arrivals .collection-banner-photo','data-banner-product',2),\n        ready:{\n          mega:document.querySelector('.glass-offers-home__viewport')?.getAttribute('aria-busy'),\n          bogo:document.querySelector('.bogo-rail')?.getAttribute('aria-busy'),\n          arrivals:document.querySelector('.home-arrivals__rail')?.getAttribute('aria-busy'),\n        },\n        familyBannerCount:document.querySelectorAll('.home-prime-family-banner').length,\n      };\n    }\"\"\")\n    row[\"visit\"]=visit\n    row[\"http\"]=response.status if response else 0\n    results.append(row)\n  print(json.dumps({\"visits\":results,\"errors\":errors[:6]},ensure_ascii=True),flush=True)\n  context.close()\n  browser.close()\n";
+  const out=spawnSync('python',['-c',script],{cwd:root,encoding:'utf8',windowsHide:true,shell:false,timeout:130000,maxBuffer:52000});
+  assert.equal(out.status,0,String(out.stderr||out.error?.message||out.stdout||'').slice(-1800));
+  const report=JSON.parse(String(out.stdout||'').trim().split(/\\r?\\n/).at(-1));
+  console.log('RELOAD_PRODUCT_AUDIT '+JSON.stringify(report));
+  assert.equal(report.visits.length,3);
+  assert.ok(report.visits.every(x=>x.http===200 && x.ready.arrivals==='false' && x.ready.bogo==='false' && x.ready.mega==='false'));
+  assert.ok(report.visits.every(x=>x.familyBannerCount===0));
+  assert.ok(report.visits.every(v=>v.arrivals.length>1),'New Arrivals must expose multiple real cards in browser');
+  for(const key of ['mega','bogo','arrivals','category']){
+    const items=report.visits.map(v=>v[key]);
+    if(items.every(list=>list.length>1)){
+      assert.notEqual(items[0][0],items[1][0],key+' first product must change on refresh 1');
+      assert.notEqual(items[1][0],items[2][0],key+' first product must change on refresh 2');
+    }
+  }
+  const sale=report.visits.map(v=>v.sale?.[0] || []);
+  if(sale.every(list=>list.length>1)){
+    assert.notEqual(sale[0][0],sale[1][0],'Sale Mela first recent item must change on refresh');
+    assert.notEqual(sale[1][0],sale[2][0],'Sale Mela shuffle must change every refresh');
+  }
 });
