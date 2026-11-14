@@ -247,7 +247,7 @@ test('home rails retain visible server products while preparing visit order and 
   for (const source of [mega, bogo, arrivals, sale, category]) {
     assert.ok(source.includes('startDelayMs: 8000'));
   }
-  assert.ok(sale.includes('const saleShuffleSeed = stableCatalogSeed'));
+  assert.ok(sale.includes('const saleShuffleSeed = stableSaleMelaSeed(catalog)'));
   assert.ok(!sale.includes('setHomeShuffleSeed('));
   assert.ok(!category.includes('sessionRailSeed()'));
   assert.ok(!category.includes('setRefreshSeed('));
@@ -366,10 +366,10 @@ test('Prime Family uses one 3D banner and the real full dashboard without a seco
   assert.match(family, /export function HomePrimeFamilyBanner\(/);
   assert.match(family, /home-commerce-banner--family/);
   assert.match(family, /href="#prime-family-dashboard"/);
-  assert.match(family, /function PrimeFamilyLoading\(/);
-  assert.doesNotMatch(family, /PrimeFamilyPreview|IntersectionObserver/);
+  assert.match(family, /import PrimeFamilyDashboard from '@\/components\/reseller\/PrimeFamilyDashboard'/);
+  assert.doesNotMatch(family, /PrimeFamilyPreview|PrimeFamilyLoading|next\/dynamic|IntersectionObserver/);
   assert.match(family, /<PrimeFamilyDashboard embedded initialSettings=\{initialSettings\} \/>/);
-  assert.match(family, /href="\/reseller\/dashboard"/);
+  assert.match(dashboard, /if \(loading && !embedded\)/);
   assert.match(css, /\.home-prime-family-banner/);
   assert.match(css, /\.home-prime-family-banner__wheel-face/);
   assert.match(dashboard, /<RewardWheel settings=\{wheel\}/);
@@ -463,8 +463,43 @@ test('three final Sale Mela retail price ranges are complete, disjoint and have 
   assert.deepEqual(saleMelaPriceRange(999), { minInclusive: 999, maxExclusive: null });
 
   const sale = await fs.readFile(path.join(root, 'components/home/HomeCollections.tsx'), 'utf8');
-  assert.match(sale, /if \(verticalHome && wholesale\) return null/);
+  assert.match(sale, /\[99, 299, 999\] as const/);
+  assert.match(sale, /packs\.length > 0 \?/);
+  assert.match(sale, /const buckets = verticalHome/);
+  assert.doesNotMatch(sale, /if \(verticalHome && wholesale\) return null/);
+  assert.doesNotMatch(sale, /const \[homeSaleCatalog,/);
   assert.match(sale, /const matches = verticalHome[\s\S]*?\? baseMatches/);
   assert.match(sale, /matchesSaleMelaBucket\(price, amount\)/);
   assert.match(sale, /\(standalone \|\| verticalHome\) && limit < products.length/);
+});
+
+test('local 393px Chrome actually renders Family and all Sale Mela tiers when preview is running', {timeout: 135000}, async t => {
+  if (process.platform !== 'win32') return t.skip('Local Windows-only visual audit');
+  let up;
+  try { up = await fetch('http://127.0.0.1:3000/', { signal: AbortSignal.timeout(6500) }); }
+  catch { return t.skip('The local preview is not running'); }
+  if (!up.ok) return t.skip('The local preview is not serving HTTP 200');
+  const { spawnSync } = await import('node:child_process');
+  const script = "from playwright.sync_api import sync_playwright\nimport json\nwith sync_playwright() as p:\n    b=p.chromium.launch(channel=\"chrome\",headless=True,args=[\"--disable-extensions\",\"--no-first-run\"])\n    c=b.new_context(viewport={\"width\":393,\"height\":852},is_mobile=True,has_touch=True)\n    pg=c.new_page()\n    errors=[]\n    pg.on(\"pageerror\",lambda e:errors.append(str(e)[:150]))\n    r=pg.goto(\"http://127.0.0.1:3000/?preview=family-sale-audit\",wait_until=\"domcontentloaded\",timeout=85000)\n    pg.wait_for_selector(\".home-sale-home--vertical\",timeout=30000)\n    pg.locator(\"#home-prime-family\").scroll_into_view_if_needed(timeout=15000)\n    try:\n        pg.wait_for_selector(\"#club-home\",timeout=32000)\n        family=True\n    except Exception:\n        family=False\n    data=pg.evaluate(\"\"\"() => {\n      const frames=[...document.querySelectorAll('.home-sale-home--vertical .home-sale-home-frame')];\n      return {\n        width:innerWidth,scrollWidth:document.documentElement.scrollWidth,\n        banner:document.querySelectorAll('.home-prime-family-banner').length,\n        familyDashboard:!!document.getElementById('club-home'),\n        familyText:document.querySelector('.home-prime-family-lazy')?.textContent?.slice(0,350) || '',\n        loadingCard:document.body.textContent.includes('Prime Family rewards load ho rahe hain'),\n        ranges:frames.map((f)=>({\n          heading:f.querySelector('.home-commerce-banner__copy h2')?.textContent?.trim() || '',\n          cards:f.querySelectorAll('.home-product').length,\n          hasNext:!!f.querySelector('.home-sale-products--vertical > div[aria-hidden=\"true\"]')\n        }))\n      };\n    }\"\"\")\n    data.update({\"http\":r.status if r else 0,\"family\":family,\"errors\":errors[:4]})\n    rows=pg.locator('.home-sale-home--vertical .home-sale-home-frame')\n    for i in range(rows.count()):\n        frame=rows.nth(i)\n        count=frame.locator('.home-product').count()\n        sentinel=frame.locator('.home-sale-products--vertical > div[aria-hidden=\"true\"]')\n        if sentinel.count():\n            sentinel.scroll_into_view_if_needed(timeout=16000)\n            pg.wait_for_timeout(1400)\n            data['progression']={'initial':count,'after':frame.locator('.home-product').count()}\n            break\n    pg.wait_for_function(\"\"\"() => {const frames=[...document.querySelectorAll('.home-sale-home--vertical .home-sale-home-frame')];return frames.length===4 && frames.every(f=>!!f.querySelector('.home-sale-progress--complete'))}\"\"\",timeout=85000)\n    data['finalCounts']=pg.evaluate(\"\"\"() => [...document.querySelectorAll('.home-sale-home--vertical .home-sale-home-frame')].map(f=>f.querySelectorAll('.home-product').length)\"\"\")\n    print(json.dumps(data,ensure_ascii=True),flush=True)\n    c.close();b.close()\n";
+  const result = spawnSync('python', ['-c', script], {
+    cwd:root,encoding:'utf8',shell:false,windowsHide:true,timeout:114000,maxBuffer:50000,
+  });
+  assert.equal(result.status,0, String(result.stderr||result.error?.message||result.stdout||'').slice(-1400));
+  const last=String(result.stdout||'').trim().split(/\\r?\\n/).at(-1);
+  const report=JSON.parse(last);
+  console.log('LOCAL_MOBILE_AUDIT '+JSON.stringify(report));
+  assert.equal(report.http,200);
+  assert.equal(report.banner,1);
+  assert.equal(report.familyDashboard,true,'actual Prime Family dashboard must render, not loading fallback');
+  assert.equal(report.loadingCard,false);
+  assert.equal(report.ranges.length,4,'Three retail bands and separate wholesale');
+  assert.match(report.ranges[0].heading,/1.?298/);
+  assert.match(report.ranges[1].heading,/299.?998/);
+  assert.match(report.ranges[2].heading,/999/);
+  assert.match(report.ranges[3].heading,/Wholesale/i);
+  assert.ok(report.ranges.every(x=>x.cards>0),'Every populated band must show real product cards');
+  assert.equal(report.scrollWidth,report.width,'No horizontal overflow on mobile');
+  if(report.progression)assert.ok(report.progression.after>report.progression.initial,'Scroll should load more products');
+  assert.equal(report.finalCounts?.length,4,'All four sections must finish loading');
+  assert.ok(report.finalCounts.every(n=>n>0),'Every final collection must finish with real products');
 });

@@ -1,7 +1,6 @@
 'use client';
 
-import dynamic from 'next/dynamic';
-import Link from 'next/link';
+import PrimeFamilyDashboard from '@/components/reseller/PrimeFamilyDashboard';
 import { ChevronDown, Gift, UsersRound } from 'lucide-react';
 import './HomeCommerceRails.css';
 
@@ -39,28 +38,8 @@ export function HomePrimeFamilyBanner() {
   );
 }
 
-// A small loading state, not a duplicate Prime Family heading/card.
-// The real dashboard mounts immediately, including its Admin-driven wheel,
-// check-in, referral, wallet, tiers, tasks and gift sections.
-function PrimeFamilyLoading() {
-  return (
-    <div className="mx-4 my-3 rounded-2xl border border-[#e1d6ba] bg-[#F6F1E8] p-5 text-sm text-[#174F44]" role="status">
-      Prime Family rewards load ho rahe hain…
-      <Link href="/reseller/dashboard" className="mt-2 block font-bold underline underline-offset-2">
-        Prime Family page kholein
-      </Link>
-    </div>
-  );
-}
-
-const PrimeFamilyDashboard = dynamic(
-  () => import('@/components/reseller/PrimeFamilyDashboard'),
-  {
-    ssr: false,
-    loading: () => <PrimeFamilyLoading />,
-  },
-);
-
+// Use the original dashboard directly: no secondary chunk fallback or preview card.
+// The embedded dashboard renders its sections while account state is syncing.
 export default function HomePrimeFamilyLazy({
   initialSettings,
 }: {

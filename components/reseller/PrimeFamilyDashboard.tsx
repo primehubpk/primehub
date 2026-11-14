@@ -474,7 +474,10 @@ export default function PrimeFamilyDashboard({
   const filteredVouchers = vouchers.filter(voucher => filter === 'all' || voucher.type === filter);
   const nextTask = activeTasks[0];
 
-  if (loading) {
+  // On embedded Home keep the full dashboard visible while the account
+  // profile synchronizes, rather than hiding Spin Wheel and rewards behind
+  // a network-dependent loading card. Standalone route retains its gate.
+  if (loading && !embedded) {
     return (
       <section className={`${outfit.className} flex ${embedded ? 'min-h-[220px]' : 'min-h-screen'} items-center justify-center bg-[#F6F1E8] text-sm font-bold text-black/45`}>
         Loading Prime Family…

@@ -405,6 +405,18 @@ function ProgressiveHomeSaleProducts({
     return () => observer.disconnect();
   }, [batchSize, limit, products.length, standalone, verticalHome]);
 
+  // The final vertical Sale Mela must eventually display EVERY product,
+  // even on phones where IntersectionObserver misses a 1px sentinel.
+  // Expand in short batches to avoid hydrating hundreds of cards in one frame.
+  useEffect(() => {
+    if (!verticalHome || limit >= products.length) return;
+    const timer = window.setTimeout(
+      () => setLimit((count) => Math.min(products.length, count + batchSize)),
+      320,
+    );
+    return () => window.clearTimeout(timer);
+  }, [verticalHome, limit, products.length, batchSize]);
+
   // OWNER LOCK: every home product is reachable in one horizontal row.
   // Only the separate standalone page retains its existing progressive grid.
   const visibleProducts = standalone ? products.slice(0, limit) : verticalHome ? visitProducts.slice(0, limit) : visitProducts;
@@ -458,9 +470,19 @@ function ProgressiveHomeSaleProducts({
       {(standalone || verticalHome) && limit < products.length ? (
         <div
           ref={loadMoreRef}
-          aria-hidden="true"
-          style={{ gridColumn: "1 / -1", height: "1px" }}
-        />
+          aria-hidden={!verticalHome}
+          role={verticalHome ? "status" : undefined}
+          className={verticalHome ? "home-sale-progress" : undefined}
+          style={verticalHome
+            ? { gridColumn: "1 / -1", minHeight: "42px" }
+            : { gridColumn: "1 / -1", height: "1px" }}
+        >
+          {verticalHome ? `${Math.min(limit, products.length)} / ${products.length} products — baqi load ho rahe hain…` : null}
+        </div>
+      ) : verticalHome && products.length > 0 ? (
+        <div className="home-sale-progress home-sale-progress--complete" style={{ gridColumn: "1 / -1" }}>
+          Is range ke tamam {products.length} products show ho gaye.
+        </div>
       ) : null}
     </div>
   );
@@ -488,27 +510,40 @@ export default function HomeCollections({
     rail.dispatchEvent(new Event('click'));
     rail.scrollBy({ left: direction * (rail.clientWidth + 10), behavior: 'smooth' });
   };
-  const liveCatalog = products.filter((p) => p.published !== false && !isExclusiveGlassDealProduct(p));
-  const [homeSaleCatalog, setHomeSaleCatalog] = useState<Product[]>(
-    () => (standalone ? [] : liveCatalog),
+  // Always reflect the latest published catalog after its first-party refresh.
+  // The previous homeSaleCatalog state froze the very first snapshot forever.
+  const catalog = products.filter((product) =>
+    product.published !== false && !isExclusiveGlassDealProduct(product),
   );
-  useEffect(() => {
-    if (standalone || homeSaleCatalog.length > 0 || liveCatalog.length === 0) return;
-    setHomeSaleCatalog(liveCatalog);
-  }, [standalone, homeSaleCatalog.length, products]);
-
-  const catalog = standalone
-    ? liveCatalog
-    : homeSaleCatalog.length > 0
-      ? homeSaleCatalog
-      : liveCatalog;
-  const stableCatalogSeed = stableSaleMelaSeed(catalog);
-  // Keep exactly the same products on SSR and client hydration.
-  const saleShuffleSeed = stableCatalogSeed;
-  const buckets = sortPriceBuckets(
-    (settings.priceBuckets || []).filter((b) => b.active),
+  const saleShuffleSeed = stableSaleMelaSeed(catalog);
+  const activeBuckets = sortPriceBuckets(
+    (settings.priceBuckets || []).filter((bucket) => bucket.active),
   );
   const packs = catalog.filter(isWholesaleProduct);
+
+  // Owner's final HOME Sale Mela is exactly three full retail bands then
+  // Wholesale. Use configured bucket details when available; the three
+  // canonical bands must not disappear because an old config lacks one.
+  const buckets = verticalHome
+    ? [
+        ...([99, 299, 999] as const).map((amount, index) =>
+          activeBuckets.find((bucket) => !isWholesalePriceBucket(bucket) && Number(bucket.amount) === amount)
+          ?? {
+            id: `home-sale-${amount}`, title: saleMelaBucketLabel(amount),
+            amount, iconUrl: '', accent: '#b98538', sortOrder: index + 1,
+            active: true,
+          },
+        ),
+        ...(packs.length > 0 ? [
+          activeBuckets.find(isWholesalePriceBucket)
+          ?? {
+            id: 'home-sale-wholesale', title: 'Wholesale Packages',
+            amount: null, iconUrl: '', accent: '#0c705e',
+            sortOrder: 4, active: true,
+          },
+        ] : []),
+      ]
+    : activeBuckets;
   const kidsPacks = packs.filter(isKidsWholesaleProduct);
   const regularPacks = packs.filter((product) => !isKidsWholesaleProduct(product));
 
@@ -528,9 +563,7 @@ export default function HomeCollections({
 
           {buckets.map((bucket) => {
             const wholesale = isWholesalePriceBucket(bucket);
-            // Home's final Sale Mela has three complete retail price tiers.
-            // Wholesale packs retain their dedicated section above.
-            if (verticalHome && wholesale) return null;
+            // The separate Wholesale Packages collection follows all three retail bands.
             const amount = Number(bucket.amount || 0);
             const anchor = bucketAnchor(bucket.amount ?? null, wholesale);
             const href = standalone
