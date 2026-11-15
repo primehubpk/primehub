@@ -103,9 +103,9 @@ test('unpublished and inactive products never appear as orderable deals', () => 
   assert.deepEqual(resolveGlassOfferProducts(products.map(item => ({ ...item, active: false })), config), []);
 });
 
-test('unified deals cannot stack benefits; mixed-cart benefits apply to regular products only', () => {
+test('all unified Mega deal products qualify for cashback, voucher/tier alternatives still exclusive', () => {
   const settings = unifyStorefrontDeals(legacy);
-  assert.equal(orderEligibleSubtotal([{ productId: 'weekly', price: 190, quantity: 2 }, { productId: 'bag', price: 500, quantity: 1 }, { productId: 'regular', price: 300, quantity: 2 }], settings), 600);
+  assert.equal(orderEligibleSubtotal([{ productId: 'weekly', price: 190, quantity: 2 }, { productId: 'bag', price: 500, quantity: 1 }, { productId: 'regular', price: 300, quantity: 2 }], settings), 1480);
 });
 
 test('homepage has one campaign with banner above swipe row and shared six-second pause', async () => {
@@ -619,7 +619,18 @@ test('all Mega offer and BOGO items stay out of ordinary Home Shop categories an
   assert.match(arrivals,/isDedicatedDealProduct\(p, glassDealShowcase\)/);
   assert.match(category,/if \(isDedicatedDealProduct\(product\)\) return false/);
   assert.doesNotMatch(cart,/Mega Deals \/ 70% off and Buy 1 Get 1 Free: no wallet cash/);
-  assert.match(cart,/Voucher \/ promo code/);
+  assert.match(cart,/Promo or friend code/);
   // The actual CTA is website Firebase Family membership, not the Play Store.
   assert.match(family,/href="\/reseller\/join\?mode=signup&redirect=%2Fcart"/);
+});
+
+test('rewards card describes app-only Rs.100 gift and Mega/BOGO cashback without making website signup a paid event', async()=>{
+ const card=await fs.readFile(path.join(root,'components/cart/PrimeFamilyCartCard.tsx'),'utf8');
+ const route=await fs.readFile(path.join(root,'app/api/orders/route.ts'),'utf8');
+ assert.match(card,/Rs\. 100 app welcome reward/);
+ assert.match(card,/Website signup alone does not credit Rs\. 100/);
+ assert.match(card,/Mega\/70% OFF and BOGO paid packs now qualify/);
+ assert.match(card,/Tier cashback OR a code benefit/);
+ assert.match(card,/Code owner earns/);
+ assert.match(route,/rewardExcluded: isLiveDealItem \|\| isBigDealItem/);
 });

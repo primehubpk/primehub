@@ -122,8 +122,9 @@ async function buildAuthoritativeItems(items: IncomingItem[]) {
     const markedImages = trustedMarkedImages(item, productId);
     return { productId, title: String(product.title || product.name || item.title || item.name || 'Product'), price, originalPrice: numberValue(product.originalPrice) > regularPrice ? numberValue(product.originalPrice) : regularPrice, quantity, image: String(markedImages[0]?.markedUrl || variant?.imageUrl || product.imageUrl || product.image || item.imageUrl || item.image || ''), ...(markedImages.length ? { markedImages } : {}), variant: item.variant || null, weeklyDealDay: isLiveDealItem ? currentDay : null,
       ...(promotion ? { promotion } : {}),
-      rewardExcluded: isBogoProduct(product) || isMegaDealItem || isLiveDealItem || isBigDealItem,
-      dealCategory: isBogoProduct(product) ? 'bogo' : isMegaDealItem ? 'mega' : isLiveDealItem ? 'weekly' : isBigDealItem ? 'big' : '',
+      // Owner-approved: paid Mega/70%-style and BOGO packs now qualify.
+      rewardExcluded: isLiveDealItem || isBigDealItem,
+      dealCategory: isLiveDealItem ? 'weekly' : isBigDealItem ? 'big' : isBogoProduct(product) ? 'bogo' : isMegaDealItem ? 'mega' : '',
       isWholesale: isWholesaleProduct(product), category: product.category || '', categoryId: product.categoryId || '' };
   });
   return { items: pricedItems, settings };

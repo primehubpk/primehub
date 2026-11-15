@@ -32,9 +32,9 @@ export async function creditDeliveredOrderBenefits(orderId: string, authoritativ
       eligible > due || !Number.isFinite(percent) || percent < 0 || percent > 100) {
     throw new Error('Invalid verified order cashback snapshot.');
   }
-  // Check original, SERVER-WRITTEN order lines again at the final credit
-  // boundary. A stale referral/tier snapshot must never reward BOGO or Mega
-  // items, even if the cart and quote once misclassified those products.
+  // Revalidate SERVER-WRITTEN paid order lines at final credit. Mega/70% and
+  // BOGO orders now qualify, but their complimentary BOGO units are never
+  // separately charged. Preserve old excluded snapshot protections.
   if (Array.isArray(authoritativeOrder.items) && authoritativeOrder.items.length > 0) {
     let regularSubtotal = 0;
     for (const item of authoritativeOrder.items) {
@@ -44,15 +44,15 @@ export async function creditDeliveredOrderBenefits(orderId: string, authoritativ
         throw new Error('Invalid verified order line for cashback.');
       }
       if (item?.rewardExcluded === true ||
-          ['bogo', 'mega', 'weekly', 'big'].includes(String(item?.dealCategory || '')) ||
-          item?.promotion?.type === 'buy-one-get-one-free' || item?.weeklyDealDay) continue;
+          ['weekly', 'big'].includes(String(item?.dealCategory || '')) ||
+          item?.weeklyDealDay) continue;
       regularSubtotal += price * quantity;
       if (!Number.isSafeInteger(regularSubtotal)) throw new Error('Invalid verified order total.');
     }
     const voucherDiscount = Number(authoritativeOrder.voucherDiscount || 0);
     if (!Number.isSafeInteger(voucherDiscount) || voucherDiscount < 0 ||
         eligible > Math.max(0, regularSubtotal - voucherDiscount)) {
-      throw new Error('Promotional products cannot receive wallet or referral cashback.');
+      throw new Error('Order cashback exceeds the verified eligible paid items.');
     }
   }
   // Keep legacy pending voucher orders' original snapshots unchanged.
