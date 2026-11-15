@@ -44,6 +44,22 @@ export function isExclusiveGlassDealProduct(product: { id?: string } | string): 
   return EXCLUSIVE_GLASS_DEAL_IDS.has(typeof product === 'string' ? product : String(product.id || ''));
 }
 
+/** Ordinary Home, Shop and category listings must never reuse promotion items.
+ *  The public catalog carries megaDealPrice on ALL configured Mega products,
+ *  not just the twelve original glass boxes. Admin settings provide a fallback
+ *  when a raw Firestore product has not yet received that server-side marker. */
+export function isDedicatedDealProduct(
+  product: { id?: string; megaDealPrice?: unknown; bogoOffer?: unknown },
+  config?: Partial<GlassOfferSettings> | null,
+): boolean {
+  const bogo = product.bogoOffer as { enabled?: boolean; unitsPerOffer?: number } | undefined;
+  if (isExclusiveGlassDealProduct(product) || (bogo?.enabled === true && bogo.unitsPerOffer === 2)) return true;
+  if (Number(product.megaDealPrice) > 0) return true;
+  if (!config) return false;
+  const current = resolveGlassOffers(config);
+  return current.enabled && current.items.some((entry) => entry.productId === String(product.id || ''));
+}
+
 export const DEFAULT_GLASS_OFFERS: GlassOfferSettings = {
   enabled: true,
   heading: 'Mega Deals',

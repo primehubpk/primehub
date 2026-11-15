@@ -8,8 +8,7 @@ import { useCartStore } from '@/lib/cartStore';
 import { categoryHref, categoryLabel, productMatchesCategory, slugifyCategory } from '@/lib/categoryUtils';
 import { smartSearchProducts } from '@/lib/smartSearch';
 import { isWholesaleProduct } from '@/lib/wholesale';
-import { isExclusiveGlassDealProduct } from '@/lib/glassOffers';
-import { isBogoProduct } from '@/lib/bogoOffers';
+import { isDedicatedDealProduct } from '@/lib/glassOffers';
 import { getEffectivePrice } from '@/lib/dealPricing';
 import { matchesSaleMelaBucket } from '@/lib/priceBucketUtils';
 import { cacheCatalogForNavigation, readCachedCatalog } from '@/lib/productNavigationCache';
@@ -26,7 +25,7 @@ export function useShopCatalog(initialCategory?: string, initialQuery = '', init
   const numericBucket = Number(bucketParam);
   const urlMax = searchParams.get('max') || ([99, 299, 999].includes(numericBucket) ? String(numericBucket) : 'all');
   const hasServerData = initialProducts.length > 0 || initialCategories.length > 0;
-  const [products, setProducts] = useState<Product[]>(() => hasServerData ? initialProducts.filter((p) => !isExclusiveGlassDealProduct(p) && !isBogoProduct(p)) : []);
+  const [products, setProducts] = useState<Product[]>(() => hasServerData ? initialProducts.filter((p) => !isDedicatedDealProduct(p, settings.glassDealShowcase)) : []);
   const [categories, setCategories] = useState<Category[]>(initialCategories);
   const [search, setSearch] = useState(initialQuery || urlQuery);
   const [category, setCategory] = useState(initialCategory || 'all');
@@ -54,7 +53,7 @@ export function useShopCatalog(initialCategory?: string, initialQuery = '', init
     // A navigation cache may paint immediately, but it is never authoritative.
     // Always replace it with a no-store storefront read as soon as this view mounts.
     if (!hasServerData && cached && cached.products.length > 0) {
-      setProducts(cached.products.filter((p) => !isExclusiveGlassDealProduct(p) && !isBogoProduct(p)));
+      setProducts(cached.products.filter((p) => !isDedicatedDealProduct(p, settings.glassDealShowcase)));
       if (cached.categories.length > 0) setCategories(cached.categories);
       setLoading(false);
     }
@@ -69,7 +68,7 @@ export function useShopCatalog(initialCategory?: string, initialQuery = '', init
         const nextProducts = (Array.isArray(data?.products) ? data.products : []) as Product[];
         const nextCategories = (Array.isArray(data?.categories) ? data.categories : []) as Category[];
 
-        if (nextProducts.length > 0) setProducts(nextProducts.filter((p) => !isExclusiveGlassDealProduct(p) && !isBogoProduct(p)));
+        if (nextProducts.length > 0) setProducts(nextProducts.filter((p) => !isDedicatedDealProduct(p, settings.glassDealShowcase)));
         if (nextCategories.length > 0) setCategories(nextCategories);
       } catch (error) {
         console.warn('shop dual catalog read unavailable', error);
@@ -105,7 +104,7 @@ export function useShopCatalog(initialCategory?: string, initialQuery = '', init
   }, [maxPrice]);
 
   const filtered = useMemo(() => {
-    const searchable = smartSearchProducts(products.filter((p) => p.published !== false && !isBogoProduct(p) && !isExclusiveGlassDealProduct(p)), search);
+    const searchable = smartSearchProducts(products.filter((p) => p.published !== false && !isDedicatedDealProduct(p, settings.glassDealShowcase)), search);
     return searchable.filter((p) => {
       const selectedCat = wholesaleOnly || productMatchesCategory(category, p, categories);
       const effectivePrice = selectedSaleMelaBucket

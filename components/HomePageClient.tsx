@@ -39,9 +39,8 @@ import type {
 import type { Product } from "@/components/shop/ShopTypes";
 import { CATALOG_REFRESH_EVENT } from "@/lib/catalogRefreshSignal";
 import { fetchPublicStorefront, invalidatePublicStorefront } from "@/lib/storefrontClient";
-import { isBogoProduct } from '@/lib/bogoOffers';
 import { HomeVisitProvider } from '@/lib/useVisitProductOrder';
-import { isExclusiveGlassDealProduct } from "@/lib/glassOffers";
+import { isDedicatedDealProduct } from "@/lib/glassOffers";
 
 type Props = {
   visitSeed: number;
@@ -234,7 +233,7 @@ export default function HomePageClient({
 
   };
 
-  const regularProducts = useMemo(() => products.filter((product) => !isExclusiveGlassDealProduct(product) && !isBogoProduct(product)), [products]);
+  const regularProducts = useMemo(() => products.filter((product) => !isDedicatedDealProduct(product, initialSettings.glassDealShowcase)), [products, initialSettings.glassDealShowcase]);
 
   const selectPrice = (amount: number | null) => {
     setSelectedMaxPrice(amount);

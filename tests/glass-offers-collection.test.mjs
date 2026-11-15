@@ -8,7 +8,7 @@ const root = process.cwd();
 const compile = text => ts.transpileModule(text, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText;
 const text = await fs.readFile(path.join(root, 'lib/glassOffers.ts'), 'utf8');
 const moduleUrl = 'data:text/javascript;charset=utf-8,' + encodeURIComponent(compile(text));
-const { STARTER_GLASS_OFFERS, resolveGlassOffers, resolveGlassOfferProducts, isExclusiveGlassDealProduct, resolveUnifiedDealCollection, unifyStorefrontDeals, applyCollectionPrice } = await import(moduleUrl);
+const { STARTER_GLASS_OFFERS, resolveGlassOffers, resolveGlassOfferProducts, isExclusiveGlassDealProduct, resolveUnifiedDealCollection, unifyStorefrontDeals, applyCollectionPrice, isDedicatedDealProduct } = await import(moduleUrl);
 const benefits = compile(await fs.readFile(path.join(root, 'lib/orderBenefits.ts'), 'utf8')).replace("from './glassOffers'", 'from ' + JSON.stringify(moduleUrl));
 const { orderEligibleSubtotal } = await import('data:text/javascript;charset=utf-8,' + encodeURIComponent(benefits));
 const legacy = {
@@ -186,7 +186,7 @@ test('home Mega, BOGO and New Arrivals rails keep native endless scrolling witho
   assert.match(bogoCss, /\.bogo-rail__group/);
   assert.match(bogoCss, /scroll-snap-type:none/);
   assert.match(arrivals, /useContinuousHomeRail\(homeRailRef/);
-  assert.match(arrivals, /newestFirst\(products, homeLayout\)/);
+  assert.match(arrivals, /newestFirst\(products, homeLayout, settings\.glassDealShowcase\)/);
   assert.doesNotMatch(arrivals, /homeLayout\s*\?\s*100/);
   assert.match(arrivals, /setHomeVisibleCount\(\(count\)\s*=>\s*Math\.min\(newest\.length,\s*count\s*\+\s*16\)\)/);
   assert.match(arrivals, /querySelector<HTMLElement>\('\[data-loop-copy\]'\)/);
@@ -555,9 +555,9 @@ test('first HTML paint uses per-request server visit ordering and distinct dedic
   assert.match(visit, /if \(active && !activeRef\.current && !bootstrap\) enter\(\)/);
   assert.ok(visit.includes('document.cookie = '));
   assert.match(shuffle, /namespace\.includes\('new-arrivals'\) \? 12 : 24/);
-  assert.match(category, /isExclusiveGlassDealProduct\(product\) \|\| isBogoProduct\(product\)/);
-  assert.match(shop, /!isBogoProduct\(p\)/);
-  assert.match(arrivals, /!isBogoProduct\(p\)/);
+  assert.match(category, /isDedicatedDealProduct\(product\)/);
+  assert.match(shop, /isDedicatedDealProduct\(p/);
+  assert.match(arrivals, /isDedicatedDealProduct\(p/);
   assert.doesNotMatch(offerPage, /redirect\('\/deals'\)/);
   assert.match(offerPage, /activePath="\/deals\/glass-bangles"/);
   assert.match(offerLanding, /activePath = '\/deals'/);
@@ -588,4 +588,38 @@ test('all configured Mega deal items, including watches and twelve glass boxes, 
     {productId:first,price:1099,quantity:1},
     {productId:'bogo',price:440,quantity:1,dealCategory:'bogo'}
   ],settings),0);
+});
+
+test('all Mega offer and BOGO items stay out of ordinary Home Shop categories and Sale Mela', async () => {
+  const settings = resolveGlassOffers({
+    enabled: true, collectionVersion: 2, items: [
+      { productId: 'glass-box' }, { productId: 'watch-extra' }, { productId: 'special-bag' }
+    ]
+  });
+  const candidates = [
+    { id: 'glass-box', megaDealPrice: 1099 },
+    { id: 'watch-extra', megaDealPrice: 1099 },
+    { id: 'special-bag' },
+    { id: 'marker-only', megaDealPrice: 750 },
+    { id: 'bogo-item', bogoOffer: { enabled: true, unitsPerOffer: 2 } },
+    { id: 'normal-item', price: 500 }
+  ];
+  assert.deepEqual(candidates.map(p => isDedicatedDealProduct(p, settings)), [true,true,true,true,true,false]);
+  assert.equal(isDedicatedDealProduct({ id:'normal-item', price:500 }), false);
+  const read = name => fs.readFile(path.join(root,name),'utf8');
+  const [home,shop,sale,arrivals,category,cart,family] = await Promise.all([
+    read('components/HomePageClient.tsx'),read('components/shop/useShopCatalog.ts'),
+    read('components/home/HomeCollections.tsx'),read('components/NewArrivalsRail.tsx'),
+    read('lib/categoryUtils.ts'),read('components/cart/CartSummary.tsx'),
+    read('components/cart/PrimeFamilyCartCard.tsx')
+  ]);
+  assert.match(home,/isDedicatedDealProduct\(product, initialSettings\.glassDealShowcase\)/);
+  assert.match(shop,/isDedicatedDealProduct\(p, settings\.glassDealShowcase\)/);
+  assert.match(sale,/isDedicatedDealProduct\(product, settings\.glassDealShowcase\)/);
+  assert.match(arrivals,/isDedicatedDealProduct\(p, glassDealShowcase\)/);
+  assert.match(category,/if \(isDedicatedDealProduct\(product\)\) return false/);
+  assert.doesNotMatch(cart,/Mega Deals \/ 70% off and Buy 1 Get 1 Free: no wallet cash/);
+  assert.match(cart,/Voucher \/ promo code/);
+  // The actual CTA is website Firebase Family membership, not the Play Store.
+  assert.match(family,/href="\/reseller\/join\?mode=signup&redirect=%2Fcart"/);
 });

@@ -1,5 +1,4 @@
-import { isExclusiveGlassDealProduct } from './glassOffers';
-import { isBogoProduct } from './bogoOffers';
+import { isDedicatedDealProduct } from './glassOffers';
 
 export type CategoryRef = {
   id?: string;
@@ -107,11 +106,11 @@ export function expandCategoryTokens(selected: string, categories: CategoryRef[]
 
 export function productMatchesCategory(
   selected: string,
-  product: { id?: string; category?: string; categoryId?: string; bogoOffer?: unknown },
+  product: { id?: string; category?: string; categoryId?: string; bogoOffer?: unknown; megaDealPrice?: unknown },
   categories: CategoryRef[] = [],
 ): boolean {
   // The original category identity stays on the product; only normal listings exclude it.
-  if (isExclusiveGlassDealProduct(product) || isBogoProduct(product)) return false;
+  if (isDedicatedDealProduct(product)) return false;
   if (!selected || selected === 'all') return true;
   const productTokens = [
     ...categoryTokens(String(product.category || '')),

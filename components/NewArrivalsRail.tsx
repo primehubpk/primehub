@@ -13,11 +13,11 @@ import { ArrowRight, ShoppingCart, Sparkles } from 'lucide-react';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useCartStore } from '@/lib/cartStore';
+import { useSettings } from '@/lib/useSettings';
 import { imageCandidatesOf, imageOf, originalOf, priceOf, productHasVariants, titleOf, type Product } from '@/components/shop/ShopTypes';
 import { isDirectStorefrontImage } from '@/lib/imageUrl';
 import { isWholesaleProduct } from '@/lib/wholesale';
-import { isExclusiveGlassDealProduct } from '@/lib/glassOffers';
-import { isBogoProduct } from '@/lib/bogoOffers';
+import { isDedicatedDealProduct } from '@/lib/glassOffers';
 import { makeTikTokContent, trackTikTokEvent } from '@/lib/tiktokPixel';
 import { getVerifiedDealProduct } from '@/lib/verifiedDealProduct';
 import '@/components/home/NewArrivalsPremium.css';
@@ -27,9 +27,9 @@ function timeOf(p: Product) {
   return typeof value?.toMillis === 'function' ? value.toMillis() : new Date(value || 0).getTime() || 0;
 }
 
-export function newestFirst(products: Product[], includeWholesale = false) {
+export function newestFirst(products: Product[], includeWholesale = false, glassDealShowcase?: Parameters<typeof isDedicatedDealProduct>[1]) {
   return [...products]
-    .filter((p) => p.published !== false && !isExclusiveGlassDealProduct(p) && !isBogoProduct(p) && (includeWholesale || !isWholesaleProduct(p)))
+    .filter((p) => p.published !== false && !isDedicatedDealProduct(p, glassDealShowcase) && (includeWholesale || !isWholesaleProduct(p)))
     .sort((a, b) => timeOf(b) - timeOf(a) || b.id.localeCompare(a.id));
 }
 
@@ -42,6 +42,7 @@ export default function NewArrivalsRail({
   liveUpdates?: boolean;
   homeLayout?: boolean;
 }) {
+  const { settings } = useSettings();
   const [products, setProducts] = useState<Product[]>(initialProducts);
   const homeRailRef = useRef<HTMLDivElement>(null);
   const [addedId, setAddedId] = useState<string | null>(null);
@@ -65,8 +66,8 @@ export default function NewArrivalsRail({
 
   const sortedNewest = useMemo(
     // Progressive rendering controls DOM cost; never cap actual catalogue choices.
-    () => newestFirst(products, homeLayout),
-    [products, homeLayout],
+    () => newestFirst(products, homeLayout, settings.glassDealShowcase),
+    [products, homeLayout, settings.glassDealShowcase],
   );
   const { items: newest, ready } = useVisitProductOrder(sortedNewest, 'new-arrivals-home', homeRailRef, homeLayout);
   const [homeVisibleCount, setHomeVisibleCount] = useState(16);

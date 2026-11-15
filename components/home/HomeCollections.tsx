@@ -25,7 +25,7 @@ import HomeRailFrame from './HomeRailFrame';
 import { Commerce3DBanner } from './HomeCommerceRails';
 import { useContinuousHomeRail } from '@/lib/useContinuousHomeRail';
 import { useVisitProductOrder } from '@/lib/useVisitProductOrder';
-import { isExclusiveGlassDealProduct } from '@/lib/glassOffers';
+import { isDedicatedDealProduct } from '@/lib/glassOffers';
 import { orderHomeProducts } from '@/lib/homeRailOrder';
 import {
   isWholesalePriceBucket,
@@ -540,7 +540,7 @@ export default function HomeCollections({
   // Always reflect the latest published catalog after its first-party refresh.
   // The previous homeSaleCatalog state froze the very first snapshot forever.
   const catalog = products.filter((product) =>
-    product.published !== false && !isExclusiveGlassDealProduct(product),
+    product.published !== false && !isDedicatedDealProduct(product, settings.glassDealShowcase),
   );
   const saleShuffleSeed = stableSaleMelaSeed(catalog);
   const activeBuckets = sortPriceBuckets(
