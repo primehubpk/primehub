@@ -15,6 +15,5 @@
       "path": "/api/notifications/cron?period=evening",
       "schedule": "0 17 * * *"
     }
-  ],
-  "ignoreCommand": "exit 1"
+  ]
 }
