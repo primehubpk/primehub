@@ -86,6 +86,11 @@ const SUPABASE_CATALOG_PRODUCT_SELECT = [
   'dealPrice:payload->dealPrice',
   'dealDay:payload->>dealDay',
   'payloadCategoryId:payload->>categoryId',
+  // BOGO identity must survive the light public catalog projection.
+  'payloadBogoOffer:payload->bogoOffer',
+  'payloadBogoPriceIncreaseV1:payload->bogoPriceIncreaseV1',
+  'payloadBogoGroup:payload->>bogoGroup',
+  'payloadBogoPreviewOnly:payload->bogoPreviewOnly',
 ].join(',');
 
 function envValue(...names: string[]) {
@@ -256,6 +261,10 @@ function catalogProductFromSupabase(row: any) {
     normalPrice: row.normalPrice,
     dealPrice: row.dealPrice,
     dealDay: row.dealDay,
+    bogoOffer: row.payloadBogoOffer,
+    bogoPriceIncreaseV1: row.payloadBogoPriceIncreaseV1 === true,
+    bogoGroup: row.payloadBogoGroup,
+    bogoPreviewOnly: row.payloadBogoPreviewOnly === true,
   };
 }
 

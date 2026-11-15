@@ -165,3 +165,33 @@ test('without a referral voucher the same member gets normal tier-only cashback'
   assert.equal(data.get(key('reseller_shopping_wallets',owner)).balance,beforeShopping+50);
   assert.equal(data.has(key('reseller_referral_credits',oid)),false);
 });
+
+
+test('delivery refuses tampered promo-only own referral and tier snapshots; no wallet credit',async()=>{
+  data.clear();
+  data.set(key('reseller_profiles',owner),{status:'active',walletAvailable:0,monthlyOrders:0});
+  const cases=[
+    {id:'order-cashback-promo-bogo', kind:'referral'},
+    {id:'order-cashback-promo-glass', kind:'tier'},
+  ];
+  for(const tc of cases){
+    const order={status:'pending',source:'website',cashbackPolicy:'delivered_only_v1',
+      rewardSettlementMode:'shopping_only_v1',resellerUserId:owner,
+      eligibleAfterVoucher:tc.kind==='referral'?440:1099,total:1500,cashbackPercent:10,
+      items:[{productId:tc.kind==='referral'?'bogo-test':'glass-test',
+        price:tc.kind==='referral'?440:1099,quantity:1,
+        rewardExcluded:true,dealCategory:tc.kind==='referral'?'bogo':'mega',
+        ...(tc.kind==='referral'?{promotion:{type:'buy-one-get-one-free'}}:{})}],
+      ...(tc.kind==='referral'?{
+        voucherKind:'referral',voucherRewardMode:'exclusive_v1',voucherCode:'PRIMEFAMILY1',
+        referralOwnerUid:owner,referralPercent:10,referralCashEstimate:44,
+      }:{voucherKind:''}),
+    };
+    data.set(key('orders',tc.id),order);
+    await assert.rejects(delivered.creditDeliveredOrderBenefits(tc.id,order),
+      /Promotional products cannot receive wallet or referral cashback/);
+    assert.equal(data.has(key('reseller_rewards',tc.id)),false);
+    assert.equal(data.has(key('reseller_referral_credits',tc.id)),false);
+    assert.equal(data.get(key('reseller_profiles',owner)).walletAvailable,0);
+  }
+});

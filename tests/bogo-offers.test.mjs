@@ -7,7 +7,7 @@ const source = fs.readFileSync(new URL('../lib/bogoOffers.ts', import.meta.url),
 const compiled = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
 const exports = {};
 vm.runInNewContext(compiled, { exports, Date, Map, Number, String, Math });
-const { bogoWindow, resolveBogoSettings, bogoFulfilment, validateBogoOrder, applyBogoAvailability } = exports;
+const { bogoWindow, resolveBogoSettings, bogoFulfilment, validateBogoOrder, applyBogoAvailability, applyBogoOfferPrice } = exports;
 const midnight = Date.parse('2026-11-12T19:00:00.000Z');
 const product = { id:'bogo-real', title:'Set', stock:30, price:400,
   bogoOffer:{enabled:true,unitsPerOffer:2,unitLabel:'set'},
@@ -68,11 +68,60 @@ test('fifty separate source photos preserve folder prices and real size sets', (
     assert.ok(p.variantMatrix.every(v=>v.price===p.price&&v.stock===30));
   }
 });
-test('staged photo catalogue is excluded from production and Vercel', () => {
+test('staged products never shadow real Supabase catalogue on Vercel', () => {
   const stageSource=fs.readFileSync(new URL('../lib/stagedBogoCatalogServer.ts',import.meta.url),'utf8');
   const code=ts.transpileModule(stageSource,{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText;
   for(const env of [{NODE_ENV:'production'},{NODE_ENV:'development',VERCEL:'1'},{NODE_ENV:'development',VERCEL_ENV:'preview'},{NODE_ENV:'development'}]){
     const result={};vm.runInNewContext(code,{exports:result,process:{env},require:(name)=>name==='server-only'?{}:{default:[{id:'photo'}]}});
-    assert.equal(result.stagedBogoProducts().length,env.NODE_ENV==='development'&&!env.VERCEL&&!env.VERCEL_ENV?1:0);
+    const expectedLocal=env.NODE_ENV==='development'&&!env.VERCEL&&!env.VERCEL_ENV;
+    assert.equal(result.stagedBogoProducts().length,expectedLocal?1:0);
   }
+});
+
+
+test('BOGO prices rise 10 percent exactly once, including real size rows', () => {
+  const item={...product,price:400,originalPrice:400,
+    variantMatrix:[{size:'2.2',price:400,stock:3},{size:'2.8',price:250,stock:4}]};
+  const once=applyBogoOfferPrice(item);
+  assert.equal(once.price,440);
+  assert.equal(once.originalPrice,440);
+  assert.deepEqual(once.variantMatrix.map(v=>v.price),[440,275]);
+  assert.equal(applyBogoOfferPrice(once).price,440);
+  assert.equal(item.price,400);
+  assert.equal(applyBogoOfferPrice({price:500,title:'Regular'}).price,500);
+});
+
+test('all fifty BOGO staged prices receive 10% exactly once, unrelated regular prices stay unchanged',()=>{
+  const all=JSON.parse(fs.readFileSync(new URL('../data/bogo-staged-products.json',import.meta.url)));
+  assert.equal(all.length,50);
+  for(const p of all){
+    const changed=applyBogoOfferPrice(p);
+    assert.equal(changed.price,Math.round(p.price*1.1));
+    assert.ok(changed.variantMatrix.every((v,i)=>v.price===Math.round(p.variantMatrix[i].price*1.1)));
+    assert.equal(applyBogoOfferPrice(changed).price,changed.price);
+    assert.equal(changed.stock,p.stock);
+  }
+  assert.equal(applyBogoOfferPrice({id:'normal',price:250}).price,250);
+});
+test('preview-only BOGO checkout is blocked at authoritative order stage',()=>{
+  const route=fs.readFileSync(new URL('../app/api/orders/route.ts',import.meta.url),'utf8');
+  const single=fs.readFileSync(new URL('../lib/verifiedDealProduct.ts',import.meta.url),'utf8');
+  const card=fs.readFileSync(new URL('../components/home/BogoDeals.tsx',import.meta.url),'utf8');
+  assert.match(route,/if \(storedProduct\.bogoPreviewOnly === true\) throw/);
+  assert.match(single,/bogoPreviewOnly/);
+  assert.match(card,/Preview only/);
+});
+
+test('Supabase public catalogue projection retains BOGO flags and already-increased price marker',()=>{
+  const reader=fs.readFileSync(new URL('../lib/dualReadServer.ts',import.meta.url),'utf8');
+  const publicCatalog=fs.readFileSync(new URL('../lib/publicCatalogServer.ts',import.meta.url),'utf8');
+  assert.match(reader,/payloadBogoOffer:payload->bogoOffer/);
+  assert.match(reader,/payloadBogoPriceIncreaseV1:payload->bogoPriceIncreaseV1/);
+  assert.match(reader,/bogoOffer: row\.payloadBogoOffer/);
+  assert.match(reader,/bogoPriceIncreaseV1: row\.payloadBogoPriceIncreaseV1 === true/);
+  assert.match(publicCatalog,/applyBogoOfferPrice\(applyCollectionPrice\(product,/);
+  const saved={id:'bogo-live',price:440,originalPrice:440,
+    bogoOffer:{enabled:true,unitsPerOffer:2,unitLabel:'set'},bogoPriceIncreaseV1:true};
+  assert.equal(applyBogoOfferPrice(saved).price,440);
+  assert.equal(applyBogoOfferPrice({...saved,bogoPriceIncreaseV1:false}).price,484);
 });

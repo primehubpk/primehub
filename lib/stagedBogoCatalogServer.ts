@@ -1,8 +1,9 @@
 import 'server-only';
 import products from '@/data/bogo-staged-products.json';
 
-// Owner review on the private laptop only. No seed products enter production
-// until the reviewed catalogue is explicitly imported through protected Admin.
+// Staged inventory is visible on the owner's local DEVELOPMENT preview only.
+// Real Vercel preview and production must read the approved Supabase Admin
+// catalogue instead: no synthetic checkout rows or shadowing a live product.
 export function stagedBogoProducts(): any[] {
   return process.env.NODE_ENV === 'development' && !process.env.VERCEL && !process.env.VERCEL_ENV
     ? products : [];

@@ -26,7 +26,8 @@ const BogoCard = memo(function BogoCard({ product, live }: { product: any; live:
   const title = String(product.title).split(' — Buy 1')[0];
   const image = normalizeImageUrl(product.imageUrl || '');
   const stock = product.stock == null || product.stock === '' ? 30 : Number(product.stock);
-  const available = live && stock > 0;
+  const previewOnly = product.bogoPreviewOnly === true;
+  const available = live && stock > 0 && !previewOnly;
   async function add() {
     if (busy || !available) return;
     setBusy(true); setError('');
@@ -47,8 +48,9 @@ const BogoCard = memo(function BogoCard({ product, live }: { product: any; live:
       <h3>{title}</h3>
       <strong className="bogo-card__price">{money(Number(product.price))}</strong>
       <p className="bogo-card__terms">1 paid + 1 free {product.bogoOffer?.unitLabel || 'pack'}<br/>Same design{product.hasVariants ? ' & size' : ''}</p>
+      {previewOnly ? <p className="text-xs font-bold text-amber-700">Preview only · inventory pending Admin approval</p> : null}
     </Link>
-    <button type="button" disabled={busy || !available} onClick={() => void add()} className="bogo-card__add"><ShoppingBag size={15}/>{busy ? 'Checking…' : !available ? stock <= 0 ? 'Sold out' : 'Offer paused' : product.hasVariants ? 'Choose size · Get 2' : 'Add offer · Get 2'}</button>
+    <button type="button" disabled={busy || !available} onClick={() => void add()} className="bogo-card__add"><ShoppingBag size={15}/>{busy ? 'Checking…' : !available ? previewOnly ? 'Preview only' : stock <= 0 ? 'Sold out' : 'Offer paused' : product.hasVariants ? 'Choose size · Get 2' : 'Add offer · Get 2'}</button>
     {error ? <p className="bogo-card__error" role="alert">{error}</p> : null}
   </article>;
 });
@@ -87,7 +89,18 @@ export default function BogoDeals({ products, landing = false }: { products: any
   const live = now !== null && windowState.live;
   const seconds = windowState.remaining;
   const digits = now === null ? ['--', '--', '--'] : [Math.floor(seconds / 3600), Math.floor(seconds % 3600 / 60), seconds % 60].map(value => String(value).padStart(2, '0'));
-  if (!config.enabled || !offers.length) return landing ? <section className="bogo-section"><h1>Buy 1 Get 1 Free</h1><p>These offers are currently unavailable. Please check again soon.</p><Link href="/deals">Browse Mega Deals →</Link></section> : null;
+  // Never make an empty Admin catalogue look like a loaded promotion.
+  // Keep the real homepage destination visible, but do not show fake product
+  // cards or allow the unimported development-only inventory to be purchased.
+  if (!config.enabled || !offers.length) {
+    if (landing) return <section className="bogo-section bogo-section--landing"><h1>Buy 1 Get 1 Free</h1><p>These offers are currently unavailable. Please check again soon.</p><Link href="/">Back to home</Link></section>;
+    return <section className="bogo-section bogo-section--unavailable" aria-label="Buy One Get One Free">
+      <Link href="/deals/bogo" className="flex items-center gap-4 rounded-2xl border border-emerald-700/20 bg-emerald-50 p-4 text-emerald-950">
+        <Image src="/bogo/gift-icon.webp" width={80} height={80} sizes="80px" alt="" />
+        <div><h2 className="text-lg font-black">Buy 1 Get 1 Free</h2><p className="text-xs">Offers filhal available nahi hain. Check details.</p><span className="mt-1 inline-block text-xs font-bold underline">View BOGO page</span></div>
+      </Link>
+    </section>;
+  }
   const Heading = landing ? 'h1' : 'h2';
   return <section className={`bogo-section${landing ? ' bogo-section--landing' : ''}`} aria-label="Buy one get one free offers">
     <div className="bogo-hero collection-banner--photos">

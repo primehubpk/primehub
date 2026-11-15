@@ -160,7 +160,8 @@ test('deal settings invalidation updates catalog, product and fresh purchase pri
   await s.getPublicCatalogSnapshot();
   collection.items = [{ productId: 'a', dealPrice: 50, referencePrice: 100 }];
   nextCache.revalidateTag('storefront-settings');
-  assert.equal((await s.getPublicProductSnapshot('a')).product.price, 50);
-  assert.equal((await s.getPublicCatalogSnapshot()).products.find(item => item.id === 'a').price, 50);
-  assert.equal((await s.getFreshPublicProductSnapshot('a')).product.price, 50);
+  // The whole owner-configured Mega collection receives a single 10% markup.
+  assert.equal((await s.getPublicProductSnapshot('a')).product.price, 55);
+  assert.equal((await s.getPublicCatalogSnapshot()).products.find(item => item.id === 'a').price, 55);
+  assert.equal((await s.getFreshPublicProductSnapshot('a')).product.price, 55);
 });

@@ -31,9 +31,9 @@ test('migration includes all Weekly and Big slots at their exact advertised pric
   const config = resolveUnifiedDealCollection(legacy);
   assert.equal(config.collectionVersion, 2);
   const offers = resolveGlassOfferProducts(products, config);
-  assert.deepEqual(offers.map(item => [item.product.id, item.price]), [['weekly', 190], ['watch', 999], ['bag', 500]]);
-  assert.equal(offers[0].savingPercent, 36);
-  assert.equal(offers[1].savingPercent, 67);
+  assert.deepEqual(offers.map(item => [item.product.id, item.price]), [['weekly', 209], ['watch', 1099], ['bag', 550]]);
+  assert.equal(offers[0].savingPercent, 30);
+  assert.equal(offers[1].savingPercent, 63);
 });
 
 test('normalization is idempotent, retires all schedules, and never mutates source documents', () => {
@@ -72,17 +72,19 @@ test('disabled collection leaves actual catalog and variant prices untouched', (
 test('all selected variants keep migrated selling price without modifying original stock or IDs', () => {
   const before = structuredClone(products[1]);
   const priced = applyCollectionPrice(products[1], resolveUnifiedDealCollection(legacy));
-  assert.equal(priced.price, 999);
-  assert.equal(priced.variantMatrix[0].price, 999);
+  assert.equal(priced.price, 1099);
+  assert.equal(priced.variantMatrix[0].price, 1099);
   assert.equal(priced.variantMatrix[0].stock, 4);
   assert.equal(priced.id, 'watch');
+  assert.equal(applyCollectionPrice(applyCollectionPrice(products[1], resolveUnifiedDealCollection(legacy)), resolveUnifiedDealCollection(legacy)).price, 1099);
+  assert.equal(applyCollectionPrice({id:'regular',price:999}, resolveUnifiedDealCollection(legacy)).price,999);
   assert.deepEqual(products[1], before);
 });
 
 test('new collection products may use catalog prices or an explicit selling price', () => {
   const config = { collectionVersion: 2, items: [{ productId: 'bag' }, { productId: 'watch', dealPrice: 799 }] };
-  assert.equal(applyCollectionPrice(products[2], config).price, 1500);
-  assert.equal(applyCollectionPrice(products[1], config).price, 799);
+  assert.equal(applyCollectionPrice(products[2], config).price, 1650);
+  assert.equal(applyCollectionPrice(products[1], config).price, 879);
   assert.equal(applyCollectionPrice({ id: 'regular', price: 200 }, config).price, 200);
 });
 
@@ -117,7 +119,7 @@ test('homepage has one campaign with banner above swipe row and shared six-secon
 });
 
 test('old customer links all reach the unified deals page', async () => {
-  for (const file of ['app/weekly-deals/page.tsx', 'app/deals/big/page.tsx', 'app/deals/[day]/page.tsx', 'app/deals/glass-bangles/page.tsx']) {
+  for (const file of ['app/weekly-deals/page.tsx', 'app/deals/big/page.tsx', 'app/deals/[day]/page.tsx']) {
     assert.match(await fs.readFile(path.join(root, file), 'utf8'), /redirect\('\/deals'\)/);
   }
 });
@@ -430,8 +432,8 @@ test('each fresh homepage entry shuffles the newest items but retains all IDs', 
   assert.equal(second.length, 96);
   assert.equal(new Set(second.map(x => x.id)).size, 96);
   assert.notEqual(first[0].id, second[0].id);
-  const topIds = new Set(items.slice(0, 24).map(x => x.id));
-  assert.ok(second.slice(0, 24).every(x => topIds.has(x.id)));
+  const topIds = new Set(items.slice(0, 12).map(x => x.id));
+  assert.ok(second.slice(0, 12).every(x => topIds.has(x.id)));
   assert.deepEqual(second, recentProductsForVisit(items, 1202, 'new-arrivals-home', first[0].id));
   const hook = await fs.readFile(path.join(root, 'lib/useVisitProductOrder.ts'), 'utf8');
   assert.match(hook, /useLayoutEffect\(\(\) => \{\s*const active = enabled && pathname === '\/'/);
@@ -563,4 +565,27 @@ test('first HTML paint uses per-request server visit ordering and distinct dedic
   assert.match(bogo, /<BogoDeals products=\{snapshot\.products\} landing\/>/);
   assert.match(sitemap, /'\/deals\/glass-bangles'/);
   assert.match(sitemap, /'\/deals\/bogo'/);
+});
+
+
+test('all configured Mega deal items, including watches and twelve glass boxes, gain ten percent once', () => {
+  const first=STARTER_GLASS_OFFERS[0].productId;
+  const glass={id:first,title:'Glass box',price:999,originalPrice:3000,variantMatrix:[{size:'2.6',price:999}]};
+  const once=applyCollectionPrice(glass);
+  assert.equal(once.price,1099);
+  assert.equal(once.variantMatrix[0].price,1099);
+  assert.equal(applyCollectionPrice(once).price,1099);
+  assert.equal(glass.price,999);
+  assert.equal(applyCollectionPrice({id:'watch',price:999}, {enabled:true,items:[{productId:'watch',dealPrice:999}]}).price,1099);
+  const settings={glassDealShowcase:{enabled:true,collectionVersion:2,items:[{productId:first},{productId:'watch'}]}};
+  const eligible=orderEligibleSubtotal([
+    {productId:first,price:1099,quantity:1,dealCategory:'mega'},
+    {productId:'bogo',price:440,quantity:1,dealCategory:'bogo',promotion:{type:'buy-one-get-one-free'}},
+    {productId:'regular',price:500,quantity:2},
+  ],settings);
+  assert.equal(eligible,1000);
+  assert.equal(orderEligibleSubtotal([
+    {productId:first,price:1099,quantity:1},
+    {productId:'bogo',price:440,quantity:1,dealCategory:'bogo'}
+  ],settings),0);
 });

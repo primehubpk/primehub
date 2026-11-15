@@ -4,7 +4,7 @@ import { STOREFRONT_REVALIDATE_SECONDS, publicProductCacheTag } from '@/lib/stor
 import { getDualCatalog, getDualCategories, getDualProduct, getDualStorefrontSettings, getDualSkills } from '@/lib/dualReadServer';
 import { getStorefrontSettingsWithBigDealRecovery } from '@/lib/storefrontSettingsServer';
 import { getCachedWholesaleVideosSnapshot } from '@/lib/wholesaleVideosServer';
-import { applyBogoAvailability } from '@/lib/bogoOffers';
+import { applyBogoAvailability, applyBogoOfferPrice } from '@/lib/bogoOffers';
 import { applyCollectionPrice } from '@/lib/glassOffers';
 
 const CATALOG_RETRY_DELAYS_MS = [0];
@@ -66,7 +66,7 @@ async function loadPublicCatalog() {
 
     if (result.source !== 'empty' && result.products.length > 0) {
       return {
-        products: result.products.map(product => applyBogoAvailability(applyCollectionPrice(product, settings.glassDealShowcase), (settings as any).bogoDealShowcase)),
+        products: result.products.map(product => applyBogoAvailability(applyBogoOfferPrice(applyCollectionPrice(product, settings.glassDealShowcase)), (settings as any).bogoDealShowcase)),
         categories: result.categories,
         source: result.source,
       };
@@ -78,7 +78,7 @@ async function loadPublicCatalog() {
 
 export const getPublicCatalogSnapshot = unstable_cache(
   loadPublicCatalog,
-  ['primehub-public-catalog-dual-v10-bogo'],
+  ['primehub-public-catalog-dual-v11-offer-markup-preview'],
   { revalidate: STOREFRONT_REVALIDATE_SECONDS, tags: ['public-catalog', 'storefront-settings'] },
 );
 
@@ -137,7 +137,7 @@ export async function getFreshPublicCatalogSnapshot() {
   if (result.source === 'empty' || result.products.length === 0) {
     throw new Error(`Fresh public catalog unavailable (source: ${result.source}).`);
   }
-  return { ...result, products: result.products.map(product => applyBogoAvailability(applyCollectionPrice(product, settings.glassDealShowcase), (settings as any).bogoDealShowcase)) };
+  return { ...result, products: result.products.map(product => applyBogoAvailability(applyBogoOfferPrice(applyCollectionPrice(product, settings.glassDealShowcase)), (settings as any).bogoDealShowcase)) };
 }
 
 async function loadPublicProduct(productId: string) {
@@ -146,7 +146,7 @@ async function loadPublicProduct(productId: string) {
   const [result, settings] = await Promise.all([getDualProduct(id, PRODUCT_READ_CACHE), getStorefrontSettingsSnapshot()]);
   // An upstream outage must not replace a last-good cached product with null.
   if (result.source === 'empty') throw new Error('Public product unavailable.');
-  return { ...result, product: result.product ? applyBogoAvailability(applyCollectionPrice(result.product, settings.glassDealShowcase), (settings as any).bogoDealShowcase) : null };
+  return { ...result, product: result.product ? applyBogoAvailability(applyBogoOfferPrice(applyCollectionPrice(result.product, settings.glassDealShowcase)), (settings as any).bogoDealShowcase) : null };
 }
 
 export async function getPublicProductSnapshot(productId: string) {
@@ -154,7 +154,7 @@ export async function getPublicProductSnapshot(productId: string) {
   if (!id) return { product: null, source: 'empty' as const };
   return unstable_cache(
     () => loadPublicProduct(id),
-    ['primehub-public-product-dual-v5-bogo', id],
+    ['primehub-public-product-dual-v6-offer-markup-preview', id],
     {
       revalidate: STOREFRONT_REVALIDATE_SECONDS,
       // Keep the roll-up tag for the explicitly requested full catalog refresh.
@@ -169,7 +169,7 @@ export async function getFreshPublicProductSnapshot(productId: string) {
   const [result, settings] = await Promise.all([
     getDualProduct(id, { cache: 'no-store', timeoutMs: PUBLIC_PRIMARY_TIMEOUT_MS }), getStorefrontSettingsSnapshot(),
   ]);
-  return { ...result, product: result.product ? applyBogoAvailability(applyCollectionPrice(result.product, settings.glassDealShowcase), (settings as any).bogoDealShowcase) : null };
+  return { ...result, product: result.product ? applyBogoAvailability(applyBogoOfferPrice(applyCollectionPrice(result.product, settings.glassDealShowcase)), (settings as any).bogoDealShowcase) : null };
 }
 
 async function loadStorefrontSettingsResult() {

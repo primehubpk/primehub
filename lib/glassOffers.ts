@@ -117,11 +117,21 @@ export function applyCollectionPrice<T extends { id?: string; price?: unknown; [
   const config = resolveGlassOffers(raw);
   const item = config.enabled ? config.items.find(entry => entry.productId === String(product.id || '')) : undefined;
   if (!item) return product;
-  const price = Number(item.dealPrice) > 0 ? Number(item.dealPrice) : Number(product.price);
-  if (!Number.isFinite(price) || price <= 0) return product;
+  // Every product in the owner-configured 70%-style Mega Deal collection gets
+  // exactly one 10% increase, including non-glass products and new Admin items.
+  // Preserve the original price across cached re-application:
+  // home -> offer component -> product details must never compound the increase.
+  const basePrice = Number(item.dealPrice) > 0
+    ? Number(item.dealPrice)
+    : Number(product.offerMarkupBasePrice) > 0
+      ? Number(product.offerMarkupBasePrice) : Number(product.price);
+  const glassIncrease = Boolean(item);
+  const price = glassIncrease ? Math.round(basePrice * 1.10) : basePrice;
+  if (!Number.isSafeInteger(price) || price <= 0) return product;
   const reference = Number(item.referencePrice) || Math.max(Number(product.originalPrice) || 0, Number(product.compareAtPrice) || 0);
   const rows = (value: unknown) => Array.isArray(value) ? value.map(row => ({ ...row, price })) : value;
   return { ...product, price, megaDealPrice: price,
+    ...(glassIncrease ? { offerMarkupBasePrice: basePrice, offerMarkupVersion: 'mega-10pct-nov15' } : {}),
     ...(reference > price ? { originalPrice: reference, compareAtPrice: reference } : {}),
     ...(Array.isArray(product.variantMatrix) ? { variantMatrix: rows(product.variantMatrix) } : {}),
     ...(Array.isArray(product.variants) ? { variants: rows(product.variants) } : {}),

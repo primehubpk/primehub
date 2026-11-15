@@ -32,6 +32,29 @@ export async function creditDeliveredOrderBenefits(orderId: string, authoritativ
       eligible > due || !Number.isFinite(percent) || percent < 0 || percent > 100) {
     throw new Error('Invalid verified order cashback snapshot.');
   }
+  // Check original, SERVER-WRITTEN order lines again at the final credit
+  // boundary. A stale referral/tier snapshot must never reward BOGO or Mega
+  // items, even if the cart and quote once misclassified those products.
+  if (Array.isArray(authoritativeOrder.items) && authoritativeOrder.items.length > 0) {
+    let regularSubtotal = 0;
+    for (const item of authoritativeOrder.items) {
+      const price = Number(item?.price);
+      const quantity = Number(item?.quantity);
+      if (!Number.isSafeInteger(price) || price < 0 || !Number.isSafeInteger(quantity) || quantity < 1) {
+        throw new Error('Invalid verified order line for cashback.');
+      }
+      if (item?.rewardExcluded === true ||
+          ['bogo', 'mega', 'weekly', 'big'].includes(String(item?.dealCategory || '')) ||
+          item?.promotion?.type === 'buy-one-get-one-free' || item?.weeklyDealDay) continue;
+      regularSubtotal += price * quantity;
+      if (!Number.isSafeInteger(regularSubtotal)) throw new Error('Invalid verified order total.');
+    }
+    const voucherDiscount = Number(authoritativeOrder.voucherDiscount || 0);
+    if (!Number.isSafeInteger(voucherDiscount) || voucherDiscount < 0 ||
+        eligible > Math.max(0, regularSubtotal - voucherDiscount)) {
+      throw new Error('Promotional products cannot receive wallet or referral cashback.');
+    }
+  }
   // Keep legacy pending voucher orders' original snapshots unchanged.
   const isReferral = authoritativeOrder.voucherRewardMode === 'exclusive_v1' &&
     authoritativeOrder.voucherKind === 'referral';

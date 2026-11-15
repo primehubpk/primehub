@@ -12,7 +12,7 @@ import { listCheckoutVouchers, resolveCheckoutVoucher } from '@/lib/checkoutVouc
 import { referralCode, resolveMemberReferralCode } from '@/lib/primeFamilyReferralsServer';
 import { bigDealConfiguredSlotCount, bigDealRotationIndex } from '@/lib/bigDealRotation';
 import { applyCollectionPrice, unifyStorefrontDeals } from '@/lib/glassOffers';
-import { bogoFulfilment, isBogoProduct, validateBogoOrder } from '@/lib/bogoOffers';
+import { applyBogoOfferPrice, bogoFulfilment, isBogoProduct, validateBogoOrder } from '@/lib/bogoOffers';
 
 export const runtime = 'nodejs';
 const WEEKDAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const;
@@ -99,7 +99,8 @@ async function buildAuthoritativeItems(items: IncomingItem[]) {
     const productId = String(item.productId || item.id || '');
     const storedProduct: any = products.get(productId);
     if (!storedProduct) throw new Error(`Product ${productId} is no longer available.`);
-    const product: any = applyCollectionPrice(storedProduct, settings.glassDealShowcase);
+    if (storedProduct.bogoPreviewOnly === true) throw new Error('BOGO preview photos are not yet available for purchase. Admin catalogue approval is required.');
+    const product: any = applyBogoOfferPrice(applyCollectionPrice(storedProduct, settings.glassDealShowcase));
     const variant: any = findVariant(product, item);
     const rawStock = variant?.stock ?? product.stock ?? product.quantity;
     const stockProvided = rawStock !== undefined && rawStock !== null && rawStock !== '';

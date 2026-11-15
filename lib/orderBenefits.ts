@@ -1,7 +1,7 @@
 import { resolveUnifiedDealCollection, type DealCollectionSource } from './glassOffers';
 
 /** Calculations for cash wallet and vouchers. Never trust cart-supplied deal flags. */
-export type BenefitItem = { productId: string; price: number; quantity: number; weeklyDealDay?: string | null; rewardExcluded?: boolean };
+export type BenefitItem = { productId: string; price: number; quantity: number; weeklyDealDay?: string | null; rewardExcluded?: boolean; dealCategory?: string; promotion?: { type?: string } | null };
 export type BenefitSettings = DealCollectionSource;
 
 export function orderEligibleSubtotal(items: BenefitItem[], settings: BenefitSettings) {
@@ -23,7 +23,9 @@ export function orderEligibleSubtotal(items: BenefitItem[], settings: BenefitSet
     }
   }
   return items.reduce((sum, item) => {
-    if (excluded.has(String(item.productId)) || item.weeklyDealDay || item.rewardExcluded) return sum;
+    if (excluded.has(String(item.productId)) || item.weeklyDealDay || item.rewardExcluded ||
+      ['mega', 'bogo', 'weekly', 'big'].includes(String(item.dealCategory || '')) ||
+      item.promotion?.type === 'buy-one-get-one-free') return sum;
     const lineTotal = Number(item.price) * Number(item.quantity);
     if (!Number.isSafeInteger(lineTotal) || lineTotal < 0) throw new Error('Invalid eligible order amount.');
     if (!Number.isSafeInteger(sum + lineTotal)) throw new Error('Order total exceeds supported range.');
