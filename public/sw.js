@@ -1,12 +1,11 @@
 // PrimeHubMall PWA service worker.
-// Only static/app-shell assets are cached. Live HTML, APIs, cart, checkout,
-// orders, account data and price-bearing responses always stay network-driven.
-const VERSION = 'primehub-pwa-v7';
+// Cache only static/app-shell assets. All navigations are network-first.
+// Never persist HTML, catalogs, prices, cart, checkout or account data.
+const VERSION = 'primehub-pwa-v8';
 const SHELL_CACHE = `${VERSION}-shell`;
 const STATIC_CACHE = `${VERSION}-static`;
 const IMAGE_CACHE = `${VERSION}-images`;
-const PAGE_CACHE = `${VERSION}-pages`;
-const PRIMEHUB_CACHES = [SHELL_CACHE, STATIC_CACHE, IMAGE_CACHE, PAGE_CACHE];
+const PRIMEHUB_CACHES = [SHELL_CACHE, STATIC_CACHE, IMAGE_CACHE];
 const TRUSTED_IMAGE_ORIGINS = new Set([
   self.location.origin,
   'https://images.primehubmall.com',
@@ -62,55 +61,15 @@ async function imageCacheFirst(request) {
   }
 }
 
-function isPrivatePage(pathname) {
-  return (
-    pathname.startsWith('/api/') ||
-    pathname.startsWith('/admin') ||
-    pathname.startsWith('/checkout') ||
-    pathname.startsWith('/cart') ||
-    pathname.startsWith('/account') ||
-    pathname.startsWith('/login') ||
-    pathname.startsWith('/orders') ||
-    pathname.startsWith('/wallet') ||
-    pathname.startsWith('/reseller') ||
-    pathname.startsWith('/auth')
-  );
-}
-
 async function networkNavigation(event) {
   try {
     const preloaded = await event.preloadResponse;
     if (preloaded) return preloaded;
-    return await fetch(event.request);
+    // Bypass HTTP cached HTML; products and prices must reflect the live release.
+  return await fetch(event.request, { cache: 'no-store' });
   } catch {
     return (await caches.match('/offline.html')) || Response.error();
   }
-}
-
-function rememberPage(cache, request, response) {
-  if (!response || !response.ok || response.type !== 'basic' || response.redirected) return Promise.resolve();
-  const cacheControl = response.headers.get('cache-control') || '';
-  if (/private|no-store/i.test(cacheControl)) return Promise.resolve();
-  return cache.put(request, response.clone()).then(() => trimCache(PAGE_CACHE, 12));
-}
-
-// Repeat app opens paint the last page immediately, then refresh that copy in
-// the background. This is the same one navigation request as before, not an
-// extra catalog read.
-async function staleWhileRevalidateNavigation(event) {
-  const cache = await caches.open(PAGE_CACHE);
-  const cached = await cache.match(event.request);
-  const update = (async () => {
-    const preloaded = await event.preloadResponse;
-    const response = preloaded || await fetch(event.request);
-    await rememberPage(cache, event.request, response);
-    return response;
-  })().catch(async () => cached || (await caches.match('/offline.html')) || Response.error());
-  if (cached) {
-    event.waitUntil(update.then(() => undefined));
-    return cached;
-  }
-  return update;
 }
 
 self.addEventListener('install', (event) => {
@@ -165,19 +124,11 @@ self.addEventListener('fetch', (event) => {
   // Never intercept customer/business data endpoints.
   if (url.pathname.startsWith('/api/')) return;
 
-  // Account, cart, checkout and admin stay network-only. Public storefront
-  // pages paint from the last visit, then refresh once in the background.
+  // All HTML navigations are network-first, including the public Home page.
+  // Serving previous-deployment HTML from CacheStorage shows outdated deals,
+  // even after production is READY. Never cache price-bearing page responses.
   if (request.mode === 'navigate') {
-    if (
-      request.headers.get('RSC') ||
-      request.headers.get('Next-Router-Prefetch') ||
-      request.headers.get('Next-Router-Segment-Prefetch') ||
-      isPrivatePage(url.pathname)
-    ) {
-      event.respondWith(networkNavigation(event));
-      return;
-    }
-    event.respondWith(staleWhileRevalidateNavigation(event));
+    event.respondWith(networkNavigation(event));
     return;
   }
 

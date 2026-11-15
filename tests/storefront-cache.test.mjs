@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 import { afterEach, test } from 'node:test';
+import { readFile } from 'node:fs/promises';
+import { runInNewContext } from 'node:vm';
 import { fetchPublicStorefront, invalidatePublicStorefront } from '../lib/storefrontClient.ts';
 
 const originalFetch = globalThis.fetch;
@@ -75,4 +77,64 @@ test('ordinary expired public reads allow HTTP caching instead of forcing an ori
   now += 60_001;
   await fetchPublicStorefront('settings');
   assert.deepEqual(modes, ['no-store', 'default']);
+});
+
+test('PWA always retrieves fresh online HTML and deletes previous deployment page caches', async () => {
+  const code = await readFile(new URL('../public/sw.js', import.meta.url), 'utf8');
+  const events = new Map();
+  const deletedCaches = [];
+  let cacheMatchCalled = false;
+  let observedRequest = null;
+  const stalePage = new Response('OLD BIG DEAL PAGE', { status: 200 });
+  const context = {
+    URL, Request, Response, Promise, Set, console,
+    self: {
+      location: { origin: 'https://www.primehubmall.com' },
+      addEventListener: (name, callback) => events.set(name, callback),
+      skipWaiting: async () => {},
+      clients: { claim: async () => {} },
+      registration: { navigationPreload: { enable: async () => {} } },
+    },
+    caches: {
+      keys: async () => ['primehub-pwa-v7-pages', 'primehub-pwa-v7-static', 'primehub-pwa-v8-shell'],
+      delete: async (name) => { deletedCaches.push(name); return true; },
+      match: async (request) => {
+        cacheMatchCalled = true;
+        return request === '/offline.html' ? new Response('OFFLINE') : stalePage;
+      },
+      open: async () => ({ add: async () => {} }),
+    },
+    fetch: async (request, options) => {
+      observedRequest = { url: request.url, cache: options?.cache };
+      return new Response('CURRENT MEGA AND BOGO PAGE', { status: 200 });
+    },
+  };
+
+  runInNewContext(code, context, { filename: 'public/sw.js' });
+  const activation = { waitUntil(promise) { this.completion = promise; } };
+  events.get('activate')(activation);
+  await activation.completion;
+  assert.deepEqual(deletedCaches.sort(), ['primehub-pwa-v7-pages', 'primehub-pwa-v7-static']);
+
+  const navigation = {
+    request: {
+      url: 'https://www.primehubmall.com/',
+      method: 'GET',
+      mode: 'navigate',
+      destination: 'document',
+      headers: { get: () => null },
+    },
+    preloadResponse: Promise.resolve(undefined),
+    respondWith(promise) { this.result = promise; },
+  };
+  events.get('fetch')(navigation);
+  assert.equal(await (await navigation.result).text(), 'CURRENT MEGA AND BOGO PAGE');
+  assert.deepEqual(observedRequest, { url: 'https://www.primehubmall.com/', cache: 'no-store' });
+  assert.equal(cacheMatchCalled, false, 'live online navigation must not read stale cache');
+
+  context.fetch = async () => { throw new Error('Offline'); };
+  const offline = { ...navigation, respondWith(promise) { this.result = promise; } };
+  events.get('fetch')(offline);
+  assert.equal(await (await offline.result).text(), 'OFFLINE');
+  assert.equal(cacheMatchCalled, true, 'only the offline static shell is read when disconnected');
 });
