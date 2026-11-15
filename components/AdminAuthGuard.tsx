@@ -16,28 +16,64 @@ export default function AdminAuthGuard({ children }: Props) {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [sessionUnavailable, setSessionUnavailable] = useState(false);
+  const [verificationAttempt, setVerificationAttempt] = useState(0);
 
   useEffect(() => {
     let active = true;
-    fetch('/api/admin/session', { cache: 'no-store', credentials: 'same-origin' })
-      .then((response) => response.json().catch(() => null))
-      .then((data) => {
-        if (!active) return;
-        const activeSession = data?.authenticated === true;
-        setAuthenticated(activeSession);
+    setChecking(true);
+    setSessionUnavailable(false);
+
+    const checkSavedSession = async () => {
+      // A temporary network/5xx failure must never turn a valid remembered
+      // device cookie into a new password prompt. Only the server can confirm
+      // admin access; localStorage is used solely to decide whether to retry.
+      for (let attempt = 0; attempt < 2 && active; attempt++) {
         try {
-          if (activeSession) window.localStorage.setItem(ADMIN_HINT_KEY, '1');
-          else window.localStorage.removeItem(ADMIN_HINT_KEY);
-        } catch {}
-      })
-      .catch(() => {
-        if (active) setAuthenticated(false);
-      })
-      .finally(() => {
-        if (active) setChecking(false);
-      });
+          const response = await fetch('/api/admin/session', {
+            cache: 'no-store',
+            credentials: 'same-origin',
+          });
+          if (!response.ok) throw new Error('Admin session verification unavailable.');
+          const data = await response.json();
+          if (typeof data?.authenticated !== 'boolean') {
+            throw new Error('Invalid admin session response.');
+          }
+          if (!active) return;
+
+          let remembered = false;
+          try { remembered = window.localStorage.getItem(ADMIN_HINT_KEY) === '1'; } catch {}
+          if (!data.authenticated && remembered && attempt === 0) {
+            // A single retry for a previously logged-in device protects
+            // against transient deployment/server signing-key errors.
+            await new Promise((resolve) => window.setTimeout(resolve, 350));
+            continue;
+          }
+
+          setAuthenticated(data.authenticated);
+          try {
+            if (data.authenticated) window.localStorage.setItem(ADMIN_HINT_KEY, '1');
+            else window.localStorage.removeItem(ADMIN_HINT_KEY);
+          } catch {}
+          setChecking(false);
+          return;
+        } catch {
+          if (attempt === 0) {
+            await new Promise((resolve) => window.setTimeout(resolve, 350));
+          }
+        }
+      }
+
+      if (!active) return;
+      // Fail closed without deleting a potentially valid signed cookie.
+      setAuthenticated(false);
+      setSessionUnavailable(true);
+      setChecking(false);
+    };
+
+    void checkSavedSession();
     return () => { active = false; };
-  }, []);
+  }, [verificationAttempt]);
 
   async function login(event: FormEvent) {
     event.preventDefault();
@@ -59,6 +95,7 @@ export default function AdminAuthGuard({ children }: Props) {
       }
 
       setAuthenticated(true);
+      setSessionUnavailable(false);
       try { window.localStorage.setItem(ADMIN_HINT_KEY, '1'); } catch {}
       setPassword('');
       router.replace('/admin');
@@ -87,6 +124,27 @@ export default function AdminAuthGuard({ children }: Props) {
 
   if (checking) {
     return <div className="flex min-h-screen items-center justify-center bg-[#F4F4F1]"><div className="rounded-3xl bg-white px-6 py-5 text-xs font-black shadow-sm">Opening admin...</div></div>;
+  }
+
+  if (sessionUnavailable) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[#F4F4F1] px-4">
+        <div className="w-full max-w-sm rounded-[30px] bg-white p-7 shadow-xl">
+          <ShieldCheck size={30} className="text-[#14140F]" />
+          <h1 className="mt-5 text-2xl font-black">Checking admin login</h1>
+          <p className="mt-2 text-xs leading-5 text-black/55">
+            Connection ki wajah se saved login verify nahi ho saka. Session delete nahi hua.
+          </p>
+          <button
+            type="button"
+            onClick={() => setVerificationAttempt((value) => value + 1)}
+            className="mt-5 w-full rounded-2xl bg-[#14140F] py-4 text-xs font-black text-white"
+          >
+            Retry saved login
+          </button>
+        </div>
+      </main>
+    );
   }
 
   if (!authenticated) {

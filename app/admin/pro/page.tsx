@@ -24,6 +24,7 @@ export default function ProfessionalAdminPage() {
 function ProfessionalAdmin() {
   const [activeTab, setActiveTab] = useState<Tab>('dashboard');
   const [search, setSearch] = useState('');
+  const [logoutError, setLogoutError] = useState('');
   const [products, setProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [vendorRequests, setVendorRequests] = useState<VendorRequest[]>([]);
@@ -53,6 +54,25 @@ function ProfessionalAdmin() {
     };
   }, []);
 
+  async function logout() {
+    setLogoutError('');
+    try {
+      const response = await fetch('/api/admin/session', {
+        method: 'DELETE',
+        cache: 'no-store',
+        credentials: 'same-origin',
+      });
+      if (!response.ok) throw new Error('Admin logout unavailable');
+    } catch {
+      // Never report logout while the signed server cookie remains valid.
+      setLogoutError('Logout complete nahi ho saka. Connection check kar ke dobara try karein.');
+      return;
+    }
+    try { window.localStorage.removeItem('primehub-admin-session-hint-v1'); } catch {}
+    await signOut(auth).catch(() => undefined);
+    window.location.assign('/admin');
+  }
+
   const handleTabChange = (tab: AdminTab) => {
     // Rewards is rendered by the parent admin router; Media Library has been removed.
     if (tab !== 'rewards') setActiveTab(tab);
@@ -70,5 +90,5 @@ function ProfessionalAdmin() {
     }
   };
 
-  return <main className="min-h-screen bg-[#F4F4F1]"><AdminHeader activeTab={activeTab} onTabChange={handleTabChange} onLogout={() => signOut(auth)} search={search} onSearchChange={setSearch} stats={{ totalProducts: products.length, totalOrders: orders.length }} />{render()}</main>;
+  return <main className="min-h-screen bg-[#F4F4F1]">{logoutError ? <p role="alert" className="mx-auto max-w-6xl px-4 py-3 text-xs font-bold text-red-700">{logoutError}</p> : null}<AdminHeader activeTab={activeTab} onTabChange={handleTabChange} onLogout={() => void logout()} search={search} onSearchChange={setSearch} stats={{ totalProducts: products.length, totalOrders: orders.length }} />{render()}</main>;
 }
