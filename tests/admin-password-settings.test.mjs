@@ -115,3 +115,13 @@ test('Remembered device only shows password for a verified missing session, not 
   assert.match(session, /response\.cookies\.set\(WALLET_ADMIN_COOKIE, '',/);
   assert.match(session, /'Cache-Control', 'no-store'/);
 });
+
+test('Professional Admin logout revokes the same signed cookie as the main Admin', () => {
+  const pro = fs.readFileSync('app/admin/pro/page.tsx', 'utf8');
+  assert.match(pro, /fetch\('\/api\/admin\/session'/);
+  assert.match(pro, /method: 'DELETE'/);
+  assert.match(pro, /credentials: 'same-origin'/);
+  assert.match(pro, /window\.localStorage\.removeItem\('primehub-admin-session-hint-v1'\)/);
+  assert.match(pro, /onLogout=\{\(\) => void logout\(\)\}/);
+  assert.ok(!pro.includes('onLogout={() => signOut(auth)}'));
+});
