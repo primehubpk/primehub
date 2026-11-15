@@ -583,11 +583,12 @@ test('all configured Mega deal items, including watches and twelve glass boxes, 
     {productId:'bogo',price:440,quantity:1,dealCategory:'bogo',promotion:{type:'buy-one-get-one-free'}},
     {productId:'regular',price:500,quantity:2},
   ],settings);
-  assert.equal(eligible,1000);
+  // Buyer earns on the entire PAID Mega, BOGO and regular subtotal.
+  assert.equal(eligible,2539);
   assert.equal(orderEligibleSubtotal([
     {productId:first,price:1099,quantity:1},
     {productId:'bogo',price:440,quantity:1,dealCategory:'bogo'}
-  ],settings),0);
+  ],settings),1539);
 });
 
 test('all Mega offer and BOGO items stay out of ordinary Home Shop categories and Sale Mela', async () => {
