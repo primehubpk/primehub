@@ -2,7 +2,7 @@
 
 import RetryableStorefrontImage from '@/components/RetryableStorefrontImage';
 import Link from "next/link";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ChevronRight, Package, ShoppingCart } from "lucide-react";
 import FastProductLink from "@/components/FastProductLink";
 import HomeHeading from "@/components/home/HomeHeading";
@@ -17,14 +17,16 @@ import {
   titleOf,
   type Product,
 } from "@/components/shop/ShopTypes";
-import { isDirectStorefrontImage } from "@/lib/imageUrl";
+import { isDirectStorefrontImage, normalizeImageUrl } from "@/lib/imageUrl";
 import { getEffectivePrice } from "@/lib/dealPricing";
 import { getVerifiedDealProduct } from "@/lib/verifiedDealProduct";
 import { isWholesaleProduct } from "@/lib/wholesale";
 import HomeRailFrame from './HomeRailFrame';
+import { Commerce3DBanner } from './HomeCommerceRails';
 import { useContinuousHomeRail } from '@/lib/useContinuousHomeRail';
-import { isExclusiveGlassDealProduct } from '@/lib/glassOffers';
-import { orderHomeProducts, sessionRailSeed } from '@/lib/homeRailOrder';
+import { useVisitProductOrder } from '@/lib/useVisitProductOrder';
+import { isDedicatedDealProduct } from '@/lib/glassOffers';
+import { orderHomeProducts } from '@/lib/homeRailOrder';
 import {
   isWholesalePriceBucket,
   matchesPriceBucket,
@@ -137,7 +139,7 @@ function buildHomeTwoRowProducts(
     return [...exactPrice, ...higherPriceTrail];
   }
 
-  // Wholesale keeps its two-row refresh rotation with newer packs favoured.
+  // Wholesale keeps its stable refresh order with newer packs favoured.
   const priorityOrder = newestHomeRow(products, amount, true);
   const topRowCount = Math.ceil(products.length / 2);
   const topRow = priorityOrder.slice(0, topRowCount);
@@ -360,6 +362,7 @@ const HOME_GRID_PRODUCT_BATCH = 24;
 function ProgressiveHomeSaleProducts({
   products,
   standalone,
+  verticalHome = false,
   wholesale,
   href,
   label,
@@ -367,23 +370,25 @@ function ProgressiveHomeSaleProducts({
 }: {
   products: Product[];
   standalone: boolean;
+  verticalHome?: boolean;
   wholesale: boolean;
   href: string;
   label: string;
   cropImageEdges?: boolean;
 }) {
-  const initialLimit = standalone ? HOME_GRID_INITIAL_PRODUCTS : HOME_RAIL_INITIAL_PRODUCTS;
-  const batchSize = standalone ? HOME_GRID_PRODUCT_BATCH : HOME_RAIL_PRODUCT_BATCH;
+  const initialLimit = standalone || verticalHome ? HOME_GRID_INITIAL_PRODUCTS : HOME_RAIL_INITIAL_PRODUCTS;
+  const batchSize = standalone || verticalHome ? HOME_GRID_PRODUCT_BATCH : HOME_RAIL_PRODUCT_BATCH;
   const [limit, setLimit] = useState(initialLimit);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const movingRailRef = useRef<HTMLDivElement>(null);
+  const { items: visitProducts, ready } = useVisitProductOrder(products, `sale-${href}`, movingRailRef, !standalone);
 
   useEffect(() => {
     setLimit(initialLimit);
   }, [initialLimit, products.length]);
 
   useEffect(() => {
-    if (!standalone || limit >= products.length) return;
+    if ((!standalone && !verticalHome) || limit >= products.length) return;
     const node = loadMoreRef.current;
     if (!node || typeof IntersectionObserver === "undefined") return;
 
@@ -398,24 +403,52 @@ function ProgressiveHomeSaleProducts({
 
     observer.observe(node);
     return () => observer.disconnect();
-  }, [batchSize, limit, products.length, standalone]);
+  }, [batchSize, limit, products.length, standalone, verticalHome]);
 
-  const visibleProducts = products.slice(0, limit);
-  // Keep two-row grid copies aligned even with an odd source length.
-  const loopProducts = !standalone && visibleProducts.length % 2 === 1 && visibleProducts.length > 1
-    ? [...visibleProducts, visibleProducts[0]] : visibleProducts;
-  useContinuousHomeRail(movingRailRef, { enabled: !standalone, itemCount: loopProducts.length, speed: 24 });
+  // The final vertical Sale Mela must eventually display EVERY product,
+  // even on phones where IntersectionObserver misses a 1px sentinel.
+  // Expand in short batches to avoid hydrating hundreds of cards in one frame.
+  // Mobile: do not eagerly mount hundreds of products in all four collections
+  // while the visitor is still looking at Mega Deals. This slows hydration and
+  // makes the visible first images appear unchanged after refresh.
+  // Load the NEXT batch when its own sentinel approaches the viewport.
+  // The scroll listener is a fallback for mobile IntersectionObserver delays.
+  useEffect(() => {
+    if (!verticalHome || limit >= products.length) return;
+    const checkNearEnd = () => {
+      const node = loadMoreRef.current;
+      if (!node) return;
+      const bounds = node.getBoundingClientRect();
+      if (bounds.top <= window.innerHeight + 1100 && bounds.bottom >= -200) {
+        setLimit((count) => Math.min(products.length, count + batchSize));
+      }
+    };
+    const first = window.setTimeout(checkNearEnd, 180);
+    window.addEventListener('scroll', checkNearEnd, { passive: true });
+    window.addEventListener('resize', checkNearEnd);
+    return () => {
+      window.clearTimeout(first);
+      window.removeEventListener('scroll', checkNearEnd);
+      window.removeEventListener('resize', checkNearEnd);
+    };
+  }, [verticalHome, limit, products.length, batchSize]);
+
+  // OWNER LOCK: every home product is reachable in one horizontal row.
+  // Only the separate standalone page retains its existing progressive grid.
+  const visibleProducts = standalone ? products.slice(0, limit) : verticalHome ? visitProducts.slice(0, limit) : visitProducts;
+  const loopProducts = visibleProducts;
+  useContinuousHomeRail(movingRailRef, { enabled: !standalone && !verticalHome, itemCount: loopProducts.length, speed: 24, startDelayMs: 8000 });
 
   return (
     <div
       ref={movingRailRef}
-      className="home-sale-products [scrollbar-width:none]"
-      style={standalone ? standaloneGridStyle : {
+      className={`home-sale-products [scrollbar-width:none]${verticalHome ? " home-sale-products--vertical" : ""}`}
+      style={verticalHome ? { display: 'grid', gap: '10px', overflow: 'visible', paddingBottom: '8px' } : standalone ? standaloneGridStyle : {
         display: "grid",
         gridTemplateColumns: "none",
         gridAutoFlow: "column",
-        gridTemplateRows: "repeat(2, auto)",
-        gridAutoColumns: "calc((100% - 10px) / 2)",
+        gridTemplateRows: "repeat(1, auto)",
+        gridAutoColumns: "min(calc((100% - 10px) / 2), 208px)",
         gap: "8px 10px",
         overflowX: "auto",
         overscrollBehaviorX: "contain",
@@ -423,18 +456,11 @@ function ProgressiveHomeSaleProducts({
         scrollSnapType: "none",
       }}
       aria-label={label}
-      onScroll={standalone ? undefined : (event) => {
-        if (limit >= products.length) return;
-        const rail = event.currentTarget;
-        const nearEnd =
-          rail.scrollLeft + rail.clientWidth >= rail.scrollWidth - rail.clientWidth * 1.25;
-        if (nearEnd) {
-          setLimit((count) => Math.min(products.length, count + batchSize));
-        }
-      }}
+      aria-busy={!ready}
+
     >
       {visibleProducts.length ? (
-        (standalone ? visibleProducts.map((product, index) => ({ product, index, copy: 0 }))
+        (standalone || verticalHome ? visibleProducts.map((product, index) => ({ product, index, copy: 0 }))
           : (loopProducts.length > 1 ? [0, 1] : [0]).flatMap((copy) => loopProducts.map((product, index) => ({ product, index, copy })))).map(({ product, index, copy }) => (
           <div
             key={`${copy}:${index}:${product.id}`}
@@ -457,12 +483,33 @@ function ProgressiveHomeSaleProducts({
           </Link>
         </p>
       )}
-      {standalone && limit < products.length ? (
+      {(standalone || verticalHome) && limit < products.length ? (
         <div
           ref={loadMoreRef}
-          aria-hidden="true"
-          style={{ gridColumn: "1 / -1", height: "1px" }}
-        />
+          aria-hidden={!verticalHome}
+          role={verticalHome ? "status" : undefined}
+          className={verticalHome ? "home-sale-progress" : undefined}
+          style={verticalHome
+            ? { gridColumn: "1 / -1", minHeight: "42px" }
+            : { gridColumn: "1 / -1", height: "1px" }}
+        >
+          {verticalHome ? (
+            <>
+              <span>{Math.min(limit, products.length)} / {products.length} products</span>
+              <button
+                type="button"
+                className="home-sale-progress__more"
+                onClick={() => setLimit((count) => Math.min(products.length, count + batchSize))}
+              >
+                Agle {Math.min(batchSize, products.length - limit)} products dekhein
+              </button>
+            </>
+          ) : null}
+        </div>
+      ) : verticalHome && products.length > 0 ? (
+        <div className="home-sale-progress home-sale-progress--complete" style={{ gridColumn: "1 / -1" }}>
+          Is range ke tamam {products.length} products show ho gaye.
+        </div>
       ) : null}
     </div>
   );
@@ -472,43 +519,58 @@ export default function HomeCollections({
   products,
   standalone = false,
   embeddedHome = false,
+  verticalHome = false,
 }: {
   products: Product[];
   standalone?: boolean;
   embeddedHome?: boolean;
+  verticalHome?: boolean;
   onSelect?: (amount: number | null) => void;
   onWholesaleSelect?: () => void;
 }) {
   const { settings } = useSettings();
-  const liveCatalog = products.filter((p) => p.published !== false && !isExclusiveGlassDealProduct(p));
-  const [homeSaleCatalog, setHomeSaleCatalog] = useState<Product[]>(
-    () => (standalone ? [] : liveCatalog),
+  const saleSectionRef = useRef<HTMLElement>(null);
+  const moveHomeSale = (direction: number, anchor?: string) => {
+    const frame = anchor ? document.getElementById(anchor) : saleSectionRef.current;
+    const rail = frame?.querySelector<HTMLElement>('.home-sale-products');
+    if (!rail) return;
+    rail.dispatchEvent(new Event('click'));
+    rail.scrollBy({ left: direction * (rail.clientWidth + 10), behavior: 'smooth' });
+  };
+  // Always reflect the latest published catalog after its first-party refresh.
+  // The previous homeSaleCatalog state froze the very first snapshot forever.
+  const catalog = products.filter((product) =>
+    product.published !== false && !isDedicatedDealProduct(product, settings.glassDealShowcase),
   );
-  const [homeShuffleSeed, setHomeShuffleSeed] = useState(0);
-
-  useLayoutEffect(() => {
-    if (standalone) return;
-    setHomeShuffleSeed(sessionRailSeed());
-  }, [standalone]);
-
-  useEffect(() => {
-    if (standalone || homeSaleCatalog.length > 0 || liveCatalog.length === 0) return;
-    setHomeSaleCatalog(liveCatalog);
-  }, [standalone, homeSaleCatalog.length, products]);
-
-  const catalog = standalone
-    ? liveCatalog
-    : homeSaleCatalog.length > 0
-      ? homeSaleCatalog
-      : liveCatalog;
-  const stableCatalogSeed = stableSaleMelaSeed(catalog);
-  const saleShuffleSeed = standalone
-    ? stableCatalogSeed
-    : homeShuffleSeed || stableCatalogSeed;
-  const buckets = sortPriceBuckets(
-    (settings.priceBuckets || []).filter((b) => b.active),
+  const saleShuffleSeed = stableSaleMelaSeed(catalog);
+  const activeBuckets = sortPriceBuckets(
+    (settings.priceBuckets || []).filter((bucket) => bucket.active),
   );
   const packs = catalog.filter(isWholesaleProduct);
+
+  // Owner's final HOME Sale Mela is exactly three full retail bands then
+  // Wholesale. Use configured bucket details when available; the three
+  // canonical bands must not disappear because an old config lacks one.
+  const buckets = verticalHome
+    ? [
+        ...([99, 299, 999] as const).map((amount, index) =>
+          activeBuckets.find((bucket) => !isWholesalePriceBucket(bucket) && Number(bucket.amount) === amount)
+          ?? {
+            id: `home-sale-${amount}`, title: saleMelaBucketLabel(amount),
+            amount, iconUrl: '', accent: '#b98538', sortOrder: index + 1,
+            active: true,
+          },
+        ),
+        ...(packs.length > 0 ? [
+          activeBuckets.find(isWholesalePriceBucket)
+          ?? {
+            id: 'home-sale-wholesale', title: 'Wholesale Packages',
+            amount: null, iconUrl: '', accent: '#0c705e',
+            sortOrder: 4, active: true,
+          },
+        ] : []),
+      ]
+    : activeBuckets;
   const kidsPacks = packs.filter(isKidsWholesaleProduct);
   const regularPacks = packs.filter((product) => !isKidsWholesaleProduct(product));
 
@@ -516,21 +578,19 @@ export default function HomeCollections({
     <>
       {buckets.length > 0 && (
         <section
-          className={standalone ? "home-sale" : "home-sale home-sale-home"}
+          className={standalone ? "home-sale" : verticalHome ? "home-sale home-sale-home home-sale-home--vertical" : "home-sale home-sale-home"}
           aria-label="PrimeHubMall Sale Mela"
+          ref={saleSectionRef}
         >
-          <HomeHeading
-            href={standalone ? undefined : "/primehubmall/salemela"}
-            actionLabel={standalone ? undefined : "Open"}
-            title={standalone ? undefined : "Open PrimeHubMall Sale Mela"}
-          >
-            <>
-              PrimeHubMall <span className="text-[#d60707]">Sale Mela</span>
-            </>
-          </HomeHeading>
+          {standalone ? (
+            <HomeHeading>
+              <>PrimeHubMall <span className="text-[#d60707]">Sale Mela</span></>
+            </HomeHeading>
+          ) : null}
 
           {buckets.map((bucket) => {
             const wholesale = isWholesalePriceBucket(bucket);
+            // The separate Wholesale Packages collection follows all three retail bands.
             const amount = Number(bucket.amount || 0);
             const anchor = bucketAnchor(bucket.amount ?? null, wholesale);
             const href = standalone
@@ -549,16 +609,20 @@ export default function HomeCollections({
                       : matchesPriceBucket(price, buckets, amount);
                   }),
                 );
-            const matches = standalone
-              ? wholesale
-                ? shuffleWithNewArrivalPriority(baseMatches, saleShuffleSeed)
-                : baseMatches
-              : buildHomeTwoRowProducts(
-                  baseMatches,
-                  amount,
-                  saleShuffleSeed,
-                  wholesale,
-                );
+            const matches = verticalHome
+              // Include all products in each range: Rs. 1–98 were previously
+              // dropped by the horizontal-only exact-price ordering helper.
+              ? baseMatches
+              : standalone
+                ? wholesale
+                  ? shuffleWithNewArrivalPriority(baseMatches, saleShuffleSeed)
+                  : baseMatches
+                : buildHomeTwoRowProducts(
+                    baseMatches,
+                    amount,
+                    saleShuffleSeed,
+                    wholesale,
+                  );
             const kidsMatches = standalone && wholesale
               ? shuffleWithNewArrivalPriority(
                   sortBySalePrice(kidsPacks),
@@ -605,8 +669,17 @@ export default function HomeCollections({
                     ? `home-sale-standalone-frame${embeddedHome && !wholesale ? ' home-sale-embedded-retail-frame' : ''}`
                     : `home-sale-home-frame${wholesale ? ' home-sale-wholesale-frame' : ''}`
                 }
-                hideHeader={standalone && embeddedHome && !wholesale}
+                hideHeader={!standalone || (embeddedHome && !wholesale)}
               >
+              {!standalone ? (
+                <Commerce3DBanner kind={wholesale ? 'wholesale' : 'sale'}
+                  showArrows={!verticalHome}
+                  title={wholesale ? 'Wholesale Deals' : amount === 999 ? 'Rs. 999+' : saleMelaBucketLabel(amount)}
+                  eyebrow={wholesale ? 'SALE MELA · WHOLESALE' : 'SALE MELA'}
+                  href={bucketHref(bucket.amount ?? null, wholesale) as `/primehubmall/salemela#${string}`}
+                  images={matches.map(product => normalizeImageUrl(imageOf(product)))}
+                  onMove={direction => moveHomeSale(direction, anchor)}/>
+              ) : null}
               <div
                 id={anchor}
                 className={`home-sale-row scroll-mt-24 ${wholesale ? "home-sale-wholesale" : ""}`}
@@ -645,6 +718,7 @@ export default function HomeCollections({
                 <ProgressiveHomeSaleProducts
                   products={matches}
                   standalone={standalone}
+                  verticalHome={verticalHome}
                   wholesale={wholesale}
                   href={href}
                   label={`${bucket.title} products`}

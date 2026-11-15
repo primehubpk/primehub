@@ -38,22 +38,33 @@ export default function PrimeFamilyCartCard({
   const eligible = Math.max(0, Number(eligibleSubtotal || 0));
   const tierCashback = Math.max(0, Number(cashbackEstimate || 0));
   const cashVoucher = Math.min(Math.max(0, Number(voucherCashAmount || 0)), Math.max(0, eligible - tierCashback));
+  const referralApplied = voucherKind === 'referral';
+  const shownReward = referralApplied ? referralCashEstimate : tierCashback + cashVoucher;
   return (
     <section aria-label="PrimeHub Family Cashback" className="mt-4 overflow-hidden rounded-[22px] border border-[#0F6A5F]/15 bg-gradient-to-br from-[#EFF9F5] via-[#F7FCF9] to-[#FFF9E9] p-3.5 sm:p-4">
       <div className="flex items-center gap-2.5">
         <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-[#0F6A5F] text-white"><Gift size={20}/></span>
         <div className="min-w-0 flex-1">
           <p className="text-[9px] font-extrabold uppercase tracking-[.13em] text-[#13746B]">PrimeHub Family</p>
-          <h3 className="text-sm font-black leading-5 text-[#123B32]">Earn cashback from your orders</h3>
+          <h3 className="text-sm font-black leading-5 text-[#123B32]">Earn cashback on Mega &amp; BOGO too</h3>
         </div>
         <Sparkles size={18} className="shrink-0 text-[#D29D39]" />
       </div>
 
+      <div className="mt-3 flex items-center justify-between gap-2 rounded-xl bg-white/85 px-3 py-2 ring-1 ring-[#0F6A5F]/10">
+        <div className="min-w-0">
+          <p className="text-[11px] font-extrabold text-[#0F6A5F]">Rs. 100 app welcome reward</p>
+          <p className="text-[9px] leading-4 text-[#355C50]">Eligible first Play Store install + sign in and claim in app. Website signup alone does not credit Rs. 100.</p>
+        </div>
+        <a href="https://play.google.com/store/apps/details?id=com.primehubmall.app" target="_blank" rel="noopener noreferrer"
+          className="shrink-0 rounded-lg bg-[#0F6A5F] px-2.5 py-2 text-[10px] font-extrabold text-white">Get app</a>
+      </div>
+
       {!signedIn ? (
         <div className="mt-3">
-          <p className="text-[11px] leading-5 text-[#355C50]">Join PrimeHub Family and earn cashback on eligible purchases. Your reward becomes shopping-only credit for eligible PrimeHub purchases after delivery.</p>
+          <p className="text-[11px] leading-5 text-[#355C50]">Join PrimeHub Family for tier cashback on regular products, Mega/70% OFF and Buy One Get One paid packs. Rewards become shopping credit after delivery.</p>
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            <Link href="/reseller/join?mode=signup&redirect=%2Fcart" className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#0F6A5F] px-4 text-xs font-extrabold text-white">Sign Up & Earn <ArrowRight size={14}/></Link>
+            <Link href="/reseller/join?mode=signup&redirect=%2Fcart" className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-[#0F6A5F] px-4 text-xs font-extrabold text-white">Join Prime Family <ArrowRight size={14}/></Link>
             <Link href="/reseller/join?mode=signin&redirect=%2Fcart" className="rounded-xl border border-[#0F6A5F]/20 bg-white px-3 py-2.5 text-[11px] font-bold text-[#0F6A5F]">Already a member? Sign In</Link>
           </div>
         </div>
@@ -70,15 +81,15 @@ export default function PrimeFamilyCartCard({
               <p className="mt-1 text-[10px] leading-4 text-black/55">Eligible products: Rs. {money(eligible)}</p>
             </div>
             <div className="shrink-0 text-right">
-              <p className="text-[9px] font-bold text-black/45">{voucherKind === 'referral' ? 'Your cashback' : 'You can earn'}</p>
-              <p className="text-lg font-black leading-6 text-[#0F6A5F]">Rs. {money(tierCashback + cashVoucher)}</p>
+              <p className="text-[9px] font-bold text-black/45">{referralApplied ? 'Code owner earns' : voucherKind === 'discount' ? 'Your voucher' : 'Cashback after delivery'}</p>
+              <p className="text-lg font-black leading-6 text-[#0F6A5F]">{voucherKind === 'discount' ? 'Applied' : `Rs. ${money(shownReward)}`}</p>
             </div>
           </div>
           <p className="mt-2 flex items-start gap-1.5 text-[10px] font-semibold leading-4 text-[#276C5C]">
             <CheckCircle2 size={14} className="mt-0.5 shrink-0" />
-            {voucherKind === 'referral' ? 'This order uses a friend code. Your tier cashback is replaced; the code owner can earn an inviter reward after delivery.' : eligible > 0 ? 'This cashback becomes shopping-only PrimeHub credit after Admin marks your order Delivered.' : 'This cart has no cashback-eligible products. Big Deal and Weekly Deal items are excluded.'}
+            {referralApplied ? 'Friend code benefits the person who shared it. Your tier cashback is replaced, not added.' : voucherKind === 'discount' ? 'Your valid code reduces the amount at checkout instead of earning tier cashback.' : eligible > 0 ? 'Cashback becomes PrimeHub shopping credit after Admin marks your order Delivered.' : 'No cashback-eligible paid products in this cart.'}
           </p>
-          {voucherKind === 'referral' && <p className="mt-1 text-[10px] font-bold text-[#0F6A5F]">Friend code: {referralPercent}% (estimated Rs. {money(referralCashEstimate)}) goes to the code OWNER once this buyer's qualifying order is Delivered; not to buyer. No double cashback.</p>}
+          {voucherKind === 'referral' && <p className="mt-1 text-[10px] font-bold text-[#0F6A5F]">Friend code: {referralPercent}% for the code owner after delivery—not an extra buyer discount.</p>}
           {voucherKind === 'cashback' && <p className="mt-1 text-[10px] font-bold text-[#0F6A5F]">Promo {voucherCashbackPercent}% replaces tier cashback: Rs. {money(cashVoucher)} shopping credit on delivery (not extra).</p>}
           {voucherKind === 'cash' && <p className="mt-1 text-[10px] font-bold text-[#0F6A5F]">Fixed cash voucher replaces tier cashback: Rs. {money(cashVoucher)} after delivery.</p>}
           {voucherKind === 'discount' && <p className="mt-1 text-[10px] font-bold text-[#0F6A5F]">Checkout discount voucher applied instead of tier cashback on this order.</p>}
@@ -101,7 +112,7 @@ export default function PrimeFamilyCartCard({
           })}
         </div>
       </div>}
-      <p className="mt-2 text-[9px] leading-4 text-[#628177]">Cashback applies to eligible regular products only—not Big Deal or Weekly Deal. No cashback is subtracted from checkout payment.</p>
+      <p className="mt-2 text-[9px] leading-4 text-[#628177]">Mega/70% OFF and BOGO paid packs now qualify. Tier cashback OR a code benefit—not both. Cashback is credited after delivery, not deducted at checkout.</p>
     </section>
   );
 }

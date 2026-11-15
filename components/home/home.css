@@ -206,14 +206,6 @@
   padding: 0 !important;
   margin: 14px auto 0 !important;
 }
-.home-categories > div:first-child {
-  display: block;
-  text-align: center;
-  margin-bottom: 12px;
-}
-.home-categories > div:first-child > a {
-  display: none;
-}
 .home-categories p {
   display: flex;
   justify-content: center;
@@ -234,12 +226,12 @@
   font-weight: 650;
   margin-top: 4px;
 }
-.home-categories > div:last-child {
+.home-categories > .home-category-rail {
   gap: 18px;
   justify-content: space-evenly;
   padding: 7px 4px 10px;
 }
-.home-categories > div:last-child > a {
+.home-categories > .home-category-rail > a {
   width: calc((100% - 54px) / 4);
   max-width: 195px;
   flex-shrink: 0;
@@ -862,11 +854,11 @@
     letter-spacing: 1px;
     gap: 8px;
   }
-  .home-categories > div:last-child {
+  .home-categories > .home-category-rail {
     gap: 10px;
     justify-content: flex-start;
   }
-  .home-categories > div:last-child > a {
+  .home-categories > .home-category-rail > a {
     width: calc((100% - 30px) / 4);
   }
   .home-categories a > span:last-child {
@@ -1165,4 +1157,146 @@
   .home-quick-links > a,
   .home-quick-links > button { min-width: 28px; }
   .home-quick-links svg { width: 28px; height: 28px; padding: 4px; }
+}
+
+/* Locked mobile visual parity: Sale Mela and home categories use the same
+   two-column portrait cards as Mega Deals/BOGO, not tiny square thumbnails.
+   Limit to the home sections: standalone Sale Mela and other shop grids stay as-is. */
+.home-sale-home-frame .home-sale-products {padding:0 9px 10px}
+.home-sale-home-frame .home-product,
+.home-category-3d-frame .home-product {
+  padding:5px;
+  min-width:0;
+  border:1px solid #e8ddcf;
+  border-radius:14px;
+  background:#fff;
+  box-shadow:0 3px 12px #291b0e08;
+}
+.home-sale-home-frame .home-product-image,
+.home-category-3d-frame .home-product-image {
+  aspect-ratio:4/5;
+  border-radius:10px;
+}
+.home-sale-home-frame .home-product-info,
+.home-category-3d-frame .home-product-info {
+  padding:8px 4px 6px;
+  gap:7px;
+}
+.home-sale-home-frame .home-product-title,
+.home-category-3d-frame .home-product-title {
+  font-size:12px;
+  line-height:1.35;
+  font-weight:700;
+  min-height:32px;
+}
+.home-sale-home-frame .home-product .home-price,
+.home-category-3d-frame .home-product .home-price {
+  font-size:18px;
+  font-weight:900;
+  line-height:1.1;
+  color:#b72a29;
+}
+.home-sale-home-frame .home-add,
+.home-category-3d-frame .home-add {
+  min-height:43px;
+  padding:7px 4px;
+  font-size:11px;
+  font-weight:800;
+  line-height:1.2;
+  color:#fff;
+  background:#0e6a5e;
+  border:1px solid #0e6a5e;
+  border-radius:10px;
+}
+.home-sale-home-frame .home-add:hover:not(:disabled),
+.home-category-3d-frame .home-add:hover:not(:disabled) {
+  background:#08584f;
+}
+@media(max-width:370px) {
+  .home-sale-price-range strong {font-size:11px}
+  .home-sale-price-range--299 strong {font-size:9.5px}
+  .home-sale-price-range--999 strong {font-size:14px}
+  .home-sale-home-frame .home-product-title,
+  .home-category-3d-frame .home-product-title {font-size:11px}
+  .home-sale-home-frame .home-product .home-price,
+  .home-category-3d-frame .home-product .home-price {font-size:16px}
+  .home-sale-home-frame .home-add,
+  .home-category-3d-frame .home-add {font-size:10px}
+}
+
+@media(min-width:641px) {
+  /* Preserve familiar desktop-sized cards instead of expanding two cards to
+     half of a 1200px rail. Inline mobile grid sizing remains untouched. */
+  .home-sale-home-frame .home-product-image,
+  .home-category-3d-frame .home-product-image {
+    aspect-ratio:1;
+  }
+}
+
+/* Owner-approved final homepage Sale Mela: a vertically growing product grid,
+   never the endless horizontal rails used by the upper home collections. */
+.home-sale-home--vertical {margin-top:12px;margin-bottom:16px}
+.home-sale-home--vertical .home-sale-home-frame {margin-bottom:14px}
+.home-sale-home--vertical .home-sale-products--vertical {
+  display:grid;
+  grid-auto-flow:row;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  grid-auto-columns:auto;
+  width:100%;
+  min-width:0;
+  max-width:100%;
+  overflow:visible;
+  scroll-snap-type:none;
+  padding:8px 10px 12px;
+  gap:10px;
+}
+.home-sale-home--vertical .home-sale-products--vertical > div {min-width:0}
+.home-sale-home--vertical .home-sale-home-frame .home-product-image {aspect-ratio:4/5}
+@media(min-width:760px){
+  .home-sale-home--vertical .home-sale-products--vertical {grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+}
+@media(min-width:1100px){
+  .home-sale-home--vertical .home-sale-products--vertical {grid-template-columns:repeat(4,minmax(0,1fr))}
+}
+
+.home-sale-home--vertical .home-sale-progress {
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  flex-direction:column;
+  gap:8px;
+  min-height:42px;
+  margin:5px 0;
+  padding:8px;
+  color:#665d52;
+  background:#f7f2e8;
+  border:1px solid #e3d7bd;
+  border-radius:9px;
+  font-size:12px;
+  line-height:1.4;
+  font-weight:700;
+  text-align:center;
+}
+.home-sale-home--vertical .home-sale-progress--complete {
+  background:#ecf7f3;
+  border-color:#c4dfd4;
+  color:#125f53;
+}
+.home-sale-home--vertical .home-sale-wholesale-frame {
+  margin-top:18px;
+}
+.home-sale-home--vertical .home-sale-progress__more {
+  width:min(100%,290px);
+  min-height:42px;
+  padding:10px 15px;
+  color:#fff;
+  background:#0e6a5e;
+  border-radius:10px;
+  font-size:12px;
+  font-weight:850;
+  cursor:pointer;
+}
+.home-sale-home--vertical .home-sale-progress__more:focus-visible {
+  outline:3px solid #d9a643;
+  outline-offset:3px;
 }

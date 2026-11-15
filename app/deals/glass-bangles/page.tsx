@@ -1,35 +1,33 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { compactPublicCatalogSnapshot, getPublicCatalogSnapshot, getStorefrontSettingsResultSnapshot } from '@/lib/publicCatalogServer';
+import Header from '@/components/home/HomeHeader';
 import GlassOffersLanding from '@/components/home/GlassOffersLanding';
-import type { Product } from '@/lib/types';
-import type { GlassOfferSettings } from '@/lib/glassOffers';
+import { resolveGlassOffers, isExclusiveGlassDealProduct } from '@/lib/glassOffers';
+import { compactPublicCatalogSnapshot, getPublicCatalogSnapshot, getStorefrontSettingsSnapshot } from '@/lib/publicCatalogServer';
+import type { Product, Category } from '@/lib/types';
+import '@/components/home/home.css';
 
 export const revalidate = 600;
 export const metadata: Metadata = {
-  title: 'Glass Bangles & Special Offers | PrimeHubMall',
-  description: 'Browse colourful glass bangles boxes and special deals. Real prices, original product photos and size or colour selections.',
+  title: 'Glass Bangles Special Deals | PrimeHubMall',
+  description: 'Explore the exclusive glass bangle deal boxes. See actual prices and savings before ordering.',
 };
 
-export default async function GlassBanglesOffersPage() {
-  const [catalog, settings] = await Promise.allSettled([
-    getPublicCatalogSnapshot(),
-    getStorefrontSettingsResultSnapshot(),
+export default async function GlassBanglesDealsPage() {
+  const [catalogResult, settingsResult] = await Promise.allSettled([
+    getPublicCatalogSnapshot(), getStorefrontSettingsSnapshot(),
   ]);
-  const products = catalog.status === 'fulfilled'
-    ? compactPublicCatalogSnapshot(catalog.value).products as Product[]
-    : [];
-  const documents = settings.status === 'fulfilled'
-    ? settings.value.documents as Record<string, any>
-    : {};
-  const config = (documents.main?.glassDealShowcase ?? documents.general?.glassDealShowcase) as Partial<GlassOfferSettings> | undefined;
-  return (
-    <main className="glass-offers-landing mx-auto min-h-screen max-w-7xl px-4 pt-6 sm:px-6">
-      <nav className="mb-4 flex items-center gap-2 text-xs font-semibold text-black/55">
-        <Link href="/" className="hover:text-[#0f6a5f]">Home</Link>
-        <span>/</span><span>Special Offers</span><span>/</span><span className="text-[#b9231c]">Glass Bangles</span>
+  const catalog = catalogResult.status === 'fulfilled'
+    ? compactPublicCatalogSnapshot(catalogResult.value) : { products: [], categories: [] };
+  const settings = settingsResult.status === 'fulfilled' ? settingsResult.value : {};
+  const config = resolveGlassOffers(settings.glassDealShowcase);
+  const exclusive = { ...config, items: config.items.filter(item => isExclusiveGlassDealProduct(item.productId)) };
+  return <><Header categories={catalog.categories as Category[]}/>
+    <main className="glass-offers-landing mx-auto min-h-screen max-w-6xl px-3 pt-4 sm:px-6">
+      <nav aria-label="Breadcrumb" className="mb-3 flex items-center gap-2 text-xs text-black/50">
+        <Link href="/">Home</Link><span>/</span><Link href="/deals">Mega Deals</Link><span>/</span><span>Glass Bangles Deals</span>
       </nav>
-      <GlassOffersLanding products={products} config={config} />
-    </main>
-  );
+      <GlassOffersLanding products={catalog.products as Product[]} categories={catalog.categories as Category[]}
+        config={exclusive} activePath="/deals/glass-bangles" headingOverride="Glass Bangles Deal Collection" />
+    </main></>;
 }

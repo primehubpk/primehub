@@ -76,7 +76,7 @@ export default function PrimeFamilyWelcomePopup({
           <div className="mt-3 rounded-xl bg-[#F6F7F5] p-3 text-[11px] leading-[1.65] text-[#35433D]">
             <p className="font-black">Family aur friends ko invite karein 👇</p>
             <p>Jab koi doosra customer aapka code qualifying order mein use kare aur order <b>Delivered</b> ho, aapko {reward.percent}% cashback PrimeHub shopping wallet mein milega. {reward.enabled ? '' : 'Offer Admin activation ke baad valid hoga.'}</p>
-            <p className="mt-1 text-[10px] text-[#7A817A]">Friend ko is referral order par extra tier cashback nahi milta. Weekly aur Big Deal items excluded hain.</p>
+            <p className="mt-1 text-[10px] text-[#7A817A]">Friend ko is referral order par extra tier cashback nahi milta. Mega Deals items excluded hain.</p>
           </div>
           <div className="mt-4 flex gap-2">
             <button type="button" onClick={() => void copyCode()}

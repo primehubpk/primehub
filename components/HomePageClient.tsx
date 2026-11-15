@@ -5,16 +5,15 @@ import { useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import Header from "@/components/home/HomeHeader";
 import HomeCollections from "@/components/home/HomeCollections";
 import HomeCategoryDealsLazy from "@/components/home/HomeCategoryDealsLazy";
-import BigDealNextPreviewSync from "@/components/home/BigDealNextPreviewSync";
+import BogoDeals from '@/components/home/BogoDeals';
+import HomeGlassOfferRail from "@/components/home/HomeGlassOfferRail";
 import {
   HomePrimeSkills,
   HomeWholesaleVideos,
 } from "@/components/home/HomeCommerceRails";
 import "./home/home.css";
-import "./home/WeeklyDealsHomeFix.css";
 import "./home/HomeFeatureRails.css";
 import "./home/HomeCommerceRails.css";
-import HeroFlashBanner from "@/components/HeroFlashBanner";
 import CategorySwiper from "@/components/CategorySwiper";
 import NewArrivalsRail from "@/components/NewArrivalsRail";
 import YouTubeGuide from "@/components/YouTubeGuide";
@@ -24,7 +23,6 @@ import SkillsShowcase, {
   type SkillItem,
 } from "@/components/SkillsShowcase";
 import HomePrimeFamilyLazy from "@/components/home/HomePrimeFamilyLazy";
-import HomeDiscoverDealsLazy from "@/components/home/HomeDiscoverDealsLazy";
 import Footer from "@/components/Footer";
 import {
   cacheCatalogForNavigation,
@@ -41,9 +39,12 @@ import type {
 import type { Product } from "@/components/shop/ShopTypes";
 import { CATALOG_REFRESH_EVENT } from "@/lib/catalogRefreshSignal";
 import { fetchPublicStorefront, invalidatePublicStorefront } from "@/lib/storefrontClient";
-import { isExclusiveGlassDealProduct } from "@/lib/glassOffers";
+import { HomeVisitProvider } from '@/lib/useVisitProductOrder';
+import { isDedicatedDealProduct } from "@/lib/glassOffers";
 
 type Props = {
+  visitSeed: number;
+  previousFirst: Record<string, string>;
   initialProducts: Product[];
   initialCategories: Category[];
   initialSettings: Partial<SiteSettings>;
@@ -56,6 +57,8 @@ const RECOVERY_DELAYS_MS = [0];
 const BACKGROUND_REFRESH_INTERVAL_MS = 5 * 60_000;
 
 export default function HomePageClient({
+  visitSeed,
+  previousFirst,
   initialProducts,
   initialCategories,
   initialSettings,
@@ -230,7 +233,7 @@ export default function HomePageClient({
 
   };
 
-  const regularProducts = useMemo(() => products.filter((product) => !isExclusiveGlassDealProduct(product)), [products]);
+  const regularProducts = useMemo(() => products.filter((product) => !isDedicatedDealProduct(product, initialSettings.glassDealShowcase)), [products, initialSettings.glassDealShowcase]);
 
   const selectPrice = (amount: number | null) => {
     setSelectedMaxPrice(amount);
@@ -243,6 +246,7 @@ export default function HomePageClient({
   };
 
   return (
+    <HomeVisitProvider seed={visitSeed} previous={previousFirst}>
     <SettingsProvider initialSettings={initialSettings}>
       <div ref={keptHome.frameRef} className="relative" data-ph-home-frame="1">
       <div
@@ -260,25 +264,15 @@ export default function HomePageClient({
           </h1>
           <HomeGuideVideo mode="intro" />
           <CategorySwiper initialCategories={categories} liveUpdates={false} />
-          <HeroFlashBanner
-            homeLayout
-            initialProducts={products as SharedProduct[]}
-            liveUpdates={false}
-            initialWeekday={initialWeekday}
-          />
-          <BigDealNextPreviewSync />
+          <HomeGlassOfferRail products={products as SharedProduct[]} />
+          <BogoDeals products={products} />
           <NewArrivalsRail
             homeLayout
             initialProducts={regularProducts}
             liveUpdates={false}
           />
-          <HomeCollections
-            products={regularProducts}
-            onSelect={selectPrice}
-            onWholesaleSelect={selectWholesale}
-          />
-          <HomeWholesaleVideos />
           <HomePrimeSkills initialItems={initialSkills} />
+          <HomeWholesaleVideos />
           <HomeCategoryDealsLazy products={regularProducts} categories={categories} />
           <div id="discover-deals-section">
             {(selectedMaxPrice !== null || wholesaleSelected) && (
@@ -318,7 +312,7 @@ export default function HomePageClient({
                   {!recoveringCatalog ? (
                     <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
                       <Link
-                        href="/weekly-deals"
+                        href="/deals"
                         className="rounded-full bg-[#14140F] px-4 py-2.5 text-[10px] font-black uppercase tracking-[0.08em] text-white"
                       >
                         View Today&apos;s Deals
@@ -335,21 +329,30 @@ export default function HomePageClient({
                   ) : null}
                 </div>
               </section>
-            ) : (
-              <HomeDiscoverDealsLazy products={regularProducts} />
-            )}
+            ) : null}
           </div>
           <SkillsShowcase
             embedded
             initialItems={initialSkills}
             initialPage={initialSkillsPage}
           />
-          <HomePrimeFamilyLazy initialSettings={initialSettings as Record<string, unknown>} />
+          <div id="home-prime-family" className="scroll-mt-20">
+            <div id="prime-family-dashboard" className="scroll-mt-20">
+              <HomePrimeFamilyLazy initialSettings={initialSettings as Record<string, unknown>} />
+            </div>
+          </div>
+          <HomeCollections
+            products={regularProducts}
+            verticalHome
+            onSelect={selectPrice}
+            onWholesaleSelect={selectWholesale}
+          />
         </main>
         <YouTubeGuide />
         <Footer onWholesaleSelect={selectWholesale} />
       </div>
       </div>
     </SettingsProvider>
+    </HomeVisitProvider>
   );
 }

@@ -241,6 +241,7 @@ export default function VariantSelectorBottomSheet({
     imageForColor.get(normalize(color)) ||
     fallbackImage;
   const visibleSelectedImage = displayReadyImage(selectedImage);
+  const bogo = (product.bogoOffer as { enabled?: boolean; unitsPerOffer?: number } | undefined)?.enabled === true && (product.bogoOffer as { unitsPerOffer?: number }).unitsPerOffer === 2;
   const valid = Boolean(selected && stock > 0 && displayPrice > 0);
   const safeQty = Math.min(Math.max(1, qty), Math.max(1, stock));
 
@@ -453,14 +454,14 @@ export default function VariantSelectorBottomSheet({
           <div className={`mt-5 rounded-2xl border p-3 ${stock > 0 ? 'border-[#0F6A5F]/10 bg-[#0F6A5F]/[0.06]' : 'border-[#E1352B]/10 bg-[#E1352B]/[0.06]'}`}>
             <div className="flex items-center justify-between gap-3">
               <span className={`text-xs font-black ${stock > 0 ? 'text-[#0F6A5F]' : 'text-[#E1352B]'}`}>
-                {selected ? stock > 0 ? `✓ In stock — ${stock} available` : 'Out of stock' : 'Select an available option'}
+                {selected ? stock > 0 ? `✓ In stock — ${stock} ${bogo ? 'offer packs' : 'available'}` : 'Out of stock' : 'Select an available option'}
               </span>
-              {selected && stock > 0 ? <span className={`text-[10px] font-bold ${hasActiveDeal ? 'text-[#E1352B]' : 'text-black/35'}`}>{money(displayPrice)} each</span> : null}
+              {selected && stock > 0 ? <span className={`text-[10px] font-bold ${hasActiveDeal ? 'text-[#E1352B]' : 'text-black/35'}`}>{money(displayPrice)} {bogo ? 'per offer (1 + 1)' : 'each'}</span> : null}
             </div>
           </div>
 
           <div className="mt-4 flex items-center justify-between rounded-2xl border border-black/8 p-2">
-            <span className="pl-2 text-[10px] font-black uppercase tracking-wider text-black/40">Quantity</span>
+            <span className="pl-2 text-[10px] font-black uppercase tracking-wider text-black/40">{bogo ? 'Offer packs (1 + 1)' : 'Quantity'}</span>
             <div className="flex items-center rounded-xl bg-[#F4F4F1]">
               <button type="button" onClick={() => setQty((value) => Math.max(1, value - 1))} className="flex h-10 w-10 items-center justify-center rounded-xl" aria-label="Decrease quantity"><Minus size={14} /></button>
               <span className="w-8 text-center text-xs font-black">{safeQty}</span>
@@ -471,7 +472,7 @@ export default function VariantSelectorBottomSheet({
 
         <button type="button" disabled={!valid} onClick={() => onConfirm({ color: color || undefined, size: size || undefined }, safeQty, markedImages)} className={`flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl py-4 text-xs font-black text-white shadow-lg transition-all disabled:cursor-not-allowed disabled:opacity-40 ${mode === 'buy' ? 'bg-[#E1352B]' : 'bg-[#14140F]'}`}>
           {mode === 'buy' ? <Zap size={17} fill="currentColor" /> : <ShoppingCart size={17} />}
-          {mode === 'buy' ? 'Buy Now / Proceed to Checkout' : 'Add to Cart'}
+          {bogo ? `${mode === 'buy' ? 'Checkout' : 'Add offer'} · ${safeQty} paid + ${safeQty} free` : mode === 'buy' ? 'Buy Now / Proceed to Checkout' : 'Add to Cart'}
         </button>
         {markEditorOpen ? (
           <MarkedPhotoEditor

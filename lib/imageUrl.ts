@@ -4,9 +4,11 @@ const CUSTOM_R2_BASE = 'https://images.primehubmall.com';
 export function normalizeImageUrl(value?: string | null) {
   const url = String(value || '').trim();
   if (!url) return '';
-  if (url === LEGACY_R2_BASE) return CUSTOM_R2_BASE;
-  if (url.startsWith(`${LEGACY_R2_BASE}/`)) {
-    return `${CUSTOM_R2_BASE}${url.slice(LEGACY_R2_BASE.length)}`;
+  // Both hosts serve this owned bucket. Prefer its verified HTTPS public mirror
+  // while the branded host has a TLS transport failure; never proxy via Vercel.
+  if (url === CUSTOM_R2_BASE) return LEGACY_R2_BASE;
+  if (url.startsWith(`${CUSTOM_R2_BASE}/`)) {
+    return `${LEGACY_R2_BASE}${url.slice(CUSTOM_R2_BASE.length)}`;
   }
   return url;
 }

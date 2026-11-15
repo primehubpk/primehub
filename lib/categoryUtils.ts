@@ -1,4 +1,4 @@
-import { isExclusiveGlassDealProduct } from './glassOffers';
+import { isDedicatedDealProduct } from './glassOffers';
 
 export type CategoryRef = {
   id?: string;
@@ -106,12 +106,12 @@ export function expandCategoryTokens(selected: string, categories: CategoryRef[]
 
 export function productMatchesCategory(
   selected: string,
-  product: { id?: string; category?: string; categoryId?: string },
+  product: { id?: string; category?: string; categoryId?: string; bogoOffer?: unknown; megaDealPrice?: unknown },
   categories: CategoryRef[] = [],
 ): boolean {
+  // The original category identity stays on the product; only normal listings exclude it.
+  if (isDedicatedDealProduct(product)) return false;
   if (!selected || selected === 'all') return true;
-  // Exclusive promotion products belong only on /deals/glass-bangles.
-  if (isExclusiveGlassDealProduct(product)) return false;
   const productTokens = [
     ...categoryTokens(String(product.category || '')),
     ...categoryTokens(String(product.categoryId || '')),

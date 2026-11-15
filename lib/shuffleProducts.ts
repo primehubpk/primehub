@@ -87,3 +87,45 @@ export function shuffleProducts<T>(items: T[]): T[] {
 
   return result;
 }
+
+/** Stable per-visit ranking: refetches/price edits cannot reshuffle existing IDs.
+ * Runs in memory, with no query strings, fetches or database writes. */
+export function shuffleForVisit<T>(items: readonly T[], seed: number, namespace = ''): T[] {
+  const identity = (item: T) => {
+    const value = item as { id?: unknown; product?: { id?: unknown } };
+    return String(value?.product?.id ?? value?.id ?? '');
+  };
+  const rank = (id: string) => {
+    let hash = 2166136261;
+    const text = `${seed}:${namespace}:${id}`;
+    for (let i = 0; i < text.length; i++) hash = Math.imul(hash ^ text.charCodeAt(i), 16777619);
+    hash ^= hash >>> 16; hash = Math.imul(hash, 0x7feb352d);
+    hash ^= hash >>> 15; hash = Math.imul(hash, 0x846ca68b);
+    return (hash ^ (hash >>> 16)) >>> 0;
+  };
+  return items.map((item, index) => ({ item, index, id: identity(item), rank: rank(identity(item)) }))
+    .sort((a, b) => a.rank - b.rank || a.id.localeCompare(b.id) || a.index - b.index)
+    .map(row => row.item);
+}
+
+
+/** Owner policy: recent uploads lead each fresh visit; preserve every real item. */
+export function recentProductsForVisit<T>(items: readonly T[], seed: number, namespace: string, previousFirst = ''): T[] {
+  if (items.length < 2) return [...items];
+  const product = (item: T) => (item as { product?: unknown })?.product || item;
+  const id = (item: T) => String((product(item) as { id?: unknown })?.id || '');
+  const dated = [...items].filter(item => productTime(product(item)) > 0)
+    .sort((a, b) => productTime(product(b)) - productTime(product(a)) || id(a).localeCompare(id(b)));
+  // New Arrivals rotates the very latest 12, not a wide stale 24-item pool.
+  const freshLimit = namespace.includes('new-arrivals') ? 12 : 24;
+  const recent = dated.slice(0, Math.min(freshLimit, Math.max(2, Math.ceil(items.length / 4))));
+  const recentIds = new Set(recent.map(id));
+  const result = [...shuffleForVisit(recent, seed, namespace + ':new'),
+    ...shuffleForVisit(items.filter(item => !recentIds.has(id(item))), seed, namespace + ':rest')];
+  // A two-product collection also visibly changes on refresh, not just its seed.
+  if (previousFirst && id(result[0]) === previousFirst) {
+    const next = result.findIndex(item => id(item) !== previousFirst);
+    if (next > 0) [result[0], result[next]] = [result[next], result[0]];
+  }
+  return result;
+}

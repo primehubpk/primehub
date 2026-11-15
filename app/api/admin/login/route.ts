@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
-import { adminPasswordMatches, issueWalletAdminSession, WALLET_ADMIN_COOKIE, walletAdminCookieOptions } from '@/lib/walletAdminSession';
+import { adminPasswordMatches, issueWalletAdminSession, WALLET_ADMIN_COOKIE, walletAdminCookieOptions, SESSION_SECONDS } from '@/lib/walletAdminSession';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 const ADMIN_COOKIE = 'primehub_admin_auth';
-const MAX_AGE = 60 * 60 * 24 * 7;
+const MAX_AGE = SESSION_SECONDS;
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null);

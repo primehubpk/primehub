@@ -3,7 +3,9 @@ import { createHmac, randomBytes, scryptSync, timingSafeEqual } from 'node:crypt
 import { getAdminDb } from '@/lib/firebaseAdmin';
 
 export const WALLET_ADMIN_COOKIE = 'primehub_wallet_admin_session';
-const SESSION_SECONDS = 60 * 60 * 4;
+// Owner-approved remembered device login; remove the former four-hour timeout.
+// Browsers cap persistent cookies at 400 days; explicit Logout clears the cookie.
+export const SESSION_SECONDS = 60 * 60 * 24 * 400;
 const CREDENTIAL_PATH = 'admin_login_credentials';
 
 // Original Admin Panel password, stored as a scrypt verifier rather than

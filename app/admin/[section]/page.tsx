@@ -7,8 +7,7 @@ import AdminAuthGuard from '@/components/AdminAuthGuard';
 import ProductsManager from '@/components/admin/ProductsManager';
 import BulkProductEditor from '@/components/admin/BulkProductEditorLayout';
 import CategoriesManager from '@/components/admin/CategoriesManager';
-import DealScheduleManager from '@/components/admin/DealScheduleManager';
-import BigDealManager from '@/components/admin/BigDealManager';
+import GlassDealShowcaseSettings from '@/components/admin/settings/GlassDealShowcaseSettings';
 import SkillsManager from '@/components/admin/SkillsManager';
 import OrdersManager from '@/components/admin/OrdersManager';
 import VendorRequests from '@/components/admin/VendorRequests';
@@ -51,16 +50,10 @@ const SECTIONS: Record<string, SectionDefinition> = {
     content: <CategoriesManager />,
   },
   deals: {
-    title: 'One Day Deals',
+    title: 'Mega Deals',
     eyebrow: 'Deals',
-    description: 'Manage the weekly one-day deal schedule.',
-    content: <DealScheduleManager />,
-  },
-  'big-deal': {
-    title: 'Big Deal',
-    eyebrow: 'Deals',
-    description: 'Build the PrimeHubMall Big Deal rotation from one to seven deals.',
-    content: <BigDealManager />,
+    description: 'All your offers in one collection. Set selling prices and add any product category.',
+    content: <div className="mx-auto max-w-5xl px-4 pb-8"><GlassDealShowcaseSettings /></div>,
   },
   skills: {
     title: 'Prime Skills',
@@ -127,7 +120,7 @@ const SECTIONS: Record<string, SectionDefinition> = {
 export default function AdminSectionPage() {
   const params = useParams<{ section: string }>();
   const key = String(params?.section || '');
-  const section = SECTIONS[key];
+  const section = SECTIONS[key === 'big-deal' ? 'deals' : key];
 
   return (
     <AdminAuthGuard>

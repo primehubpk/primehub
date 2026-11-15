@@ -1,12 +1,13 @@
+import type { DealCollectionSource } from './glassOffers';
+
 /** Calculations for cash wallet and vouchers. Never trust cart-supplied deal flags. */
-export type BenefitItem = { productId: string; price: number; quantity: number; weeklyDealDay?: string | null; rewardExcluded?: boolean };
-export type BenefitSettings = { bigDeal?: any; dailyDeal?: any; weeklyDeals?: any[] };
+export type BenefitItem = { productId: string; price: number; quantity: number; weeklyDealDay?: string | null; rewardExcluded?: boolean; dealCategory?: string; promotion?: { type?: string } | null };
+export type BenefitSettings = DealCollectionSource;
 
 export function orderEligibleSubtotal(items: BenefitItem[], settings: BenefitSettings) {
-  // Every product *assigned* to an active Admin Big Deal or Weekly Deal is
-  // excluded, including locked future days. Deals never stack with wallet
-  // deductions, cashback or checkout vouchers, even at the regular price.
-  // IDs are sourced from server-side Admin settings, not cart-supplied flags.
+  // Mega/70%-style and BOGO PAID packs now qualify for cashback, wallet
+  // spending and vouchers, just like regular products. Free BOGO packs have no
+  // separately charged line. Only legacy Weekly/Big offers remain excluded.
   const excluded = new Set<string>();
   for (const deal of Array.isArray(settings.weeklyDeals) ? settings.weeklyDeals : []) {
     if (deal?.active !== false && deal?.productId) excluded.add(String(deal.productId));
@@ -19,7 +20,8 @@ export function orderEligibleSubtotal(items: BenefitItem[], settings: BenefitSet
     }
   }
   return items.reduce((sum, item) => {
-    if (excluded.has(String(item.productId)) || item.weeklyDealDay || item.rewardExcluded) return sum;
+    if (excluded.has(String(item.productId)) || item.weeklyDealDay || item.rewardExcluded ||
+      ['weekly', 'big'].includes(String(item.dealCategory || ''))) return sum;
     const lineTotal = Number(item.price) * Number(item.quantity);
     if (!Number.isSafeInteger(lineTotal) || lineTotal < 0) throw new Error('Invalid eligible order amount.');
     if (!Number.isSafeInteger(sum + lineTotal)) throw new Error('Order total exceeds supported range.');

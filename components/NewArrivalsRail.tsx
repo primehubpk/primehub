@@ -1,20 +1,23 @@
 'use client';
 
 import RetryableStorefrontImage from '@/components/RetryableStorefrontImage';
-import HomeHeading from '@/components/home/HomeHeading';
+import Image from 'next/image';
+import { CollectionBannerActions, CollectionBannerPhotos } from '@/components/home/CollectionBannerContent';
 import { HomeProductCard } from '@/components/home/HomeCollections';
 import FastProductLink from '@/components/FastProductLink';
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useContinuousHomeRail } from '@/lib/useContinuousHomeRail';
+import { useVisitProductOrder } from '@/lib/useVisitProductOrder';
 import { ArrowRight, ShoppingCart, Sparkles } from 'lucide-react';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useCartStore } from '@/lib/cartStore';
+import { useSettings } from '@/lib/useSettings';
 import { imageCandidatesOf, imageOf, originalOf, priceOf, productHasVariants, titleOf, type Product } from '@/components/shop/ShopTypes';
 import { isDirectStorefrontImage } from '@/lib/imageUrl';
 import { isWholesaleProduct } from '@/lib/wholesale';
-import { isExclusiveGlassDealProduct } from '@/lib/glassOffers';
+import { isDedicatedDealProduct } from '@/lib/glassOffers';
 import { makeTikTokContent, trackTikTokEvent } from '@/lib/tiktokPixel';
 import { getVerifiedDealProduct } from '@/lib/verifiedDealProduct';
 import '@/components/home/NewArrivalsPremium.css';
@@ -24,9 +27,9 @@ function timeOf(p: Product) {
   return typeof value?.toMillis === 'function' ? value.toMillis() : new Date(value || 0).getTime() || 0;
 }
 
-export function newestFirst(products: Product[], includeWholesale = false) {
+export function newestFirst(products: Product[], includeWholesale = false, glassDealShowcase?: Parameters<typeof isDedicatedDealProduct>[1]) {
   return [...products]
-    .filter((p) => p.published !== false && !isExclusiveGlassDealProduct(p) && (includeWholesale || !isWholesaleProduct(p)))
+    .filter((p) => p.published !== false && !isDedicatedDealProduct(p, glassDealShowcase) && (includeWholesale || !isWholesaleProduct(p)))
     .sort((a, b) => timeOf(b) - timeOf(a) || b.id.localeCompare(a.id));
 }
 
@@ -39,6 +42,7 @@ export default function NewArrivalsRail({
   liveUpdates?: boolean;
   homeLayout?: boolean;
 }) {
+  const { settings } = useSettings();
   const [products, setProducts] = useState<Product[]>(initialProducts);
   const homeRailRef = useRef<HTMLDivElement>(null);
   const [addedId, setAddedId] = useState<string | null>(null);
@@ -60,10 +64,12 @@ export default function NewArrivalsRail({
     return () => stop();
   }, [liveUpdates]);
 
-  const newest = useMemo(
-    () => newestFirst(products, homeLayout).slice(0, homeLayout ? 100 : products.length),
-    [products, homeLayout],
+  const sortedNewest = useMemo(
+    // Progressive rendering controls DOM cost; never cap actual catalogue choices.
+    () => newestFirst(products, homeLayout, settings.glassDealShowcase),
+    [products, homeLayout, settings.glassDealShowcase],
   );
+  const { items: newest, ready } = useVisitProductOrder(sortedNewest, 'new-arrivals-home', homeRailRef, homeLayout);
   const [homeVisibleCount, setHomeVisibleCount] = useState(16);
 
   useEffect(() => {
@@ -73,8 +79,12 @@ export default function NewArrivalsRail({
   const visibleNewest = homeLayout
     ? newest.slice(0, homeVisibleCount)
     : newest;
-  useContinuousHomeRail(homeRailRef, { enabled: homeLayout, itemCount: visibleNewest.length, speed: 25 });
+  const pauseAutoScroll = useContinuousHomeRail(homeRailRef, { enabled: homeLayout, itemCount: visibleNewest.length, speed: 25, startDelayMs: 8000 });
 
+  function moveArrivals(direction: number) {
+    pauseAutoScroll.current();
+    homeRailRef.current?.scrollBy({ left: direction * (homeRailRef.current.clientWidth + 10), behavior: 'smooth' });
+  }
   const addProduct = async (product: Product) => {
     if (checkingId) return;
     setCheckingId(product.id);
@@ -117,15 +127,22 @@ export default function NewArrivalsRail({
   if (homeLayout) {
     return (
       <section className="home-arrivals">
-        <HomeHeading>New Arrivals</HomeHeading>
+        <header className="arrivals-hero collection-banner--photos">
+          <Image src="/new-arrivals-icon.webp" width={256} height={256} sizes="72px" className="arrivals-hero__art" alt="Emerald shopping bag with a gold New badge"/>
+          <div className="arrivals-hero__copy"><h2>New Arrivals</h2><span>Explore new arrivals <ArrowRight size={13}/></span></div>
+          <CollectionBannerPhotos products={newest}/>
+          <Link href="/new-arrivals" prefetch={false} className="arrivals-hero__link" aria-label="Shop all New Arrivals"/>
+          <CollectionBannerActions path="/new-arrivals" title="New Arrivals" className="arrivals-hero__controls" shareClassName="arrivals-hero__share" onPrevious={() => moveArrivals(-1)} onNext={() => moveArrivals(1)}/>
+        </header>
         <div
           ref={homeRailRef}
-          className="grid grid-flow-col grid-rows-2 auto-cols-[calc((100%-7px)/2)] gap-2 overflow-x-auto overscroll-x-contain pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          aria-busy={!ready}
+          className="home-arrivals__rail" role="region" aria-label="Swipe New Arrivals" tabIndex={0}
           onScroll={(event) => {
             if (homeVisibleCount >= newest.length) return;
             const rail = event.currentTarget;
             const nearEnd =
-              rail.scrollLeft + rail.clientWidth >= rail.scrollWidth - rail.clientWidth * 1.25;
+              rail.scrollLeft + rail.clientWidth * 2 >= (rail.querySelector<HTMLElement>('[data-loop-copy]')?.offsetLeft ?? rail.scrollWidth / 2);
             if (nearEnd) {
               setHomeVisibleCount((count) => Math.min(newest.length, count + 16));
             }
@@ -134,7 +151,7 @@ export default function NewArrivalsRail({
           {(visibleNewest.length > 1 ? [0, 1] : [0]).flatMap((copy) => visibleNewest.map((p, index) => (
             <div key={`${copy}:${p.id}`} data-loop-original={copy === 0 && index === 0 ? '' : undefined}
               data-loop-copy={copy === 1 && index === 0 ? '' : undefined} className="min-w-0">
-              <HomeProductCard product={p} horizontal badgeText="New Arrival" />
+              <HomeProductCard product={p} badgeText="New Arrival" />
             </div>
           )))}
         </div>

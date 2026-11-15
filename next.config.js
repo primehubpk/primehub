@@ -1,5 +1,13 @@
+// Allow the owner's actual LAN addresses for the private local preview only.
+const { networkInterfaces } = require('node:os');
+const localDevOrigins = ['localhost', '127.0.0.1', ...Object.values(networkInterfaces()).flat()
+  .filter((entry) => entry && !entry.internal && entry.family === 'IPv4'
+    && /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(entry.address))
+  .map((entry) => entry.address)];
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  allowedDevOrigins: localDevOrigins,
   reactStrictMode: true,
   compress: true,
   transpilePackages: ['firebase-admin', 'jwks-rsa', 'jose'],

@@ -17,6 +17,8 @@ export async function getVerifiedDealProduct(productId: string): Promise<Variant
   if (!product || String(product.id) !== productId) {
     throw new Error('Product options are temporarily unavailable. Please retry.');
   }
+  if (product.active === false || product.published === false) throw new Error('This product is currently unavailable.');
+  if ((product as VariantModalProduct & { bogoPreviewOnly?: boolean }).bogoPreviewOnly) throw new Error('Preview-only BOGO items cannot be purchased until Admin approval.');
   const sourceRows = [
     ...(Array.isArray(product.variantMatrix) ? product.variantMatrix : []),
     ...(Array.isArray(product.variants) ? product.variants : []),

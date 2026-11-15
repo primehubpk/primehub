@@ -7,6 +7,7 @@ type Options = {
   speed?: number;
   resumeAfterMs?: number;
   itemCount?: number;
+  startDelayMs?: number;
 };
 
 /**
@@ -16,7 +17,7 @@ type Options = {
  */
 export function useContinuousHomeRail(
   railRef: RefObject<HTMLElement | null>,
-  { enabled = true, speed = 24, resumeAfterMs = 6000, itemCount = 0 }: Options = {},
+  { enabled = true, speed = 24, resumeAfterMs = 6000, startDelayMs = 0, itemCount = 0 }: Options = {},
 ) {
   const pauseRef = useRef<() => void>(() => {});
 
@@ -36,6 +37,9 @@ export function useContinuousHomeRail(
     let pausedUntil = 0;
     let frame = 0;
     let lastFrame = 0;
+    // Native scrollLeft rounds subpixel assignments. Retain the fractional
+    // position across frames so a 24px/s trail also moves on 60/120Hz screens.
+    let scrollPosition = rail.scrollLeft;
 
     const pause = () => {
       pausedUntil = performance.now() + resumeAfterMs;
@@ -72,8 +76,11 @@ export function useContinuousHomeRail(
           !pointerHolding && !touchHolding &&
           time >= pausedUntil &&
           loopLength > rail!.clientWidth + 4) {
-        const next = rail!.scrollLeft + speed * delta;
-        rail!.scrollLeft = next >= loopLength ? next - loopLength : next;
+        scrollPosition += speed * delta;
+        if (scrollPosition >= loopLength) scrollPosition -= loopLength;
+        rail!.scrollLeft = scrollPosition;
+      } else {
+        scrollPosition = rail!.scrollLeft;
       }
       frame = window.requestAnimationFrame(tick);
     }
@@ -86,7 +93,10 @@ export function useContinuousHomeRail(
           // Prevent offscreen animation / scroll restoration leaving half of
           // the first product visible on the customer's first visit.
           rail.scrollLeft = 0;
+          scrollPosition = 0;
           hasEnteredViewport = true;
+          // Show the first products long enough to read before the subtle rail moves.
+          pausedUntil = Math.max(pausedUntil, performance.now() + startDelayMs);
         }
         lastFrame = 0;
         frame = window.requestAnimationFrame(tick);
@@ -143,7 +153,7 @@ export function useContinuousHomeRail(
       rail.removeEventListener('focusin', pause);
       pauseRef.current = () => {};
     };
-  }, [railRef, enabled, speed, resumeAfterMs, itemCount]);
+  }, [railRef, enabled, speed, resumeAfterMs, startDelayMs, itemCount]);
 
   return pauseRef;
 }

@@ -165,3 +165,87 @@ test('without a referral voucher the same member gets normal tier-only cashback'
   assert.equal(data.get(key('reseller_shopping_wallets',owner)).balance,beforeShopping+50);
   assert.equal(data.has(key('reseller_referral_credits',oid)),false);
 });
+
+
+test('legacy reward-excluded order snapshots stay protected; no retroactive credit',async()=>{
+  data.clear();
+  data.set(key('reseller_profiles',owner),{status:'active',walletAvailable:0,monthlyOrders:0});
+  const cases=[
+    {id:'order-cashback-promo-bogo', kind:'referral'},
+    {id:'order-cashback-promo-glass', kind:'tier'},
+  ];
+  for(const tc of cases){
+    const order={status:'pending',source:'website',cashbackPolicy:'delivered_only_v1',
+      rewardSettlementMode:'shopping_only_v1',resellerUserId:owner,
+      eligibleAfterVoucher:tc.kind==='referral'?440:1099,total:1500,cashbackPercent:10,
+      items:[{productId:tc.kind==='referral'?'bogo-test':'glass-test',
+        price:tc.kind==='referral'?440:1099,quantity:1,
+        rewardExcluded:true,dealCategory:tc.kind==='referral'?'bogo':'mega',
+        ...(tc.kind==='referral'?{promotion:{type:'buy-one-get-one-free'}}:{})}],
+      ...(tc.kind==='referral'?{
+        voucherKind:'referral',voucherRewardMode:'exclusive_v1',voucherCode:'PRIMEFAMILY1',
+        referralOwnerUid:owner,referralPercent:10,referralCashEstimate:44,
+      }:{voucherKind:''}),
+    };
+    data.set(key('orders',tc.id),order);
+    await assert.rejects(delivered.creditDeliveredOrderBenefits(tc.id,order),
+      /Order cashback exceeds the verified eligible paid items/);
+    assert.equal(data.has(key('reseller_rewards',tc.id)),false);
+    assert.equal(data.has(key('reseller_referral_credits',tc.id)),false);
+    assert.equal(data.get(key('reseller_profiles',owner)).walletAvailable,0);
+  }
+});
+
+test('new Mega and BOGO paid packs earn tier cashback only once after Delivered',async()=>{
+  data.clear();
+  data.set(key('reseller_profiles',buyer),{status:'active',walletAvailable:0,monthlyOrders:0});
+  const oid='order-20261115-tier-mega-bogo';
+  const order={
+    status:'pending',source:'website',cashbackPolicy:'delivered_only_v1',
+    rewardSettlementMode:'shopping_only_v1',resellerUserId:buyer,
+    eligibleAfterVoucher:1539,total:1889,cashbackPercent:10,voucherKind:'',
+    items:[
+      {productId:'glass-mega',price:1099,quantity:1,dealCategory:'mega',rewardExcluded:false},
+      {productId:'bogo-product',price:440,quantity:1,dealCategory:'bogo',
+        rewardExcluded:false,promotion:{type:'buy-one-get-one-free',paidPacks:1,freePacks:1}},
+    ],
+  };
+  data.set(key('orders',oid),order);
+  const first=await delivered.creditDeliveredOrderBenefits(oid,order);
+  assert.equal(first.cashback,154);
+  assert.equal(first.referralCash,0);
+  assert.equal(data.get(key('reseller_shopping_wallets',buyer)).balance,154);
+  assert.equal(data.get(key('reseller_profiles',buyer)).walletAvailable,0);
+  assert.equal(data.get(key('reseller_rewards',oid)).cashback,154);
+  const again=await delivered.creditDeliveredOrderBenefits(oid,order);
+  assert.equal(again.alreadyCredited,true);
+  assert.equal(data.get(key('reseller_shopping_wallets',buyer)).balance,154);
+});
+
+test('friend code on BOGO gives inviter 10 percent, not a second buyer tier award',async()=>{
+  data.clear();
+  for(const uid of [owner,buyer])
+    data.set(key('reseller_profiles',uid),{status:'active',walletAvailable:0,monthlyOrders:0});
+  data.set(key('reseller_referral_codes','PRIMEFAMILY1'),{code:'PRIMEFAMILY1',ownerUid:owner});
+  const oid='order-20261115-bogo-referral';
+  const order={
+    status:'pending',source:'website',cashbackPolicy:'delivered_only_v1',
+    rewardSettlementMode:'shopping_only_v1',resellerUserId:buyer,
+    eligibleAfterVoucher:440,total:790,cashbackPercent:0,
+    voucherKind:'referral',voucherRewardMode:'exclusive_v1',voucherCode:'PRIMEFAMILY1',
+    referralOwnerUid:owner,referralPercent:10,referralCashEstimate:44,
+    items:[{productId:'bogo-product',price:440,quantity:1,dealCategory:'bogo',
+      rewardExcluded:false,promotion:{type:'buy-one-get-one-free',paidPacks:1,freePacks:1}}],
+  };
+  data.set(key('orders',oid),order);
+  const first=await delivered.creditDeliveredOrderBenefits(oid,order);
+  assert.equal(first.reward,0);
+  assert.equal(first.cashback,0);
+  assert.equal(first.referralCash,44);
+  assert.equal(data.get(key('reseller_shopping_wallets',owner)).balance,44);
+  assert.equal(data.get(key('reseller_shopping_wallets',buyer)).balance,0);
+  assert.equal(data.get(key('reseller_referral_credits',oid)).amount,44);
+  const second=await delivered.creditDeliveredOrderBenefits(oid,order);
+  assert.equal(second.alreadyCredited,true);
+  assert.equal(data.get(key('reseller_shopping_wallets',owner)).balance,44);
+});

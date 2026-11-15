@@ -1,52 +1,35 @@
 'use client';
-
-import Link from 'next/link';
-import { useRef } from 'react';
-import { ArrowRight, BadgePercent } from 'lucide-react';
+import { useMemo, useRef } from 'react';
 import type { Product } from '@/lib/types';
-import { resolveGlassOfferProducts, resolveGlassOffers, type GlassOfferSettings } from '@/lib/glassOffers';
-import GlassOfferCard from './GlassOfferCard';
+import { resolveGlassOfferProducts, type GlassOfferSettings } from '@/lib/glassOffers';
+import { useSettings } from '@/lib/useSettings';
 import { useContinuousHomeRail } from '@/lib/useContinuousHomeRail';
+import GlassOfferCard from './GlassOfferCard';
+import MegaDealsHero from './MegaDealsHero';
+import { useVisitProductOrder } from '@/lib/useVisitProductOrder';
+import { CollectionBannerActions } from './CollectionBannerContent';
 import './glass-offers.css';
 
-export default function HomeGlassOfferRail({
-  products,
-  settings,
-}: {
-  products: Product[];
-  settings?: Partial<GlassOfferSettings> | null;
-}) {
+export default function HomeGlassOfferRail({ products, settings: supplied }: { products: Product[]; settings?: Partial<GlassOfferSettings> | null }) {
+  const { settings } = useSettings();
+  const config = supplied || settings.glassDealShowcase;
+  const resolvedOffers = useMemo(() => resolveGlassOfferProducts(products, config), [products, config]);
   const railRef = useRef<HTMLDivElement>(null);
-  const config = resolveGlassOffers(settings);
-  const offers = resolveGlassOfferProducts(products, settings);
-  useContinuousHomeRail(railRef, { itemCount: offers.length, speed: 24 });
+  const { items: offers, ready } = useVisitProductOrder(resolvedOffers, 'mega-home', railRef);
+  const pauseAutoScroll = useContinuousHomeRail(railRef, { itemCount: offers.length, speed: 14, startDelayMs: 8000 });
+  function move(direction: number) {
+    pauseAutoScroll.current();
+    railRef.current?.scrollBy({ left: direction * (railRef.current.clientWidth + 8), behavior: 'smooth' });
+  }
   if (!offers.length) return null;
-
-  return (
-    <section className="glass-offers-home mx-2 mt-3 sm:mx-4 sm:mt-5" aria-label="70% OFF and more special deals">
-      <div className="glass-offers-home__toolbar">
-        <Link href="/deals/glass-bangles" prefetch={false} className="glass-offers-home__more">
-          View More <ArrowRight size={15} />
-        </Link>
+  return <section id="mega-deals" className="glass-offers-home" aria-label="Mega Deals from every category">
+    <MegaDealsHero offers={offers} heading={config?.heading} subtitle={config?.subtitle} controls={<CollectionBannerActions path="/deals" title="Mega Deals" shareClassName="mega-deals-hero__share" onPrevious={() => move(-1)} onNext={() => move(1)}/>} />
+    <div ref={railRef} aria-busy={!ready} className="glass-offers-home__viewport" role="region" aria-label="Swipe to explore all deals" tabIndex={0}>
+      <div className="glass-offers-home__marquee">
+        {[0, 1].map(copy => <div key={copy} className="glass-offers-home__group" data-loop-original={copy === 0 ? '' : undefined} data-loop-copy={copy === 1 ? '' : undefined}>
+          {offers.map(offer => <GlassOfferCard key={offer.product.id} offer={offer} compact clone={copy === 1} />)}
+        </div>)}
       </div>
-
-      <div className="glass-offers-home__row">
-        <Link href="/deals/glass-bangles" prefetch={false} className="glass-offers-home__promo" aria-label={`${config.badge} special offers, view all products`}>
-          <span className="glass-offers-home__promo-kicker">DEAL BOX COLLECTION</span>
-          <BadgePercent className="glass-offers-home__badge-icon" size={30} aria-hidden="true" />
-          <strong>{config.badge}</strong>
-        </Link>
-
-        <div ref={railRef} className="glass-offers-home__viewport" role="region" aria-label="Continuously scrolling product offers" tabIndex={0}>
-          <div className="glass-offers-home__marquee">
-            {[0, 1].map((copy) => (
-              <div key={copy} className="glass-offers-home__group" data-loop-original={copy === 0 ? '' : undefined} data-loop-copy={copy === 1 ? '' : undefined}>
-                {offers.map((offer) => <GlassOfferCard key={offer.product.id} offer={offer} compact clone={copy === 1} />)}
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </section>
-  );
+    </div>
+  </section>;
 }

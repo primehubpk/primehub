@@ -8,7 +8,7 @@ import AdminHeader, { type AdminTab } from '@/components/admin/AdminHeader';
 import ProDashboard from '@/components/admin/ProDashboard';
 import ProductsManager from '@/components/admin/ProductsManager';
 import CategoriesManager from '@/components/admin/CategoriesManager';
-import DealScheduleManager from '@/components/admin/DealScheduleManager';
+import GlassDealShowcaseSettings from '@/components/admin/settings/GlassDealShowcaseSettings';
 import OrdersManager from '@/components/admin/OrdersManager';
 import VendorRequests from '@/components/admin/VendorRequests';
 import SiteSettingsManager from '@/components/admin/SiteSettingsManager';
@@ -63,7 +63,7 @@ function ProfessionalAdmin() {
       case 'dashboard': return <ProDashboard products={products} orders={orders} vendorRequests={vendorRequests} />;
       case 'products': return <ProductsManager />;
       case 'categories': return <CategoriesManager />;
-      case 'deals': return <DealScheduleManager />;
+      case 'deals': return <div className="mx-auto max-w-5xl px-4 pb-8"><GlassDealShowcaseSettings /></div>;
       case 'orders': return <OrdersManager />;
       case 'suppliers': return <VendorRequests />;
       case 'settings': return <SiteSettingsManager />;
