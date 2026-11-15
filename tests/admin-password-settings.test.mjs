@@ -68,7 +68,10 @@ test('Signed cookie uses independent secret and rejects forgeries, expiry', () =
   const req = value => ({ headers: { get: name => name === 'cookie' ?
     'primehub_wallet_admin_session=' + value : '' } });
   assert.equal(session.authorizedWalletAdmin(req(token), now + 100), true);
-  assert.equal(session.authorizedWalletAdmin(req(token), now + 14400), false);
+  assert.equal(session.authorizedWalletAdmin(req(token), now + 14400), true, 'four hours must not expire a remembered device');
+  assert.equal(session.authorizedWalletAdmin(req(token), now + 365 * 86400), true, 'a remembered device remains signed in');
+  assert.equal(session.authorizedWalletAdmin(req(token), now + session.SESSION_SECONDS), false, 'bounded signed cookie eventually expires');
+  assert.equal(session.walletAdminCookieOptions().maxAge, session.SESSION_SECONDS);
   assert.equal(session.authorizedWalletAdmin(req(token + 'x'), now + 100), false);
   assert.equal(session.authorizedWalletAdmin(req('guessable'), now + 100), false);
   sandbox.process.env.FIREBASE_SERVICE_ACCOUNT_KEY = JSON.stringify({ private_key: '-----BEGIN PRIVATE KEY-----\\nrotated-firebase-test-key\\n-----END PRIVATE KEY-----' });
@@ -94,4 +97,21 @@ test('Admin Settings form updates admin login, never unrelated Firebase Auth', (
   assert.ok(!source.includes('process.env.ADMIN_SESSION_SECRET'));
   assert.ok(!source.includes("const ADMIN_PASSWORD = "));
   assert.ok(!source.includes("= 'junaid00'"));
+});
+
+test('Remembered device only shows password for a verified missing session, not a transient error', () => {
+  const guard = fs.readFileSync('components/AdminAuthGuard.tsx', 'utf8');
+  const session = fs.readFileSync('app/api/admin/session/route.ts', 'utf8');
+  assert.match(guard, /if \(!response\.ok\) throw new Error/);
+  assert.match(guard, /typeof data\?\.authenticated !== 'boolean'/);
+  assert.match(guard, /attempt < 2 && active/);
+  assert.match(guard, /setSessionUnavailable\(true\)/);
+  assert.match(guard, /Retry saved login/);
+  assert.match(guard, /window\.localStorage\.getItem\(ADMIN_HINT_KEY\) === '1'/);
+  assert.match(guard, /setAuthenticated\(data\.authenticated\)/);
+  assert.match(guard, /window\.localStorage\.removeItem\(ADMIN_HINT_KEY\)/);
+  assert.match(session, /authorizedWalletAdmin\(request\)/);
+  assert.match(session, /issueWalletAdminSession\(\)/);
+  assert.match(session, /response\.cookies\.set\(WALLET_ADMIN_COOKIE, '',/);
+  assert.match(session, /'Cache-Control', 'no-store'/);
 });
