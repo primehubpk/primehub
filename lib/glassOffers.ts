@@ -14,6 +14,8 @@ export type GlassOfferItem = {
 export type GlassOfferSettings = {
   /** Version 2 is an explicit, editable unified list; legacy schedules seed it once. */
   collectionVersion?: 2;
+  /** Flip only together with the audited one-time catalogue/offer price migration. */
+  priceAdjustmentNov17Complete?: boolean;
   enabled: boolean;
   heading: string;
   subtitle: string;
@@ -85,6 +87,7 @@ export function resolveGlassOffers(raw?: Partial<GlassOfferSettings> | null): Gl
     .slice(0, 100);
   return {
     ...(raw.collectionVersion === 2 ? { collectionVersion: 2 as const } : {}),
+    ...(raw.priceAdjustmentNov17Complete === true ? { priceAdjustmentNov17Complete: true } : {}),
     enabled: raw.enabled !== false,
     heading: typeof raw.heading === 'string' && raw.heading.trim() ? raw.heading.trim().slice(0, 90) : DEFAULT_GLASS_OFFERS.heading,
     subtitle: typeof raw.subtitle === 'string' ? raw.subtitle.trim().slice(0, 180) : DEFAULT_GLASS_OFFERS.subtitle,
@@ -95,6 +98,7 @@ export function resolveGlassOffers(raw?: Partial<GlassOfferSettings> | null): Gl
 
 export type DealCollectionSource = {
   glassDealShowcase?: Partial<GlassOfferSettings> | null;
+  priceAdjustmentNov17Complete?: boolean;
   weeklyDeals?: Array<{ productId?: string; active?: boolean; originalPrice?: number; dealPrice?: number }>;
   bigDeal?: Record<string, any> | null;
   dailyDeal?: Record<string, any> | null;
@@ -103,7 +107,9 @@ export type DealCollectionSource = {
 /** Read-only migration: keep IDs and catalog prices, retire day locks and rotation. */
 export function resolveUnifiedDealCollection(source: DealCollectionSource = {}): GlassOfferSettings {
   const saved = source.glassDealShowcase;
-  const config = resolveGlassOffers(saved);
+  const config = resolveGlassOffers({ ...saved,
+    priceAdjustmentNov17Complete: source.priceAdjustmentNov17Complete === true || saved?.priceAdjustmentNov17Complete === true,
+  });
   if (saved?.collectionVersion === 2) return config;
   const items = [...config.items];
   for (const deal of source.weeklyDeals || []) {
@@ -133,10 +139,12 @@ export function applyCollectionPrice<T extends { id?: string; price?: unknown; [
   const config = resolveGlassOffers(raw);
   const item = config.enabled ? config.items.find(entry => entry.productId === String(product.id || '')) : undefined;
   if (!item) return product;
-  // The one-time price adjustment is persisted in the catalogue / Admin offer
-  // configuration, not applied during rendering. Newly added deals and later
-  // Admin price edits must NOT inherit another automatic ten-percent markup.
-  const price = Number(item.dealPrice) > 0 ? Number(item.dealPrice) : Number(product.price);
+  // Keep the existing site price until the one-off catalogue + offer price
+  // migration is verified and the migration flag is committed atomically.
+  // Afterwards new products and later Admin edits use their exact stored price.
+  const basePrice = Number(item.dealPrice) > 0 ? Number(item.dealPrice) : Number(product.price);
+  const price = config.priceAdjustmentNov17Complete === true
+    ? basePrice : Math.round(basePrice * 1.10);
   if (!Number.isSafeInteger(price) || price <= 0) return product;
   const reference = Number(item.referencePrice) || Math.max(Number(product.originalPrice) || 0, Number(product.compareAtPrice) || 0);
   const rows = (value: unknown) => Array.isArray(value) ? value.map(row => ({ ...row, price })) : value;
