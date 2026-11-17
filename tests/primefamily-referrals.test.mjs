@@ -93,7 +93,7 @@ test('default referral disabled; 10% admin validates range, own code allowed',as
   assert.equal(result.kind,'referral');
   assert.equal(result.ownerUid,owner);
 });
-test('one delivered order credits inviter 10% and buyer 0, idempotently',async()=>{
+test('one delivered order credits buyer 10% and inviter 10% without tier stacking, idempotently',async()=>{
   const orderId='order-20261021-one';
   const order={status:'pending',source:'website',cashbackPolicy:'delivered_only_v1',
     resellerUserId:buyer,eligibleAfterVoucher:1000,total:1500,cashbackPercent:0,
@@ -101,13 +101,16 @@ test('one delivered order credits inviter 10% and buyer 0, idempotently',async()
     referralOwnerUid:owner,referralPercent:10,referralCashEstimate:100};
   data.set(key('orders',orderId),order);
   const first=await delivered.creditDeliveredOrderBenefits(orderId,order);
-  assert.equal(first.reward,0);
+  assert.equal(first.reward,100);
+  assert.equal(first.buyerReferralCash,100);
   assert.equal(first.referralCash,100);
-  assert.equal(data.get(key('reseller_profiles',buyer)).walletAvailable,100);
+  assert.equal(data.get(key('reseller_profiles',buyer)).walletAvailable,200);
   assert.equal(data.get(key('reseller_profiles',owner)).walletAvailable,100);
   assert.equal(data.get(key('reseller_referral_credits',orderId)).amount,100);
   const second=await delivered.creditDeliveredOrderBenefits(orderId,order);
   assert.equal(second.alreadyCredited,true);
+  assert.equal(second.buyerReferralCash,100);
+  assert.equal(data.get(key('reseller_profiles',buyer)).walletAvailable,200);
   assert.equal(data.get(key('reseller_profiles',owner)).walletAvailable,100);
   assert.equal(data.get(key('reseller_profiles',buyer)).monthlyOrders,1);
 });
@@ -138,9 +141,11 @@ test('own referral delivers 10% shopping credit once without stacking tier or ov
   const beforeCash=before.walletAvailable;
   const beforeOrders=before.monthlyOrders;
   const first=await delivered.creditDeliveredOrderBenefits(oid,order);
-  assert.equal(first.reward,0); // Tier 5% must not stack with the referral 10%.
+  assert.equal(first.reward,100); // Own code pays 10% once; tier 5% cannot stack.
   assert.equal(first.cashback,0);
   assert.equal(first.referralCash,100);
+  assert.equal(first.buyerReferralCash,0); // Prevent doubling own code.
+  assert.equal(data.get(key('reseller_rewards',oid)).amount,100);
   assert.equal(data.get(key('reseller_shopping_wallets',owner)).balance,beforeShopping+100);
   assert.equal(data.get(key('reseller_profiles',owner)).walletShopping,beforeShopping+100);
   assert.equal(data.get(key('reseller_profiles',owner)).walletAvailable,beforeCash);
@@ -222,7 +227,7 @@ test('new Mega and BOGO paid packs earn tier cashback only once after Delivered'
   assert.equal(data.get(key('reseller_shopping_wallets',buyer)).balance,154);
 });
 
-test('friend code on BOGO gives inviter 10 percent, not a second buyer tier award',async()=>{
+test('friend code on BOGO pays buyer and inviter 10 percent each, instead of buyer tier',async()=>{
   data.clear();
   for(const uid of [owner,buyer])
     data.set(key('reseller_profiles',uid),{status:'active',walletAvailable:0,monthlyOrders:0});
@@ -239,13 +244,15 @@ test('friend code on BOGO gives inviter 10 percent, not a second buyer tier awar
   };
   data.set(key('orders',oid),order);
   const first=await delivered.creditDeliveredOrderBenefits(oid,order);
-  assert.equal(first.reward,0);
+  assert.equal(first.reward,44);
   assert.equal(first.cashback,0);
+  assert.equal(first.buyerReferralCash,44);
   assert.equal(first.referralCash,44);
   assert.equal(data.get(key('reseller_shopping_wallets',owner)).balance,44);
-  assert.equal(data.get(key('reseller_shopping_wallets',buyer)).balance,0);
+  assert.equal(data.get(key('reseller_shopping_wallets',buyer)).balance,44);
   assert.equal(data.get(key('reseller_referral_credits',oid)).amount,44);
   const second=await delivered.creditDeliveredOrderBenefits(oid,order);
   assert.equal(second.alreadyCredited,true);
   assert.equal(data.get(key('reseller_shopping_wallets',owner)).balance,44);
+  assert.equal(data.get(key('reseller_shopping_wallets',buyer)).balance,44);
 });
