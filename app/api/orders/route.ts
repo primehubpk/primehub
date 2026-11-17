@@ -226,7 +226,7 @@ export async function POST(request: Request) {
     const eligibleSubtotal = orderEligibleSubtotal(items, settings);
     const submittedVoucher = String(body?.voucherCode || '').trim();
     // Friend codes are assigned by the server, not editable Admin coupon rows.
-    // They benefit the OTHER member whose code was used, not the buyer.
+    // A friend's code rewards buyer and inviter after delivery; own code credits once.
     if (referralCode(submittedVoucher) && !reseller?.userId) {
       throw new Error('Sign in to your active Prime Family account to use a friend code.');
     }
@@ -249,6 +249,9 @@ export async function POST(request: Request) {
     const voucherCashbackPercent = voucher?.kind === 'cashback' ? Number(voucher.percent || 0) : 0;
     const referralPercent = voucher?.kind === 'referral' ? Number(voucher.percent || 0) : 0;
     const referralCashEstimate = voucher?.kind === 'referral' ? Number(voucher.referrerEarns || 0) : 0;
+    const buyerReferralCashEstimate = voucher?.kind === 'referral'
+      ? cashBackForTier(eligibleSubtotal, referralPercent) : 0;
+    const referralIsOwnCode = voucher?.kind === 'referral' && voucher.ownerUid === reseller?.userId;
     const eligibleAfterVoucher = Math.max(0, eligibleSubtotal - voucherDiscount);
     // Discount at checkout has been replaced by CASHBACK only after Admin delivery.
     const tierDiscountPercent = 0, tierDiscount = 0;
@@ -287,7 +290,7 @@ export async function POST(request: Request) {
     const quote = { items, rawSubtotal, tierDiscount, tierDiscountPercent, resellerTier: reseller?.tierName || '',
       eligibleSubtotal, eligibleAfterVoucher, voucherCode: voucher?.code || '', voucherId: voucher?.id || '',
       voucherKind: voucher?.kind || '', voucherDiscount, voucherCashAmount, voucherCashbackPercent,
-      referralPercent, referralCashEstimate,
+      referralPercent, referralCashEstimate, buyerReferralCashEstimate, referralIsOwnCode,
       voucherRewardMode: voucher ? 'exclusive_v1' : '',
       tierCashbackPercent, cashbackPercent, cashbackEstimate, cashbackPolicy: 'delivered_only_v1', rewardSettlementMode: 'shopping_only_v1',
       ...(quoteOnly ? { cashbackMemberActive: Boolean(reseller?.userId), cashbackTiers } : {}),
