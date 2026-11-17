@@ -634,6 +634,7 @@ test('rewards card describes app-only Rs.100 gift and Mega/BOGO cashback without
  assert.match(card,/Website signup alone does not credit Rs\. 100/);
  assert.match(card,/Mega\/70% OFF and BOGO paid packs now qualify/);
  assert.match(card,/Tier cashback OR a code benefit/);
- assert.match(card,/Code owner earns/);
+ assert.match(card,/Your referral cashback/);
+ assert.match(card,/code owner|member who shared it/i);
  assert.match(route,/rewardExcluded: isLiveDealItem \|\| isBigDealItem/);
 });
