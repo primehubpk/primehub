@@ -22,25 +22,11 @@ export function bogoWindow(raw?: Partial<BogoSettings> | null, now = Date.now())
 export function isBogoProduct(product: any): boolean {
   return product?.bogoOffer?.enabled === true && product.bogoOffer.unitsPerOffer === 2;
 }
-/** Apply the owner's one-time 10% price increase at every public/checkout
- * boundary. A marker prevents the cached public catalog or offer card from
- * applying it twice. Unrelated catalog products are never affected. */
+/** The one-time owner-approved BOGO price update belongs in persisted catalogue
+ * prices, not checkout/render logic. This identity transform is retained for
+ * existing call sites. Future BOGO products get exactly their Admin-set price. */
 export function applyBogoOfferPrice<T extends Record<string, any>>(product: T): T {
-  if (!isBogoProduct(product) || product.bogoPriceIncreaseV1 === true) return product;
-  const base = Number(product.price);
-  if (!Number.isSafeInteger(base) || base <= 0) return product;
-  const price = Math.round(base * 1.10);
-  const rows = (value: unknown) => Array.isArray(value)
-    ? value.map(row => {
-        const previous = Number(row?.price);
-        return { ...row, price: Number.isFinite(previous) && previous > 0
-          ? Math.round(previous * 1.10) : price };
-      }) : value;
-  return { ...product, price, bogoPriceIncreaseV1: true,
-    ...(Number(product.originalPrice) === base ? { originalPrice: price } : {}),
-    ...(Array.isArray(product.variantMatrix) ? { variantMatrix: rows(product.variantMatrix) } : {}),
-    ...(Array.isArray(product.variants) ? { variants: rows(product.variants) } : {}),
-  };
+  return product;
 }
 
 export function bogoFulfilment(product: any, quantity: number) {
