@@ -79,25 +79,25 @@ test('staged products never shadow real Supabase catalogue on Vercel', () => {
 });
 
 
-test('BOGO prices rise 10 percent exactly once, including real size rows', () => {
+test('BOGO price helper preserves saved Admin prices and real size rows', () => {
   const item={...product,price:400,originalPrice:400,
     variantMatrix:[{size:'2.2',price:400,stock:3},{size:'2.8',price:250,stock:4}]};
   const once=applyBogoOfferPrice(item);
-  assert.equal(once.price,440);
-  assert.equal(once.originalPrice,440);
-  assert.deepEqual(once.variantMatrix.map(v=>v.price),[440,275]);
-  assert.equal(applyBogoOfferPrice(once).price,440);
+  assert.equal(once.price,400);
+  assert.equal(once.originalPrice,400);
+  assert.deepEqual(once.variantMatrix.map(v=>v.price),[400,250]);
+  assert.equal(applyBogoOfferPrice(once).price,400);
   assert.equal(item.price,400);
   assert.equal(applyBogoOfferPrice({price:500,title:'Regular'}).price,500);
 });
 
-test('all fifty BOGO staged prices receive 10% exactly once, unrelated regular prices stay unchanged',()=>{
+test('fifty BOGO offerings and future additions do not silently gain ten percent',()=>{
   const all=JSON.parse(fs.readFileSync(new URL('../data/bogo-staged-products.json',import.meta.url)));
   assert.equal(all.length,50);
   for(const p of all){
     const changed=applyBogoOfferPrice(p);
-    assert.equal(changed.price,Math.round(p.price*1.1));
-    assert.ok(changed.variantMatrix.every((v,i)=>v.price===Math.round(p.variantMatrix[i].price*1.1)));
+    assert.equal(changed.price,p.price);
+    assert.ok(changed.variantMatrix.every((v,i)=>v.price===p.variantMatrix[i].price));
     assert.equal(applyBogoOfferPrice(changed).price,changed.price);
     assert.equal(changed.stock,p.stock);
   }
@@ -123,5 +123,5 @@ test('Supabase public catalogue projection retains BOGO flags and already-increa
   const saved={id:'bogo-live',price:440,originalPrice:440,
     bogoOffer:{enabled:true,unitsPerOffer:2,unitLabel:'set'},bogoPriceIncreaseV1:true};
   assert.equal(applyBogoOfferPrice(saved).price,440);
-  assert.equal(applyBogoOfferPrice({...saved,bogoPriceIncreaseV1:false}).price,484);
+  assert.equal(applyBogoOfferPrice({...saved,bogoPriceIncreaseV1:false}).price,440);
 });
