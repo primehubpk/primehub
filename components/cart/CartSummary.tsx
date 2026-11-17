@@ -15,6 +15,8 @@ type CartQuote = {
   voucherCashbackPercent?: number;
   referralPercent?: number;
   referralCashEstimate?: number;
+  buyerReferralCashEstimate?: number;
+  referralIsOwnCode?: boolean;
   voucherKind?: string;
   tierCashbackPercent?: number;
   cashbackEstimate?: number;
@@ -77,9 +79,9 @@ export default function CartSummary({
             Apply
           </button>
         </div>
-        <p className="mt-2 text-[10px] leading-4 text-black/50">Use a promo code for a discount or reward, or keep your Family tier cashback. Only one benefit per order. Friend codes reward the member who shared them.</p>
+        <p className="mt-2 text-[10px] leading-4 text-black/50">Use a promo code for a discount or reward, or keep your Family tier cashback. Only one buyer benefit per order. Friend codes earn 10% cashback for both buyer and inviter after delivery; own codes credit once.</p>
         {voucherCode && quote && !loading && (quote.voucherKind === 'cashback' || quote.voucherKind === 'cash') && <p className="mt-2 text-[10px] font-extrabold text-[#0F6A5F]">Promo replaces tier cashback (never stacked): {quote.voucherKind === 'cashback' ? String(quote.voucherCashbackPercent || 0) + '% cashback; ' : 'Fixed cash voucher; '}Rs. {Number(quote.voucherCashAmount || 0).toLocaleString()} shopping credit after delivery.</p>}
-        {voucherCode && quote && !loading && quote.voucherKind === 'referral' && <p role="status" className="mt-2 text-[10px] font-extrabold text-[#0F6A5F]">Friend code accepted: its owner earns {quote.referralPercent || 0}% (about Rs. {Number(quote.referralCashEstimate || 0).toLocaleString()}) after delivery. Your tier cashback is replaced; no extra buyer discount.</p>}
+        {voucherCode && quote && !loading && quote.voucherKind === 'referral' && <p role="status" className="mt-2 text-[10px] font-extrabold text-[#0F6A5F]">Friend code accepted: you earn {quote.referralPercent || 0}% (about Rs. {Number(quote.buyerReferralCashEstimate || 0).toLocaleString()}) after delivery. {quote.referralIsOwnCode ? 'Your own code pays you once, not twice.' : `The code owner also earns Rs. ${Number(quote.referralCashEstimate || 0).toLocaleString()}.`} This replaces your tier cashback, not an extra checkout discount.</p>}
         {voucherCode && quote && !loading && quote.voucherKind !== 'cashback' && quote.voucherKind !== 'cash' && quote.voucherKind !== 'referral' && <p role="status"  className="mt-2 text-[10px] font-extrabold text-[#0F6A5F]">
           {Number(quote.voucherDiscount || 0) > 0
             ? `Rs. ${Number(quote.voucherDiscount).toLocaleString()} checkout discount applied.`
@@ -110,6 +112,8 @@ export default function CartSummary({
         voucherKind={String(quote.voucherKind || '')}
         referralPercent={Number(quote.referralPercent || 0)}
         referralCashEstimate={Number(quote.referralCashEstimate || 0)}
+        buyerReferralCashEstimate={Number(quote.buyerReferralCashEstimate || 0)}
+        referralIsOwnCode={quote.referralIsOwnCode === true}
         cashbackEstimate={Number(quote.cashbackEstimate || 0)}
         eligibleSubtotal={Number(quote.eligibleAfterVoucher || 0)}
         voucherCashAmount={Number(quote.voucherCashAmount || 0)}
