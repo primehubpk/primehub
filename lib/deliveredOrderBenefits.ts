@@ -111,7 +111,8 @@ export async function creditDeliveredOrderBenefits(orderId: string, authoritativ
       if (recorded.resellerUserId !== userId) throw new Error('Reward ledger ownership mismatch.');
       return { alreadyCredited: true, reward: Number(recorded.amount || 0),
         cashback: Number(recorded.cashback || 0), voucherCash: Number(recorded.voucherCash || 0),
-        referralCash: Number(recorded.referralCash || 0) };
+        referralCash: Number(recorded.referralCash || 0),
+        buyerReferralCash: Number(recorded.buyerReferralCash || 0) };
     }
     if (!profileSnap.exists || profileSnap.data()?.status !== 'active') {
       throw new Error('Linked reseller profile is not active. No cash has been credited.');
@@ -137,6 +138,10 @@ export async function creditDeliveredOrderBenefits(orderId: string, authoritativ
     const referralPayable = isReferral &&
       referralOwner?.exists && referralOwner.data()?.status === 'active'
       ? cashBackForTier(eligible, referralPercent) : 0;
+    // A friend's verified code rewards BOTH members, without stacking the buyer's tier.
+    // Own-code checkout keeps its existing single 10% reward, not two payouts.
+    const buyerReferralPayable = isReferral && !isOwnReferral
+      ? cashBackForTier(eligible, referralPercent) : 0;
     const referralExisting = Number(referralOwner?.data()?.walletAvailable ?? 0);
     const referralShopping = Number(referralShoppingDoc?.data()?.balance ?? 0);
     if (isReferral && (!Number.isSafeInteger(referralExisting) || referralExisting < 0 ||
@@ -148,7 +153,7 @@ export async function creditDeliveredOrderBenefits(orderId: string, authoritativ
     // subsequent legitimate delivered orders if a cash code is reused.
     const voucherAwarded = voucherClaimRef && !priorVoucher?.exists
       ? Math.min(voucherCash, Math.max(0, eligible - tierCash)) : 0;
-    const reward = tierCash + voucherAwarded;
+    const reward = tierCash + voucherAwarded + buyerReferralPayable;
     // When buyer and referral owner are the same member, credit the wallet once.
     // A separate referral update to the same document would overwrite order counts or balances.
     const walletReward = reward + (isOwnReferral ? referralPayable : 0);
@@ -161,8 +166,9 @@ export async function creditDeliveredOrderBenefits(orderId: string, authoritativ
     });
     if (shoppingOnly) tx.set(shoppingRef, { userId, balance: oldShopping + walletReward, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
     tx.create(creditRef, {
-      resellerUserId: userId, orderId, amount: reward, cashback: tierCash,
-      voucherCash: voucherAwarded, referralCash: referralPayable,
+      resellerUserId: userId, orderId, amount: walletReward, cashback: tierCash,
+      voucherCash: voucherAwarded, buyerReferralCash: buyerReferralPayable,
+      referralCash: referralPayable,
       referralOwnerUid: isReferral ? referralOwnerUid : '',
       rewardPercent: percent,
       tierId: String(authoritativeOrder.resellerTier || ''),
@@ -198,11 +204,14 @@ export async function creditDeliveredOrderBenefits(orderId: string, authoritativ
     tx.set(orderRef, {
       ...(orderSnap.exists ? {} : { ...authoritativeOrder }),
       status: 'delivered', resellerRewardStatus: 'credited',
-      resellerReward: reward, resellerCashback: tierCash,
-      voucherCashCredited: voucherAwarded, referralCashCredited: referralPayable,
+      resellerReward: walletReward, resellerCashback: tierCash,
+      voucherCashCredited: voucherAwarded, buyerReferralCashCredited: buyerReferralPayable,
+      referralCashCredited: referralPayable,
       updatedAt: new Date().toISOString(),
     }, { merge: true });
-    return { alreadyCredited: false, reward, cashback: tierCash, voucherCash: voucherAwarded, referralCash: referralPayable };
+    return { alreadyCredited: false, reward: walletReward, cashback: tierCash,
+      voucherCash: voucherAwarded, buyerReferralCash: buyerReferralPayable,
+      referralCash: referralPayable };
   });
 
   try { await mirrorResellerFirestoreDoc('reseller_profiles', userId); }
