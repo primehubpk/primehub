@@ -31,9 +31,9 @@ test('migration includes all Weekly and Big slots at their exact advertised pric
   const config = resolveUnifiedDealCollection(legacy);
   assert.equal(config.collectionVersion, 2);
   const offers = resolveGlassOfferProducts(products, config);
-  assert.deepEqual(offers.map(item => [item.product.id, item.price]), [['weekly', 209], ['watch', 1099], ['bag', 550]]);
-  assert.equal(offers[0].savingPercent, 30);
-  assert.equal(offers[1].savingPercent, 63);
+  assert.deepEqual(offers.map(item => [item.product.id, item.price]), [['weekly', 190], ['watch', 999], ['bag', 500]]);
+  assert.equal(offers[0].savingPercent, 36);
+  assert.equal(offers[1].savingPercent, 67);
 });
 
 test('normalization is idempotent, retires all schedules, and never mutates source documents', () => {
@@ -568,15 +568,15 @@ test('first HTML paint uses per-request server visit ordering and distinct dedic
 });
 
 
-test('all configured Mega deal items, including watches and twelve glass boxes, gain ten percent once', () => {
+test('Mega offer prices use exactly the persisted Admin value, with no future auto-markup', () => {
   const first=STARTER_GLASS_OFFERS[0].productId;
-  const glass={id:first,title:'Glass box',price:999,originalPrice:3000,variantMatrix:[{size:'2.6',price:999}]};
+  const glass={id:first,title:'Glass box',price:1099,originalPrice:3000,variantMatrix:[{size:'2.6',price:1099}]};
   const once=applyCollectionPrice(glass);
   assert.equal(once.price,1099);
   assert.equal(once.variantMatrix[0].price,1099);
   assert.equal(applyCollectionPrice(once).price,1099);
-  assert.equal(glass.price,999);
-  assert.equal(applyCollectionPrice({id:'watch',price:999}, {enabled:true,items:[{productId:'watch',dealPrice:999}]}).price,1099);
+  assert.equal(glass.price,1099);
+  assert.equal(applyCollectionPrice({id:'watch',price:999}, {enabled:true,items:[{productId:'watch',dealPrice:1099}]}).price,1099);
   const settings={glassDealShowcase:{enabled:true,collectionVersion:2,items:[{productId:first},{productId:'watch'}]}};
   const eligible=orderEligibleSubtotal([
     {productId:first,price:1099,quantity:1,dealCategory:'mega'},
