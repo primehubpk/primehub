@@ -20,6 +20,8 @@ type Props = {
   voucherKind: string;
   referralPercent: number;
   referralCashEstimate: number;
+  buyerReferralCashEstimate: number;
+  referralIsOwnCode: boolean;
   cashbackEstimate: number;
   eligibleSubtotal: number;
   voucherCashAmount: number;
@@ -29,7 +31,8 @@ type Props = {
 /** Always use prices and tiers from /api/orders quote, not cart prices. */
 export default function PrimeFamilyCartCard({
   signedIn, activeMember, tierName, cashbackPercent, tierCashbackPercent,
-  voucherCashbackPercent, voucherKind, referralPercent, referralCashEstimate, cashbackEstimate,
+  voucherCashbackPercent, voucherKind, referralPercent, referralCashEstimate,
+  buyerReferralCashEstimate, referralIsOwnCode, cashbackEstimate,
   eligibleSubtotal, voucherCashAmount, tiers,
 }: Props) {
   const active = signedIn && activeMember;
@@ -39,7 +42,7 @@ export default function PrimeFamilyCartCard({
   const tierCashback = Math.max(0, Number(cashbackEstimate || 0));
   const cashVoucher = Math.min(Math.max(0, Number(voucherCashAmount || 0)), Math.max(0, eligible - tierCashback));
   const referralApplied = voucherKind === 'referral';
-  const shownReward = referralApplied ? referralCashEstimate : tierCashback + cashVoucher;
+  const shownReward = referralApplied ? buyerReferralCashEstimate : tierCashback + cashVoucher;
   return (
     <section aria-label="PrimeHub Family Cashback" className="mt-4 overflow-hidden rounded-[22px] border border-[#0F6A5F]/15 bg-gradient-to-br from-[#EFF9F5] via-[#F7FCF9] to-[#FFF9E9] p-3.5 sm:p-4">
       <div className="flex items-center gap-2.5">
@@ -81,15 +84,15 @@ export default function PrimeFamilyCartCard({
               <p className="mt-1 text-[10px] leading-4 text-black/55">Eligible products: Rs. {money(eligible)}</p>
             </div>
             <div className="shrink-0 text-right">
-              <p className="text-[9px] font-bold text-black/45">{referralApplied ? 'Code owner earns' : voucherKind === 'discount' ? 'Your voucher' : 'Cashback after delivery'}</p>
+              <p className="text-[9px] font-bold text-black/45">{referralApplied ? 'Your referral cashback' : voucherKind === 'discount' ? 'Your voucher' : 'Cashback after delivery'}</p>
               <p className="text-lg font-black leading-6 text-[#0F6A5F]">{voucherKind === 'discount' ? 'Applied' : `Rs. ${money(shownReward)}`}</p>
             </div>
           </div>
           <p className="mt-2 flex items-start gap-1.5 text-[10px] font-semibold leading-4 text-[#276C5C]">
             <CheckCircle2 size={14} className="mt-0.5 shrink-0" />
-            {referralApplied ? 'Friend code benefits the person who shared it. Your tier cashback is replaced, not added.' : voucherKind === 'discount' ? 'Your valid code reduces the amount at checkout instead of earning tier cashback.' : eligible > 0 ? 'Cashback becomes PrimeHub shopping credit after Admin marks your order Delivered.' : 'No cashback-eligible paid products in this cart.'}
+            {referralApplied ? 'You earn 10% cashback with a verified friend code after delivery, replacing your tier cashback.' : voucherKind === 'discount' ? 'Your valid code reduces the amount at checkout instead of earning tier cashback.' : eligible > 0 ? 'Cashback becomes PrimeHub shopping credit after Admin marks your order Delivered.' : 'No cashback-eligible paid products in this cart.'}
           </p>
-          {voucherKind === 'referral' && <p className="mt-1 text-[10px] font-bold text-[#0F6A5F]">Friend code: {referralPercent}% for the code owner after delivery—not an extra buyer discount.</p>}
+          {voucherKind === 'referral' && <p className="mt-1 text-[10px] font-bold text-[#0F6A5F]">Friend code: {referralPercent}% cashback for you {referralIsOwnCode ? 'once (own code; no double credit).' : `and ${referralPercent}% for the member who shared it (Rs. ${money(referralCashEstimate)} for them).`} Credited after delivery, not deducted from checkout.</p>}
           {voucherKind === 'cashback' && <p className="mt-1 text-[10px] font-bold text-[#0F6A5F]">Promo {voucherCashbackPercent}% replaces tier cashback: Rs. {money(cashVoucher)} shopping credit on delivery (not extra).</p>}
           {voucherKind === 'cash' && <p className="mt-1 text-[10px] font-bold text-[#0F6A5F]">Fixed cash voucher replaces tier cashback: Rs. {money(cashVoucher)} after delivery.</p>}
           {voucherKind === 'discount' && <p className="mt-1 text-[10px] font-bold text-[#0F6A5F]">Checkout discount voucher applied instead of tier cashback on this order.</p>}
