@@ -5,7 +5,7 @@ import { getDualCatalog, getDualCategories, getDualProduct, getDualStorefrontSet
 import { getStorefrontSettingsWithBigDealRecovery } from '@/lib/storefrontSettingsServer';
 import { getCachedWholesaleVideosSnapshot } from '@/lib/wholesaleVideosServer';
 import { applyBogoAvailability, applyBogoOfferPrice } from '@/lib/bogoOffers';
-import { applyCollectionPrice } from '@/lib/glassOffers';
+import { applyCollectionPrice, getMegaDealAvailableSizes } from '@/lib/glassOffers';
 
 const CATALOG_RETRY_DELAYS_MS = [0];
 const SETTINGS_RETRY_DELAYS_MS = [0];
@@ -123,6 +123,7 @@ export function compactPublicCatalogSnapshot<
           // one R2 cover object is missing, without shipping full variant payloads.
           compact.images = compact.images.slice(0, 3);
         }
+        if (Number(product.megaDealPrice) > 0) compact.availableSizes = getMegaDealAvailableSizes(product);
         return compact;
       })
     : [];
