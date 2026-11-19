@@ -657,3 +657,32 @@ test('Mega card size labels include only real selectable stock and respect hidde
   assert.deepEqual(getMegaDealAvailableSizes({ variants: [{ size: '2.8', stock: 1 }] }), ['2.8']);
   assert.equal(product.variantMatrix.length, 8);
 });
+
+test('original photo restoration preview keeps live data and newer Admin photos unchanged', async () => {
+  const source = await fs.readFile(path.join(root, 'lib/megaImageRestorationPreview.ts'), 'utf8');
+  const repairs = JSON.parse(await fs.readFile(path.join(root, 'scripts/mega-image-restoration-20261119.json'), 'utf8'));
+  assert.ok(repairs.length >= 14);
+  const body = source.replace(/^import.*;\r?\n/gm, '');
+  const fixture = repairs[0];
+  const prefix = 'const repairs=' + JSON.stringify(repairs) + ';const normalizeImageUrl=url=>String(url||"").replace("https://images.primehubmall.com","https://pub-157b90419bf04016bdea666e4cbce181.r2.dev");';
+  const { applyMegaImageRestorationPreview } = await import('data:text/javascript;charset=utf-8,' + encodeURIComponent(prefix + compile(body)));
+  const previous = process.env.VERCEL_ENV;
+  const product = { id:fixture.productId,imageUrl:fixture.oldUrl,images:[fixture.oldUrl],variantMatrix:[{size:'2.4',stock:3,imageUrl:fixture.oldUrl}],price:1209 };
+  try {
+    process.env.VERCEL_ENV='production';
+    assert.equal(applyMegaImageRestorationPreview(product),product);
+    process.env.VERCEL_ENV='preview';
+    const restored=applyMegaImageRestorationPreview(product);
+    assert.equal(restored.imageUrl,fixture.newUrl);
+    assert.equal(restored.images[0],fixture.newUrl);
+    assert.equal(restored.variantMatrix[0].imageUrl,fixture.newUrl);
+    assert.equal(restored.variantMatrix[0].stock,3);
+    assert.equal(restored.price,1209);
+    assert.equal(product.imageUrl,fixture.oldUrl);
+    const newer={...product,imageUrl:'https://example.com/new-admin-photo.webp'};
+    assert.equal(applyMegaImageRestorationPreview(newer),newer);
+    assert.equal(applyMegaImageRestorationPreview({id:'ordinary',imageUrl:fixture.oldUrl}).imageUrl,fixture.oldUrl);
+  } finally {
+    if(previous===undefined)delete process.env.VERCEL_ENV;else process.env.VERCEL_ENV=previous;
+  }
+});
