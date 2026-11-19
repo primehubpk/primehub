@@ -1,6 +1,7 @@
 import 'server-only';
 import { stagedBogoProducts, withStagedBogoCatalog } from '@/lib/stagedBogoCatalogServer';
 import { getAdminDb } from '@/lib/firebaseAdmin';
+import { getMegaDealAvailableSizes } from '@/lib/glassOffers';
 
 type ReadMode = 'firebase-primary' | 'supabase-primary' | 'firebase-only' | 'supabase-only';
 export type DualReadCacheOptions = { cache?: RequestCache; revalidate?: number; tags?: string[]; timeoutMs?: number };
@@ -611,4 +612,35 @@ export function getDualSkills(options?: DualReadCacheOptions) {
 
 export function getConfiguredReadMode() {
   return mode();
+}
+
+/** One bounded server read for Mega size labels; full matrices never enter catalog HTML. */
+export async function getDualProductSizeSummaries(productIds: string[], options?: DualReadCacheOptions): Promise<Record<string, string[]>> {
+  const ids = Array.from(new Set(productIds.map(id => String(id).trim()).filter(Boolean))).slice(0, 100);
+  if (!ids.length) return {};
+  return withFallback<Record<string, string[]>>(
+    async () => {
+      const db = getAdminDb();
+      const docs = await db.getAll(...ids.map(id => db.collection('products').doc(id)));
+      return Object.fromEntries(docs.filter(doc => doc.exists).map(doc => [doc.id, getMegaDealAvailableSizes(doc.data() || {})]));
+    },
+    async () => {
+      const { url, key } = supabaseConfig();
+      const params = new URLSearchParams({
+        select: 'id,stock,variant_matrix,variants,payloadMatrix:payload->variantMatrix,payloadVariants:payload->variants,payloadStock:payload->stock,hasVariants:payload->hasVariants',
+        id: 'in.(' + ids.map(id => '"' + id.replace(/["\\\\]/g, '') + '"').join(',') + ')',
+      });
+      const response = await fetch(url + '/rest/v1/products?' + params, {
+        headers: { apikey: key, Authorization: 'Bearer ' + key }, ...supabaseReadInit(options),
+      });
+      if (!response.ok) throw new Error('Mega size summary read failed ' + response.status);
+      const rows = await response.json() as any[];
+      return Object.fromEntries(rows.map(row => [row.id, getMegaDealAvailableSizes({
+        hasVariants: row.hasVariants, stock: row.payloadStock ?? row.stock,
+        variantMatrix: Array.isArray(row.payloadMatrix) ? row.payloadMatrix : row.variant_matrix,
+        variants: Array.isArray(row.payloadVariants) ? row.payloadVariants : row.variants,
+      })]));
+    },
+    {},
+  );
 }
