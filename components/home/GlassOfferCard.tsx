@@ -5,7 +5,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { ShoppingCart, Tag } from 'lucide-react';
 import { isDirectStorefrontImage, normalizeImageUrl } from '@/lib/imageUrl';
-import { useCartStore } from '@/lib/cartStore';
+import { normalizeProductVariants, useCartStore } from '@/lib/cartStore';
 import { getVerifiedDealProduct } from '@/lib/verifiedDealProduct';
 import { imageOf, priceOf, originalOf, productHasVariants, titleOf, type Product } from '@/components/shop/ShopTypes';
 import type { GlassOfferDisplay } from '@/lib/glassOffers';
@@ -25,6 +25,7 @@ export default function GlassOfferCard({
   const [checking, setChecking] = useState(false);
   const [error, setError] = useState('');
   const [added, setAdded] = useState(false);
+  const [selectedSize, setSelectedSize] = useState('');
   const [measuredImage, setMeasuredImage] = useState<{ src: string; aspect: number } | null>(null);
   const openVariantModal = useCartStore((state) => state.openVariantModal);
   const addItem = useCartStore((state) => state.addItem);
@@ -35,7 +36,10 @@ export default function GlassOfferCard({
   const offersSize = product.hasVariants !== false;
   const imageAspect = measuredImage?.src === image ? measuredImage.aspect : 1;
 
-  async function selectSize() {
+  const sizes = Array.isArray(product.availableSizes) ? product.availableSizes.filter((size): size is string => typeof size === 'string' && Boolean(size.trim())) : [];
+  const sizeLabel = (size: string) => size.match(/^\d+(?:\.\d+)?/)?.[0] || size;
+
+  async function selectSize(preferredSize = selectedSize) {
     if (checking) return;
     setChecking(true);
     setError('');
@@ -46,7 +50,12 @@ export default function GlassOfferCard({
       const freshImage = imageOf(fresh) || image;
       const currentPrice = priceOf(fresh);
       if (productHasVariants(fresh)) {
-        if (!openVariantModal({ ...fresh, price: currentPrice, image: freshImage, imageUrl: freshImage }, 'cart')) {
+        if (preferredSize && !normalizeProductVariants(fresh).rows.some(row => String(row.size || '').trim().toLowerCase() === preferredSize.trim().toLowerCase() && Number(row.stock) > 0)) {
+          setSelectedSize('');
+          throw new Error('This size is no longer in stock. Please choose another size.');
+        }
+        setSelectedSize(preferredSize);
+        if (!openVariantModal({ ...fresh, price: currentPrice, image: freshImage, imageUrl: freshImage, preferredSize }, 'cart')) {
           throw new Error('Please retry selecting your size.');
         }
         return;
@@ -74,7 +83,7 @@ export default function GlassOfferCard({
     <article data-product-id={product.id} data-price={price} aria-hidden={clone || undefined} className={compact ? 'glass-offer-card glass-offer-card--compact' : 'glass-offer-card'}>
       <Link href={`/product/${encodeURIComponent(product.id)}`} prefetch={false} tabIndex={clone ? -1 : undefined}
         className="glass-offer-card__link" aria-label={`View ${title}, ${money(price)}`}>
-        <div className="glass-offer-card__image" style={{ aspectRatio: imageAspect }}>
+        <div className="glass-offer-card__image" style={compact ? undefined : { aspectRatio: imageAspect }}>
           {image ? <Image src={image} alt={title} fill unoptimized={isDirectStorefrontImage(image)} sizes={compact ? '180px' : '(max-width: 640px) 45vw, 260px'} quality={72}
             onLoad={(event) => {
               const { naturalWidth: width, naturalHeight: height } = event.currentTarget;
@@ -92,6 +101,12 @@ export default function GlassOfferCard({
           {referencePrice > price ? <s>{money(referencePrice)}</s> : null}
         </div>
       </Link>
+      {sizes.length > 0 && <fieldset className="glass-offer-card__sizes" disabled={checking}>
+        <legend>Available sizes</legend>
+        <div>{sizes.map(size => <button key={size} type="button" title={size}
+          aria-label={`Choose size ${size} for ${title}`} aria-pressed={selectedSize === size}
+          tabIndex={clone ? -1 : undefined} onClick={() => void selectSize(size)}>{sizeLabel(size)}</button>)}</div>
+      </fieldset>}
       <button type="button" className="glass-offer-card__action" onClick={() => void selectSize()}
         disabled={checking} tabIndex={clone ? -1 : undefined}
         aria-label={`Select size for ${title}`}>
