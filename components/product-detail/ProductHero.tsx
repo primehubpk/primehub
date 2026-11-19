@@ -78,7 +78,7 @@ export default function ProductHero({ product, images, activeImage, savingsAmoun
                 }
               }}
               className={isMegaProduct
-                ? (trimSourcePadding ? 'object-contain scale-[1.13]' : 'object-contain')
+                ? (trimSourcePadding ? 'object-contain scale-[1.17]' : 'object-contain')
                 : (liveDeal || bigDealActive ? 'object-contain' : 'object-cover')}
             />
           </button>
