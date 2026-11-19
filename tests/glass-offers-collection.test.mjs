@@ -8,7 +8,7 @@ const root = process.cwd();
 const compile = text => ts.transpileModule(text, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText;
 const text = await fs.readFile(path.join(root, 'lib/glassOffers.ts'), 'utf8');
 const moduleUrl = 'data:text/javascript;charset=utf-8,' + encodeURIComponent(compile(text));
-const { STARTER_GLASS_OFFERS, resolveGlassOffers, resolveGlassOfferProducts, isExclusiveGlassDealProduct, resolveUnifiedDealCollection, unifyStorefrontDeals, applyCollectionPrice, isDedicatedDealProduct } = await import(moduleUrl);
+const { STARTER_GLASS_OFFERS, resolveGlassOffers, resolveGlassOfferProducts, isExclusiveGlassDealProduct, resolveUnifiedDealCollection, unifyStorefrontDeals, applyCollectionPrice, isDedicatedDealProduct, getMegaDealAvailableSizes } = await import(moduleUrl);
 const benefits = compile(await fs.readFile(path.join(root, 'lib/orderBenefits.ts'), 'utf8')).replace("from './glassOffers'", 'from ' + JSON.stringify(moduleUrl));
 const { orderEligibleSubtotal } = await import('data:text/javascript;charset=utf-8,' + encodeURIComponent(benefits));
 const legacy = {
@@ -637,4 +637,23 @@ test('rewards card describes app-only Rs.100 gift and Mega/BOGO cashback without
  assert.match(card,/Your referral cashback/);
  assert.match(card,/code owner|member who shared it/i);
  assert.match(route,/rewardExcluded: isLiveDealItem \|\| isBigDealItem/);
+});
+
+test('Mega card size labels include only real selectable stock and respect hidden rows and explicit zero', () => {
+  const product = { stock: 30, variantMatrix: [
+    { size: '2.6 - Regular', stock: 2 },
+    { size: '2.6 - Regular', stock: 9, color: 'Second colour' },
+    { size: '2.4', stock: 0 },
+    { size: '2.8', stock: 8, hidden: true },
+    { size: '2.2', stock: 8, active: false },
+    { size: 'Free size' },
+    { options: { size: 'Medium' }, stock: '1' },
+    { variantSize: 'Large', stock: 'bad' },
+  ] };
+  assert.deepEqual(getMegaDealAvailableSizes(product), ['2.6 - Regular', 'Free size', 'Medium']);
+  assert.deepEqual(getMegaDealAvailableSizes({ ...product, hasVariants: false }), []);
+  assert.deepEqual(getMegaDealAvailableSizes({ stock: 0, variants: [{ size: '2.6' }] }), []);
+  assert.deepEqual(getMegaDealAvailableSizes({ sizes: ['Invented'], hasVariants: true }), []);
+  assert.deepEqual(getMegaDealAvailableSizes({ variants: [{ size: '2.8', stock: 1 }] }), ['2.8']);
+  assert.equal(product.variantMatrix.length, 8);
 });
