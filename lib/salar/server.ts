@@ -345,20 +345,25 @@ async function readCompleteCatalogue() {
 async function readSalarStateFromDatabase() {
   const payload = await getSupabasePrimaryPayload('settings', SALAR_SETTINGS_ID);
   const state = normalizeState(payload);
-  // Older saved snapshots came from the card-only storefront projection and
-  // silently lost every variant/description. Repair on the cached server read,
-  // not by making one product request per chat or changing the public payload.
-  if (state.catalogue && state.catalogue.detailVersion !== 2) {
-    const complete = await readCompleteCatalogue();
-    state.catalogue = { ...state.catalogue, ...complete, detailVersion: 2, updatedAt: new Date().toISOString() };
+  // Refresh even version-2 snapshots: saving a complete catalogue once must
+  // never freeze prices, stock or business settings until an admin refresh.
+  // Fail closed on upstream failure instead of presenting stale facts as live.
+  if (state.catalogue) {
+    const [complete, storefront] = await Promise.all([
+      readCompleteCatalogue(),
+      getFreshStorefrontSettingsSnapshot(),
+    ]);
+    state.catalogue = { ...state.catalogue, ...complete,
+      storefront: publicStorefrontValue(storefront) as Record<string, unknown>,
+      detailVersion: 2, updatedAt: new Date().toISOString() };
   }
   return state;
 }
 
 const readCachedSalarState = unstable_cache(
   readSalarStateFromDatabase,
-  ['primehub-salar-state-v2'],
-  { revalidate: 3600, tags: [SALAR_STATE_TAG] },
+  ['primehub-salar-state-v3'],
+  { revalidate: 60, tags: [SALAR_STATE_TAG] },
 );
 
 export function getSalarState() {

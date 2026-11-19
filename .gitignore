@@ -35,3 +35,9 @@ play-store/android-twa/*.keystore
 *.jks
 *.p12
 *.keystore
+
+# Private WhatsApp queue and customer media/state stay on the laptop.
+/tools/salar-whatsapp/private/
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm

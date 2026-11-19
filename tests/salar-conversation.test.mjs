@@ -168,7 +168,7 @@ test('legacy Salar snapshot gains complete variants/descriptions once per cached
   const stateServer = load('lib/salar/server.ts', {
     'server-only': {}, '@/lib/salar/credentialStore': {}, '@/lib/salar/providerConfig': config,
     'next/cache': { unstable_cache: fn => { let cached; return () => cached ??= fn(); }, revalidateTag() {} },
-    '@/lib/publicCatalogServer': {},
+    '@/lib/publicCatalogServer': { getFreshStorefrontSettingsSnapshot: async () => ({ freeShippingCount: 5 }) },
     '@/lib/dualReadServer': { getDualFeedCatalog: async () => {
       reads++;
       return { source: 'supabase', categories: [{ id: 'glass', title: 'Glass Bangles' }], products: [
@@ -185,6 +185,7 @@ test('legacy Salar snapshot gains complete variants/descriptions once per cached
   assert.equal(state.catalogue.products[0].id, 'newer');
   assert.equal(state.catalogue.products[1].variantMatrix[0].size, '2.8');
   assert.equal(state.catalogue.products[1].description, 'Full product detail');
+  assert.equal(state.catalogue.storefront.freeShippingCount, 5);
   assert.ok(state.catalogue.products[1].images.includes('https://images.example/variant.jpg'));
   await stateServer.getSalarState();
   assert.equal(reads, 1);
@@ -197,4 +198,91 @@ test('legacy Salar snapshot gains complete variants/descriptions once per cached
   assert.equal(result.products.length, 0);
   assert.equal(result.reply, 'Is design ka naam confirm kar dein?');
   assert.match(t.prompts[1][0].content, /no products matched/);
+});
+
+test('customer references ignore assistant galleries and preserve latest customer selection', () => {
+  const store = load('lib/salar/chatStore.ts', { 'server-only': {}, '@/lib/dualWriteServer': {} });
+  const refs = store.recentCustomerProductReferences({ messages: [
+    { actor: 'customer', products: [{ id: 'selected', title: 'Selected' }] },
+    { actor: 'salar', products: [{ id: 'not-selected', title: 'Gallery' }] },
+    { actor: 'admin', products: [{ id: 'suggestion', title: 'Suggestion' }] },
+  ] }, 1);
+  assert.deepEqual(Array.from(refs, p => p.id), ['selected']);
+});
+
+test('all thirty selected prices survive detailed context limits in customer priority order', async () => {
+  const t = setup();
+  const ids = Array.from({ length: 30 }, (_, i) => `g${29 - i}`);
+  t.state.catalogue.products.forEach((p, i) => { p.price = 100 + i; });
+  await t.engine.answerWithModelDrivenSalar({ message: 'Prices of these selected designs', exactProductIds: ids });
+  const prompt = t.prompts[0][0].content;
+  const line = prompt.split('\n').find(s => s.startsWith('EXACT CUSTOMER PRODUCT PRICES'));
+  const data = JSON.parse(line.slice(line.indexOf(': ') + 2));
+  assert.deepEqual(data.map(p => p.id), ids);
+  assert.equal(data[0].price, 129);
+  const detailedLine = prompt.split('\n').find(s => s.startsWith('RELEVANT/EXACT LIVE PRODUCTS:'));
+  assert.equal(JSON.parse(detailedLine.split(': ').slice(1).join(': '))[0].id, ids[0]);
+});
+
+test('long recent customer context is retained rather than silently dropping the turn', async () => {
+  const t = setup();
+  await t.engine.answerWithModelDrivenSalar({ message: 'Their prices please', history: [
+    { role: 'user', content: 'SELECTED-CUSTOMER-REFERENCE ' + 'details '.repeat(500) },
+    { role: 'assistant', content: 'Please choose.' },
+  ] });
+  assert.ok(t.prompts[0].some(m => typeof m.content === 'string' && m.content.includes('SELECTED-CUSTOMER-REFERENCE')));
+});
+
+test('delivery settings remain visible behind a large unrelated promotion payload', async () => {
+  const t = setup();
+  t.state.catalogue.storefront = { bigDeal: { copy: 'banner '.repeat(1000) }, freeShippingCount: 7, freeDelivery: { enabled: true } };
+  await t.engine.answerWithModelDrivenSalar({ message: 'Shipping is expensive' });
+  const line = t.prompts[0][0].content.split('\n').find(s => s.startsWith('CURRENT DELIVERY AND SHOP POLICIES:'));
+  assert.equal(JSON.parse(line.slice(line.indexOf(': ') + 2)).freeShippingCount, 7);
+});
+
+test('version two saved snapshots also refresh current products and shop policy', async () => {
+  const server = load('lib/salar/server.ts', {
+    'server-only': {}, '@/lib/salar/credentialStore': {}, '@/lib/salar/providerConfig': config,
+    'next/cache': { unstable_cache: fn => fn, revalidateTag() {} },
+    '@/lib/publicCatalogServer': { getFreshStorefrontSettingsSnapshot: async () => ({ freeShippingCount: 7 }) },
+    '@/lib/dualReadServer': { getDualFeedCatalog: async () => ({ source: 'supabase', categories: [], products: [product('live', 'Glass', { price: 125 })] }) },
+    '@/lib/dualWriteServer': { getSupabasePrimaryPayload: async () => ({ enabled: true, instructions: 'Keep owner rules', catalogue: { detailVersion: 2, products: [{ id: 'stale', price: 10 }], pages: [], storefront: {}, categories: [] } }) },
+  });
+  const state = await server.getSalarState();
+  assert.equal(state.catalogue.products[0].id, 'live');
+  assert.equal(state.catalogue.products[0].price, 125);
+  assert.equal(state.catalogue.storefront.freeShippingCount, 7);
+  assert.equal(state.instructions, 'Keep owner rules');
+});
+
+test('admin chat history rejects forged legacy cookie and verifies signed sessions', async () => {
+  const wallet = load('lib/walletAdminSession.ts', { 'server-only': {}, '@/lib/firebaseAdmin': {} }, {
+    process: { env: { FIREBASE_SERVICE_ACCOUNT_KEY: JSON.stringify({ private_key: '-----BEGIN PRIVATE KEY-----test-only-signing-input' }) } },
+  });
+  let reads = 0;
+  const route = load('app/api/admin/salar/chats/route.ts', {
+    'next/server': { NextResponse: { json: (body, init) => Response.json(body, init) } },
+    '@/lib/adminSession': { verifyPrimeHubAdminRequest: async req => wallet.authorizedWalletAdmin(req) ? { admin: true } : null },
+    '@/lib/salar/chatStore': { cleanChatId: () => '', listSalarChats: async () => { reads++; return []; } },
+    '@/lib/salar/blockStore': { listBlockedSalarChatIds: async () => new Set() },
+  });
+  const url = 'https://store.example/api/admin/salar/chats';
+  assert.equal((await route.GET(new Request(url, { headers: { cookie: 'primehub_admin_auth=true' } }))).status, 401);
+  assert.equal(reads, 0);
+  const cookie = `${wallet.WALLET_ADMIN_COOKIE}=${wallet.issueWalletAdminSession()}`;
+  assert.equal((await route.GET(new Request(url, { headers: { cookie } }))).status, 200);
+  assert.equal(reads, 1);
+  assert.equal((await route.GET(new Request(url, { headers: { cookie: cookie + 'tampered' } }))).status, 401);
+  assert.equal((await route.POST(new Request(url, { method: 'POST', headers: { cookie, origin: 'https://other.example' }, body: '{}' }))).status, 403);
+});
+
+test('WhatsApp sends a bounded batch and remembers only those product IDs as shown', async () => {
+  const t = setup();
+  t.setHandler(() => ({ reply: 'A few matching designs', display: 'product_images', searchQuery: 'Glass Bangles' }));
+  const result = await t.engine.answerWithModelDrivenSalar({ message: 'Glass bangles', channel: 'whatsapp', productLimit: 3 });
+  assert.equal(result.products.length, 3);
+  assert.equal(result.matchingProductCount, 47);
+  assert.equal(result.context.shownProductIds.length, 3);
+  assert.match(t.prompts[0][0].content, /CHANNEL: WhatsApp/);
 });

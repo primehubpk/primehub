@@ -43,7 +43,7 @@ test('cross-origin key writes are rejected', async () => {
 test('Google verification action is no longer supported', async () => {
   assert.equal((await route.POST(req({action:'verify-admin',idToken:'test-token'}, 'primehub_admin_auth=true'))).status,400);
   assert.doesNotMatch(adminSessionSource, /Google|Firebase|VERCEL_GIT_COMMIT_REF|verifySessionCookie/);
-  assert.match(adminSessionSource, /primehub_admin_auth/);
+  assert.match(adminSessionSource, /authorizedWalletAdmin/);
 });
 
 test('authorized key saves return metadata without secret values', async () => {
