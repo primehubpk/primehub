@@ -1,5 +1,5 @@
 import 'server-only';
-import { applyMegaImageRestorationPreview } from '@/lib/megaImageRestorationPreview';
+import { applyMegaImageRestorationPreview, megaImagePreviewCacheKey } from '@/lib/megaImageRestorationPreview';
 import { unstable_cache } from 'next/cache';
 import { STOREFRONT_REVALIDATE_SECONDS, publicProductCacheTag } from '@/lib/storefrontCachePolicy';
 import { getDualCatalog, getDualCategories, getDualProduct, getDualProductSizeSummaries, getDualStorefrontSettings, getDualSkills } from '@/lib/dualReadServer';
@@ -87,7 +87,7 @@ async function loadPublicCatalog() {
 
 export const getPublicCatalogSnapshot = unstable_cache(
   loadPublicCatalog,
-  ['primehub-public-catalog-dual-v13-mega-originals-sizes'],
+  ['primehub-public-catalog-dual-v13-mega-originals-sizes', megaImagePreviewCacheKey],
   { revalidate: STOREFRONT_REVALIDATE_SECONDS, tags: ['public-catalog', 'storefront-settings'] },
 );
 
@@ -164,7 +164,7 @@ export async function getPublicProductSnapshot(productId: string) {
   if (!id) return { product: null, source: 'empty' as const };
   return unstable_cache(
     () => loadPublicProduct(id),
-    ['primehub-public-product-dual-v7-mega-originals-preview', id],
+    ['primehub-public-product-dual-v7-mega-originals-preview', megaImagePreviewCacheKey, id],
     {
       revalidate: STOREFRONT_REVALIDATE_SECONDS,
       // Keep the roll-up tag for the explicitly requested full catalog refresh.
