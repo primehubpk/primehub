@@ -25,6 +25,7 @@ export default function GlassOfferCard({
   const [checking, setChecking] = useState(false);
   const [error, setError] = useState('');
   const [added, setAdded] = useState(false);
+  const [measuredImage, setMeasuredImage] = useState<{ src: string; aspect: number } | null>(null);
   const openVariantModal = useCartStore((state) => state.openVariantModal);
   const addItem = useCartStore((state) => state.addItem);
   const title = String(product.title || 'Bangles deal');
@@ -32,6 +33,10 @@ export default function GlassOfferCard({
   const cover = gallery[0];
   const image = normalizeImageUrl(String(product.imageUrl || product.image || (typeof cover === 'string' ? cover : (cover as { url?: string } | undefined)?.url || '') || ''));
   const offersSize = product.hasVariants !== false;
+  const imageAspect = measuredImage?.src === image ? measuredImage.aspect : 1;
+  // Generated R2 gift-box photos may include a blurred border inside the file.
+  // Other catalogue photos keep their full original artwork, without a forced crop.
+  const paddedGiftBoxPhoto = /\.r2\.dev\/products\/file_[^/]+\.webp(?:[?#]|$)/i.test(image);
 
   async function selectSize() {
     if (checking) return;
@@ -72,8 +77,15 @@ export default function GlassOfferCard({
     <article data-product-id={product.id} data-price={price} aria-hidden={clone || undefined} className={compact ? 'glass-offer-card glass-offer-card--compact' : 'glass-offer-card'}>
       <Link href={`/product/${encodeURIComponent(product.id)}`} prefetch={false} tabIndex={clone ? -1 : undefined}
         className="glass-offer-card__link" aria-label={`View ${title}, ${money(price)}`}>
-        <div className="glass-offer-card__image">
-          {image ? <Image src={image} alt={title} fill sizes={compact ? '180px' : '(max-width: 640px) 45vw, 260px'} quality={72} className="object-cover transition-transform duration-300 group-hover:scale-105" />
+        <div className="glass-offer-card__image" style={{ aspectRatio: imageAspect }}>
+          {image ? <Image src={image} alt={title} fill sizes={compact ? '180px' : '(max-width: 640px) 45vw, 260px'} quality={72}
+            onLoad={(event) => {
+              const { naturalWidth: width, naturalHeight: height } = event.currentTarget;
+              if (width > 0 && height > 0) {
+                setMeasuredImage({ src: image, aspect: Math.min(1.6, Math.max(0.5, width / height)) });
+              }
+            }}
+            className={`object-contain transition-transform duration-300${paddedGiftBoxPhoto ? ' glass-offer-card__padded-photo' : ''}`} />
             : <div className="glass-offer-card__empty">PrimeHubMall</div>}
           {savingPercent > 0 ? <span className="glass-offer-card__discount"><Tag size={11} /> Save {savingPercent}%</span> : null}
         </div>

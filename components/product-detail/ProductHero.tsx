@@ -1,6 +1,6 @@
 'use client';
 import Image from 'next/image';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 import { Sparkles, ChevronLeft, ChevronRight, Play, X, ZoomIn } from 'lucide-react';
 import { isDirectStorefrontImage } from '@/lib/imageUrl';
 import { money, titleOf, videoOf, type Product } from './ProductDetailTypes';
@@ -20,10 +20,20 @@ function shouldUseDirectStorefrontImage(url: string, bigDealActive: boolean) {
   return bigDealActive || isDirectStorefrontImage(url);
 }
 
+// Some R2 gift-box photos already contain a soft blurred outer frame. A small
+// optical zoom removes that built-in frame without changing the product art.
+function isPaddedGiftBoxPhoto(url: string) {
+  return /\.r2\.dev\/products\/file_[^/]+\.webp(?:[?#]|$)/i.test(url);
+}
+
 export default function ProductHero({ product, images, activeImage, savingsAmount, liveDeal, bigDealActive, onImageChange, onVideoOpen }: Props) {
   const displayImage = images[activeImage] || '';
   const directDisplayImage = shouldUseDirectStorefrontImage(displayImage, bigDealActive);
   const [zoomed, setZoomed] = useState(false);
+  const [measuredImage, setMeasuredImage] = useState<{ src: string; aspect: number } | null>(null);
+  const isMegaProduct = Number(product.megaDealPrice || 0) > 0;
+  const megaAspect = measuredImage?.src === displayImage ? measuredImage.aspect : 1;
+  const trimSourcePadding = isMegaProduct && isPaddedGiftBoxPhoto(displayImage);
 
   useEffect(() => {
     if (!zoomed) return;
@@ -43,7 +53,12 @@ export default function ProductHero({ product, images, activeImage, savingsAmoun
 
   return <>
     <section className="overflow-hidden rounded-[30px] border border-black/7 bg-white shadow-sm md:sticky md:top-[66px] md:self-start">
-      <div className="relative aspect-square overflow-hidden bg-[#F4F4F1] md:aspect-[4/3]">
+      <div
+        className={isMegaProduct
+          ? "relative aspect-[var(--mega-image-aspect)] overflow-hidden bg-[#F4F4F1]"
+          : "relative aspect-square overflow-hidden bg-[#F4F4F1] md:aspect-[4/3]"}
+        style={isMegaProduct ? ({ "--mega-image-aspect": String(megaAspect) } as CSSProperties) : undefined}
+      >
         {displayImage ? (
           <button type="button" onClick={() => setZoomed(true)} className="absolute inset-0 cursor-zoom-in" aria-label={`Enlarge ${titleOf(product)} image`}>
             <Image
@@ -55,7 +70,16 @@ export default function ProductHero({ product, images, activeImage, savingsAmoun
               unoptimized={directDisplayImage}
               sizes="(max-width: 768px) 100vw, 52vw"
               quality={78}
-              className={liveDeal || bigDealActive ? 'object-contain' : 'object-cover'}
+              onLoad={(event) => {
+                if (!isMegaProduct) return;
+                const { naturalWidth: width, naturalHeight: height } = event.currentTarget;
+                if (width > 0 && height > 0) {
+                  setMeasuredImage({ src: displayImage, aspect: Math.min(1.6, Math.max(0.5, width / height)) });
+                }
+              }}
+              className={isMegaProduct
+                ? (trimSourcePadding ? 'object-contain scale-[1.17]' : 'object-contain')
+                : (liveDeal || bigDealActive ? 'object-contain' : 'object-cover')}
             />
           </button>
         ) : <div className="flex h-full items-center justify-center text-sm font-bold text-black/25">No product image</div>}
@@ -70,7 +94,7 @@ export default function ProductHero({ product, images, activeImage, savingsAmoun
         <div className="flex gap-2 overflow-x-auto p-3">
           {images.map((image, index) => (
             <button type="button" key={`${image}-${index}`} onClick={() => onImageChange(() => index)} className={`relative h-16 w-16 shrink-0 overflow-hidden rounded-xl border-2 ${index === activeImage ? 'border-[#E1352B]' : 'border-transparent'}`} aria-label={`View image ${index + 1}`}>
-              <Image src={image} alt="" fill unoptimized={shouldUseDirectStorefrontImage(image, bigDealActive)} sizes="64px" quality={65} loading="lazy" className="object-cover" />
+              <Image src={image} alt="" fill unoptimized={shouldUseDirectStorefrontImage(image, bigDealActive)} sizes="64px" quality={65} loading="lazy" className={isMegaProduct ? "object-contain" : "object-cover"} />
             </button>
           ))}
         </div>
