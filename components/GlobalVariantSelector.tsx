@@ -119,6 +119,7 @@ export default function GlobalVariantSelector() {
       open
       mode={mode}
       quantity={1}
+      preferredSize={typeof product.preferredSize === 'string' ? product.preferredSize : undefined}
       currentPrice={effectiveProductPrice}
       originalPrice={originalPrice}
       onClose={close}
