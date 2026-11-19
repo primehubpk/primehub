@@ -664,7 +664,7 @@ test('original photo restoration preview keeps live data and newer Admin photos 
   assert.ok(repairs.length >= 14);
   const body = source.replace(/^import.*;\r?\n/gm, '');
   const fixture = repairs[0];
-  const prefix = 'const repairs=' + JSON.stringify(repairs) + ';const normalizeImageUrl=url=>String(url||"").replace("https://images.primehubmall.com","https://pub-157b90419bf04016bdea666e4cbce181.r2.dev");';
+  const prefix = 'const createHash=()=>({update:()=>({digest:()=>"test-manifest"})});const repairs=' + JSON.stringify(repairs) + ';const normalizeImageUrl=url=>String(url||"").replace("https://images.primehubmall.com","https://pub-157b90419bf04016bdea666e4cbce181.r2.dev");';
   const { applyMegaImageRestorationPreview } = await import('data:text/javascript;charset=utf-8,' + encodeURIComponent(prefix + compile(body)));
   const previous = process.env.VERCEL_ENV;
   const product = { id:fixture.productId,imageUrl:fixture.oldUrl,images:[fixture.oldUrl],variantMatrix:[{size:'2.4',stock:3,imageUrl:fixture.oldUrl}],price:1209 };
