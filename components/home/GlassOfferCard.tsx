@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { ShoppingCart, Tag } from 'lucide-react';
-import { normalizeImageUrl } from '@/lib/imageUrl';
+import { isDirectStorefrontImage, normalizeImageUrl } from '@/lib/imageUrl';
 import { useCartStore } from '@/lib/cartStore';
 import { getVerifiedDealProduct } from '@/lib/verifiedDealProduct';
 import { imageOf, priceOf, originalOf, productHasVariants, titleOf, type Product } from '@/components/shop/ShopTypes';
@@ -75,7 +75,7 @@ export default function GlassOfferCard({
       <Link href={`/product/${encodeURIComponent(product.id)}`} prefetch={false} tabIndex={clone ? -1 : undefined}
         className="glass-offer-card__link" aria-label={`View ${title}, ${money(price)}`}>
         <div className="glass-offer-card__image" style={{ aspectRatio: imageAspect }}>
-          {image ? <Image src={image} alt={title} fill sizes={compact ? '180px' : '(max-width: 640px) 45vw, 260px'} quality={72}
+          {image ? <Image src={image} alt={title} fill unoptimized={isDirectStorefrontImage(image)} sizes={compact ? '180px' : '(max-width: 640px) 45vw, 260px'} quality={72}
             onLoad={(event) => {
               const { naturalWidth: width, naturalHeight: height } = event.currentTarget;
               if (width > 0 && height > 0) {
