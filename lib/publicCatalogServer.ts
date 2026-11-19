@@ -1,4 +1,5 @@
 import 'server-only';
+import { applyMegaImageRestorationPreview } from '@/lib/megaImageRestorationPreview';
 import { unstable_cache } from 'next/cache';
 import { STOREFRONT_REVALIDATE_SECONDS, publicProductCacheTag } from '@/lib/storefrontCachePolicy';
 import { getDualCatalog, getDualCategories, getDualProduct, getDualProductSizeSummaries, getDualStorefrontSettings, getDualSkills } from '@/lib/dualReadServer';
@@ -59,9 +60,9 @@ async function wait(ms: number) {
 async function withMegaSizeLabels(products: any[]) {
   const missing = products.filter(product => Number(product.megaDealPrice) > 0 && product.hasVariants !== false && !Array.isArray(product.variantMatrix) && !Array.isArray(product.variants));
   const summaries = await getDualProductSizeSummaries(missing.map(product => String(product.id)), CATALOG_READ_CACHE);
-  return products.map(product => Number(product.megaDealPrice) > 0
+  return products.map(product => applyMegaImageRestorationPreview(Number(product.megaDealPrice) > 0
     ? { ...product, availableSizes: summaries[String(product.id)] || getMegaDealAvailableSizes(product) }
-    : product);
+    : product));
 }
 
 async function loadPublicCatalog() {
@@ -86,7 +87,7 @@ async function loadPublicCatalog() {
 
 export const getPublicCatalogSnapshot = unstable_cache(
   loadPublicCatalog,
-  ['primehub-public-catalog-dual-v12-mega-size-labels'],
+  ['primehub-public-catalog-dual-v13-mega-originals-sizes'],
   { revalidate: STOREFRONT_REVALIDATE_SECONDS, tags: ['public-catalog', 'storefront-settings'] },
 );
 
@@ -155,7 +156,7 @@ async function loadPublicProduct(productId: string) {
   const [result, settings] = await Promise.all([getDualProduct(id, PRODUCT_READ_CACHE), getStorefrontSettingsSnapshot()]);
   // An upstream outage must not replace a last-good cached product with null.
   if (result.source === 'empty') throw new Error('Public product unavailable.');
-  return { ...result, product: result.product ? applyBogoAvailability(applyBogoOfferPrice(applyCollectionPrice(result.product, settings.glassDealShowcase)), (settings as any).bogoDealShowcase) : null };
+  return { ...result, product: result.product ? applyMegaImageRestorationPreview(applyBogoAvailability(applyBogoOfferPrice(applyCollectionPrice(result.product, settings.glassDealShowcase)), (settings as any).bogoDealShowcase)) : null };
 }
 
 export async function getPublicProductSnapshot(productId: string) {
@@ -163,7 +164,7 @@ export async function getPublicProductSnapshot(productId: string) {
   if (!id) return { product: null, source: 'empty' as const };
   return unstable_cache(
     () => loadPublicProduct(id),
-    ['primehub-public-product-dual-v6-offer-markup-preview', id],
+    ['primehub-public-product-dual-v7-mega-originals-preview', id],
     {
       revalidate: STOREFRONT_REVALIDATE_SECONDS,
       // Keep the roll-up tag for the explicitly requested full catalog refresh.
@@ -178,7 +179,7 @@ export async function getFreshPublicProductSnapshot(productId: string) {
   const [result, settings] = await Promise.all([
     getDualProduct(id, { cache: 'no-store', timeoutMs: PUBLIC_PRIMARY_TIMEOUT_MS }), getStorefrontSettingsSnapshot(),
   ]);
-  return { ...result, product: result.product ? applyBogoAvailability(applyBogoOfferPrice(applyCollectionPrice(result.product, settings.glassDealShowcase)), (settings as any).bogoDealShowcase) : null };
+  return { ...result, product: result.product ? applyMegaImageRestorationPreview(applyBogoAvailability(applyBogoOfferPrice(applyCollectionPrice(result.product, settings.glassDealShowcase)), (settings as any).bogoDealShowcase)) : null };
 }
 
 async function loadStorefrontSettingsResult() {
