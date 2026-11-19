@@ -5,6 +5,7 @@ import { Plus } from 'lucide-react';
 import FastProductLink from '@/components/FastProductLink';
 import { useCartStore } from '@/lib/cartStore';
 import { isExclusiveGlassDealProduct } from '@/lib/glassOffers';
+import { normalizeImageUrl } from '@/lib/imageUrl';
 import {
   loadProductsForNavigation,
   readCachedProduct,
@@ -22,9 +23,9 @@ function addableItem(product: Product) { const image = imageOf(product); return 
 
 function ProductCard({ product, compact = false }: { product: Product; compact?: boolean }) {
   const addItem = useCartStore((state) => state.addItem);
-  const image = imageOf(product);
   const discount = discountOf(product);
   const showFullImage = Number(product.megaDealPrice || 0) > 0 || isExclusiveGlassDealProduct(product);
+  const image = showFullImage ? normalizeImageUrl(imageOf(product)) : imageOf(product);
   return (
     <article className={`${compact ? 'w-[154px] shrink-0' : 'w-full'} overflow-hidden rounded-[20px] border border-black/7 bg-white shadow-[0_8px_25px_rgba(20,20,15,0.06)]`}>
       <FastProductLink product={product} className="block">
