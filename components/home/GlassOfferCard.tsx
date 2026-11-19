@@ -34,9 +34,6 @@ export default function GlassOfferCard({
   const image = normalizeImageUrl(String(product.imageUrl || product.image || (typeof cover === 'string' ? cover : (cover as { url?: string } | undefined)?.url || '') || ''));
   const offersSize = product.hasVariants !== false;
   const imageAspect = measuredImage?.src === image ? measuredImage.aspect : 1;
-  // Generated R2 gift-box photos may include a blurred border inside the file.
-  // Other catalogue photos keep their full original artwork, without a forced crop.
-  const paddedGiftBoxPhoto = /\.r2\.dev\/products\/file_[^/]+\.webp(?:[?#]|$)/i.test(image);
 
   async function selectSize() {
     if (checking) return;
@@ -82,10 +79,10 @@ export default function GlassOfferCard({
             onLoad={(event) => {
               const { naturalWidth: width, naturalHeight: height } = event.currentTarget;
               if (width > 0 && height > 0) {
-                setMeasuredImage({ src: image, aspect: Math.min(1.6, Math.max(0.5, width / height)) });
+                setMeasuredImage({ src: image, aspect: width / height });
               }
             }}
-            className={`object-contain transition-transform duration-300${paddedGiftBoxPhoto ? ' glass-offer-card__padded-photo' : ''}`} />
+            className="object-contain" />
             : <div className="glass-offer-card__empty">PrimeHubMall</div>}
           {savingPercent > 0 ? <span className="glass-offer-card__discount"><Tag size={11} /> Save {savingPercent}%</span> : null}
         </div>
