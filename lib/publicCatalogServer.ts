@@ -1,7 +1,7 @@
 import 'server-only';
 import { unstable_cache } from 'next/cache';
 import { STOREFRONT_REVALIDATE_SECONDS, publicProductCacheTag } from '@/lib/storefrontCachePolicy';
-import { getDualCatalog, getDualCategories, getDualProduct, getDualStorefrontSettings, getDualSkills } from '@/lib/dualReadServer';
+import { getDualCatalog, getDualCategories, getDualProduct, getDualProductSizeSummaries, getDualStorefrontSettings, getDualSkills } from '@/lib/dualReadServer';
 import { getStorefrontSettingsWithBigDealRecovery } from '@/lib/storefrontSettingsServer';
 import { getCachedWholesaleVideosSnapshot } from '@/lib/wholesaleVideosServer';
 import { applyBogoAvailability, applyBogoOfferPrice } from '@/lib/bogoOffers';
@@ -56,6 +56,14 @@ async function wait(ms: number) {
   await new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+async function withMegaSizeLabels(products: any[]) {
+  const missing = products.filter(product => Number(product.megaDealPrice) > 0 && product.hasVariants !== false && !Array.isArray(product.variantMatrix) && !Array.isArray(product.variants));
+  const summaries = await getDualProductSizeSummaries(missing.map(product => String(product.id)), CATALOG_READ_CACHE);
+  return products.map(product => Number(product.megaDealPrice) > 0
+    ? { ...product, availableSizes: summaries[String(product.id)] || getMegaDealAvailableSizes(product) }
+    : product);
+}
+
 async function loadPublicCatalog() {
   let lastSource = 'empty';
 
@@ -66,7 +74,7 @@ async function loadPublicCatalog() {
 
     if (result.source !== 'empty' && result.products.length > 0) {
       return {
-        products: result.products.map(product => applyBogoAvailability(applyBogoOfferPrice(applyCollectionPrice(product, settings.glassDealShowcase)), (settings as any).bogoDealShowcase)),
+        products: await withMegaSizeLabels(result.products.map(product => applyBogoAvailability(applyBogoOfferPrice(applyCollectionPrice(product, settings.glassDealShowcase)), (settings as any).bogoDealShowcase))),
         categories: result.categories,
         source: result.source,
       };
@@ -78,7 +86,7 @@ async function loadPublicCatalog() {
 
 export const getPublicCatalogSnapshot = unstable_cache(
   loadPublicCatalog,
-  ['primehub-public-catalog-dual-v11-offer-markup-preview'],
+  ['primehub-public-catalog-dual-v12-mega-size-labels'],
   { revalidate: STOREFRONT_REVALIDATE_SECONDS, tags: ['public-catalog', 'storefront-settings'] },
 );
 
@@ -123,7 +131,7 @@ export function compactPublicCatalogSnapshot<
           // one R2 cover object is missing, without shipping full variant payloads.
           compact.images = compact.images.slice(0, 3);
         }
-        if (Number(product.megaDealPrice) > 0) compact.availableSizes = getMegaDealAvailableSizes(product);
+        if (Number(product.megaDealPrice) > 0) compact.availableSizes = Array.isArray(product.availableSizes) ? product.availableSizes : getMegaDealAvailableSizes(product);
         return compact;
       })
     : [];
@@ -138,7 +146,7 @@ export async function getFreshPublicCatalogSnapshot() {
   if (result.source === 'empty' || result.products.length === 0) {
     throw new Error(`Fresh public catalog unavailable (source: ${result.source}).`);
   }
-  return { ...result, products: result.products.map(product => applyBogoAvailability(applyBogoOfferPrice(applyCollectionPrice(product, settings.glassDealShowcase)), (settings as any).bogoDealShowcase)) };
+  return { ...result, products: await withMegaSizeLabels(result.products.map(product => applyBogoAvailability(applyBogoOfferPrice(applyCollectionPrice(product, settings.glassDealShowcase)), (settings as any).bogoDealShowcase))) };
 }
 
 async function loadPublicProduct(productId: string) {
