@@ -35,3 +35,13 @@ instructions, not canned sales responses. API latency and platform quotas still
 apply.
 
 Validation: `node --test tests/salar-*.test.mjs` (Node 24).
+
+## 19 November 2026 — WhatsApp preparation and conversation review
+
+Reviewed eight recent stored chats using authorized read-only database access; no customer transcripts or identifiers are committed. Reproduced three data-path bugs: assistant galleries contaminated customer-selected references; long selected-product history was dropped entirely; catalogue order and an 18-product detailed-context cap displaced recently selected items. Fixes retain customer-only references, prioritize current IDs, include all selected base prices, preserve bounded recent history and include variant prices. Delivery/policy settings receive separate prompt context rather than being displaced by a large promotion payload. Complete version-2 catalogues also refresh instead of staying permanently frozen after manual refresh; shared cache interval is 60 seconds. Model reply quality still requires live evaluation, not only these deterministic tests.
+
+Admin chat access now uses the existing signed admin verifier instead of trusting a boolean cookie, with same-origin mutation checks. Reference-image URLs are resolved from trusted catalogue data instead of arbitrary client-supplied URLs. Website image zoom UX was reviewed but not changed or visually tested.
+
+Laptop WhatsApp receiver/queue and the private shared-engine bridge are in `tools/salar-whatsapp/` and `app/api/salar/whatsapp/route.ts`. Sending is disabled by default. Existing production webhook is unchanged. No live message, order, database mutation or production deployment was performed. See adapter README for exact setup and supported/unsupported operations.
+
+Checkpoint: feature branch `fix/salar-whatsapp-context-20261118`; 47 automated tests passed, TypeScript passed. Full Next build is blocked in the execution environment before compilation by existing next.config.js calling os.networkInterfaces (`uv_interface_addresses`, system error 1). Windows installation, existing private API/token verification, Meta number onboarding, live Gemma response and Vercel preview remain pending. Commander reported shell=false and rejected the attempted laptop Git status command with “Terminal requires owner approval”; no existing laptop checkout was modified.

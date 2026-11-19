@@ -446,6 +446,8 @@ export function recentCustomerProductReferences(chat: SalarCustomerChat, max = 1
   const output: Array<{ id: string; title: string; imageUrl?: string }> = [];
   const seen = new Set<string>();
   for (const message of [...chat.messages].reverse()) {
+    // A gallery shown by Salar/admin is not a customer selection.
+    if (message.actor !== 'customer') continue;
     const references = [
       ...(message.products || []).map((product) => ({ id: product.id, title: product.title, imageUrl: product.imageUrl })),
       ...(message.mention ? [{ id: message.mention.id, title: message.mention.title, imageUrl: message.mention.imageUrl }] : []),

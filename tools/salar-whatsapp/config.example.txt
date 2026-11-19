@@ -1,0 +1,17 @@
+# Documentation only. Put real values in a private env file outside Git.
+# Use the same bridge token in the Next server and adapter, minimum 32 random chars.
+SALAR_WHATSAPP_BRIDGE_TOKEN=
+SALAR_WHATSAPP_BRIDGE_URL=http://127.0.0.1:3000/api/salar/whatsapp
+SALAR_WHATSAPP_DATA_DIR=
+SALAR_STOREFRONT_ORIGIN=
+SALAR_WHATSAPP_PORT=8787
+SALAR_WHATSAPP_PRODUCT_LIMIT=3
+SALAR_CURRENCY_CODE=
+SALAR_WHATSAPP_SEND_ENABLED=false
+WHATSAPP_APP_SECRET=
+WHATSAPP_VERIFY_TOKEN=
+WHATSAPP_ACCESS_TOKEN=
+WHATSAPP_PHONE_NUMBER_ID=
+WHATSAPP_GRAPH_VERSION=
+# Next also needs the existing authorized server environment for Salar settings
+# and encrypted provider credentials. Do not copy secrets into this file.

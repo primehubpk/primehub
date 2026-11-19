@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { verifyPrimeHubAdminRequest } from '@/lib/adminSession';
 import {
   appendSalarMessage,
   cleanChatId,
@@ -17,9 +18,8 @@ import {
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-function authorized(request: Request) {
-  const cookie = request.headers.get('cookie') || '';
-  return cookie.split(';').some((part) => part.trim() === 'primehub_admin_auth=true');
+async function authorized(request: Request) {
+  return Boolean(await verifyPrimeHubAdminRequest(request));
 }
 
 function cleanText(value: unknown, max = 6000) {
@@ -29,7 +29,7 @@ function cleanText(value: unknown, max = 6000) {
 const BLOCK_MESSAGE = 'Aapka chat access filhaal block hai. Unblock request ke liye primehubpk1@gmail.com par contact karein.';
 
 export async function GET(request: Request) {
-  if (!authorized(request)) return NextResponse.json({ success: false, error: 'Authentication required.' }, { status: 401 });
+  if (!await authorized(request)) return NextResponse.json({ success: false, error: 'Authentication required.' }, { status: 401 });
   try {
     const url = new URL(request.url);
     const chatId = cleanChatId(url.searchParams.get('chatId'));
@@ -54,7 +54,8 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  if (!authorized(request)) return NextResponse.json({ success: false, error: 'Authentication required.' }, { status: 401 });
+  if (request.headers.get('origin') !== new URL(request.url).origin) return NextResponse.json({ success: false }, { status: 403 });
+  if (!await authorized(request)) return NextResponse.json({ success: false, error: 'Authentication required.' }, { status: 401 });
   try {
     const body = await request.json().catch(() => ({}));
     const action = String(body?.action || '').trim();
