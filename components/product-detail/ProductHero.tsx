@@ -20,12 +20,6 @@ function shouldUseDirectStorefrontImage(url: string, bigDealActive: boolean) {
   return bigDealActive || isDirectStorefrontImage(url);
 }
 
-// Some R2 gift-box photos already contain a soft blurred outer frame. A small
-// optical zoom removes that built-in frame without changing the product art.
-function isPaddedGiftBoxPhoto(url: string) {
-  return /\.r2\.dev\/products\/file_[^/]+\.webp(?:[?#]|$)/i.test(url);
-}
-
 export default function ProductHero({ product, images, activeImage, savingsAmount, liveDeal, bigDealActive, onImageChange, onVideoOpen }: Props) {
   const displayImage = images[activeImage] || '';
   const directDisplayImage = shouldUseDirectStorefrontImage(displayImage, bigDealActive);
@@ -33,7 +27,6 @@ export default function ProductHero({ product, images, activeImage, savingsAmoun
   const [measuredImage, setMeasuredImage] = useState<{ src: string; aspect: number } | null>(null);
   const isMegaProduct = Number(product.megaDealPrice || 0) > 0;
   const megaAspect = measuredImage?.src === displayImage ? measuredImage.aspect : 1;
-  const trimSourcePadding = isMegaProduct && isPaddedGiftBoxPhoto(displayImage);
 
   useEffect(() => {
     if (!zoomed) return;
@@ -74,11 +67,11 @@ export default function ProductHero({ product, images, activeImage, savingsAmoun
                 if (!isMegaProduct) return;
                 const { naturalWidth: width, naturalHeight: height } = event.currentTarget;
                 if (width > 0 && height > 0) {
-                  setMeasuredImage({ src: displayImage, aspect: Math.min(1.6, Math.max(0.5, width / height)) });
+                  setMeasuredImage({ src: displayImage, aspect: width / height });
                 }
               }}
               className={isMegaProduct
-                ? (trimSourcePadding ? 'object-contain scale-[1.17]' : 'object-contain')
+                ? 'object-contain p-2'
                 : (liveDeal || bigDealActive ? 'object-contain' : 'object-cover')}
             />
           </button>
