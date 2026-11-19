@@ -36,8 +36,8 @@
 .glass-offer-card__image { position:relative; width:100%; aspect-ratio:1; border-radius:10px; overflow:hidden; background:#faf5ec; }
 .glass-offer-card__link:hover .glass-offer-card__image img:not(.glass-offer-card__padded-photo) { transform:scale(1.015); }
 /* R2 gift-box photographs may contain a baked-in blurred frame (~6% per side). */
-.glass-offer-card__image img.glass-offer-card__padded-photo { transform:scale(1.13); }
-.glass-offer-card__link:hover .glass-offer-card__image img.glass-offer-card__padded-photo { transform:scale(1.15); }
+.glass-offer-card__image img.glass-offer-card__padded-photo { transform:scale(1.17); }
+.glass-offer-card__link:hover .glass-offer-card__image img.glass-offer-card__padded-photo { transform:scale(1.19); }
 .glass-offer-card__empty { height:100%; display:grid; place-items:center; font-size:12px; color:#6d6355; }
 .glass-offer-card__discount { position:absolute; top:5px; left:5px; display:flex; align-items:center; gap:3px; padding:4px 6px; border-radius:6px; background:#c8282e; color:white; font-size:10px; font-weight:850; }
 .glass-offer-card__title { height:34px; margin:8px 1px 4px; font-size:12px; font-weight:750; line-height:1.4; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
