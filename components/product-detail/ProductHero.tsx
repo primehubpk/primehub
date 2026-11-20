@@ -91,7 +91,7 @@ export default function ProductHero({ product, images, activeImage, savingsAmoun
         <div className="flex gap-2 overflow-x-auto p-3">
           {images.map((image, index) => (
             <button type="button" key={`${image}-${index}`} onClick={() => onImageChange(() => index)} className={`relative h-16 w-16 shrink-0 overflow-hidden rounded-xl border-2 ${index === activeImage ? 'border-[#E1352B]' : 'border-transparent'}`} aria-label={`View image ${index + 1}`}>
-              <Image src={image} alt="" fill unoptimized={shouldUseDirectStorefrontImage(image, bigDealActive)} sizes="64px" quality={65} loading="lazy" className={isMegaProduct ? "object-contain" : "object-cover"} />
+              <Image src={image} alt="" fill unoptimized={shouldUseDirectStorefrontImage(image, bigDealActive)} sizes="64px" quality={65} loading="lazy" style={megaImageNeedsTrim(product.id, image) ? megaImageTrimStyle : undefined} className={isMegaProduct ? "object-contain" : "object-cover"} />
             </button>
           ))}
         </div>

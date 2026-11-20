@@ -32,14 +32,12 @@ export default function GlassOfferCard({
   const [colors, setColors] = useState<string[]>([]);
   const [freshSizes, setFreshSizes] = useState<string[] | null>(null);
   const adding = useRef(false);
-  const [measuredImage, setMeasuredImage] = useState<{ src: string; aspect: number } | null>(null);
   const addItem = useCartStore((state) => state.addItem);
   const title = String(product.title || 'Bangles deal');
   const gallery = Array.isArray(product.images) ? product.images : [];
   const cover = gallery[0];
   const image = normalizeImageUrl(String(product.imageUrl || product.image || (typeof cover === 'string' ? cover : (cover as { url?: string } | undefined)?.url || '') || ''));
   const trimImage = megaImageNeedsTrim(product.id, image);
-  const imageAspect = measuredImage?.src === image ? measuredImage.aspect : 1;
 
   const sizes = freshSizes ?? (Array.isArray(product.availableSizes) ? product.availableSizes.filter((size): size is string => typeof size === 'string' && Boolean(size.trim())) : []);
   const sizeLabel = (size: string) => size.match(/^\d+(?:\.\d+)?/)?.[0] || size;
@@ -93,14 +91,8 @@ export default function GlassOfferCard({
     <article data-product-id={product.id} data-price={price} aria-hidden={clone || undefined} className={compact ? 'glass-offer-card glass-offer-card--compact' : 'glass-offer-card'}>
       <Link href={`/product/${encodeURIComponent(product.id)}`} prefetch={false} tabIndex={clone ? -1 : undefined}
         className="glass-offer-card__link" aria-label={`View ${title}, ${money(price)}`}>
-        <div className="glass-offer-card__image" style={trimImage ? { aspectRatio: 1 } : compact ? undefined : { aspectRatio: imageAspect }}>
+        <div className="glass-offer-card__image">
           {image ? <Image src={image} alt={title} fill unoptimized={isDirectStorefrontImage(image)} sizes={compact ? '180px' : '(max-width: 640px) 45vw, 260px'} quality={72}
-            onLoad={(event) => {
-              const { naturalWidth: width, naturalHeight: height } = event.currentTarget;
-              if (width > 0 && height > 0) {
-                setMeasuredImage({ src: image, aspect: width / height });
-              }
-            }}
             style={trimImage ? megaImageTrimStyle : undefined}
             data-mega-trim={trimImage || undefined} className="object-contain" />
             : <div className="glass-offer-card__empty">PrimeHubMall</div>}

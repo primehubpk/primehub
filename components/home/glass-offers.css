@@ -32,7 +32,7 @@
 .glass-offers-home__group { display:flex; align-items:flex-start; flex-shrink:0; gap:11px; padding:0 11px 7px 0; }
 .glass-offer-card { min-width:0; border:1px solid #e9dfd1; border-radius:15px; background:#fff; overflow:hidden; box-shadow:0 3px 12px #291b0e08; }
 .glass-offer-card--compact { width:180px; min-width:180px; align-self:flex-start; }
-.glass-offer-card--compact .glass-offer-card__image { aspect-ratio:4/5; }
+.glass-offer-card--compact .glass-offer-card__image { aspect-ratio:1; }
 .glass-offer-card__sizes { min-width:0; margin:0 7px 8px; padding:0; border:0; }
 .glass-offer-card__sizes legend { margin-bottom:5px; font-size:10px; font-weight:750; color:#665f54; }
 .glass-offer-card__sizes > div { display:flex; flex-wrap:wrap; gap:5px; }
@@ -101,7 +101,7 @@
  .glass-offers-home__group { gap:8px; padding-right:8px; }
  .glass-offers-home__viewport { margin-inline:-10px; border-radius:0; }
  .glass-offer-card--compact { width:calc((100vw - 28px)/2); min-width:calc((100vw - 28px)/2); width:calc((100cqw - 8px)/2); min-width:calc((100cqw - 8px)/2); }
- .glass-offer-card--compact .glass-offer-card__image { aspect-ratio:4/5; }
+ .glass-offer-card--compact .glass-offer-card__image { aspect-ratio:1; }
  .glass-offer-card--compact .glass-offer-card__title { font-size:12px; height:34px; }
  .glass-offer-card--compact .glass-offer-card__prices strong { font-size:17px; }
  .glass-offer-card--compact .glass-offer-card__action { min-height:42px; font-size:12px; }

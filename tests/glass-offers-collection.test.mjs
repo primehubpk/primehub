@@ -298,7 +298,7 @@ test('home Sale Mela uses a full vertical grid while upper category trails stay 
     'components/home/glass-offers.css',
     'components/home/HomeCategoryDeals.tsx',
   ].map(name => fs.readFile(path.join(root, name), 'utf8')));
-  assert.match(mega, /\.glass-offer-card--compact \.glass-offer-card__image \{ aspect-ratio:4\/5/);
+  assert.match(mega, /\.glass-offer-card--compact \.glass-offer-card__image \{ aspect-ratio:1/);
   assert.match(css, /\.home-sale-home-frame \.home-product-image,\s*\.home-category-3d-frame \.home-product-image\s*\{\s*aspect-ratio:4\/5/);
   assert.match(css, /\.home-sale-home-frame \.home-add,\s*\.home-category-3d-frame \.home-add/);
   assert.match(css, /\.home-sale-home-frame \.home-product \.home-price/);
