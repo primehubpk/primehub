@@ -84,5 +84,6 @@ export default function CartSummary({ totalItems, quote, loading, quoteError, se
         cashbackEstimate={Number(quote.cashbackEstimate || 0)} eligibleSubtotal={Number(quote.eligibleAfterVoucher || 0)}
         voucherCashAmount={Number(quote.voucherCashAmount || 0)} tiers={Array.isArray(quote.cashbackTiers) ? quote.cashbackTiers : []}/>
     </details>}
+    <div id="cart-help-slot" className="mt-3"/>
   </section>;
 }

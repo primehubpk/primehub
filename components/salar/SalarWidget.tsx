@@ -4,6 +4,7 @@ import { fetchPublicStorefront } from '@/lib/storefrontClient';
 import { FormEvent, PointerEvent as ReactPointerEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { Bot, Check, Forward, ImagePlus, Maximize2, Menu, Minus, Minimize2, Pencil, Plus, RotateCcw, Send, ShoppingCart, X, ZoomIn, ZoomOut } from 'lucide-react';
 import { usePathname } from 'next/navigation';
+import { createPortal } from 'react-dom';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import SalarAdminDrawer from '@/components/salar/SalarAdminDrawer';
@@ -260,6 +261,18 @@ function whatsappTileHref(number: string) {
   const canonical = /^03\d{9}$/.test(digits) ? '92' + digits.slice(1) : digits;
   return /^923\d{9}$/.test(canonical) ? `https://wa.me/${canonical}` : '';
 }
+function CartHelpLauncher({ onOpen }: { onOpen: () => void }) {
+  const [slot, setSlot] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    const update = () => setSlot(document.getElementById('cart-help-slot'));
+    update();
+    const observer = new MutationObserver(update);
+    observer.observe(document.body, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  }, []);
+  return slot ? createPortal(<button type="button" onClick={onOpen} className="flex min-h-10 w-full items-center justify-center rounded-lg border border-[#DCE7DF] bg-[#F7FAF6] px-3 text-xs font-semibold text-[#0F6A5F]">Need help with your cart? Ask Salar</button>, slot) : null;
+}
+
 export default function SalarWidget() {
   const pathname = usePathname();
   const isAdminRoute = pathname?.startsWith('/admin') === true;
@@ -603,6 +616,7 @@ export default function SalarWidget() {
   }
 
   if (isAdminRoute || salarEnabled !== true) return null;
+  if (pathname === '/cart' && !open) return <CartHelpLauncher onOpen={openSalarFromCurrentPage}/>;
 
   function clearImage() {
     setImageFile(null);
@@ -1003,7 +1017,7 @@ export default function SalarWidget() {
     : 'relative flex h-[min(620px,calc(100dvh-120px))] w-[min(390px,calc(100vw-24px))] flex-col overflow-hidden rounded-[26px] border border-black/10 bg-[#FFFDF8] shadow-2xl';
 
   return (
-    <div className={expanded && open ? 'fixed inset-0 z-[80]' : pathname === '/cart' && !open ? 'fixed bottom-[176px] right-3 z-50 sm:bottom-6 sm:right-5' : 'fixed bottom-[104px] right-3 z-50 sm:bottom-6 sm:right-5'}>
+    <div className={expanded && open ? 'fixed inset-0 z-[80]' : 'fixed bottom-[104px] right-3 z-50 sm:bottom-6 sm:right-5'}>
       {open ? (
         <div className={chatShellClass}>
           <div className="flex shrink-0 items-center justify-between bg-[#14140F] px-3 py-3 text-white">

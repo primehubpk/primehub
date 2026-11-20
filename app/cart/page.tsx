@@ -23,6 +23,7 @@ export default function CartPage() {
         <h1 className="mt-5 text-2xl font-black tracking-tight">Your cart is empty</h1>
         <p className="mt-2 text-sm leading-6 text-black/50">Choose your products, size and quantity to get started.</p>
         <Link href="/shop" className="mt-6 flex min-h-12 items-center justify-center rounded-xl bg-[#0F6A5F] text-sm font-bold text-white">Start shopping</Link>
+        <div id="cart-help-slot" className="mt-3"/>
       </div>
     </main>
   );
