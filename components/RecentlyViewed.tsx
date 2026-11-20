@@ -8,10 +8,13 @@ import { getMegaDealAvailableSizes, isExclusiveGlassDealProduct, resolveGlassOff
 import GlassOfferCard from '@/components/home/GlassOfferCard';
 import { useSettings } from '@/lib/useSettings';
 import { selectMegaRecommendations } from '@/lib/megaRecommendations';
+import { fetchPublicStorefront } from '@/lib/storefrontClient';
 import { normalizeImageUrl } from '@/lib/imageUrl';
 import { megaImageNeedsTrim, megaImageTrimStyle } from '@/lib/megaImagePresentation';
 import {
   loadProductsForNavigation,
+  cacheCatalogForNavigation,
+  readCachedCatalog,
   readCachedProduct,
   readCachedProducts,
 } from '@/lib/productNavigationCache';
@@ -73,6 +76,16 @@ export default function RecentlyViewed({ excludeId }: { excludeId?: string }) {
         const ids: string[] = JSON.parse(localStorage.getItem('phdeals-recent') || '[]').filter((id: string) => id !== excludeId).slice(0, 12);
         const requestedIds = [...(excludeId ? [excludeId] : []), ...ids];
         const loaded = await loadProductsForNavigation<Product>(requestedIds);
+        // Direct product links have no Home/Shop navigation catalog yet.
+        // Reuse the shared request cache instead of depending on a previous visit.
+        if (!readCachedCatalog()) {
+          const response = await fetchPublicStorefront('catalog');
+          if (response.ok) {
+            const catalog = await response.json();
+            if (cancelled) return;
+            cacheCatalogForNavigation(Array.isArray(catalog.products) ? catalog.products : [], Array.isArray(catalog.categories) ? catalog.categories : []);
+          }
+        }
         if (cancelled) return;
         setCurrent(excludeId ? loaded[excludeId] || readCachedProduct<Product>(excludeId) : null);
         setAllProducts(readCachedProducts<Product>());
