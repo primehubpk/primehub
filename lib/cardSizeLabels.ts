@@ -27,3 +27,47 @@ export function uniqueCardSizes(value: unknown): string[] {
       seen.add(v.toLowerCase()); return true;
     });
 }
+
+/** False bangle-hand sizes copied onto unrelated products must never be offered.
+ * The source catalog remains untouched; this is a conservative display and
+ * checkout safety check until the owner repairs the source variants in Admin.
+ */
+export interface SizeAuditProduct {
+  id?: unknown;
+  title?: unknown;
+  name?: unknown;
+  category?: unknown;
+  availableSizes?: unknown;
+  variantMatrix?: unknown;
+  variants?: unknown;
+}
+
+function sizeStrings(product: SizeAuditProduct): string[] {
+  const rows = [...(Array.isArray(product.variantMatrix) ? product.variantMatrix : []),
+    ...(Array.isArray(product.variants) ? product.variants : [])] as Array<Record<string, unknown>>;
+  const fromRows = rows.map(row => String(row.size ?? row.variantSize ??
+    (row.options && typeof row.options === 'object' ? (row.options as Record<string, unknown>).size : '') ?? '').trim());
+  return uniqueCardSizes(fromRows.length ? fromRows : product.availableSizes);
+}
+
+function isBangleItem(product: SizeAuditProduct): boolean {
+  const title = String(product.title || product.name || '');
+  if (/\b(swing|jhoola|jhula|sock|bootie|shoe|garment|sweatshirt|jogger|blanket|winter vest|hooded suit)\b/i.test(title)) return false;
+  return /bangl|churi|choori|chud[iy]|chura|chooda|churra|kangan|karay|kada\b/i.test(title + ' ' + String(product.category || ''));
+}
+function hasHandMeasurements(size: string): boolean {
+  return /\b(normal hand|bareek hand|healthy hand|bhari hand|sawa 2|ponay 2|apda 2|dhai size)\b/i.test(size);
+}
+/** This is a DATA error, not a user-selectable variant: requires Admin correction. */
+export function hasMismatchedHandSizes(product: SizeAuditProduct): boolean {
+  const values = sizeStrings(product);
+  return values.length > 0 && !isBangleItem(product) && values.some(hasHandMeasurements);
+}
+function isUnitOrPackDescription(size: string): boolean {
+  return /^(one pair|girls bracelet\s*[-—]|mehndi (?:box|pack)\b|mix size box\b|3 packs?\s*[-—])/i.test(size.trim());
+}
+/** Return true sizes only; not bundles, fixed quantities, adjustable-fit claims or mistaken bangle labels. */
+export function getCardSizeOptions(product: SizeAuditProduct): string[] {
+  if (hasMismatchedHandSizes(product)) return [];
+  return sizeStrings(product).filter(size => !isUnitOrPackDescription(size));
+}

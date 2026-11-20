@@ -1,7 +1,7 @@
 'use client';
 
 import { useId, useState } from 'react';
-import { cardSizeDescription, shortCardSize, uniqueCardSizes } from '@/lib/cardSizeLabels';
+import { cardSizeDescription, shortCardSize, getCardSizeOptions } from '@/lib/cardSizeLabels';
 
 type Props = {
   sizes: unknown;
@@ -17,7 +17,7 @@ type Props = {
 export default function CardSizePicker({ sizes, selected, onSelect, title, category = '', disabled = false, className = '' }: Props) {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const detailsId = useId();
-  const options = uniqueCardSizes(sizes);
+  const options = getCardSizeOptions({ title, category, availableSizes: sizes });
   const sizeContext = `${category} ${title}`;
   if (!options.length) return null;
 

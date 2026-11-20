@@ -1,4 +1,5 @@
 import { normalizeProductVariants, type VariantModalProduct } from '@/lib/cartStore';
+import { hasMismatchedHandSizes } from '@/lib/cardSizeLabels';
 
 /**
  * Compact home/catalog records intentionally omit variantMatrix. Never mistake
@@ -23,6 +24,9 @@ export async function getVerifiedDealProduct(productId: string): Promise<Variant
     ...(Array.isArray(product.variantMatrix) ? product.variantMatrix : []),
     ...(Array.isArray(product.variants) ? product.variants : []),
   ];
+  if (hasMismatchedHandSizes(product)) {
+    throw new Error('This product has incorrect size information. Please contact PrimeHubMall to confirm options before ordering.');
+  }
   if (sourceRows.length > 0 && !normalizeProductVariants(product).hasVariants) {
     throw new Error('This product has no selectable in-stock variants.');
   }

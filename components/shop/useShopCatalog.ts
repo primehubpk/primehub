@@ -9,6 +9,7 @@ import { categoryHref, categoryLabel, productMatchesCategory, slugifyCategory } 
 import { smartSearchProducts } from '@/lib/smartSearch';
 import { isWholesaleProduct } from '@/lib/wholesale';
 import { getMegaDealAvailableSizes, isDedicatedDealProduct } from '@/lib/glassOffers';
+import { hasMismatchedHandSizes } from '@/lib/cardSizeLabels';
 import { getEffectivePrice } from '@/lib/dealPricing';
 import { matchesSaleMelaBucket } from '@/lib/priceBucketUtils';
 import { cacheCatalogForNavigation, readCachedCatalog } from '@/lib/productNavigationCache';
@@ -178,6 +179,7 @@ export function useShopCatalog(initialCategory?: string, initialQuery = '', init
       const data = await response.json();
       if (!data?.product || String(data.product.id || '') !== String(product.id)) throw new Error('Product is unavailable.');
       const currentProduct = data.product as Product;
+      if (hasMismatchedHandSizes(currentProduct)) throw new Error('This product has incorrect size information. Please contact PrimeHubMall to confirm options before ordering.');
       const selectedSize = typeof product.preferredSize === 'string' ? product.preferredSize : '';
       if (selectedSize && !getMegaDealAvailableSizes(currentProduct).includes(selectedSize)) {
         throw new Error('Selected size no longer available. Please choose another.');
