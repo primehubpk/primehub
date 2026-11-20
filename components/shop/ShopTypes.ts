@@ -22,7 +22,7 @@ export type ShopCatalogActions = {
 };
 export type ShopCatalogModel = FilterState & ShopCatalogActions & {
   products: Product[]; categories: Category[]; filtered: Product[]; rails: CategoryRail[]; buckets: any[];
-  addedId: string | null; wholesaleOnly: boolean; categoryLabel: string; loading: boolean;
+  addedId: string | null; actionError: string; wholesaleOnly: boolean; categoryLabel: string; loading: boolean;
 };
 
 export function titleOf(p: Product) { return p.title || p.name || ''; }

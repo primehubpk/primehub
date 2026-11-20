@@ -14,6 +14,8 @@ import { useVisitShuffled } from '@/lib/useVisitShuffled';
 import { useVisitProductOrder } from '@/lib/useVisitProductOrder';
 import { useContinuousHomeRail } from '@/lib/useContinuousHomeRail';
 import { normalizeImageUrl } from '@/lib/imageUrl';
+import CardSizePicker from '@/components/shop/CardSizePicker';
+import { getMegaDealAvailableSizes } from '@/lib/glassOffers';
 import './bogo-deals.css';
 
 const money = (value: number) => 'Rs. ' + value.toLocaleString('en-PK');
@@ -21,6 +23,7 @@ const money = (value: number) => 'Rs. ' + value.toLocaleString('en-PK');
 const BogoCard = memo(function BogoCard({ product, live }: { product: any; live: boolean }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [selectedSize, setSelectedSize] = useState('');
   const addItem = useCartStore(state => state.addItem);
   const openVariantModal = useCartStore(state => state.openVariantModal);
   const title = String(product.title).split(' — Buy 1')[0];
@@ -34,7 +37,8 @@ const BogoCard = memo(function BogoCard({ product, live }: { product: any; live:
     try {
       const fresh = await getVerifiedDealProduct(product.id);
       if (!isBogoProduct(fresh) || fresh.active === false || fresh.published === false) throw new Error('This offer is unavailable.');
-      if (openVariantModal(fresh, 'cart')) return;
+      if (selectedSize && !getMegaDealAvailableSizes(fresh).includes(selectedSize)) throw new Error('Selected size no longer available. Please choose another.');
+      if (openVariantModal({ ...fresh, preferredSize: selectedSize || undefined }, 'cart')) return;
       addItem({ id: fresh.id, productId: fresh.id, name: String(fresh.title), category: String(fresh.category || ''),
         price: Number(fresh.price), originalPrice: Number(fresh.originalPrice || fresh.price),
         image: String(fresh.imageUrl || image), imageUrl: String(fresh.imageUrl || image),
@@ -50,6 +54,10 @@ const BogoCard = memo(function BogoCard({ product, live }: { product: any; live:
       <p className="bogo-card__terms">1 paid + 1 free {product.bogoOffer?.unitLabel || 'pack'}<br/>Same design{product.hasVariants ? ' & size' : ''}</p>
       {previewOnly ? <p className="text-xs font-bold text-amber-700">Preview only · inventory pending Admin approval</p> : null}
     </Link>
+    <CardSizePicker sizes={product.availableSizes} selected={selectedSize}
+      onSelect={size => { setSelectedSize(size); setError(''); }} title={title}
+      category={String(product.category || '')} disabled={busy}
+      className="mx-2 mb-2" />
     <button type="button" disabled={busy || !available} onClick={() => void add()} className="bogo-card__add"><ShoppingBag size={15}/>{busy ? 'Checking…' : !available ? previewOnly ? 'Preview only' : stock <= 0 ? 'Sold out' : 'Offer paused' : product.hasVariants ? 'Choose size · Get 2' : 'Add offer · Get 2'}</button>
     {error ? <p className="bogo-card__error" role="alert">{error}</p> : null}
   </article>;

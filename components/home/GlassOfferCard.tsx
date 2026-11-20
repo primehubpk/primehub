@@ -11,6 +11,7 @@ import { imageOf, type Product } from '@/components/shop/ShopTypes';
 import { MAX_MEGA_CART_QUANTITY, prepareMegaCartItem } from '@/lib/megaDealCart';
 import { megaImageNeedsTrim, megaImageNeedsWideBackdrop, megaImageTrimStyle } from '@/lib/megaImagePresentation';
 import type { GlassOfferDisplay } from '@/lib/glassOffers';
+import { cardSizeDescription } from '@/lib/cardSizeLabels';
 import './glass-offers.css';
 
 const money = (price: number) => 'Rs. ' + price.toLocaleString('en-PK');
@@ -31,6 +32,7 @@ export default function GlassOfferCard({
   const [error, setError] = useState('');
   const [added, setAdded] = useState(false);
   const [selectedSize, setSelectedSize] = useState('');
+  const [sizeDetailsOpen, setSizeDetailsOpen] = useState(false);
   const [selectedColor, setSelectedColor] = useState('');
   const [colors, setColors] = useState<string[]>([]);
   const [freshSizes, setFreshSizes] = useState<string[] | null>(null);
@@ -113,10 +115,15 @@ export default function GlassOfferCard({
         </div>
       </Link>
       {sizes.length > 0 && <fieldset className="glass-offer-card__sizes" disabled={checking}>
-        <legend>Available sizes</legend>
+        <legend>Available sizes <button type="button" tabIndex={clone ? -1 : undefined}
+          aria-expanded={sizeDetailsOpen} onClick={() => setSizeDetailsOpen(open => !open)}>Size details</button></legend>
         <div>{sizes.map(size => <button key={size} type="button" title={size}
           aria-label={`Choose size ${size} for ${title}`} aria-pressed={selectedSize === size}
           tabIndex={clone ? -1 : undefined} onClick={() => chooseSize(size)}>{sizeLabel(size)}</button>)}</div>
+        {selectedSize && sizes.includes(selectedSize) ? <p role="status" className="mega-card-size-info">Selected: {cardSizeDescription(selectedSize, String(product.category || 'Glass bangles'))}</p> : null}
+        {sizeDetailsOpen && <div className="mega-card-size-details" role="region" aria-label={`Size details for ${title}`}>
+          {sizes.map(size => <p key={size}>{cardSizeDescription(size, String(product.category || 'Glass bangles'))}</p>)}
+        </div>}
       </fieldset>}
       {colors.length > 1 && <fieldset className="glass-offer-card__sizes" disabled={checking}>
         <legend>Available colours</legend>

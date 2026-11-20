@@ -1,6 +1,8 @@
 'use client';
 
 import RetryableStorefrontImage from '@/components/RetryableStorefrontImage';
+import { useState } from 'react';
+import CardSizePicker from '@/components/shop/CardSizePicker';
 import { Check, Eye, ShoppingBag, Star } from 'lucide-react';
 import FastProductLink from '@/components/FastProductLink';
 import WholesaleBadge from '@/components/WholesaleBadge';
@@ -19,6 +21,7 @@ type Props = {
 };
 
 export default function CatalogProductCard({ product, addedId, addProduct, compact = false, dense = false, premium = false, priority = false }: Props) {
+  const [selectedSize, setSelectedSize] = useState('');
   const price = priceOf(product);
   const original = originalOf(product);
   const discount = discountOf(product);
@@ -35,7 +38,7 @@ export default function CatalogProductCard({ product, addedId, addProduct, compa
     // Always use the central addProduct path. It performs a no-store read for the
     // current product before deciding whether to open the variant selector, so a
     // stale card can never reopen deleted/old size options.
-    addProduct(product);
+    addProduct({ ...product, preferredSize: selectedSize || undefined });
   }
 
   if (premium) {
@@ -99,6 +102,9 @@ export default function CatalogProductCard({ product, addedId, addProduct, compa
             {added ? <Check size={15} /> : <ShoppingBag size={15} />}
           </button>
         </div>
+        <CardSizePicker sizes={product.availableSizes} selected={selectedSize} onSelect={setSelectedSize}
+          title={titleOf(product)} category={String(product.category || '')} disabled={unavailable}
+          className="mx-2.5 mb-2.5 sm:mx-3" />
       </article>
     );
   }
@@ -145,6 +151,9 @@ export default function CatalogProductCard({ product, addedId, addProduct, compa
         </div>
       </FastProductLink>
       <div className={dense ? "mt-auto px-2.5 pb-2 pt-1.5 sm:px-3 sm:pb-3 sm:pt-2" : "mt-auto px-3 pb-3 pt-2"}>
+        <CardSizePicker sizes={product.availableSizes} selected={selectedSize} onSelect={setSelectedSize}
+          title={titleOf(product)} category={String(product.category || '')} disabled={unavailable}
+          className="mb-2" />
         <button
           type="button"
           disabled={unavailable}

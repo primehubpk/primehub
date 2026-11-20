@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { ChevronRight, Package, ShoppingCart } from "lucide-react";
 import FastProductLink from "@/components/FastProductLink";
+import CardSizePicker from '@/components/shop/CardSizePicker';
+import { getMegaDealAvailableSizes } from '@/lib/glassOffers';
 import HomeHeading from "@/components/home/HomeHeading";
 import { useSettings } from "@/lib/useSettings";
 import { useCartStore } from "@/lib/cartStore";
@@ -183,6 +185,7 @@ export function HomeProductCard({
   const [unavailable, setUnavailable] = useState(false);
   const [checking, setChecking] = useState(false);
   const [actionError, setActionError] = useState('');
+  const [selectedSize, setSelectedSize] = useState('');
   const price = homePrice(product);
   const imageCandidates = imageCandidatesOf(product);
   const src = imageCandidates[0] || '';
@@ -199,9 +202,12 @@ export function HomeProductCard({
       const currentProduct = await getVerifiedDealProduct(product.id) as Product;
       const currentPrice = homePrice(currentProduct);
       const currentSrc = imageOf(currentProduct) || src;
+      if (selectedSize && !getMegaDealAvailableSizes(currentProduct).includes(selectedSize)) {
+        throw new Error('That size is no longer in stock. Please choose another size.');
+      }
 
       if (productHasVariants(currentProduct) &&
-          openVariantModal({ ...currentProduct, price: currentPrice, image: currentSrc, imageUrl: currentSrc }, 'cart')) {
+          openVariantModal({ ...currentProduct, price: currentPrice, image: currentSrc, imageUrl: currentSrc, preferredSize: selectedSize || undefined }, 'cart')) {
         setUnavailable(false);
         return;
       }
@@ -273,6 +279,8 @@ export function HomeProductCard({
         <strong className="home-price">
           Rs. {price.toLocaleString("en-PK")}
         </strong>
+        <CardSizePicker sizes={product.availableSizes} selected={selectedSize} onSelect={size => { setSelectedSize(size); setAdded(false); setActionError(''); }}
+          title={titleOf(product)} category={String(product.category || '')} disabled={checking} className="my-2" />
         <button
             className="home-add"
             type="button"
