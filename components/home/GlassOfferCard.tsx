@@ -11,6 +11,7 @@ import { imageOf, type Product } from '@/components/shop/ShopTypes';
 import { MAX_MEGA_CART_QUANTITY, prepareMegaCartItem } from '@/lib/megaDealCart';
 import { megaImageNeedsTrim, megaImageTrimStyle } from '@/lib/megaImagePresentation';
 import type { GlassOfferDisplay } from '@/lib/glassOffers';
+import './glass-offers.css';
 
 const money = (price: number) => 'Rs. ' + price.toLocaleString('en-PK');
 
