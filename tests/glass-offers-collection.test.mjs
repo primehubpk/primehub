@@ -188,8 +188,15 @@ test('home Mega, BOGO and New Arrivals rails keep native endless scrolling witho
   assert.match(arrivals, /useContinuousHomeRail\(homeRailRef/);
   assert.match(arrivals, /newestFirst\(products, homeLayout, settings\.glassDealShowcase\)/);
   assert.doesNotMatch(arrivals, /homeLayout\s*\?\s*100/);
-  assert.match(arrivals, /setHomeVisibleCount\(\(count\)\s*=>\s*Math\.min\(newest\.length,\s*count\s*\+\s*16\)\)/);
-  assert.match(arrivals, /querySelector<HTMLElement>\('\[data-loop-copy\]'\)/);
+  assert.match(arrivals, /setHomeVisibleCount\(\(?count\)?\s*=>\s*Math\.min\(newest\.length,\s*count\s*\+\s*16\)\)/);
+  assert.match(arrivals, /allNewestVisible && visibleNewest\.length > 1/);
+  assert.match(arrivals, /rail\.scrollWidth - rail\.scrollLeft - rail\.clientWidth/);
+  const categoryRail = await fs.readFile(path.join(root, 'components/home/HomeCategoryDeals.tsx'), 'utf8');
+  assert.match(categoryRail, /allCategoryProductsVisible && loopProducts\.length > 1/);
+  assert.match(categoryRail, /rail\.scrollWidth - rail\.scrollLeft - rail\.clientWidth/);
+  const continuous = await fs.readFile(path.join(root, 'lib/useContinuousHomeRail.ts'), 'utf8');
+  assert.match(continuous, /copy \? copy\.offsetLeft/);
+  assert.match(continuous, /if \(!copy\) scrollPosition = Math\.min\(scrollPosition, maxScroll\)/);
 });
 
 test('Skills and Wholesale come directly after arrivals, with real-thumb 3D collection banners', async () => {

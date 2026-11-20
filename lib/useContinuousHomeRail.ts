@@ -20,6 +20,7 @@ export function useContinuousHomeRail(
   { enabled = true, speed = 24, resumeAfterMs = 6000, startDelayMs = 0, itemCount = 0 }: Options = {},
 ) {
   const pauseRef = useRef<() => void>(() => {});
+  const hasInitializedPosition = useRef(false);
 
   useEffect(() => {
     const rail = railRef.current;
@@ -27,7 +28,9 @@ export function useContinuousHomeRail(
 
     const original = rail.querySelector<HTMLElement>('[data-loop-original]');
     const copy = rail.querySelector<HTMLElement>('[data-loop-copy]');
-    if (!original || !copy) return;
+    if (!original) return;
+    // During progressive loading there is intentionally no duplicate copy.
+    // Scroll through unrepeated products until all have been revealed.
 
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
     let visible = false;
@@ -70,14 +73,16 @@ export function useContinuousHomeRail(
 
       const delta = Math.min((time - (lastFrame || time)) / 1000, 0.05);
       lastFrame = time;
-      const loopLength = copy!.offsetLeft - original!.offsetLeft;
+      const loopLength = copy ? copy.offsetLeft - original!.offsetLeft : 0;
+      const maxScroll = Math.max(0, rail!.scrollWidth - rail!.clientWidth);
       if (!reducedMotion.matches &&
           document.visibilityState === 'visible' &&
           !pointerHolding && !touchHolding &&
           time >= pausedUntil &&
-          loopLength > rail!.clientWidth + 4) {
+          (copy ? loopLength > rail!.clientWidth + 4 : maxScroll > 4)) {
         scrollPosition += speed * delta;
-        if (scrollPosition >= loopLength) scrollPosition -= loopLength;
+        if (copy && scrollPosition >= loopLength) scrollPosition -= loopLength;
+        if (!copy) scrollPosition = Math.min(scrollPosition, maxScroll);
         rail!.scrollLeft = scrollPosition;
       } else {
         scrollPosition = rail!.scrollLeft;
@@ -92,8 +97,11 @@ export function useContinuousHomeRail(
         if (!hasEnteredViewport) {
           // Prevent offscreen animation / scroll restoration leaving half of
           // the first product visible on the customer's first visit.
-          rail.scrollLeft = 0;
-          scrollPosition = 0;
+          if (!hasInitializedPosition.current) {
+            rail.scrollLeft = 0;
+            hasInitializedPosition.current = true;
+          }
+          scrollPosition = rail.scrollLeft;
           hasEnteredViewport = true;
           // Show the first products long enough to read before the subtle rail moves.
           pausedUntil = Math.max(pausedUntil, performance.now() + startDelayMs);

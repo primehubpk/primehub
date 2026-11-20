@@ -79,13 +79,32 @@ export default function NewArrivalsRail({
     if (homeLayout) setHomeVisibleCount(16);
   }, [homeLayout, products.length]);
 
+  const allNewestVisible = homeVisibleCount >= newest.length;
   const visibleNewest = homeLayout
     ? newest.slice(0, homeVisibleCount)
     : newest;
   const pauseAutoScroll = useContinuousHomeRail(homeRailRef, { enabled: homeLayout, itemCount: visibleNewest.length, speed: 25, startDelayMs: 8000 });
+  useEffect(() => {
+    if (homeLayout && homeRailRef.current) homeRailRef.current.dataset.clientMounted = 'true';
+  }, [homeLayout]);
+  useEffect(() => {
+    if (!homeLayout || homeVisibleCount >= newest.length) return;
+    const rail = homeRailRef.current;
+    if (!rail) return;
+    const reveal = () => {
+      if (rail.scrollWidth - rail.scrollLeft - rail.clientWidth <= rail.clientWidth * 2) {
+        setHomeVisibleCount(count => Math.min(newest.length, count + 16));
+      }
+    };
+    rail.addEventListener('scroll', reveal, { passive: true });
+    return () => rail.removeEventListener('scroll', reveal);
+  }, [homeLayout, homeVisibleCount, newest.length]);
 
   function moveArrivals(direction: number) {
     pauseAutoScroll.current();
+    if (direction > 0 && homeVisibleCount < newest.length) {
+      setHomeVisibleCount(count => Math.min(newest.length, count + 16));
+    }
     homeRailRef.current?.scrollBy({ left: direction * (homeRailRef.current.clientWidth + 10), behavior: 'smooth' });
   }
   const addProduct = async (product: Product, selectedSize = '') => {
@@ -141,18 +160,11 @@ export default function NewArrivalsRail({
         <div
           ref={homeRailRef}
           aria-busy={!ready}
+          data-total-products={newest.length}
+          data-rendered-products={visibleNewest.length}
           className="home-arrivals__rail" role="region" aria-label="Swipe New Arrivals" tabIndex={0}
-          onScroll={(event) => {
-            if (homeVisibleCount >= newest.length) return;
-            const rail = event.currentTarget;
-            const nearEnd =
-              rail.scrollLeft + rail.clientWidth * 2 >= (rail.querySelector<HTMLElement>('[data-loop-copy]')?.offsetLeft ?? rail.scrollWidth / 2);
-            if (nearEnd) {
-              setHomeVisibleCount((count) => Math.min(newest.length, count + 16));
-            }
-          }}
         >
-          {(visibleNewest.length > 1 ? [0, 1] : [0]).flatMap((copy) => visibleNewest.map((p, index) => (
+          {(allNewestVisible && visibleNewest.length > 1 ? [0, 1] : [0]).flatMap((copy) => visibleNewest.map((p, index) => (
             <div key={`${copy}:${p.id}`} data-loop-original={copy === 0 && index === 0 ? '' : undefined}
               data-loop-copy={copy === 1 && index === 0 ? '' : undefined} className="min-w-0">
               <HomeProductCard product={p} badgeText="New Arrival" />

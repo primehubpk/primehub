@@ -3,9 +3,10 @@
 import RetryableStorefrontImage from '@/components/RetryableStorefrontImage';
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { ChevronRight, Package, ShoppingCart } from "lucide-react";
+import { ChevronRight, Eye, Package, ShoppingCart } from "lucide-react";
 import FastProductLink from "@/components/FastProductLink";
 import CardSizePicker from '@/components/shop/CardSizePicker';
+import { hasMismatchedHandSizes } from '@/lib/cardSizeLabels';
 import { getMegaDealAvailableSizes } from '@/lib/glassOffers';
 import HomeHeading from "@/components/home/HomeHeading";
 import { useSettings } from "@/lib/useSettings";
@@ -190,6 +191,7 @@ export function HomeProductCard({
   const imageCandidates = imageCandidatesOf(product);
   const src = imageCandidates[0] || '';
   const cardHasPrice = price > 0;
+  const needsSizeConfirmation = hasMismatchedHandSizes(product);
 
   async function add() {
     if (!cardHasPrice || checking) return;
@@ -281,18 +283,21 @@ export function HomeProductCard({
         </strong>
         <CardSizePicker sizes={product.availableSizes} selected={selectedSize} onSelect={size => { setSelectedSize(size); setAdded(false); setActionError(''); }}
           title={titleOf(product)} category={String(product.category || '')} disabled={checking} className="my-2" />
-        <button
-            className="home-add"
-            type="button"
-            onClick={add}
+        {needsSizeConfirmation ? (
+          <FastProductLink product={product} className="home-add"
+            aria-label={`Confirm product options for ${titleOf(product)}`}>
+            <span>Confirm options</span><Eye size={15} />
+          </FastProductLink>
+        ) : (
+          <button className="home-add" type="button" onClick={add}
             disabled={!cardHasPrice || checking}
-            aria-label={`${unavailable ? "Out of stock:" : "Add to cart:"} ${titleOf(product)}`}
-          >
+            aria-label={`${unavailable ? "Out of stock:" : "Add to cart:"} ${titleOf(product)}`}>
             <span aria-live="polite">
               {checking ? "Checking options…" : unavailable ? "Out of stock" : added ? "Add another" : "Add to cart"}
             </span>
             <ShoppingCart size={15} />
-        </button>
+          </button>
+        )}
         {actionError ? <small role="alert" className="mt-1 block text-[10px] font-semibold text-red-700">{actionError}</small> : null}
       </div>
     </article>

@@ -22,21 +22,34 @@ function MovingCategoryProductRail({ products, railRef, namespace }: {
   const [visibleCount, setVisibleCount] = useState(12);
   useEffect(() => setVisibleCount(12), [namespace, products.length]);
   const loopProducts = allProducts.slice(0, visibleCount);
+  const allCategoryProductsVisible = visibleCount >= allProducts.length;
   useContinuousHomeRail(railRef, { itemCount: loopProducts.length, speed: 23, startDelayMs: 8000 });
-  const revealMore = (rail: HTMLDivElement) => {
-    if (visibleCount >= allProducts.length) return;
-    const copy = rail.querySelector<HTMLElement>('[data-loop-copy]');
-    const boundary = copy?.offsetLeft ?? rail.scrollWidth / 2;
-    if (rail.scrollLeft + rail.clientWidth * 2 >= boundary) {
-      setVisibleCount((count) => Math.min(allProducts.length, count + 12));
-    }
-  };
+  useEffect(() => {
+    const rail = railRef.current;
+    if (rail) rail.dataset.clientMounted = 'true';
+    if (!rail) return;
+    const loadNext = () => setVisibleCount(count => Math.min(allProducts.length, count + 12));
+    const reveal = () => {
+      if (visibleCount < allProducts.length &&
+          rail.scrollWidth - rail.scrollLeft - rail.clientWidth <= rail.clientWidth * 2) loadNext();
+    };
+    const onAdvance = (event: Event) => {
+      if ((event as CustomEvent<number>).detail > 0 && visibleCount < allProducts.length) loadNext();
+    };
+    rail.addEventListener('scroll', reveal, { passive: true });
+    rail.addEventListener('primehub:advance', onAdvance);
+    return () => {
+      rail.removeEventListener('scroll', reveal);
+      rail.removeEventListener('primehub:advance', onAdvance);
+    };
+  }, [railRef, visibleCount, allProducts.length]);
 
   return <div
     ref={railRef}
     data-home-category-rail
+    data-total-products={allProducts.length}
+    data-rendered-products={loopProducts.length}
     aria-busy={!ready}
-    onScroll={(event) => revealMore(event.currentTarget)}
     className="overflow-x-auto px-4 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
     style={{
       display: 'grid',
@@ -50,7 +63,7 @@ function MovingCategoryProductRail({ products, railRef, namespace }: {
       scrollPaddingInlineStart: 0,
     }}
   >
-    {(loopProducts.length > 1 ? [0, 1] : [0]).flatMap(copy =>
+    {(allCategoryProductsVisible && loopProducts.length > 1 ? [0, 1] : [0]).flatMap(copy =>
       loopProducts.map((product, index) => (
         <div key={copy + ':' + index + ':' + product.id} className="min-w-0"
           data-loop-original={copy === 0 && index === 0 ? '' : undefined}
@@ -69,6 +82,7 @@ function CategoryRailCard({ category, matches }: { category: Category; matches: 
     const rail = railRef.current;
     if (!rail) return;
     rail.dispatchEvent(new Event('click'));
+    rail.dispatchEvent(new CustomEvent<number>('primehub:advance', { detail: direction }));
     rail.scrollBy({ left: direction * (rail.clientWidth + 10), behavior: 'smooth' });
   };
   return <div className="home-category-3d-frame rounded-[20px] border border-[#DCCCA8]/60 bg-[#FFFCF7] pb-3 shadow-sm">

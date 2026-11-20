@@ -35,3 +35,6 @@ play-store/android-twa/*.keystore
 *.jks
 *.p12
 *.keystore
+
+# One-time inventory rollback records: preserve locally, never commit catalog data
+/scripts/inventory-topup-20261120-*.local.json

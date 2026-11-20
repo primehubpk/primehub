@@ -2,6 +2,8 @@
 
 import RetryableStorefrontImage from '@/components/RetryableStorefrontImage';
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { hasMismatchedHandSizes } from '@/lib/cardSizeLabels';
 import CardSizePicker from '@/components/shop/CardSizePicker';
 import { Check, Eye, ShoppingBag, Star } from 'lucide-react';
 import FastProductLink from '@/components/FastProductLink';
@@ -22,6 +24,8 @@ type Props = {
 
 export default function CatalogProductCard({ product, addedId, addProduct, compact = false, dense = false, premium = false, priority = false }: Props) {
   const [selectedSize, setSelectedSize] = useState('');
+  const router = useRouter();
+  const needsSizeConfirmation = hasMismatchedHandSizes(product);
   const price = priceOf(product);
   const original = originalOf(product);
   const discount = discountOf(product);
@@ -34,6 +38,10 @@ export default function CatalogProductCard({ product, addedId, addProduct, compa
   const reviews = Math.max(0, Number(product.reviews || product.reviewCount || 0));
 
   function handleAdd() {
+    if (needsSizeConfirmation) {
+      router.push(`/product/${encodeURIComponent(product.id)}`);
+      return;
+    }
     if (unavailable) return;
     // Always use the central addProduct path. It performs a no-store read for the
     // current product before deciding whether to open the variant selector, so a
@@ -95,11 +103,11 @@ export default function CatalogProductCard({ product, addedId, addProduct, compa
             type="button"
             disabled={unavailable}
             onClick={handleAdd}
-            aria-label={unavailable ? `${titleOf(product)} unavailable` : added ? `${titleOf(product)} added to cart` : `Add ${titleOf(product)} to cart`}
-            title={unavailable ? 'Unavailable' : added ? 'Added to cart' : 'Add to cart'}
+            aria-label={needsSizeConfirmation ? `Confirm options for ${titleOf(product)}` : unavailable ? `${titleOf(product)} unavailable` : added ? `${titleOf(product)} added to cart` : `Add ${titleOf(product)} to cart`}
+            title={needsSizeConfirmation ? 'Confirm options' : unavailable ? 'Unavailable' : added ? 'Added to cart' : 'Add to cart'}
             className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition active:scale-95 sm:h-10 sm:w-10 ${unavailable ? 'cursor-not-allowed bg-black/5 text-black/25' : added ? 'bg-[#0F6A5F] text-white' : 'bg-[#FFF8EC] text-[#8B5A12] shadow-sm ring-1 ring-[#EAD7B6] hover:bg-[#F7E4C4]'}`}
           >
-            {added ? <Check size={15} /> : <ShoppingBag size={15} />}
+            {needsSizeConfirmation ? <Eye size={15} /> : added ? <Check size={15} /> : <ShoppingBag size={15} />}
           </button>
         </div>
         <CardSizePicker sizes={product.availableSizes} selected={selectedSize} onSelect={setSelectedSize}
@@ -160,7 +168,7 @@ export default function CatalogProductCard({ product, addedId, addProduct, compa
           onClick={handleAdd}
           className={`flex w-full min-w-0 items-center justify-center gap-1.5 rounded-xl px-2 text-[8px] font-black transition active:scale-[0.98] sm:text-[10px] ${dense ? 'min-h-9 py-1.5 sm:min-h-10 sm:py-2' : 'min-h-10 py-2'} ${unavailable ? 'cursor-not-allowed bg-black/5 text-black/25' : added ? 'bg-[#0F6A5F] text-white' : 'bg-[#005448] text-white hover:bg-[#063f37]'}`}
         >
-          {unavailable ? 'Unavailable' : added ? <><Check size={13} />Added to Cart</> : <><ShoppingBag size={dense ? 12 : 13} />Add to Cart</>}
+          {needsSizeConfirmation ? <><Eye size={dense ? 12 : 13}/>Confirm options</> : unavailable ? 'Unavailable' : added ? <><Check size={13} />Added to Cart</> : <><ShoppingBag size={dense ? 12 : 13} />Add to Cart</>}
         </button>
       </div>
     </article>
