@@ -64,6 +64,22 @@
 .glass-offer-card__quantity :focus-visible { outline:2px solid #0f6a5f; outline-offset:-2px; }
 .glass-offer-card--recommendation { width:clamp(154px,calc((100vw - 44px)/2),220px); min-width:154px; flex:0 0 auto; align-self:stretch; display:flex; flex-direction:column; }
 .glass-offer-card--recommendation .glass-offer-card__image { aspect-ratio:4/5; }
+/* The reviewed 800x600 gift-box photo can remain uncropped in the portrait card:
+   a soft fill behind the complete image replaces the empty letterbox bands. */
+.glass-offer-card--recommendation.glass-offer-card--wide {
+  width:clamp(290px,30vw,340px); min-width:290px; align-self:flex-start;
+}
+.glass-offer-card--recommendation .glass-offer-card__image--wide {
+  aspect-ratio:4/3; background:#faf5ec;
+}
+.glass-offer-card__image--wide .glass-offer-card__wide-main {
+  object-fit:contain; padding:0; transform:none; filter:none;
+}
+@media(max-width:640px) {
+  .glass-offer-card--recommendation.glass-offer-card--wide {
+    width:min(82vw,330px); min-width:min(82vw,330px);
+  }
+}
 .glass-offer-card--recommendation .glass-offer-card__quantity { margin-top:auto; }
 .mega-recommendations-grid > .glass-offer-card--recommendation { width:100%; min-width:0; }
 .glass-offer-card__trimmed-preview { position:absolute; left:0; right:0; top:50%; aspect-ratio:1; transform:translateY(-50%); overflow:hidden; }

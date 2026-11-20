@@ -9,7 +9,7 @@ import { normalizeProductVariants, useCartStore } from '@/lib/cartStore';
 import { getVerifiedDealProduct } from '@/lib/verifiedDealProduct';
 import { imageOf, type Product } from '@/components/shop/ShopTypes';
 import { MAX_MEGA_CART_QUANTITY, prepareMegaCartItem } from '@/lib/megaDealCart';
-import { megaImageNeedsTrim, megaImageTrimStyle } from '@/lib/megaImagePresentation';
+import { megaImageNeedsTrim, megaImageNeedsWideBackdrop, megaImageTrimStyle } from '@/lib/megaImagePresentation';
 import type { GlassOfferDisplay } from '@/lib/glassOffers';
 import './glass-offers.css';
 
@@ -43,6 +43,7 @@ export default function GlassOfferCard({
   const cover = gallery[0];
   const image = normalizeImageUrl(String(product.imageUrl || product.image || (typeof cover === 'string' ? cover : (cover as { url?: string } | undefined)?.url || '') || ''));
   const trimImage = megaImageNeedsTrim(product.id, image);
+  const wideRecommendationImage = recommendation && !trimImage && megaImageNeedsWideBackdrop(product.id, image);
 
   const sizes = freshSizes ?? (Array.isArray(product.availableSizes) ? product.availableSizes.filter((size): size is string => typeof size === 'string' && Boolean(size.trim())) : []);
   const sizeLabel = (size: string) => size.match(/^\d+(?:\.\d+)?/)?.[0] || size;
@@ -93,14 +94,16 @@ export default function GlassOfferCard({
   }
 
   return (
-    <article data-product-id={product.id} data-price={price} data-mega-recommendation={recommendation || undefined} aria-hidden={clone || undefined} className={`glass-offer-card${compact ? ' glass-offer-card--compact' : ''}${recommendation ? ' glass-offer-card--recommendation' : ''}`}>
+    <article data-product-id={product.id} data-price={price} data-mega-recommendation={recommendation || undefined} aria-hidden={clone || undefined} className={`glass-offer-card${compact ? ' glass-offer-card--compact' : ''}${recommendation ? ' glass-offer-card--recommendation' : ''}${wideRecommendationImage ? ' glass-offer-card--wide' : ''}`}>
       <Link href={`/product/${encodeURIComponent(product.id)}`} prefetch={false} tabIndex={clone ? -1 : undefined}
         className="glass-offer-card__link" aria-label={`View ${title}, ${money(price)}`}>
-        <div className="glass-offer-card__image">
-          {image ? <div className={recommendation && trimImage ? 'glass-offer-card__trimmed-preview' : 'absolute inset-0'}><Image src={image} alt={title} fill unoptimized={isDirectStorefrontImage(image)} sizes={recommendation ? '220px' : compact ? '180px' : '(max-width: 640px) 45vw, 260px'} quality={72}
-            style={trimImage ? megaImageTrimStyle : undefined}
-            data-mega-trim={trimImage || undefined} className="object-contain" /></div>
-            : <div className="glass-offer-card__empty">PrimeHubMall</div>}
+        <div className={wideRecommendationImage ? 'glass-offer-card__image glass-offer-card__image--wide' : 'glass-offer-card__image'}>
+          {image ? <>
+            {/* One complete image fills its own landscape frame; no duplicate backdrop. */}
+            <div className={recommendation && trimImage ? 'glass-offer-card__trimmed-preview' : 'absolute inset-0'}><Image src={image} alt={title} fill unoptimized={isDirectStorefrontImage(image)} sizes={wideRecommendationImage ? '(max-width: 640px) 82vw, 340px' : recommendation ? '220px' : compact ? '180px' : '(max-width: 640px) 45vw, 260px'} quality={72}
+              style={trimImage ? megaImageTrimStyle : undefined}
+              data-mega-trim={trimImage || undefined} data-mega-wide={wideRecommendationImage || undefined} className={wideRecommendationImage ? 'glass-offer-card__wide-main' : 'object-contain'} /></div>
+          </> : <div className="glass-offer-card__empty">PrimeHubMall</div>}
           {savingPercent > 0 ? <span className="glass-offer-card__discount"><Tag size={11} /> Save {savingPercent}%</span> : null}
         </div>
         <h3 className="glass-offer-card__title">{title}</h3>
