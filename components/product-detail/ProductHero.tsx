@@ -3,6 +3,7 @@ import Image from 'next/image';
 import { useEffect, useState, type CSSProperties } from 'react';
 import { Sparkles, ChevronLeft, ChevronRight, Play, X, ZoomIn } from 'lucide-react';
 import { isDirectStorefrontImage } from '@/lib/imageUrl';
+import { megaImageNeedsTrim, megaImageTrimStyle } from '@/lib/megaImagePresentation';
 import { money, titleOf, videoOf, type Product } from './ProductDetailTypes';
 
 type Props = {
@@ -23,6 +24,7 @@ function shouldUseDirectStorefrontImage(url: string, bigDealActive: boolean) {
 export default function ProductHero({ product, images, activeImage, savingsAmount, liveDeal, bigDealActive, onImageChange, onVideoOpen }: Props) {
   const displayImage = images[activeImage] || '';
   const directDisplayImage = shouldUseDirectStorefrontImage(displayImage, bigDealActive);
+  const trimImage = megaImageNeedsTrim(product.id, displayImage);
   const [zoomed, setZoomed] = useState(false);
   const [measuredImage, setMeasuredImage] = useState<{ src: string; aspect: number } | null>(null);
   const isMegaProduct = Number(product.megaDealPrice || 0) > 0;
@@ -63,6 +65,8 @@ export default function ProductHero({ product, images, activeImage, savingsAmoun
               unoptimized={directDisplayImage}
               sizes="(max-width: 768px) 100vw, 52vw"
               quality={78}
+              style={trimImage ? megaImageTrimStyle : undefined}
+              data-mega-trim={trimImage || undefined}
               onLoad={(event) => {
                 if (!isMegaProduct) return;
                 const { naturalWidth: width, naturalHeight: height } = event.currentTarget;
@@ -97,8 +101,8 @@ export default function ProductHero({ product, images, activeImage, savingsAmoun
     {zoomed && displayImage && (
       <div role="dialog" aria-modal="true" aria-label={`${titleOf(product)} enlarged image`} className="fixed inset-0 z-[120] flex items-center justify-center bg-black/95 p-3 sm:p-8" onClick={() => setZoomed(false)}>
         <button type="button" onClick={() => setZoomed(false)} className="absolute right-4 top-4 z-20 flex h-11 w-11 items-center justify-center rounded-full bg-white text-black shadow-lg" aria-label="Close enlarged image"><X size={20}/></button>
-        <div className="relative h-full w-full max-w-6xl" onClick={(event) => event.stopPropagation()}>
-          <Image src={displayImage} alt={`${titleOf(product)} enlarged`} fill priority unoptimized={directDisplayImage} sizes="100vw" quality={85} className="object-contain" />
+        <div className={trimImage ? "relative aspect-square overflow-hidden" : "relative h-full w-full max-w-6xl"} style={trimImage ? { width: 'min(100%, calc(100dvh - 64px))' } : undefined} onClick={(event) => event.stopPropagation()}>
+          <Image src={displayImage} alt={`${titleOf(product)} enlarged`} fill priority unoptimized={directDisplayImage} sizes="100vw" quality={85} style={trimImage ? megaImageTrimStyle : undefined} data-mega-trim={trimImage || undefined} className="object-contain" />
         </div>
         {images.length > 1 && <><button type="button" onClick={(event) => { event.stopPropagation(); onImageChange((index) => (index - 1 + images.length) % images.length); }} className="absolute left-3 top-1/2 z-20 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white text-black shadow-lg sm:left-6" aria-label="Previous enlarged image"><ChevronLeft size={21}/></button><button type="button" onClick={(event) => { event.stopPropagation(); onImageChange((index) => (index + 1) % images.length); }} className="absolute right-3 top-1/2 z-20 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white text-black shadow-lg sm:right-6" aria-label="Next enlarged image"><ChevronRight size={21}/></button></>}
         <span className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-white/15 px-3 py-1.5 text-[10px] font-black text-white">{activeImage + 1} / {images.length}</span>
