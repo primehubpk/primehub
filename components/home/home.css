@@ -1229,7 +1229,7 @@
      half of a 1200px rail. Inline mobile grid sizing remains untouched. */
   .home-sale-home-frame .home-product-image,
   .home-category-3d-frame .home-product-image {
-    aspect-ratio:1;
+    aspect-ratio:4/5;
   }
 }
 

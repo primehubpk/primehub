@@ -172,7 +172,6 @@ export function HomeProductCard({
   horizontal = false,
   pack = false,
   badgeText,
-  cropImageEdges = false,
 }: {
   product: Product;
   horizontal?: boolean;
@@ -256,8 +255,7 @@ export function HomeProductCard({
             fill
             unoptimized={isDirectStorefrontImage(src)}
             sizes="(max-width: 600px) 40vw, 300px"
-            className="object-cover"
-            style={cropImageEdges ? { transform: "scale(1.08)" } : undefined}
+            className="object-contain object-center p-1"
           />
         ) : (
           <Package aria-label="Image unavailable" />

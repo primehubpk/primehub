@@ -206,7 +206,7 @@ export default function NewArrivalsRail({
                       unoptimized={isDirectStorefrontImage(src)}
                       sizes="(max-width: 640px) 132px, 160px"
                       quality={72}
-                      className="object-cover"
+                      className="object-contain object-center p-1"
                     />
                   ) : (
                     <div className="flex h-full items-center justify-center text-[9px] text-black/30">No image</div>

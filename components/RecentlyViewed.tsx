@@ -45,7 +45,7 @@ function ProductCard({ product, compact = false, offer }: { product: Product; co
     <article className={`${compact ? 'w-[154px] shrink-0' : 'w-full'} overflow-hidden rounded-[20px] border border-black/7 bg-white shadow-[0_8px_25px_rgba(20,20,15,0.06)]`}>
       <FastProductLink product={product} className="block">
         <div className={`${trimImage ? 'aspect-square' : showFullImage ? 'p-2' : compact ? 'aspect-square' : 'aspect-[4/3]'} relative overflow-hidden bg-[#F4F4F1]`}>
-          {image ? <img src={image} alt={titleOf(product)} loading="lazy" draggable={false} style={trimImage ? megaImageTrimStyle : undefined} data-mega-trim={trimImage || undefined} className={trimImage ? "h-full w-full object-cover" : showFullImage ? "block h-auto w-full object-contain" : "h-full w-full object-cover transition duration-300 hover:scale-[1.02]"} onError={(e) => { e.currentTarget.src = '/placeholder.png'; }} /> : <div className="flex h-full items-center justify-center text-[9px] font-bold text-black/25">No image</div>}
+          {image ? <img src={image} alt={titleOf(product)} loading="lazy" draggable={false} style={trimImage ? megaImageTrimStyle : undefined} data-mega-trim={trimImage || undefined} className={trimImage ? "h-full w-full object-cover" : showFullImage ? "block h-auto w-full object-contain" : "h-full w-full object-contain object-center p-1"} onError={(e) => { e.currentTarget.src = '/placeholder.png'; }} /> : <div className="flex h-full items-center justify-center text-[9px] font-bold text-black/25">No image</div>}
           {discount > 0 && <span className="pointer-events-none absolute left-2 top-2 rounded-full bg-[#E1352B] px-2 py-1 text-[8px] font-black text-white">-{discount}%</span>}
         </div>
       </FastProductLink>
