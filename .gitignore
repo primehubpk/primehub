@@ -38,3 +38,5 @@ play-store/android-twa/*.keystore
 
 # One-time inventory rollback records: preserve locally, never commit catalog data
 /scripts/inventory-topup-20261120-*.local.json
+
+/scripts/kids-size-correction-20261120-*.local.json

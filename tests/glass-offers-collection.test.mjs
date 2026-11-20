@@ -423,7 +423,7 @@ test('homepage connects the full Prime Family before an unbounded vertical Sale 
   assert.match(sale, /standalone \|\| verticalHome \? visibleProducts\.map/);
   assert.match(css, /\.home-sale-home--vertical \.home-sale-products--vertical/);
   assert.match(css, /grid-auto-flow:row/);
-  assert.match(css, /grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
+  assert.match(css, /grid-template-columns:minmax\(0,1fr\)/);
   assert.match(commerce, /onPrevious=\{showArrows \?/);
 });
 
@@ -692,4 +692,19 @@ test('original photo restoration preview keeps live data and newer Admin photos 
   } finally {
     if(previous===undefined)delete process.env.VERCEL_ENV;else process.env.VERCEL_ENV=previous;
   }
+});
+
+test('home Sale Mela shows exactly one full-photo card per row with price-ordered products, not visit shuffle', async () => {
+  const [css, source] = await Promise.all([
+    fs.readFile(path.join(root, 'components/home/home.css'), 'utf8'),
+    fs.readFile(path.join(root, 'components/home/HomeCollections.tsx'), 'utf8'),
+  ]);
+  const section = css.split('.home-sale-home--vertical .home-sale-products--vertical {')[1]?.split('}')[0] || '';
+  assert.match(section, /grid-template-columns:minmax\(0,1fr\)/);
+  assert.match(section, /max-width:720px/);
+  assert.match(css, /\.home-sale-home--vertical \.home-sale-home-frame \.home-product-image img \{object-fit:contain !important\}/);
+  assert.doesNotMatch(css, /\.home-sale-home--vertical \.home-sale-products--vertical \{grid-template-columns:repeat\((?:2|3|4)/);
+  assert.match(source, /useVisitProductOrder\(products, `sale-\$\{href\}`, movingRailRef, !standalone && !verticalHome\)/);
+  assert.match(source, /const baseMatches = wholesale[\s\S]*?sortBySalePrice\(/);
+  assert.match(source, /const matches = verticalHome[\s\S]*?\? baseMatches/);
 });

@@ -394,7 +394,9 @@ function ProgressiveHomeSaleProducts({
   const [limit, setLimit] = useState(initialLimit);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const movingRailRef = useRef<HTMLDivElement>(null);
-  const { items: visitProducts, ready } = useVisitProductOrder(products, `sale-${href}`, movingRailRef, !standalone);
+  // Vertical Sale Mela starts with the first real product in the configured price band.
+  // Only horizontal carousels rotate on a new visit; do not shuffle the vertical list.
+  const { items: visitProducts, ready } = useVisitProductOrder(products, `sale-${href}`, movingRailRef, !standalone && !verticalHome);
 
   useEffect(() => {
     setLimit(initialLimit);

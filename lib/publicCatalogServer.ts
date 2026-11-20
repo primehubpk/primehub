@@ -106,7 +106,7 @@ async function loadPublicCatalog() {
 
 export const getPublicCatalogSnapshot = unstable_cache(
   loadPublicCatalog,
-  ['primehub-public-catalog-dual-v14-all-card-sizes', megaImagePreviewCacheKey],
+  ['primehub-public-catalog-dual-v15-verified-kids-size-cleanup', megaImagePreviewCacheKey],
   { revalidate: STOREFRONT_REVALIDATE_SECONDS, tags: ['public-catalog', 'storefront-settings'] },
 );
 
