@@ -12,7 +12,7 @@ function load(path, require = () => ({})) {
   vm.runInNewContext(compile(path), { exports, require, setTimeout, clearTimeout, URL, console, Error });
   return exports;
 }
-const { prepareMegaCartItem } = load('lib/megaDealCart.ts');
+const { prepareMegaCartItem, MAX_MEGA_CART_QUANTITY } = load('lib/megaDealCart.ts');
 const { megaImageNeedsTrim } = load('lib/megaImagePresentation.ts');
 const normalized = load('lib/cartStore.ts', name => name === 'zustand' ? { create: () => () => null }
   : name === 'zustand/middleware' ? { persist: x => x, createJSONStorage: () => null } : {});
@@ -79,7 +79,7 @@ function harness(fresh = product) {
     if (name === 'react/jsx-runtime') return { jsx: (type, props) => ({ type, props }), jsxs: (type, props) => ({ type, props }) };
     if (name === '@/lib/cartStore') return { ...normalized, useCartStore: store };
     if (name === '@/lib/verifiedDealProduct') return { getVerifiedDealProduct: async () => { reads++; if (fresh instanceof Error) throw fresh; return fresh; } };
-    if (name === '@/lib/megaDealCart') return { prepareMegaCartItem };
+    if (name === '@/lib/megaDealCart') return { prepareMegaCartItem, MAX_MEGA_CART_QUANTITY };
     if (name === '@/lib/megaImagePresentation') return { megaImageNeedsTrim };
     if (name === '@/lib/imageUrl') return { normalizeImageUrl: x => x, isDirectStorefrontImage: () => true };
     if (name === '@/components/shop/ShopTypes') return { imageOf: p => p.imageUrl };
@@ -114,4 +114,26 @@ test('failed fresh read leaves cart empty, shows error and enables retry', async
   assert.equal(h.cart.length, 0);
   assert.equal(h.button(tree, 'to cart').props.disabled, false);
   assert.equal(h.nodes(tree).find(n => n.props?.role === 'alert').props.children, 'Network unavailable');
+});
+
+test('requested quantity is checked against fresh stock and existing cart before adding any units', () => {
+  const item = prepareMegaCartItem(product, rows, '2.4', '', [], 2).item;
+  assert.ok(item);
+  assert.throws(() => prepareMegaCartItem(product, rows, '2.4', '', [], 3), /No more stock/);
+  assert.throws(() => prepareMegaCartItem(product, rows, '2.4', '', [{ ...item, qty: 1 }], 2), /No more stock/);
+  for (const qty of [0, -1, 1.5, NaN, 51]) assert.throws(() => prepareMegaCartItem(product, rows, '2.4', '', [], qty), /quantity from 1 to 50/);
+  const lots = { ...product, stock: 100 };
+  assert.throws(() => prepareMegaCartItem(lots, [], '', '', [{ id: 'real', qty: 49 }], 2), /Maximum 50/);
+});
+
+test('card quantity selects two of the same size with one fresh read and no modal', async () => {
+  const h = harness();
+  h.button(h.render(), 'Choose size 2.4').props.onClick();
+  h.button(h.render(), 'Increase Box quantity').props.onClick();
+  h.button(h.render(), 'to cart').props.onClick();
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(h.counts().reads, 1);
+  assert.equal(h.counts().modal, 0);
+  assert.equal(h.cart.length, 2);
+  assert.ok(h.cart.every(item => item.variant.size === '2.4' && item.price === 1209));
 });

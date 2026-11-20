@@ -76,6 +76,8 @@ export function useCartQuote(items: CartItem[]) {
     setQuoteNonce(value => value + 1);
   };
   return {
+    retryQuote: () => setQuoteNonce(value => value + 1),
+    clearVoucher: () => { setVoucherCode(''); setVoucherInput(''); setQuoteNonce(value => value + 1); },
     selfCollect, setSelfCollect, voucherCode, voucherInput, setVoucherInput,
     applyVoucher, quote, quoteError, signedIn: Boolean(uid), authReady, loading: loading || !preferencesReady || !authReady,
   };

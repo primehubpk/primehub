@@ -3,12 +3,12 @@
 import { useRef, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { ShoppingCart, Tag } from 'lucide-react';
+import { Minus, Plus, ShoppingCart, Tag } from 'lucide-react';
 import { isDirectStorefrontImage, normalizeImageUrl } from '@/lib/imageUrl';
 import { normalizeProductVariants, useCartStore } from '@/lib/cartStore';
 import { getVerifiedDealProduct } from '@/lib/verifiedDealProduct';
 import { imageOf, type Product } from '@/components/shop/ShopTypes';
-import { prepareMegaCartItem } from '@/lib/megaDealCart';
+import { MAX_MEGA_CART_QUANTITY, prepareMegaCartItem } from '@/lib/megaDealCart';
 import { megaImageNeedsTrim, megaImageTrimStyle } from '@/lib/megaImagePresentation';
 import type { GlassOfferDisplay } from '@/lib/glassOffers';
 
@@ -31,6 +31,7 @@ export default function GlassOfferCard({
   const [selectedColor, setSelectedColor] = useState('');
   const [colors, setColors] = useState<string[]>([]);
   const [freshSizes, setFreshSizes] = useState<string[] | null>(null);
+  const [quantity, setQuantity] = useState(1);
   const adding = useRef(false);
   const addItem = useCartStore((state) => state.addItem);
   const title = String(product.title || 'Bangles deal');
@@ -70,13 +71,13 @@ export default function GlassOfferCard({
       const rows = normalizeProductVariants(fresh).rows;
       const available = rows.filter(row => Number(row.stock) > 0);
       setFreshSizes([...new Set(available.map(row => String(row.size || 'Standard')))]);
-      const prepared = prepareMegaCartItem({ ...fresh, imageUrl: freshImage }, rows, selectedSize, selectedColor, useCartStore.getState().items);
+      const prepared = prepareMegaCartItem({ ...fresh, imageUrl: freshImage }, rows, selectedSize, selectedColor, useCartStore.getState().items, quantity);
       if (!prepared.item) {
         setColors(prepared.colors);
         setError('Please choose a colour below, then add to cart.');
         return;
       }
-      addItem(prepared.item);
+      for (let count = 0; count < quantity; count += 1) addItem(prepared.item);
       setAdded(true);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Product options are unavailable. Please retry.');
@@ -115,6 +116,18 @@ export default function GlassOfferCard({
         <div>{colors.map(color => <button key={color} type="button" aria-pressed={selectedColor === color}
           tabIndex={clone ? -1 : undefined} onClick={() => { setSelectedColor(color); setAdded(false); setError(''); }}>{color}</button>)}</div>
       </fieldset>}
+      <div className="glass-offer-card__quantity">
+        <label htmlFor={`mega-qty-${product.id}-${clone ? 'copy' : compact ? 'home' : 'grid'}`}>Quantity</label>
+        <div>
+          <button type="button" aria-label={`Decrease ${title} quantity`} disabled={checking || quantity <= 1} tabIndex={clone ? -1 : undefined}
+            onClick={() => { setQuantity(Math.max(1, quantity - 1)); setAdded(false); }}><Minus size={12}/></button>
+          <input id={`mega-qty-${product.id}-${clone ? 'copy' : compact ? 'home' : 'grid'}`} type="number" inputMode="numeric" min={1} max={MAX_MEGA_CART_QUANTITY} step={1}
+            value={quantity} disabled={checking} tabIndex={clone ? -1 : undefined} aria-label={`Quantity for ${title}`}
+            onChange={event => { setQuantity(Math.max(1, Math.min(MAX_MEGA_CART_QUANTITY, Math.floor(Number(event.target.value) || 1)))); setAdded(false); setError(''); }}/>
+          <button type="button" aria-label={`Increase ${title} quantity`} disabled={checking || quantity >= MAX_MEGA_CART_QUANTITY} tabIndex={clone ? -1 : undefined}
+            onClick={() => { setQuantity(Math.min(MAX_MEGA_CART_QUANTITY, quantity + 1)); setAdded(false); }}><Plus size={12}/></button>
+        </div>
+      </div>
       <button type="button" className="glass-offer-card__action" onClick={() => void addSelected()}
         disabled={checking} tabIndex={clone ? -1 : undefined}
         aria-label={`Add ${title}${selectedSize ? ` size ${selectedSize}` : ''} to cart`}>

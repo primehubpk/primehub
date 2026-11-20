@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { ArrowLeft, ShoppingBag } from 'lucide-react';
+import { ArrowLeft, ShoppingBag, Truck } from 'lucide-react';
 import { useCartStore } from '@/lib/cartStore';
 import CartItem from '@/components/cart/CartItem';
 import CartSummary from '@/components/cart/CartSummary';
@@ -16,81 +16,56 @@ export default function CartPage() {
   const deliveryProgress = useCartStore(s => s.getDeliveryProgress());
   const selection = useCartQuote(items);
 
-  if (!items.length) {
-    return (
-      <main className="min-h-screen bg-[#F7F7F5] px-4 pb-28 pt-5 sm:pt-7">
-        <div className="mx-auto flex min-h-[calc(100vh-8rem)] max-w-md items-center justify-center">
-          <div className="w-full rounded-[30px] border border-black/[0.06] bg-white p-8 text-center shadow-[0_8px_30px_rgba(0,0,0,0.05)]">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-[#F7F7F5]"><ShoppingBag size={26} className="text-black/30" /></div>
-            <p className="mt-5 text-[9px] font-black uppercase tracking-[0.25em] text-[#E1352B]">Your cart</p>
-            <h1 className="mt-2 text-2xl font-black tracking-tight">Your Shopping Bag is Empty</h1>
-            <p className="mt-2 text-sm leading-6 text-black/45">Find something you love and add it to your cart.</p>
-            <Link href="/shop" className="mt-6 flex min-h-14 w-full items-center justify-center rounded-2xl bg-[#14140F] py-4 text-xs font-black text-white">Start Shopping</Link>
-          </div>
-        </div>
-      </main>
-    );
-  }
+  if (!items.length) return (
+    <main className="min-h-[70vh] bg-[#F7F7F5] px-5 pb-28 pt-16">
+      <div className="mx-auto max-w-sm rounded-3xl border border-black/5 bg-white px-6 py-10 text-center">
+        <ShoppingBag size={36} className="mx-auto text-[#0F6A5F]"/>
+        <h1 className="mt-5 text-2xl font-black tracking-tight">Your cart is empty</h1>
+        <p className="mt-2 text-sm leading-6 text-black/50">Choose your products, size and quantity to get started.</p>
+        <Link href="/shop" className="mt-6 flex min-h-12 items-center justify-center rounded-xl bg-[#0F6A5F] text-sm font-bold text-white">Start shopping</Link>
+      </div>
+    </main>
+  );
 
   return (
-    <main className="min-h-screen bg-[#F7F7F5] pb-28">
-      <header className="sticky top-0 z-30 border-b border-black/[0.06] bg-[#F7F7F5]/95 px-4 py-3 backdrop-blur-md sm:py-4">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3">
-          <Link href="/shop" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white shadow-sm" aria-label="Back to shop"><ArrowLeft size={17}/></Link>
-          <div className="min-w-0 text-center"><h1 className="text-base font-black tracking-tight text-[#14140F] sm:text-lg">My Cart</h1><p className="text-[9px] font-bold text-black/40">{itemCount} {itemCount === 1 ? 'item' : 'items'}</p></div>
-          <Link href="/shop" className="px-1 text-[10px] font-black text-black/45">Edit</Link>
+    <main className="min-h-screen bg-[#F7F7F5] px-3 pb-48 pt-5 text-[#18231F] sm:px-6 sm:pb-28 sm:pt-8">
+      <div className="mx-auto max-w-5xl">
+        <header className="mb-5 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <Link href="/shop" aria-label="Back to shop" className="grid h-10 w-10 place-items-center rounded-full border border-black/5 bg-white"><ArrowLeft size={18}/></Link>
+            <div><h1 className="text-xl font-black tracking-tight sm:text-2xl">My Cart <span className="ml-1 text-sm font-semibold text-black/40">({itemCount})</span></h1>
+              <p className="mt-0.5 text-xs text-black/50">Check your items, then checkout.</p></div>
+          </div>
+          <Link href="/shop" className="text-right text-xs font-bold text-[#0F6A5F] underline underline-offset-4">Continue shopping</Link>
+        </header>
+
+        <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_360px]">
+          <section aria-label="Your cart items" className="min-w-0 space-y-3">
+            <div className="rounded-xl border border-[#D9E8DF] bg-[#EDF6F0] px-3 py-3">
+              <p className="flex items-center gap-2 text-xs font-bold text-[#17634F]"><Truck size={16} className="shrink-0"/>
+                {selection.selfCollect ? 'Shop pickup is free' : itemsToFreeDelivery > 0 ? `Add ${itemsToFreeDelivery} more ${itemsToFreeDelivery === 1 ? 'item' : 'items'} for free delivery` : 'Free delivery unlocked'}</p>
+              {!selection.selfCollect && <div className="mt-2 h-1 overflow-hidden rounded-full bg-[#0F6A5F]/10"><div className="h-full rounded-full bg-[#0F6A5F] transition-[width]" style={{ width: `${deliveryProgress}%` }}/></div>}
+            </div>
+            {items.map(item => <CartItem key={String(item.id)} item={item} removeItem={removeItem} updateQty={updateQty} compact/>)}
+          </section>
+
+          <div className="min-w-0 lg:sticky lg:top-5">
+            <CartSummary totalItems={itemCount} signedIn={selection.signedIn} quote={selection.quote as any}
+              loading={selection.loading} quoteError={selection.quoteError} selfCollect={selection.selfCollect}
+              setSelfCollect={selection.setSelfCollect} coupon={selection.voucherInput} setCoupon={selection.setVoucherInput}
+              voucherCode={selection.voucherCode} applyCoupon={selection.applyVoucher} clearCoupon={selection.clearVoucher} retryQuote={selection.retryQuote}/>
+          </div>
         </div>
-      </header>
+      </div>
 
-      <div className="mx-auto max-w-4xl space-y-4 px-4 py-5 sm:py-7">
-        <Link href="/shop" className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-3 text-[11px] font-black text-[#14140F] shadow-sm">
-          <ArrowLeft size={13}/> Continue Shopping
-        </Link>
-
-        <section className="rounded-2xl border border-black/[0.06] bg-white p-4 shadow-[0_4px_18px_rgba(0,0,0,0.045)]">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="text-[9px] font-black uppercase tracking-[0.2em] text-[#0F6A5F]">Delivery Reward</p>
-              <h2 className="mt-1 text-sm font-black text-[#14140F]">
-                {itemsToFreeDelivery > 0
-                  ? `Add ${itemsToFreeDelivery} more ${itemsToFreeDelivery === 1 ? 'item' : 'items'} for FREE DELIVERY`
-                  : 'FREE DELIVERY unlocked!'}
-              </h2>
-            </div>
-            <span className="text-[10px] font-black text-[#0F6A5F]">{deliveryProgress}%</span>
-          </div>
-          <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#0F6A5F]/10">
-            <div className="h-full rounded-full bg-[#0F6A5F] transition-all duration-300" style={{ width: `${deliveryProgress}%` }}/>
-          </div>
-          <p className="mt-2 text-[10px] text-black/45">5 total items = Rs. 0 delivery, including wholesale items. Shop pickup is always free.</p>
-        </section>
-
-        <section className="pt-2">
-          <div className="mb-4 flex items-end justify-between gap-3">
-            <div>
-              <p className="text-[9px] font-black uppercase tracking-[0.24em] text-[#E1352B]">Your items</p>
-              <h2 className="mt-1 text-2xl font-black tracking-tight text-[#14140F] sm:text-3xl">Shopping Cart</h2>
-            </div>
-            <span className="rounded-full bg-white px-3 py-2 text-[9px] font-black text-black/45 shadow-sm">{itemCount} {itemCount === 1 ? 'ITEM' : 'ITEMS'}</span>
-          </div>
-          <div className="space-y-3">
-            {items.map(item => <CartItem key={String(item.id)} item={item} removeItem={removeItem} updateQty={updateQty}/>)}
-          </div>
-        </section>
-
-        <CartSummary
-          totalItems={itemCount}
-          signedIn={selection.signedIn}
-          quote={selection.quote as any}
-          loading={selection.loading}
-          quoteError={selection.quoteError}
-          selfCollect={selection.selfCollect}
-          setSelfCollect={selection.setSelfCollect}
-          coupon={selection.voucherInput}
-          setCoupon={selection.setVoucherInput}
-          voucherCode={selection.voucherCode}
-          applyCoupon={selection.applyVoucher}
-        />
+      <div data-cart-checkout-bar className="fixed inset-x-0 bottom-[calc(72px+env(safe-area-inset-bottom))] z-30 border-t border-[#D9E3DC] bg-white/95 px-4 py-2.5 backdrop-blur-md sm:hidden">
+        <div className="mx-auto flex max-w-md items-center justify-between gap-4">
+          <div aria-live="polite"><p className="text-[10px] font-semibold text-black/50">Total to pay</p>
+            <p className="text-lg font-black">{selection.loading ? 'Updating…' : selection.quote && !selection.quoteError ? `Rs. ${Number(selection.quote.total || 0).toLocaleString('en-PK')}` : 'Unavailable'}</p></div>
+          {selection.quote && !selection.loading && !selection.quoteError
+            ? <Link href="/checkout" className="flex min-h-11 min-w-[148px] items-center justify-center rounded-xl bg-[#0F6A5F] px-5 text-sm font-bold text-white">Checkout →</Link>
+            : <button disabled className="min-h-11 min-w-[148px] rounded-xl bg-[#0F6A5F]/40 px-4 text-xs font-bold text-white">{selection.loading ? 'Updating total…' : 'Check total first'}</button>}
+        </div>
       </div>
     </main>
   );

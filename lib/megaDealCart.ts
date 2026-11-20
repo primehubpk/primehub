@@ -2,9 +2,11 @@ import type { CartItem } from '@/lib/cartStore';
 import type { ProductVariantRow } from '@/lib/types';
 
 const key = (value: unknown) => String(value ?? '').trim().toLowerCase();
+export const MAX_MEGA_CART_QUANTITY = 50;
 
 /** Resolve a real row only; never silently choose between different colours. */
-export function prepareMegaCartItem(product: Record<string, any>, rows: ProductVariantRow[], size: string, color: string, items: CartItem[]) {
+export function prepareMegaCartItem(product: Record<string, any>, rows: ProductVariantRow[], size: string, color: string, items: CartItem[], quantity = 1) {
+  if (!Number.isSafeInteger(quantity) || quantity < 1 || quantity > MAX_MEGA_CART_QUANTITY) throw new Error('Choose a quantity from 1 to 50.');
   let selected: ProductVariantRow | undefined;
   if (rows.length) {
     if (!size) throw new Error('Please choose a size.');
@@ -19,7 +21,9 @@ export function prepareMegaCartItem(product: Record<string, any>, rows: ProductV
   const identity = selection ? Object.entries(selection).filter(([, value]) => value).sort(([a], [b]) => a.localeCompare(b)).map(([name, value]) => `${name}:${value}`).join('|') : '';
   const id = selection ? `${product.id}:${identity}` : String(product.id);
   const stock = selected ? Number(selected.stock) : Number(product.stock ?? product.quantity ?? 30);
-  if (!Number.isFinite(stock) || stock <= 0 || (items.find(item => item.id === id)?.qty || 0) >= stock) {
+  const existingQuantity = items.find(item => item.id === id)?.qty || 0;
+  if (existingQuantity + quantity > MAX_MEGA_CART_QUANTITY) throw new Error('Maximum 50 per option. Reduce the quantity.');
+  if (!Number.isFinite(stock) || stock <= 0 || existingQuantity + quantity > stock) {
     throw new Error('No more stock is available for this option.');
   }
   const basePrice = Number(product.price);

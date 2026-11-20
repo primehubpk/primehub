@@ -2,15 +2,19 @@
 
 import { imageOf, priceOf, titleOf } from '@/components/checkout/useCheckout';
 import CartItemControls from './CartItemControls';
+import { Minus, Plus, Trash2 } from 'lucide-react';
+import { megaImageNeedsTrim, megaImageTrimStyle } from '@/lib/megaImagePresentation';
 
 export default function CartItem({
   item,
   removeItem,
   updateQty,
+  compact = false,
 }: {
   item: any;
   removeItem: (id: string) => void;
   updateQty: (id: string, q: number) => void;
+  compact?: boolean;
 }) {
   const qty = Number(item.quantity || item.qty || 1);
   const id = String(item.id || item.productId);
@@ -18,6 +22,44 @@ export default function CartItem({
   const image = imageOf(item);
   const price = priceOf(item);
   const lineTotal = price * qty;
+
+  if (compact) {
+    const fullSize = String(item.variant?.size || '');
+    const size = fullSize.match(/^2\.\d+(?=\s+-)/)?.[0] || fullSize;
+    const trim = megaImageNeedsTrim(item.productId, image);
+    return <article data-cart-item={id} className="rounded-2xl border border-[#E4E8E1] bg-white p-3">
+      <div className="flex items-start gap-3">
+        <div className="h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-[#F7F7F2]">
+          {image ? <img src={image} alt={title} className="h-full w-full object-contain" style={trim ? megaImageTrimStyle : undefined}/> : <div className="grid h-full place-items-center text-xs text-black/30">No image</div>}
+        </div>
+        <div className="min-w-0 flex-1">
+          <h2 className="line-clamp-2 text-[13px] font-bold leading-[18px]">{title}</h2>
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px]">
+            {size && <span title={fullSize} className="rounded-md bg-[#EAF3ED] px-2 py-1 font-bold text-[#0F6A5F]">Size {size}</span>}
+            {item.variant?.color && <span className="text-black/50">{item.variant.color}</span>}
+          </div>
+          <p className="mt-1.5 text-xs text-black/55">Rs. {price.toLocaleString('en-PK')} <span className="text-[10px]">{item.bogoOffer?.enabled ? 'per offer' : 'each'}</span></p>
+        </div>
+      </div>
+      {item.bogoOffer?.enabled && <p className="mt-2 text-[11px] font-semibold text-[#0F6A5F]">{qty} paid + {qty} free · same design / size</p>}
+      {Array.isArray(item.markedImages) && item.markedImages.length > 0 && <div className="mt-2">
+        <p className="text-[10px] font-semibold text-[#0F6A5F]">Your marked colours ({item.markedImages.length})</p>
+        <div className="mt-1 flex flex-wrap gap-1.5">{item.markedImages.slice(0, 12).map((photo: { markedUrl: string }, index: number) =>
+          <a key={photo.markedUrl} href={photo.markedUrl} target="_blank" rel="noopener noreferrer" title={`View marked photo ${index + 1}`}>
+            <img src={photo.markedUrl} alt={`Marked photo ${index + 1}`} className="h-10 w-10 rounded-lg border border-[#0F6A5F]/20 object-cover"/>
+          </a>)}</div>
+      </div>}
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-black/5 pt-2.5">
+        <div className="flex items-center gap-1 rounded-lg border border-[#E0E7DF] bg-[#F8FAF6]">
+          <button type="button" disabled={qty <= 1} onClick={() => updateQty(id, qty - 1)} aria-label={`Decrease ${title} quantity`} className="grid h-9 w-9 place-items-center text-[#0F6A5F] disabled:opacity-30"><Minus size={14}/></button>
+          <span className="min-w-6 text-center text-xs font-bold" aria-label={`Quantity ${qty}`}>{qty}</span>
+          <button type="button" disabled={qty >= 50} onClick={() => updateQty(id, qty + 1)} aria-label={`Increase ${title} quantity`} className="grid h-9 w-9 place-items-center text-[#0F6A5F] disabled:opacity-30"><Plus size={14}/></button>
+        </div>
+        <button type="button" onClick={() => removeItem(id)} aria-label={`Remove ${title}`} className="flex min-h-9 items-center gap-1 px-1 text-[10px] font-semibold text-black/45"><Trash2 size={13}/>Remove</button>
+        <p className="ml-auto text-right text-sm font-black">Rs. {lineTotal.toLocaleString('en-PK')}</p>
+      </div>
+    </article>;
+  }
 
   return (
     <article className="rounded-2xl border border-black/[0.06] bg-white p-3 shadow-[0_4px_18px_rgba(0,0,0,0.045)] sm:p-4">

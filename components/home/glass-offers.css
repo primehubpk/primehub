@@ -54,6 +54,14 @@
 .glass-offer-card__action:hover { background:#08594f; }
 .glass-offer-card__action:disabled { opacity:.65; }
 .glass-offer-card__error { padding:0 8px 8px; color:#a9252b; font-size:11px; }
+.glass-offer-card__quantity { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:5px; margin:0 7px 9px; }
+.glass-offer-card__quantity label { font-size:10px; font-weight:750; color:#665f54; }
+.glass-offer-card__quantity > div { display:flex; align-items:center; border:1px solid #dce4df; border-radius:8px; overflow:hidden; }
+.glass-offer-card__quantity button { display:grid; place-items:center; width:30px; height:34px; background:#f5f8f5; color:#0f6a5f; }
+.glass-offer-card__quantity button:disabled { opacity:.35; }
+.glass-offer-card__quantity input { width:32px; height:34px; padding:0; border:0; background:white; text-align:center; font-size:12px; font-weight:800; color:#183f36; appearance:textfield; }
+.glass-offer-card__quantity input::-webkit-inner-spin-button,.glass-offer-card__quantity input::-webkit-outer-spin-button { appearance:none; margin:0; }
+.glass-offer-card__quantity :focus-visible { outline:2px solid #0f6a5f; outline-offset:-2px; }
 .glass-offers-landing { padding-bottom:96px; }
 .mega-deals-search { display:flex; align-items:center; gap:8px; margin:17px 0 12px; padding:11px 14px; border:1px solid #ded5c7; border-radius:999px; background:white; color:#0f6a5f; }
 .mega-deals-search input { width:100%; min-width:0; outline:none; color:#29261f; background:transparent; font-size:13px; }
