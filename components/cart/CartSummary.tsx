@@ -1,144 +1,89 @@
 'use client';
 
 import Link from 'next/link';
-import { Check, LockKeyhole, RotateCcw, Tag, Truck, ArrowRight } from 'lucide-react';
+import { ArrowRight, ChevronDown, Store, Truck } from 'lucide-react';
 import CartTotals from './CartTotals';
-import DeliveryOptions from '@/components/checkout/DeliveryOptions';
 import PrimeFamilyCartCard, { type CashbackTier } from './PrimeFamilyCartCard';
 
 type CartQuote = {
-  rawSubtotal: number;
-  total: number;
-  deliveryCharge: number;
-  voucherDiscount?: number;
-  voucherCashAmount?: number;
-  voucherCashbackPercent?: number;
-  referralPercent?: number;
-  referralCashEstimate?: number;
-  buyerReferralCashEstimate?: number;
-  referralIsOwnCode?: boolean;
-  voucherKind?: string;
-  tierCashbackPercent?: number;
-  cashbackEstimate?: number;
-  cashbackPercent?: number;
-  cashbackMemberActive?: boolean;
-  cashbackTiers?: CashbackTier[];
-  eligibleAfterVoucher?: number;
-  resellerTier?: string;
-  rewardLabel?: string;
-  wholesaleItems?: number;
+  rawSubtotal: number; total: number; deliveryCharge: number; voucherDiscount?: number;
+  voucherCashAmount?: number; voucherCashbackPercent?: number; referralPercent?: number;
+  referralCashEstimate?: number; buyerReferralCashEstimate?: number; referralIsOwnCode?: boolean;
+  voucherKind?: string; tierCashbackPercent?: number; cashbackEstimate?: number; cashbackPercent?: number;
+  cashbackMemberActive?: boolean; cashbackTiers?: CashbackTier[]; eligibleAfterVoucher?: number;
+  resellerTier?: string; rewardLabel?: string; wholesaleItems?: number;
 };
 
-export default function CartSummary({
-  totalItems, quote, loading, quoteError, selfCollect, setSelfCollect,
-  coupon, setCoupon, applyCoupon, voucherCode, signedIn,
+export default function CartSummary({ totalItems, quote, loading, quoteError, selfCollect, setSelfCollect,
+  coupon, setCoupon, applyCoupon, clearCoupon, retryQuote, voucherCode, signedIn,
 }: {
-  totalItems: number;
-  quote: CartQuote | null;
-  loading: boolean;
-  quoteError: string;
-  selfCollect: boolean;
-  setSelfCollect: (value: boolean) => void;
-  coupon: string;
-  setCoupon: (value: string) => void;
-  applyCoupon: () => void;
-  voucherCode: string;
-  signedIn: boolean;
+  totalItems: number; quote: CartQuote | null; loading: boolean; quoteError: string;
+  selfCollect: boolean; setSelfCollect: (value: boolean) => void;
+  coupon: string; setCoupon: (value: string) => void; applyCoupon: () => void;
+  clearCoupon: () => void; retryQuote: () => void; voucherCode: string; signedIn: boolean;
 }) {
-  return (
-    <section className="rounded-[28px] border border-black/[0.06] bg-white p-5 shadow-[0_8px_30px_rgba(0,0,0,0.055)] sm:p-6">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="text-[9px] font-black uppercase tracking-[0.22em] text-[#E1352B]">Order summary</p>
-          <h2 className="mt-1 text-xl font-black tracking-tight text-[#14140F]">Bill Details</h2>
-        </div>
-        <span className="rounded-full bg-[#F7F7F5] px-3 py-2 text-[9px] font-black text-black/50">
-          {totalItems} {totalItems === 1 ? 'item' : 'items'}
-        </span>
+  const ready = Boolean(quote && !loading && !quoteError);
+  return <section aria-label="Order summary" className="rounded-2xl border border-[#E4E8E1] bg-white p-4">
+    <div className="mb-4 flex items-center justify-between gap-3">
+      <h2 className="text-base font-black">Order total</h2>
+      <span className="text-xs text-black/45">{totalItems} {totalItems === 1 ? 'item' : 'items'}</span>
+    </div>
+
+    <fieldset className="mb-4">
+      <legend className="mb-2 text-xs font-bold text-black/65">How would you like your order?</legend>
+      <div className="grid grid-cols-2 gap-2">
+        {[false, true].map(pickup => <label key={String(pickup)} className={`flex cursor-pointer items-start gap-2 rounded-xl border px-2.5 py-3 ${selfCollect === pickup ? 'border-[#0F6A5F] bg-[#F0F7F2]' : 'border-[#E4E8E1] bg-white'}`}>
+          <input type="radio" name="cart-delivery" value={pickup ? 'pickup' : 'delivery'} checked={selfCollect === pickup} onChange={() => setSelfCollect(pickup)} className="mt-0.5 h-4 w-4 shrink-0 accent-[#0F6A5F]"/>
+          <span className="min-w-0"><span className="flex items-center gap-1 text-[11px] font-bold">{pickup ? <Store size={13}/> : <Truck size={13}/>} {pickup ? 'Shop pickup' : 'Home delivery'}</span>
+            <span className="mt-1 block text-[10px] leading-4 text-black/50">{pickup ? 'Free · collect from shop' : 'Delivery fee shown below'}</span></span>
+        </label>)}
       </div>
+    </fieldset>
 
-      <DeliveryOptions selfCollect={selfCollect} onChange={setSelfCollect} />
-
-      <div className="mt-5 rounded-2xl bg-[#F7F7F5] p-3">
-        <label htmlFor="cart-voucher" className="mb-2 block text-[10px] font-black text-[#0F6A5F]">
-          Promo or friend code
-        </label>
-        <div className="flex items-center gap-2">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-black/35"><Tag size={16} /></div>
-          <input
-            id="cart-voucher"
-            value={coupon}
-            maxLength={24}
-            onChange={(e) => setCoupon(e.target.value.toUpperCase())}
-            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); applyCoupon(); } }}
-            placeholder="Enter code (optional)"
-            className="min-w-0 flex-1 bg-transparent px-1 text-xs font-bold uppercase outline-none placeholder:text-black/30"
-          />
-          <button type="button" onClick={applyCoupon} disabled={loading}
-            className="rounded-xl bg-[#14140F] px-3.5 py-2.5 text-[10px] font-black text-white disabled:opacity-50">
-            Apply
-          </button>
-        </div>
-        <p className="mt-2 text-[10px] leading-4 text-black/50">Use a promo code for a discount or reward, or keep your Family tier cashback. Only one buyer benefit per order. Friend codes earn 10% cashback for both buyer and inviter after delivery; own codes credit once.</p>
-        {voucherCode && quote && !loading && (quote.voucherKind === 'cashback' || quote.voucherKind === 'cash') && <p className="mt-2 text-[10px] font-extrabold text-[#0F6A5F]">Promo replaces tier cashback (never stacked): {quote.voucherKind === 'cashback' ? String(quote.voucherCashbackPercent || 0) + '% cashback; ' : 'Fixed cash voucher; '}Rs. {Number(quote.voucherCashAmount || 0).toLocaleString()} shopping credit after delivery.</p>}
-        {voucherCode && quote && !loading && quote.voucherKind === 'referral' && <p role="status" className="mt-2 text-[10px] font-extrabold text-[#0F6A5F]">Friend code accepted: you earn {quote.referralPercent || 0}% (about Rs. {Number(quote.buyerReferralCashEstimate || 0).toLocaleString()}) after delivery. {quote.referralIsOwnCode ? 'Your own code pays you once, not twice.' : `The code owner also earns Rs. ${Number(quote.referralCashEstimate || 0).toLocaleString()}.`} This replaces your tier cashback, not an extra checkout discount.</p>}
-        {voucherCode && quote && !loading && quote.voucherKind !== 'cashback' && quote.voucherKind !== 'cash' && quote.voucherKind !== 'referral' && <p role="status"  className="mt-2 text-[10px] font-extrabold text-[#0F6A5F]">
-          {Number(quote.voucherDiscount || 0) > 0
-            ? `Rs. ${Number(quote.voucherDiscount).toLocaleString()} checkout discount applied.`
-            : Number(quote.voucherCashAmount || 0) > 0
-              ? `Rs. ${Number(quote.voucherCashAmount).toLocaleString()} shopping credit after Delivered.`
-              : 'Voucher not applied.'}
-        </p>}
+    <details className="mb-4 rounded-xl border border-[#E4E8E1] px-3 py-2.5" open={Boolean(voucherCode || quoteError) || undefined}>
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-xs font-semibold"><span>Promo or friend code <span className="font-normal text-black/40">(optional)</span></span><ChevronDown size={14}/></summary>
+      <div className="mt-3 flex gap-2">
+        <label htmlFor="cart-voucher" className="sr-only">Promo or friend code</label>
+        <input id="cart-voucher" value={coupon} maxLength={24} onChange={event => setCoupon(event.target.value.toUpperCase())}
+          onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); applyCoupon(); } }}
+          placeholder="Enter code" className="h-10 min-w-0 flex-1 rounded-lg border border-black/10 bg-[#FAFBF8] px-3 text-xs font-semibold uppercase outline-[#0F6A5F]"/>
+        <button type="button" onClick={applyCoupon} disabled={loading} className="rounded-lg bg-[#0F6A5F] px-3 text-xs font-bold text-white disabled:opacity-40">Apply</button>
       </div>
+      <p className="mt-2 text-[10px] leading-4 text-black/50">Use one code or your Family tier benefit. Cashback is credited after delivery.</p>
+      {voucherCode && <button type="button" onClick={clearCoupon} className="mt-1 min-h-8 text-[11px] font-bold text-[#0F6A5F] underline underline-offset-2">Remove code</button>}
+      {ready && voucherCode && quote && <p role="status" className="mt-2 text-[11px] font-semibold leading-4 text-[#0F6A5F]">
+        {quote.voucherKind === 'discount' && Number(quote.voucherDiscount) > 0
+          ? `Rs. ${Number(quote.voucherDiscount).toLocaleString('en-PK')} discount applied.`
+          : quote.voucherKind === 'referral'
+            ? `You earn Rs. ${Number(quote.buyerReferralCashEstimate || 0).toLocaleString('en-PK')} after delivery. ${quote.referralIsOwnCode ? 'Your own code credits once.' : 'The code owner earns cashback too.'}`
+            : quote.voucherKind === 'cash' || quote.voucherKind === 'cashback'
+              ? `Rs. ${Number(quote.voucherCashAmount || 0).toLocaleString('en-PK')} shopping credit after delivery, replacing tier cashback.` : 'Code not applied.'}
+      </p>}
+    </details>
 
-      <div className="mt-5 rounded-2xl bg-[#F7F7F5] p-4" aria-live="polite">
-        {loading ? <p className="py-5 text-center text-xs font-bold text-black/50">Verifying current prices and delivery…</p>
-          : quote ? <CartTotals subtotal={Number(quote.rawSubtotal || 0)}
-            deliveryCharge={Number(quote.deliveryCharge || 0)}
-            total={Number(quote.total || 0)}
-            discount={Number(quote.voucherDiscount || 0)}
-            selfCollect={selfCollect} deliveryReward={quote.rewardLabel || ''} />
-          : <p className="text-xs font-bold text-rose-600">Unable to verify totals right now.</p>}
-      </div>
-      {quoteError && <p role="alert" className="mt-3 rounded-xl bg-rose-50 p-3 text-xs font-bold text-rose-700">{quoteError}</p>}
+    <div aria-live="polite" className="border-t border-black/5 pt-3">
+      {loading ? <p className="py-4 text-xs text-black/50">Updating prices and delivery…</p>
+        : quote && !quoteError ? <CartTotals subtotal={Number(quote.rawSubtotal || 0)} deliveryCharge={Number(quote.deliveryCharge || 0)} total={Number(quote.total || 0)}
+          discount={Number(quote.voucherDiscount || 0)} selfCollect={selfCollect} deliveryReward={quote.rewardLabel || ''}/>
+          : <p className="text-xs font-semibold text-rose-700">We could not check your total.</p>}
+    </div>
+    {quoteError && <div role="alert" className="mt-3 rounded-lg bg-rose-50 p-3 text-xs text-rose-700"><p>{quoteError}</p>
+      <button type="button" onClick={retryQuote} disabled={loading} className="mt-2 min-h-9 rounded-lg border border-rose-200 px-3 font-bold">Retry total</button></div>}
 
-      {quote && !loading && <PrimeFamilyCartCard
-        signedIn={signedIn}
-        activeMember={quote.cashbackMemberActive === true}
-        tierName={String(quote.resellerTier || '')}
-        cashbackPercent={Number(quote.cashbackPercent || 0)}
-        tierCashbackPercent={Number(quote.tierCashbackPercent || 0)}
-        voucherCashbackPercent={Number(quote.voucherCashbackPercent || 0)}
-        voucherKind={String(quote.voucherKind || '')}
-        referralPercent={Number(quote.referralPercent || 0)}
-        referralCashEstimate={Number(quote.referralCashEstimate || 0)}
-        buyerReferralCashEstimate={Number(quote.buyerReferralCashEstimate || 0)}
-        referralIsOwnCode={quote.referralIsOwnCode === true}
-        cashbackEstimate={Number(quote.cashbackEstimate || 0)}
-        eligibleSubtotal={Number(quote.eligibleAfterVoucher || 0)}
-        voucherCashAmount={Number(quote.voucherCashAmount || 0)}
-        tiers={Array.isArray(quote.cashbackTiers) ? quote.cashbackTiers : []}
-      />}
+    {ready ? <Link href="/checkout" className="mt-4 flex min-h-12 items-center justify-center gap-2 rounded-xl bg-[#0F6A5F] text-sm font-bold text-white">Checkout <ArrowRight size={16}/></Link>
+      : <button type="button" disabled className="mt-4 min-h-12 w-full rounded-xl bg-[#0F6A5F]/40 text-xs font-bold text-white">{loading ? 'Updating total…' : 'Check total first'}</button>}
+    <p className="mt-2 text-center text-[10px] text-black/45">Address and payment on the next step.</p>
 
-      {quote && !loading ? (
-        <Link href="/checkout"
-          className="mt-5 flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl bg-[#14140F] px-4 text-sm font-black text-white shadow-[0_8px_20px_rgba(0,0,0,0.16)]">
-          Continue to Payment & Delivery Details <ArrowRight size={16}/>
-        </Link>
-      ) : (
-        <button type="button" disabled className="mt-5 flex min-h-14 w-full items-center justify-center rounded-2xl bg-[#14140F]/40 text-xs font-bold text-white">
-          {loading ? 'Checking your order…' : 'Verify order to continue'}
-        </button>
-      )}
-
-      <div className="mt-5 grid grid-cols-3 divide-x divide-black/[0.08] border-t border-black/[0.08] pt-4">
-        <div className="flex flex-col items-center gap-1 px-2 text-center"><Truck size={16} className="text-[#0F6A5F]"/><span className="text-[8px] font-black leading-3 text-black/50">COD Available</span></div>
-        <div className="flex flex-col items-center gap-1 px-2 text-center"><LockKeyhole size={16} className="text-[#0F6A5F]"/><span className="text-[8px] font-black leading-3 text-black/50">Secure Checkout</span></div>
-        <div className="flex flex-col items-center gap-1 px-2 text-center"><RotateCcw size={16} className="text-[#0F6A5F]"/><span className="text-[8px] font-black leading-3 text-black/50">Easy Returns</span></div>
-      </div>
-      <p className="mt-4 flex items-center justify-center gap-1 text-center text-[8px] font-bold text-black/30">
-        <Check size={11}/> Final charges verified again securely at order submission.
-      </p>
-    </section>
-  );
+    {ready && quote && <details className="mt-4 border-t border-black/5 pt-3">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-xs font-bold text-[#0F6A5F]">Cashback &amp; Prime Family <ChevronDown size={14}/></summary>
+      <PrimeFamilyCartCard signedIn={signedIn} activeMember={quote.cashbackMemberActive === true}
+        tierName={String(quote.resellerTier || '')} cashbackPercent={Number(quote.cashbackPercent || 0)} tierCashbackPercent={Number(quote.tierCashbackPercent || 0)}
+        voucherCashbackPercent={Number(quote.voucherCashbackPercent || 0)} voucherKind={String(quote.voucherKind || '')}
+        referralPercent={Number(quote.referralPercent || 0)} referralCashEstimate={Number(quote.referralCashEstimate || 0)}
+        buyerReferralCashEstimate={Number(quote.buyerReferralCashEstimate || 0)} referralIsOwnCode={quote.referralIsOwnCode === true}
+        cashbackEstimate={Number(quote.cashbackEstimate || 0)} eligibleSubtotal={Number(quote.eligibleAfterVoucher || 0)}
+        voucherCashAmount={Number(quote.voucherCashAmount || 0)} tiers={Array.isArray(quote.cashbackTiers) ? quote.cashbackTiers : []}/>
+    </details>}
+    <div id="cart-help-slot" className="mt-3"/>
+  </section>;
 }

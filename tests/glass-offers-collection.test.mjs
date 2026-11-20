@@ -8,7 +8,7 @@ const root = process.cwd();
 const compile = text => ts.transpileModule(text, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText;
 const text = await fs.readFile(path.join(root, 'lib/glassOffers.ts'), 'utf8');
 const moduleUrl = 'data:text/javascript;charset=utf-8,' + encodeURIComponent(compile(text));
-const { STARTER_GLASS_OFFERS, resolveGlassOffers, resolveGlassOfferProducts, isExclusiveGlassDealProduct, resolveUnifiedDealCollection, unifyStorefrontDeals, applyCollectionPrice, isDedicatedDealProduct } = await import(moduleUrl);
+const { STARTER_GLASS_OFFERS, resolveGlassOffers, resolveGlassOfferProducts, isExclusiveGlassDealProduct, resolveUnifiedDealCollection, unifyStorefrontDeals, applyCollectionPrice, isDedicatedDealProduct, getMegaDealAvailableSizes } = await import(moduleUrl);
 const benefits = compile(await fs.readFile(path.join(root, 'lib/orderBenefits.ts'), 'utf8')).replace("from './glassOffers'", 'from ' + JSON.stringify(moduleUrl));
 const { orderEligibleSubtotal } = await import('data:text/javascript;charset=utf-8,' + encodeURIComponent(benefits));
 const legacy = {
@@ -298,7 +298,7 @@ test('home Sale Mela uses a full vertical grid while upper category trails stay 
     'components/home/glass-offers.css',
     'components/home/HomeCategoryDeals.tsx',
   ].map(name => fs.readFile(path.join(root, name), 'utf8')));
-  assert.match(mega, /\.glass-offer-card--compact \.glass-offer-card__image \{ aspect-ratio:4\/5/);
+  assert.match(mega, /\.glass-offer-card--compact \.glass-offer-card__image \{ aspect-ratio:1/);
   assert.match(css, /\.home-sale-home-frame \.home-product-image,\s*\.home-category-3d-frame \.home-product-image\s*\{\s*aspect-ratio:4\/5/);
   assert.match(css, /\.home-sale-home-frame \.home-add,\s*\.home-category-3d-frame \.home-add/);
   assert.match(css, /\.home-sale-home-frame \.home-product \.home-price/);
@@ -637,4 +637,52 @@ test('rewards card describes app-only Rs.100 gift and Mega/BOGO cashback without
  assert.match(card,/Your referral cashback/);
  assert.match(card,/code owner|member who shared it/i);
  assert.match(route,/rewardExcluded: isLiveDealItem \|\| isBigDealItem/);
+});
+
+test('Mega card size labels include only real selectable stock and respect hidden rows and explicit zero', () => {
+  const product = { stock: 30, variantMatrix: [
+    { size: '2.6 - Regular', stock: 2 },
+    { size: '2.6 - Regular', stock: 9, color: 'Second colour' },
+    { size: '2.4', stock: 0 },
+    { size: '2.8', stock: 8, hidden: true },
+    { size: '2.2', stock: 8, active: false },
+    { size: 'Free size' },
+    { options: { size: 'Medium' }, stock: '1' },
+    { variantSize: 'Large', stock: 'bad' },
+  ] };
+  assert.deepEqual(getMegaDealAvailableSizes(product), ['2.6 - Regular', 'Free size', 'Medium']);
+  assert.deepEqual(getMegaDealAvailableSizes({ ...product, hasVariants: false }), []);
+  assert.deepEqual(getMegaDealAvailableSizes({ stock: 0, variants: [{ size: '2.6' }] }), []);
+  assert.deepEqual(getMegaDealAvailableSizes({ sizes: ['Invented'], hasVariants: true }), []);
+  assert.deepEqual(getMegaDealAvailableSizes({ variants: [{ size: '2.8', stock: 1 }] }), ['2.8']);
+  assert.equal(product.variantMatrix.length, 8);
+});
+
+test('original photo restoration preview keeps live data and newer Admin photos unchanged', async () => {
+  const source = await fs.readFile(path.join(root, 'lib/megaImageRestorationPreview.ts'), 'utf8');
+  const repairs = JSON.parse(await fs.readFile(path.join(root, 'scripts/mega-image-restoration-20261119.json'), 'utf8'));
+  assert.ok(repairs.length >= 14);
+  const body = source.replace(/^import.*;\r?\n/gm, '');
+  const fixture = repairs[0];
+  const prefix = 'const createHash=()=>({update:()=>({digest:()=>"test-manifest"})});const repairs=' + JSON.stringify(repairs) + ';const normalizeImageUrl=url=>String(url||"").replace("https://images.primehubmall.com","https://pub-157b90419bf04016bdea666e4cbce181.r2.dev");';
+  const { applyMegaImageRestorationPreview } = await import('data:text/javascript;charset=utf-8,' + encodeURIComponent(prefix + compile(body)));
+  const previous = process.env.VERCEL_ENV;
+  const product = { id:fixture.productId,imageUrl:fixture.oldUrl,images:[fixture.oldUrl],variantMatrix:[{size:'2.4',stock:3,imageUrl:fixture.oldUrl}],price:1209 };
+  try {
+    process.env.VERCEL_ENV='production';
+    assert.equal(applyMegaImageRestorationPreview(product),product);
+    process.env.VERCEL_ENV='preview';
+    const restored=applyMegaImageRestorationPreview(product);
+    assert.equal(restored.imageUrl,fixture.newUrl);
+    assert.equal(restored.images[0],fixture.newUrl);
+    assert.equal(restored.variantMatrix[0].imageUrl,fixture.newUrl);
+    assert.equal(restored.variantMatrix[0].stock,3);
+    assert.equal(restored.price,1209);
+    assert.equal(product.imageUrl,fixture.oldUrl);
+    const newer={...product,imageUrl:'https://example.com/new-admin-photo.webp'};
+    assert.equal(applyMegaImageRestorationPreview(newer),newer);
+    assert.equal(applyMegaImageRestorationPreview({id:'ordinary',imageUrl:fixture.oldUrl}).imageUrl,fixture.oldUrl);
+  } finally {
+    if(previous===undefined)delete process.env.VERCEL_ENV;else process.env.VERCEL_ENV=previous;
+  }
 });

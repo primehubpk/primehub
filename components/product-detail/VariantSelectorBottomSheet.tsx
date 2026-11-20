@@ -18,6 +18,7 @@ type Props = {
   currentPrice: number;
   originalPrice: number;
   preferredImage?: string;
+  preferredSize?: string;
   onClose: () => void;
   onConfirm: (selection: ProductVariantSelection, quantity: number, markedImages?: MarkedProductImage[]) => void;
 };
@@ -96,6 +97,7 @@ export default function VariantSelectorBottomSheet({
   currentPrice,
   originalPrice,
   preferredImage,
+  preferredSize,
   onClose,
   onConfirm,
 }: Props) {
@@ -211,10 +213,11 @@ export default function VariantSelectorBottomSheet({
 
   useEffect(() => {
     if (!open) return;
-    setColor(colorNames[0] || effectiveRows[0]?.color || '');
-    setSize(sizes[0] || effectiveRows[0]?.size || '');
+    const preferred = preferredSize ? effectiveRows.find(row => normalize(row.size) === normalize(preferredSize) && stockOf(row) > 0) : undefined;
+    setColor(preferred?.color || colorNames[0] || effectiveRows[0]?.color || '');
+    setSize(preferred?.size || sizes[0] || effectiveRows[0]?.size || '');
     setQty(Math.max(1, quantity));
-  }, [open, product.id, colorNames, sizes, effectiveRows, quantity]);
+  }, [open, product.id, colorNames, sizes, effectiveRows, quantity, preferredSize]);
 
   const selected = useMemo(
     () => effectiveRows.find(

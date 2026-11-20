@@ -1,14 +1,17 @@
 'use client';
 
-import { useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { ShoppingCart, Tag } from 'lucide-react';
-import { normalizeImageUrl } from '@/lib/imageUrl';
-import { useCartStore } from '@/lib/cartStore';
+import { Minus, Plus, ShoppingCart, Tag } from 'lucide-react';
+import { isDirectStorefrontImage, normalizeImageUrl } from '@/lib/imageUrl';
+import { normalizeProductVariants, useCartStore } from '@/lib/cartStore';
 import { getVerifiedDealProduct } from '@/lib/verifiedDealProduct';
-import { imageOf, priceOf, originalOf, productHasVariants, titleOf, type Product } from '@/components/shop/ShopTypes';
+import { imageOf, type Product } from '@/components/shop/ShopTypes';
+import { MAX_MEGA_CART_QUANTITY, prepareMegaCartItem } from '@/lib/megaDealCart';
+import { megaImageNeedsTrim, megaImageTrimStyle } from '@/lib/megaImagePresentation';
 import type { GlassOfferDisplay } from '@/lib/glassOffers';
+import './glass-offers.css';
 
 const money = (price: number) => 'Rs. ' + price.toLocaleString('en-PK');
 
@@ -16,76 +19,87 @@ export default function GlassOfferCard({
   offer,
   compact = false,
   clone = false,
+  recommendation = false,
 }: {
   offer: GlassOfferDisplay;
   compact?: boolean;
   clone?: boolean;
+  recommendation?: boolean;
 }) {
   const { product, price, referencePrice, savingPercent } = offer;
   const [checking, setChecking] = useState(false);
   const [error, setError] = useState('');
   const [added, setAdded] = useState(false);
-  const [measuredImage, setMeasuredImage] = useState<{ src: string; aspect: number } | null>(null);
-  const openVariantModal = useCartStore((state) => state.openVariantModal);
+  const [selectedSize, setSelectedSize] = useState('');
+  const [selectedColor, setSelectedColor] = useState('');
+  const [colors, setColors] = useState<string[]>([]);
+  const [freshSizes, setFreshSizes] = useState<string[] | null>(null);
+  const [quantity, setQuantity] = useState(1);
+  const adding = useRef(false);
+  const quantityId = useId();
   const addItem = useCartStore((state) => state.addItem);
   const title = String(product.title || 'Bangles deal');
   const gallery = Array.isArray(product.images) ? product.images : [];
   const cover = gallery[0];
   const image = normalizeImageUrl(String(product.imageUrl || product.image || (typeof cover === 'string' ? cover : (cover as { url?: string } | undefined)?.url || '') || ''));
-  const offersSize = product.hasVariants !== false;
-  const imageAspect = measuredImage?.src === image ? measuredImage.aspect : 1;
-  // Generated R2 gift-box photos may include a blurred border inside the file.
-  // Other catalogue photos keep their full original artwork, without a forced crop.
-  const paddedGiftBoxPhoto = /\.r2\.dev\/products\/file_[^/]+\.webp(?:[?#]|$)/i.test(image);
+  const trimImage = megaImageNeedsTrim(product.id, image);
 
-  async function selectSize() {
-    if (checking) return;
-    setChecking(true);
+  const sizes = freshSizes ?? (Array.isArray(product.availableSizes) ? product.availableSizes.filter((size): size is string => typeof size === 'string' && Boolean(size.trim())) : []);
+  const sizeLabel = (size: string) => size.match(/^\d+(?:\.\d+)?/)?.[0] || size;
+
+  function chooseSize(size: string) {
+    setSelectedSize(size);
+    setSelectedColor('');
+    setColors([]);
+    setAdded(false);
     setError('');
+  }
+
+  async function addSelected() {
+    if (adding.current) return;
+    if (sizes.length && !selectedSize) {
+      setError('Please choose a size.');
+      return;
+    }
+    adding.current = true;
+    setChecking(true);
+    setAdded(false);
+    setError('');
+    let timer: ReturnType<typeof setTimeout> | undefined;
     try {
-      // Catalog cards are deliberately compact and have no variant rows.
-      // Never allow a missing/failing fresh read to bypass size selection.
-      const fresh = await getVerifiedDealProduct(product.id) as Product;
+      const fresh = await Promise.race([
+        getVerifiedDealProduct(product.id),
+        new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error('Connection is slow. Please retry adding to cart.')), 12000); }),
+      ]) as Product;
       const freshImage = imageOf(fresh) || image;
-      const currentPrice = priceOf(fresh);
-      if (productHasVariants(fresh)) {
-        if (!openVariantModal({ ...fresh, price: currentPrice, image: freshImage, imageUrl: freshImage }, 'cart')) {
-          throw new Error('Please retry selecting your size.');
-        }
+      const rows = normalizeProductVariants(fresh).rows;
+      const available = rows.filter(row => Number(row.stock) > 0);
+      setFreshSizes([...new Set(available.map(row => String(row.size || 'Standard')))]);
+      const prepared = prepareMegaCartItem({ ...fresh, imageUrl: freshImage }, rows, selectedSize, selectedColor, useCartStore.getState().items, quantity);
+      if (!prepared.item) {
+        setColors(prepared.colors);
+        setError('Please choose a colour below, then add to cart.');
         return;
       }
-      if (currentPrice <= 0) throw new Error('Product price is unavailable.');
-      addItem({
-        id: fresh.id,
-        productId: fresh.id,
-        name: titleOf(fresh),
-        category: String(fresh.category || ''),
-        price: currentPrice,
-        originalPrice: originalOf(fresh) || currentPrice,
-        image: freshImage,
-        imageUrl: freshImage,
-      });
+      for (let count = 0; count < quantity; count += 1) addItem(prepared.item);
       setAdded(true);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Product options are unavailable. Please retry.');
     } finally {
+      clearTimeout(timer);
+      adding.current = false;
       setChecking(false);
     }
   }
 
   return (
-    <article data-product-id={product.id} data-price={price} aria-hidden={clone || undefined} className={compact ? 'glass-offer-card glass-offer-card--compact' : 'glass-offer-card'}>
+    <article data-product-id={product.id} data-price={price} data-mega-recommendation={recommendation || undefined} aria-hidden={clone || undefined} className={`glass-offer-card${compact ? ' glass-offer-card--compact' : ''}${recommendation ? ' glass-offer-card--recommendation' : ''}`}>
       <Link href={`/product/${encodeURIComponent(product.id)}`} prefetch={false} tabIndex={clone ? -1 : undefined}
         className="glass-offer-card__link" aria-label={`View ${title}, ${money(price)}`}>
-        <div className="glass-offer-card__image" style={{ aspectRatio: imageAspect }}>
-          {image ? <Image src={image} alt={title} fill sizes={compact ? '180px' : '(max-width: 640px) 45vw, 260px'} quality={72}
-            onLoad={(event) => {
-              const { naturalWidth: width, naturalHeight: height } = event.currentTarget;
-              if (width > 0 && height > 0) {
-                setMeasuredImage({ src: image, aspect: Math.min(1.6, Math.max(0.5, width / height)) });
-              }
-            }}
-            className={`object-contain transition-transform duration-300${paddedGiftBoxPhoto ? ' glass-offer-card__padded-photo' : ''}`} />
+        <div className="glass-offer-card__image">
+          {image ? <div className={recommendation && trimImage ? 'glass-offer-card__trimmed-preview' : 'absolute inset-0'}><Image src={image} alt={title} fill unoptimized={isDirectStorefrontImage(image)} sizes={recommendation ? '220px' : compact ? '180px' : '(max-width: 640px) 45vw, 260px'} quality={72}
+            style={trimImage ? megaImageTrimStyle : undefined}
+            data-mega-trim={trimImage || undefined} className="object-contain" /></div>
             : <div className="glass-offer-card__empty">PrimeHubMall</div>}
           {savingPercent > 0 ? <span className="glass-offer-card__discount"><Tag size={11} /> Save {savingPercent}%</span> : null}
         </div>
@@ -95,12 +109,37 @@ export default function GlassOfferCard({
           {referencePrice > price ? <s>{money(referencePrice)}</s> : null}
         </div>
       </Link>
-      <button type="button" className="glass-offer-card__action" onClick={() => void selectSize()}
+      {sizes.length > 0 && <fieldset className="glass-offer-card__sizes" disabled={checking}>
+        <legend>Available sizes</legend>
+        <div>{sizes.map(size => <button key={size} type="button" title={size}
+          aria-label={`Choose size ${size} for ${title}`} aria-pressed={selectedSize === size}
+          tabIndex={clone ? -1 : undefined} onClick={() => chooseSize(size)}>{sizeLabel(size)}</button>)}</div>
+      </fieldset>}
+      {colors.length > 1 && <fieldset className="glass-offer-card__sizes" disabled={checking}>
+        <legend>Available colours</legend>
+        <div>{colors.map(color => <button key={color} type="button" aria-pressed={selectedColor === color}
+          tabIndex={clone ? -1 : undefined} onClick={() => { setSelectedColor(color); setAdded(false); setError(''); }}>{color}</button>)}</div>
+      </fieldset>}
+      <div className="glass-offer-card__quantity">
+        <label htmlFor={quantityId}>Quantity</label>
+        <div>
+          <button type="button" aria-label={`Decrease ${title} quantity`} disabled={checking || quantity <= 1} tabIndex={clone ? -1 : undefined}
+            onClick={() => { setQuantity(Math.max(1, quantity - 1)); setAdded(false); }}><Minus size={12}/></button>
+          <input id={quantityId} type="number" inputMode="numeric" min={1} max={MAX_MEGA_CART_QUANTITY} step={1}
+            value={quantity} disabled={checking} tabIndex={clone ? -1 : undefined} aria-label={`Quantity for ${title}`}
+            onChange={event => { setQuantity(Math.max(1, Math.min(MAX_MEGA_CART_QUANTITY, Math.floor(Number(event.target.value) || 1)))); setAdded(false); setError(''); }}/>
+          <button type="button" aria-label={`Increase ${title} quantity`} disabled={checking || quantity >= MAX_MEGA_CART_QUANTITY} tabIndex={clone ? -1 : undefined}
+            onClick={() => { setQuantity(Math.min(MAX_MEGA_CART_QUANTITY, quantity + 1)); setAdded(false); }}><Plus size={12}/></button>
+        </div>
+      </div>
+      {added ? <Link href="/cart" prefetch={false} tabIndex={clone ? -1 : undefined} className="glass-offer-card__action" aria-label={`My Cart after adding ${title}`}>
+        <ShoppingCart size={16} aria-hidden="true" className="text-white"/> My Cart
+      </Link> : <button type="button" className="glass-offer-card__action" onClick={() => void addSelected()}
         disabled={checking} tabIndex={clone ? -1 : undefined}
-        aria-label={`Select size for ${title}`}>
+        aria-label={`Add ${title}${selectedSize ? ` size ${selectedSize}` : ''} to cart`}>
         <ShoppingCart size={14} />
-        {checking ? 'Checking sizes…' : added ? 'Added ✓' : offersSize ? 'Select Size' : 'Add to Cart'}
-      </button>
+        {checking ? 'Adding…' : 'Add to Cart'}
+      </button>}
       {error && !clone ? <p role="alert" className="glass-offer-card__error">{error}</p> : null}
     </article>
   );

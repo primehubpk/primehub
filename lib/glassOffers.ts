@@ -190,3 +190,22 @@ export function resolveGlassOfferProducts(
     return [{ product, price, referencePrice, savingPercent }];
   });
 }
+
+/** Lightweight, real in-stock labels for Mega cards; actions still revalidate the full product. */
+export function getMegaDealAvailableSizes(product: Record<string, any>): string[] {
+  if (product.hasVariants === false) return [];
+  const rows = Array.isArray(product.variantMatrix) && product.variantMatrix.length
+    ? product.variantMatrix : Array.isArray(product.variants) ? product.variants : [];
+  const parentRaw = product.stock ?? product.quantity;
+  const parentStock = parentRaw == null || parentRaw === '' ? 30 : Number(parentRaw);
+  const result: string[] = [];
+  for (const row of rows) {
+    if (!row || row.active === false || row.hidden === true) continue;
+    const raw = row.stock;
+    const stock = raw == null || raw === '' ? parentStock : Number(raw);
+    if (!Number.isFinite(stock) || stock <= 0) continue;
+    const size = String(row.size ?? row.variantSize ?? row.options?.size ?? '').trim();
+    if (size && !result.some(item => item.toLowerCase() === size.toLowerCase())) result.push(size);
+  }
+  return result;
+}

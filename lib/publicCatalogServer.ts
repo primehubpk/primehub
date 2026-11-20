@@ -1,11 +1,12 @@
 import 'server-only';
+import { applyMegaImageRestorationPreview, megaImagePreviewCacheKey } from '@/lib/megaImageRestorationPreview';
 import { unstable_cache } from 'next/cache';
 import { STOREFRONT_REVALIDATE_SECONDS, publicProductCacheTag } from '@/lib/storefrontCachePolicy';
-import { getDualCatalog, getDualCategories, getDualProduct, getDualStorefrontSettings, getDualSkills } from '@/lib/dualReadServer';
+import { getDualCatalog, getDualCategories, getDualProduct, getDualProductSizeSummaries, getDualStorefrontSettings, getDualSkills } from '@/lib/dualReadServer';
 import { getStorefrontSettingsWithBigDealRecovery } from '@/lib/storefrontSettingsServer';
 import { getCachedWholesaleVideosSnapshot } from '@/lib/wholesaleVideosServer';
 import { applyBogoAvailability, applyBogoOfferPrice } from '@/lib/bogoOffers';
-import { applyCollectionPrice } from '@/lib/glassOffers';
+import { applyCollectionPrice, getMegaDealAvailableSizes } from '@/lib/glassOffers';
 
 const CATALOG_RETRY_DELAYS_MS = [0];
 const SETTINGS_RETRY_DELAYS_MS = [0];
@@ -56,6 +57,14 @@ async function wait(ms: number) {
   await new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+async function withMegaSizeLabels(products: any[]) {
+  const missing = products.filter(product => Number(product.megaDealPrice) > 0 && product.hasVariants !== false && !Array.isArray(product.variantMatrix) && !Array.isArray(product.variants));
+  const summaries = await getDualProductSizeSummaries(missing.map(product => String(product.id)), CATALOG_READ_CACHE);
+  return products.map(product => applyMegaImageRestorationPreview(Number(product.megaDealPrice) > 0
+    ? { ...product, availableSizes: summaries[String(product.id)] || getMegaDealAvailableSizes(product) }
+    : product));
+}
+
 async function loadPublicCatalog() {
   let lastSource = 'empty';
 
@@ -66,7 +75,7 @@ async function loadPublicCatalog() {
 
     if (result.source !== 'empty' && result.products.length > 0) {
       return {
-        products: result.products.map(product => applyBogoAvailability(applyBogoOfferPrice(applyCollectionPrice(product, settings.glassDealShowcase)), (settings as any).bogoDealShowcase)),
+        products: await withMegaSizeLabels(result.products.map(product => applyBogoAvailability(applyBogoOfferPrice(applyCollectionPrice(product, settings.glassDealShowcase)), (settings as any).bogoDealShowcase))),
         categories: result.categories,
         source: result.source,
       };
@@ -78,7 +87,7 @@ async function loadPublicCatalog() {
 
 export const getPublicCatalogSnapshot = unstable_cache(
   loadPublicCatalog,
-  ['primehub-public-catalog-dual-v11-offer-markup-preview'],
+  ['primehub-public-catalog-dual-v13-mega-originals-sizes', megaImagePreviewCacheKey],
   { revalidate: STOREFRONT_REVALIDATE_SECONDS, tags: ['public-catalog', 'storefront-settings'] },
 );
 
@@ -123,6 +132,7 @@ export function compactPublicCatalogSnapshot<
           // one R2 cover object is missing, without shipping full variant payloads.
           compact.images = compact.images.slice(0, 3);
         }
+        if (Number(product.megaDealPrice) > 0) compact.availableSizes = Array.isArray(product.availableSizes) ? product.availableSizes : getMegaDealAvailableSizes(product);
         return compact;
       })
     : [];
@@ -137,7 +147,7 @@ export async function getFreshPublicCatalogSnapshot() {
   if (result.source === 'empty' || result.products.length === 0) {
     throw new Error(`Fresh public catalog unavailable (source: ${result.source}).`);
   }
-  return { ...result, products: result.products.map(product => applyBogoAvailability(applyBogoOfferPrice(applyCollectionPrice(product, settings.glassDealShowcase)), (settings as any).bogoDealShowcase)) };
+  return { ...result, products: await withMegaSizeLabels(result.products.map(product => applyBogoAvailability(applyBogoOfferPrice(applyCollectionPrice(product, settings.glassDealShowcase)), (settings as any).bogoDealShowcase))) };
 }
 
 async function loadPublicProduct(productId: string) {
@@ -146,7 +156,7 @@ async function loadPublicProduct(productId: string) {
   const [result, settings] = await Promise.all([getDualProduct(id, PRODUCT_READ_CACHE), getStorefrontSettingsSnapshot()]);
   // An upstream outage must not replace a last-good cached product with null.
   if (result.source === 'empty') throw new Error('Public product unavailable.');
-  return { ...result, product: result.product ? applyBogoAvailability(applyBogoOfferPrice(applyCollectionPrice(result.product, settings.glassDealShowcase)), (settings as any).bogoDealShowcase) : null };
+  return { ...result, product: result.product ? applyMegaImageRestorationPreview(applyBogoAvailability(applyBogoOfferPrice(applyCollectionPrice(result.product, settings.glassDealShowcase)), (settings as any).bogoDealShowcase)) : null };
 }
 
 export async function getPublicProductSnapshot(productId: string) {
@@ -154,7 +164,7 @@ export async function getPublicProductSnapshot(productId: string) {
   if (!id) return { product: null, source: 'empty' as const };
   return unstable_cache(
     () => loadPublicProduct(id),
-    ['primehub-public-product-dual-v6-offer-markup-preview', id],
+    ['primehub-public-product-dual-v7-mega-originals-preview', megaImagePreviewCacheKey, id],
     {
       revalidate: STOREFRONT_REVALIDATE_SECONDS,
       // Keep the roll-up tag for the explicitly requested full catalog refresh.
@@ -169,7 +179,7 @@ export async function getFreshPublicProductSnapshot(productId: string) {
   const [result, settings] = await Promise.all([
     getDualProduct(id, { cache: 'no-store', timeoutMs: PUBLIC_PRIMARY_TIMEOUT_MS }), getStorefrontSettingsSnapshot(),
   ]);
-  return { ...result, product: result.product ? applyBogoAvailability(applyBogoOfferPrice(applyCollectionPrice(result.product, settings.glassDealShowcase)), (settings as any).bogoDealShowcase) : null };
+  return { ...result, product: result.product ? applyMegaImageRestorationPreview(applyBogoAvailability(applyBogoOfferPrice(applyCollectionPrice(result.product, settings.glassDealShowcase)), (settings as any).bogoDealShowcase)) : null };
 }
 
 async function loadStorefrontSettingsResult() {
