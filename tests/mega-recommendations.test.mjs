@@ -92,3 +92,11 @@ test('only the reviewed landscape Mega photo gets its own wide uncropped frame',
   assert.match(css, /min-width:290px; align-self:flex-start/);
   assert.match(css, /\.glass-offer-card__image--wide \.glass-offer-card__wide-main/);
 });
+
+
+test('legacy padded photos keep their complete source without zoom cropping',async()=>{
+ const source=ts.transpileModule(fs.readFileSync('lib/megaImagePresentation.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2022}}).outputText;
+ const {megaImageTrimStyle}=await import('data:text/javascript;charset=utf-8,'+encodeURIComponent(source));
+ assert.equal(megaImageTrimStyle.objectFit,'contain');
+ assert.equal(megaImageTrimStyle.transform,'none');
+});
