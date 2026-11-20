@@ -74,7 +74,7 @@ function harness(fresh = product) {
   const store = selector => selector({ addItem: item => cart.push({ ...item, qty: 1 }), openVariantModal: () => { modal++; } });
   store.getState = () => ({ items: cart });
   const card = load('components/home/GlassOfferCard.tsx', name => {
-    if (name === 'react') return { useState: value => { const index = cursor++; if (!(index in state)) state[index] = value; return [state[index], value => { state[index] = value; }]; },
+    if (name === 'react') return { useId: () => 'quantity-test', useState: value => { const index = cursor++; if (!(index in state)) state[index] = value; return [state[index], value => { state[index] = value; }]; },
       useRef: value => { const index = refCursor++; return refs[index] || (refs[index] = { current: value }); } };
     if (name === 'react/jsx-runtime') return { jsx: (type, props) => ({ type, props }), jsxs: (type, props) => ({ type, props }) };
     if (name === '@/lib/cartStore') return { ...normalized, useCartStore: store };
@@ -136,4 +136,17 @@ test('card quantity selects two of the same size with one fresh read and no moda
   assert.equal(h.counts().modal, 0);
   assert.equal(h.cart.length, 2);
   assert.ok(h.cart.every(item => item.variant.size === '2.4' && item.price === 1209));
+});
+
+
+test('successful add exposes My Cart navigation instead of a second add action', async () => {
+  const h = harness();
+  h.button(h.render(), 'Choose size 2.4').props.onClick();
+  h.button(h.render(), 'to cart').props.onClick();
+  await new Promise(resolve => setImmediate(resolve));
+  const nodes = h.nodes(h.render());
+  assert.ok(nodes.find(node => node.props?.href === '/cart' && node.props?.['aria-label'] === 'My Cart after adding Box'));
+  assert.equal(h.button(h.render(), 'to cart'), undefined);
+  h.button(h.render(), 'Increase Box quantity').props.onClick();
+  assert.ok(h.button(h.render(), 'to cart'));
 });

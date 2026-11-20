@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { Minus, Plus, ShoppingCart, Tag } from 'lucide-react';
@@ -18,10 +18,12 @@ export default function GlassOfferCard({
   offer,
   compact = false,
   clone = false,
+  recommendation = false,
 }: {
   offer: GlassOfferDisplay;
   compact?: boolean;
   clone?: boolean;
+  recommendation?: boolean;
 }) {
   const { product, price, referencePrice, savingPercent } = offer;
   const [checking, setChecking] = useState(false);
@@ -33,6 +35,7 @@ export default function GlassOfferCard({
   const [freshSizes, setFreshSizes] = useState<string[] | null>(null);
   const [quantity, setQuantity] = useState(1);
   const adding = useRef(false);
+  const quantityId = useId();
   const addItem = useCartStore((state) => state.addItem);
   const title = String(product.title || 'Bangles deal');
   const gallery = Array.isArray(product.images) ? product.images : [];
@@ -89,13 +92,13 @@ export default function GlassOfferCard({
   }
 
   return (
-    <article data-product-id={product.id} data-price={price} aria-hidden={clone || undefined} className={compact ? 'glass-offer-card glass-offer-card--compact' : 'glass-offer-card'}>
+    <article data-product-id={product.id} data-price={price} data-mega-recommendation={recommendation || undefined} aria-hidden={clone || undefined} className={`glass-offer-card${compact ? ' glass-offer-card--compact' : ''}${recommendation ? ' glass-offer-card--recommendation' : ''}`}>
       <Link href={`/product/${encodeURIComponent(product.id)}`} prefetch={false} tabIndex={clone ? -1 : undefined}
         className="glass-offer-card__link" aria-label={`View ${title}, ${money(price)}`}>
         <div className="glass-offer-card__image">
-          {image ? <Image src={image} alt={title} fill unoptimized={isDirectStorefrontImage(image)} sizes={compact ? '180px' : '(max-width: 640px) 45vw, 260px'} quality={72}
+          {image ? <div className={recommendation && trimImage ? 'glass-offer-card__trimmed-preview' : 'absolute inset-0'}><Image src={image} alt={title} fill unoptimized={isDirectStorefrontImage(image)} sizes={recommendation ? '220px' : compact ? '180px' : '(max-width: 640px) 45vw, 260px'} quality={72}
             style={trimImage ? megaImageTrimStyle : undefined}
-            data-mega-trim={trimImage || undefined} className="object-contain" />
+            data-mega-trim={trimImage || undefined} className="object-contain" /></div>
             : <div className="glass-offer-card__empty">PrimeHubMall</div>}
           {savingPercent > 0 ? <span className="glass-offer-card__discount"><Tag size={11} /> Save {savingPercent}%</span> : null}
         </div>
@@ -117,23 +120,25 @@ export default function GlassOfferCard({
           tabIndex={clone ? -1 : undefined} onClick={() => { setSelectedColor(color); setAdded(false); setError(''); }}>{color}</button>)}</div>
       </fieldset>}
       <div className="glass-offer-card__quantity">
-        <label htmlFor={`mega-qty-${product.id}-${clone ? 'copy' : compact ? 'home' : 'grid'}`}>Quantity</label>
+        <label htmlFor={quantityId}>Quantity</label>
         <div>
           <button type="button" aria-label={`Decrease ${title} quantity`} disabled={checking || quantity <= 1} tabIndex={clone ? -1 : undefined}
             onClick={() => { setQuantity(Math.max(1, quantity - 1)); setAdded(false); }}><Minus size={12}/></button>
-          <input id={`mega-qty-${product.id}-${clone ? 'copy' : compact ? 'home' : 'grid'}`} type="number" inputMode="numeric" min={1} max={MAX_MEGA_CART_QUANTITY} step={1}
+          <input id={quantityId} type="number" inputMode="numeric" min={1} max={MAX_MEGA_CART_QUANTITY} step={1}
             value={quantity} disabled={checking} tabIndex={clone ? -1 : undefined} aria-label={`Quantity for ${title}`}
             onChange={event => { setQuantity(Math.max(1, Math.min(MAX_MEGA_CART_QUANTITY, Math.floor(Number(event.target.value) || 1)))); setAdded(false); setError(''); }}/>
           <button type="button" aria-label={`Increase ${title} quantity`} disabled={checking || quantity >= MAX_MEGA_CART_QUANTITY} tabIndex={clone ? -1 : undefined}
             onClick={() => { setQuantity(Math.min(MAX_MEGA_CART_QUANTITY, quantity + 1)); setAdded(false); }}><Plus size={12}/></button>
         </div>
       </div>
-      <button type="button" className="glass-offer-card__action" onClick={() => void addSelected()}
+      {added ? <Link href="/cart" prefetch={false} tabIndex={clone ? -1 : undefined} className="glass-offer-card__action" aria-label={`My Cart after adding ${title}`}>
+        <ShoppingCart size={16} aria-hidden="true" className="text-white"/> My Cart
+      </Link> : <button type="button" className="glass-offer-card__action" onClick={() => void addSelected()}
         disabled={checking} tabIndex={clone ? -1 : undefined}
         aria-label={`Add ${title}${selectedSize ? ` size ${selectedSize}` : ''} to cart`}>
         <ShoppingCart size={14} />
-        {checking ? 'Adding…' : added ? 'Added ✓' : 'Add to Cart'}
-      </button>
+        {checking ? 'Adding…' : 'Add to Cart'}
+      </button>}
       {error && !clone ? <p role="alert" className="glass-offer-card__error">{error}</p> : null}
     </article>
   );

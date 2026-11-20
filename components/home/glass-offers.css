@@ -62,6 +62,10 @@
 .glass-offer-card__quantity input { width:32px; height:34px; padding:0; border:0; background:white; text-align:center; font-size:12px; font-weight:800; color:#183f36; appearance:textfield; }
 .glass-offer-card__quantity input::-webkit-inner-spin-button,.glass-offer-card__quantity input::-webkit-outer-spin-button { appearance:none; margin:0; }
 .glass-offer-card__quantity :focus-visible { outline:2px solid #0f6a5f; outline-offset:-2px; }
+.glass-offer-card--recommendation { width:clamp(154px,calc((100vw - 44px)/2),220px); min-width:154px; flex:0 0 auto; align-self:stretch; display:flex; flex-direction:column; }
+.glass-offer-card--recommendation .glass-offer-card__image { aspect-ratio:4/5; }
+.glass-offer-card--recommendation .glass-offer-card__quantity { margin-top:auto; }
+.glass-offer-card__trimmed-preview { position:absolute; left:0; right:0; top:50%; aspect-ratio:1; transform:translateY(-50%); overflow:hidden; }
 .glass-offers-landing { padding-bottom:96px; }
 .mega-deals-search { display:flex; align-items:center; gap:8px; margin:17px 0 12px; padding:11px 14px; border:1px solid #ded5c7; border-radius:999px; background:white; color:#0f6a5f; }
 .mega-deals-search input { width:100%; min-width:0; outline:none; color:#29261f; background:transparent; font-size:13px; }
