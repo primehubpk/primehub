@@ -19,10 +19,11 @@ type Props = {
   compact?: boolean;
   dense?: boolean;
   premium?: boolean;
+  fullPhoto?: boolean;
   priority?: boolean;
 };
 
-export default function CatalogProductCard({ product, addedId, addProduct, compact = false, dense = false, premium = false, priority = false }: Props) {
+export default function CatalogProductCard({ product, addedId, addProduct, compact = false, dense = false, premium = false, fullPhoto = false, priority = false }: Props) {
   const [selectedSize, setSelectedSize] = useState('');
   const router = useRouter();
   const needsSizeConfirmation = hasMismatchedHandSizes(product);
@@ -53,7 +54,7 @@ export default function CatalogProductCard({ product, addedId, addProduct, compa
     return (
       <article className="group overflow-hidden rounded-[18px] border border-[#E9E2D8] bg-white shadow-[0_7px_22px_rgba(56,43,27,0.075)] transition hover:-translate-y-0.5 hover:shadow-[0_11px_28px_rgba(56,43,27,0.12)] sm:rounded-[20px]">
         <FastProductLink product={product} className="block">
-          <div className="relative aspect-[1.5/1] overflow-hidden bg-[#F7F2EA] sm:aspect-[1.58/1]">
+          <div data-glass-full-photo={fullPhoto || undefined} className={fullPhoto ? 'relative aspect-square overflow-hidden bg-[#FFFCF7]' : 'relative aspect-[1.5/1] overflow-hidden bg-[#F7F2EA] sm:aspect-[1.58/1]'}>
             {image ? (
               <RetryableStorefrontImage
                 src={image}
@@ -65,7 +66,7 @@ export default function CatalogProductCard({ product, addedId, addProduct, compa
                 fetchPriority={priority ? 'high' : 'auto'}
                 unoptimized={isDirectStorefrontImage(image)}
                 sizes="(max-width: 900px) 50vw, 430px"
-                className="object-cover transition duration-500 group-hover:scale-[1.03]"
+                className={fullPhoto ? 'object-contain object-center' : 'object-cover transition duration-500 group-hover:scale-[1.03]'}
               />
             ) : (
               <div className="flex h-full items-center justify-center text-[10px] font-bold text-black/25">No image</div>
