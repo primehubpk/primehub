@@ -14,6 +14,7 @@ function load(path, require = () => ({})) {
 }
 const { prepareMegaCartItem, MAX_MEGA_CART_QUANTITY } = load('lib/megaDealCart.ts');
 const { megaImageNeedsTrim } = load('lib/megaImagePresentation.ts');
+const cardSizeLabels = load('lib/cardSizeLabels.ts');
 const normalized = load('lib/cartStore.ts', name => name === 'zustand' ? { create: () => () => null }
   : name === 'zustand/middleware' ? { persist: x => x, createJSONStorage: () => null } : {});
 const product = { id: 'real', title: 'Box', price: 1209, megaDealPrice: 1209, originalPrice: 3000, imageUrl: 'original.webp', stock: 30,
@@ -81,6 +82,7 @@ function harness(fresh = product) {
     if (name === '@/lib/verifiedDealProduct') return { getVerifiedDealProduct: async () => { reads++; if (fresh instanceof Error) throw fresh; return fresh; } };
     if (name === '@/lib/megaDealCart') return { prepareMegaCartItem, MAX_MEGA_CART_QUANTITY };
     if (name === '@/lib/megaImagePresentation') return { megaImageNeedsTrim };
+    if (name === '@/lib/cardSizeLabels') return cardSizeLabels;
     if (name === '@/lib/imageUrl') return { normalizeImageUrl: x => x, isDirectStorefrontImage: () => true };
     if (name === '@/components/shop/ShopTypes') return { imageOf: p => p.imageUrl };
     return {};

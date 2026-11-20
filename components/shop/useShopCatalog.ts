@@ -8,12 +8,13 @@ import { useCartStore } from '@/lib/cartStore';
 import { categoryHref, categoryLabel, productMatchesCategory, slugifyCategory } from '@/lib/categoryUtils';
 import { smartSearchProducts } from '@/lib/smartSearch';
 import { isWholesaleProduct } from '@/lib/wholesale';
-import { isDedicatedDealProduct } from '@/lib/glassOffers';
+import { getMegaDealAvailableSizes, isDedicatedDealProduct } from '@/lib/glassOffers';
+import { hasMismatchedHandSizes } from '@/lib/cardSizeLabels';
 import { getEffectivePrice } from '@/lib/dealPricing';
 import { matchesSaleMelaBucket } from '@/lib/priceBucketUtils';
 import { cacheCatalogForNavigation, readCachedCatalog } from '@/lib/productNavigationCache';
 import { makeTikTokContent, trackTikTokEvent } from '@/lib/tiktokPixel';
-import { Product, Category, ShopCatalogModel, imageOf, priceOf, originalOf, productHasVariants, titleOf } from './ShopTypes';
+import { Product, Category, ShopCatalogModel, imageOf, priceOf, originalOf, availableStockOf, productHasVariants, titleOf } from './ShopTypes';
 
 export function useShopCatalog(initialCategory?: string, initialQuery = '', initialProducts: Product[] = [], initialCategories: Category[] = []): ShopCatalogModel {
   const { settings } = useSettings();
@@ -33,6 +34,7 @@ export function useShopCatalog(initialCategory?: string, initialQuery = '', init
   const [onlyDeals, setOnlyDeals] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [addedId, setAddedId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState('');
   const [loading, setLoading] = useState(!hasServerData);
   const [wholesaleOnly, setWholesaleOnly] = useState(['true', '1'].includes(searchParams.get('wholesale') || ''));
 
@@ -167,52 +169,45 @@ export function useShopCatalog(initialCategory?: string, initialQuery = '', init
   const resolvedCategoryLabel = useMemo(() => categoryLabel(category, categories), [category, categories]);
 
   const addProduct = async (product: Product) => {
-    let currentProduct = product;
-
+    setActionError('');
     try {
       const response = await fetch(
         `/api/storefront/read?type=product&id=${encodeURIComponent(product.id)}`,
         { cache: 'no-store' },
       );
-      if (response.ok) {
-        const data = await response.json();
-        if (data?.product && String(data.product.id || '') === String(product.id)) {
-          currentProduct = data.product as Product;
-          setProducts((current) => current.map((item) => item.id === currentProduct.id ? currentProduct : item));
-        }
+      if (!response.ok) throw new Error('Product options could not be verified. Please retry.');
+      const data = await response.json();
+      if (!data?.product || String(data.product.id || '') !== String(product.id)) throw new Error('Product is unavailable.');
+      const currentProduct = data.product as Product;
+      if (hasMismatchedHandSizes(currentProduct)) throw new Error('This product has incorrect size information. Please contact PrimeHubMall to confirm options before ordering.');
+      const selectedSize = typeof product.preferredSize === 'string' ? product.preferredSize : '';
+      if (selectedSize && !getMegaDealAvailableSizes(currentProduct).includes(selectedSize)) {
+        throw new Error('Selected size no longer available. Please choose another.');
       }
+      const image = imageOf(currentProduct) || imageOf(product);
+      setProducts((current) => current.map((item) => item.id === currentProduct.id ? currentProduct : item));
+      if (productHasVariants(currentProduct) &&
+          openVariantModal({ ...currentProduct, image, imageUrl: image, preferredSize: selectedSize || undefined }, 'cart')) return;
+      const currentPrice = priceOf(currentProduct);
+      if (availableStockOf(currentProduct) <= 0 || currentPrice <= 0) throw new Error('This product is unavailable.');
+      addItem({
+        id: currentProduct.id, productId: currentProduct.id,
+        category: String(currentProduct.category || ''), name: titleOf(currentProduct),
+        price: currentPrice, originalPrice: originalOf(currentProduct) || currentPrice,
+        image, imageUrl: image,
+      });
+      trackTikTokEvent('AddToCart', {
+        contents: [makeTikTokContent({
+          id: currentProduct.id, name: titleOf(currentProduct), category: currentProduct.category,
+          price: currentPrice, quantity: 1,
+        })],
+        value: currentPrice, currency: 'PKR',
+      });
+      setAddedId(currentProduct.id);
+      window.setTimeout(() => setAddedId((current) => (current === currentProduct.id ? null : current)), 1400);
     } catch (error) {
-      console.warn('fresh product read unavailable; using current catalog product', error);
+      setActionError(error instanceof Error ? error.message : 'Could not verify this item. Please retry.');
     }
-
-    const image = imageOf(currentProduct) || imageOf(product);
-    if (productHasVariants(currentProduct) && openVariantModal({ ...currentProduct, image, imageUrl: image }, 'cart')) return;
-    const currentPrice = priceOf(currentProduct);
-    addItem({
-      id: currentProduct.id,
-      productId: currentProduct.id,
-      category: String(currentProduct.category || ''),
-      name: titleOf(currentProduct),
-      price: currentPrice,
-      originalPrice: originalOf(currentProduct) || currentPrice,
-      image,
-      imageUrl: image,
-    });
-    trackTikTokEvent('AddToCart', {
-      contents: [
-        makeTikTokContent({
-          id: currentProduct.id,
-          name: titleOf(currentProduct),
-          category: currentProduct.category,
-          price: currentPrice,
-          quantity: 1,
-        }),
-      ],
-      value: currentPrice,
-      currency: 'PKR',
-    });
-    setAddedId(currentProduct.id);
-    window.setTimeout(() => setAddedId((current) => (current === currentProduct.id ? null : current)), 1400);
   };
 
   return {
@@ -224,6 +219,7 @@ export function useShopCatalog(initialCategory?: string, initialQuery = '', init
     onlyDeals,
     filtersOpen,
     addedId,
+    actionError,
     wholesaleOnly,
     buckets,
     filtered,

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { normalizeProductVariants, useCartStore } from '@/lib/cartStore';
+import { hasMismatchedHandSizes } from '@/lib/cardSizeLabels';
 import { useSettings } from '@/lib/useSettings';
 import { WEEKDAY_LABELS, WEEKDAY_ORDER, countdownParts, dealTiming } from '@/lib/weeklyDealUtils';
 import { bigDealConfiguredSlotCount, bigDealRotationIndex } from '@/lib/bigDealRotation';
@@ -363,6 +364,10 @@ export function useProductDetail(options?: {
   const requestVerifiedAction = async (mode: 'cart' | 'buy') => {
     if (!product || currentPrice <= 0 || stock === 0 || verifyingOptions.current) return;
     setVariantCheckError('');
+    if (hasMismatchedHandSizes(product)) {
+      setVariantCheckError('This product has incorrect size information. Please contact PrimeHubMall to confirm options before ordering.');
+      return;
+    }
     if (hasVariants || verifiedProductId.current === id) {
       completeAction(mode);
       return;
@@ -375,6 +380,7 @@ export function useProductDetail(options?: {
       const data = await response.json();
       const fresh = data?.product && String(data.product.id) === id ? data.product as Product : null;
       if (!fresh) throw new Error('Product options are temporarily unavailable.');
+      if (hasMismatchedHandSizes(fresh)) throw new Error('This product has incorrect size information. Please contact PrimeHubMall to confirm options before ordering.');
       const rawRows = [
         ...(Array.isArray(fresh.variantMatrix) ? fresh.variantMatrix : []),
         ...(Array.isArray(fresh.variants) ? fresh.variants : []),

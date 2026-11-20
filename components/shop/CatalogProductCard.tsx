@@ -1,6 +1,10 @@
 'use client';
 
 import RetryableStorefrontImage from '@/components/RetryableStorefrontImage';
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { hasMismatchedHandSizes } from '@/lib/cardSizeLabels';
+import CardSizePicker from '@/components/shop/CardSizePicker';
 import { Check, Eye, ShoppingBag, Star } from 'lucide-react';
 import FastProductLink from '@/components/FastProductLink';
 import WholesaleBadge from '@/components/WholesaleBadge';
@@ -15,10 +19,14 @@ type Props = {
   compact?: boolean;
   dense?: boolean;
   premium?: boolean;
+  fullPhoto?: boolean;
   priority?: boolean;
 };
 
-export default function CatalogProductCard({ product, addedId, addProduct, compact = false, dense = false, premium = false, priority = false }: Props) {
+export default function CatalogProductCard({ product, addedId, addProduct, compact = false, dense = false, premium = false, fullPhoto = false, priority = false }: Props) {
+  const [selectedSize, setSelectedSize] = useState('');
+  const router = useRouter();
+  const needsSizeConfirmation = hasMismatchedHandSizes(product);
   const price = priceOf(product);
   const original = originalOf(product);
   const discount = discountOf(product);
@@ -31,18 +39,22 @@ export default function CatalogProductCard({ product, addedId, addProduct, compa
   const reviews = Math.max(0, Number(product.reviews || product.reviewCount || 0));
 
   function handleAdd() {
+    if (needsSizeConfirmation) {
+      router.push(`/product/${encodeURIComponent(product.id)}`);
+      return;
+    }
     if (unavailable) return;
     // Always use the central addProduct path. It performs a no-store read for the
     // current product before deciding whether to open the variant selector, so a
     // stale card can never reopen deleted/old size options.
-    addProduct(product);
+    addProduct({ ...product, preferredSize: selectedSize || undefined });
   }
 
   if (premium) {
     return (
       <article className="group overflow-hidden rounded-[18px] border border-[#E9E2D8] bg-white shadow-[0_7px_22px_rgba(56,43,27,0.075)] transition hover:-translate-y-0.5 hover:shadow-[0_11px_28px_rgba(56,43,27,0.12)] sm:rounded-[20px]">
         <FastProductLink product={product} className="block">
-          <div className="relative aspect-[1.5/1] overflow-hidden bg-[#F7F2EA] sm:aspect-[1.58/1]">
+          <div data-glass-full-photo={fullPhoto || undefined} className={fullPhoto ? 'relative aspect-square overflow-hidden bg-[#FFFCF7]' : 'relative aspect-[1.5/1] overflow-hidden bg-[#F7F2EA] sm:aspect-[1.58/1]'}>
             {image ? (
               <RetryableStorefrontImage
                 src={image}
@@ -54,7 +66,7 @@ export default function CatalogProductCard({ product, addedId, addProduct, compa
                 fetchPriority={priority ? 'high' : 'auto'}
                 unoptimized={isDirectStorefrontImage(image)}
                 sizes="(max-width: 900px) 50vw, 430px"
-                className="object-cover transition duration-500 group-hover:scale-[1.03]"
+                className={fullPhoto ? 'object-contain object-center' : 'object-cover transition duration-500 group-hover:scale-[1.03]'}
               />
             ) : (
               <div className="flex h-full items-center justify-center text-[10px] font-bold text-black/25">No image</div>
@@ -92,13 +104,16 @@ export default function CatalogProductCard({ product, addedId, addProduct, compa
             type="button"
             disabled={unavailable}
             onClick={handleAdd}
-            aria-label={unavailable ? `${titleOf(product)} unavailable` : added ? `${titleOf(product)} added to cart` : `Add ${titleOf(product)} to cart`}
-            title={unavailable ? 'Unavailable' : added ? 'Added to cart' : 'Add to cart'}
+            aria-label={needsSizeConfirmation ? `Confirm options for ${titleOf(product)}` : unavailable ? `${titleOf(product)} unavailable` : added ? `${titleOf(product)} added to cart` : `Add ${titleOf(product)} to cart`}
+            title={needsSizeConfirmation ? 'Confirm options' : unavailable ? 'Unavailable' : added ? 'Added to cart' : 'Add to cart'}
             className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition active:scale-95 sm:h-10 sm:w-10 ${unavailable ? 'cursor-not-allowed bg-black/5 text-black/25' : added ? 'bg-[#0F6A5F] text-white' : 'bg-[#FFF8EC] text-[#8B5A12] shadow-sm ring-1 ring-[#EAD7B6] hover:bg-[#F7E4C4]'}`}
           >
-            {added ? <Check size={15} /> : <ShoppingBag size={15} />}
+            {needsSizeConfirmation ? <Eye size={15} /> : added ? <Check size={15} /> : <ShoppingBag size={15} />}
           </button>
         </div>
+        <CardSizePicker sizes={product.availableSizes} selected={selectedSize} onSelect={setSelectedSize}
+          title={titleOf(product)} category={String(product.category || '')} disabled={unavailable}
+          className="mx-2.5 mb-2.5 sm:mx-3" />
       </article>
     );
   }
@@ -145,13 +160,16 @@ export default function CatalogProductCard({ product, addedId, addProduct, compa
         </div>
       </FastProductLink>
       <div className={dense ? "mt-auto px-2.5 pb-2 pt-1.5 sm:px-3 sm:pb-3 sm:pt-2" : "mt-auto px-3 pb-3 pt-2"}>
+        <CardSizePicker sizes={product.availableSizes} selected={selectedSize} onSelect={setSelectedSize}
+          title={titleOf(product)} category={String(product.category || '')} disabled={unavailable}
+          className="mb-2" />
         <button
           type="button"
           disabled={unavailable}
           onClick={handleAdd}
           className={`flex w-full min-w-0 items-center justify-center gap-1.5 rounded-xl px-2 text-[8px] font-black transition active:scale-[0.98] sm:text-[10px] ${dense ? 'min-h-9 py-1.5 sm:min-h-10 sm:py-2' : 'min-h-10 py-2'} ${unavailable ? 'cursor-not-allowed bg-black/5 text-black/25' : added ? 'bg-[#0F6A5F] text-white' : 'bg-[#005448] text-white hover:bg-[#063f37]'}`}
         >
-          {unavailable ? 'Unavailable' : added ? <><Check size={13} />Added to Cart</> : <><ShoppingBag size={dense ? 12 : 13} />Add to Cart</>}
+          {needsSizeConfirmation ? <><Eye size={dense ? 12 : 13}/>Confirm options</> : unavailable ? 'Unavailable' : added ? <><Check size={13} />Added to Cart</> : <><ShoppingBag size={dense ? 12 : 13} />Add to Cart</>}
         </button>
       </div>
     </article>

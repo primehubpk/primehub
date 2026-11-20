@@ -3,8 +3,11 @@
 import RetryableStorefrontImage from '@/components/RetryableStorefrontImage';
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { ChevronRight, Package, ShoppingCart } from "lucide-react";
+import { ChevronRight, Eye, Package, ShoppingCart } from "lucide-react";
 import FastProductLink from "@/components/FastProductLink";
+import CardSizePicker from '@/components/shop/CardSizePicker';
+import { hasMismatchedHandSizes } from '@/lib/cardSizeLabels';
+import { getMegaDealAvailableSizes } from '@/lib/glassOffers';
 import HomeHeading from "@/components/home/HomeHeading";
 import { useSettings } from "@/lib/useSettings";
 import { useCartStore } from "@/lib/cartStore";
@@ -183,10 +186,12 @@ export function HomeProductCard({
   const [unavailable, setUnavailable] = useState(false);
   const [checking, setChecking] = useState(false);
   const [actionError, setActionError] = useState('');
+  const [selectedSize, setSelectedSize] = useState('');
   const price = homePrice(product);
   const imageCandidates = imageCandidatesOf(product);
   const src = imageCandidates[0] || '';
   const cardHasPrice = price > 0;
+  const needsSizeConfirmation = hasMismatchedHandSizes(product);
 
   async function add() {
     if (!cardHasPrice || checking) return;
@@ -199,9 +204,12 @@ export function HomeProductCard({
       const currentProduct = await getVerifiedDealProduct(product.id) as Product;
       const currentPrice = homePrice(currentProduct);
       const currentSrc = imageOf(currentProduct) || src;
+      if (selectedSize && !getMegaDealAvailableSizes(currentProduct).includes(selectedSize)) {
+        throw new Error('That size is no longer in stock. Please choose another size.');
+      }
 
       if (productHasVariants(currentProduct) &&
-          openVariantModal({ ...currentProduct, price: currentPrice, image: currentSrc, imageUrl: currentSrc }, 'cart')) {
+          openVariantModal({ ...currentProduct, price: currentPrice, image: currentSrc, imageUrl: currentSrc, preferredSize: selectedSize || undefined }, 'cart')) {
         setUnavailable(false);
         return;
       }
@@ -273,18 +281,23 @@ export function HomeProductCard({
         <strong className="home-price">
           Rs. {price.toLocaleString("en-PK")}
         </strong>
-        <button
-            className="home-add"
-            type="button"
-            onClick={add}
+        <CardSizePicker sizes={product.availableSizes} selected={selectedSize} onSelect={size => { setSelectedSize(size); setAdded(false); setActionError(''); }}
+          title={titleOf(product)} category={String(product.category || '')} disabled={checking} className="my-2" />
+        {needsSizeConfirmation ? (
+          <FastProductLink product={product} className="home-add"
+            aria-label={`Confirm product options for ${titleOf(product)}`}>
+            <span>Confirm options</span><Eye size={15} />
+          </FastProductLink>
+        ) : (
+          <button className="home-add" type="button" onClick={add}
             disabled={!cardHasPrice || checking}
-            aria-label={`${unavailable ? "Out of stock:" : "Add to cart:"} ${titleOf(product)}`}
-          >
+            aria-label={`${unavailable ? "Out of stock:" : "Add to cart:"} ${titleOf(product)}`}>
             <span aria-live="polite">
               {checking ? "Checking options…" : unavailable ? "Out of stock" : added ? "Add another" : "Add to cart"}
             </span>
             <ShoppingCart size={15} />
-        </button>
+          </button>
+        )}
         {actionError ? <small role="alert" className="mt-1 block text-[10px] font-semibold text-red-700">{actionError}</small> : null}
       </div>
     </article>
@@ -381,7 +394,9 @@ function ProgressiveHomeSaleProducts({
   const [limit, setLimit] = useState(initialLimit);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const movingRailRef = useRef<HTMLDivElement>(null);
-  const { items: visitProducts, ready } = useVisitProductOrder(products, `sale-${href}`, movingRailRef, !standalone);
+  // Vertical Sale Mela starts with the first real product in the configured price band.
+  // Only horizontal carousels rotate on a new visit; do not shuffle the vertical list.
+  const { items: visitProducts, ready } = useVisitProductOrder(products, `sale-${href}`, movingRailRef, !standalone && !verticalHome);
 
   useEffect(() => {
     setLimit(initialLimit);

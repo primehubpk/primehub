@@ -11,6 +11,7 @@ type Props = {
   loading?: boolean;
   dense?: boolean;
   premium?: boolean;
+  fullPhoto?: boolean;
 };
 
 const DEFAULT_INITIAL_COUNT = 24;
@@ -24,6 +25,7 @@ export default function CatalogProductGrid({
   loading,
   dense = false,
   premium = false,
+  fullPhoto = false,
 }: Props) {
   const grid = premium
     ? 'grid grid-cols-2 gap-2.5 sm:gap-3'
@@ -89,6 +91,7 @@ export default function CatalogProductGrid({
             addProduct={addProduct}
             dense={dense}
             premium={premium}
+            fullPhoto={fullPhoto}
             priority={index < (premium ? 4 : 8)}
           />
         ))}

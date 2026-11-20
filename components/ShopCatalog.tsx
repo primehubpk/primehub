@@ -69,11 +69,13 @@ function DeferredCategoryProducts({
   addedId,
   addProduct,
   loading,
+  fullPhoto = false,
 }: {
   products: Product[];
   addedId: string | null;
   addProduct: (product: Product) => void;
   loading: boolean;
+  fullPhoto?: boolean;
 }) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const [ready, setReady] = useState(false);
@@ -110,6 +112,7 @@ function DeferredCategoryProducts({
           addProduct={addProduct}
           loading={loading}
           premium
+          fullPhoto={fullPhoto}
         />
       ) : (
         <div className="grid grid-cols-2 gap-2.5 sm:gap-3" aria-hidden="true">
@@ -150,6 +153,7 @@ export default function ShopCatalog({
   const bucketParam = searchParams.get('bucket') || '';
   const numericBucket = Number(bucketParam);
   const categoryView = Boolean(initialCategory);
+  const fullPhotoCategory = slugifyCategory(initialCategory || '') === 'glass-bangles';
   const searchView = Boolean(shop.search.trim());
   const budgetView =
     !categoryView &&
@@ -367,6 +371,7 @@ export default function ShopCatalog({
               addProduct={shop.addProduct}
               loading={shop.loading}
               premium
+              fullPhoto={fullPhotoCategory}
             />
           </section>
 
@@ -424,6 +429,7 @@ export default function ShopCatalog({
                   addedId={shop.addedId}
                   addProduct={shop.addProduct}
                   loading={shop.loading}
+                  fullPhoto={fullPhotoCategory}
                 />
               </section>
             );

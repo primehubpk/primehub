@@ -20,6 +20,8 @@ import { isWholesaleProduct } from '@/lib/wholesale';
 import { isDedicatedDealProduct } from '@/lib/glassOffers';
 import { makeTikTokContent, trackTikTokEvent } from '@/lib/tiktokPixel';
 import { getVerifiedDealProduct } from '@/lib/verifiedDealProduct';
+import { getMegaDealAvailableSizes } from '@/lib/glassOffers';
+import CardSizePicker from '@/components/shop/CardSizePicker';
 import '@/components/home/NewArrivalsPremium.css';
 
 function timeOf(p: Product) {
@@ -48,6 +50,7 @@ export default function NewArrivalsRail({
   const [addedId, setAddedId] = useState<string | null>(null);
   const [checkingId, setCheckingId] = useState<string | null>(null);
   const [actionError, setActionError] = useState('');
+  const [pickedSizes, setPickedSizes] = useState<Record<string, string>>({});
   const addItem = useCartStore((s) => s.addItem);
   const openVariantModal = useCartStore((s) => s.openVariantModal);
 
@@ -76,16 +79,35 @@ export default function NewArrivalsRail({
     if (homeLayout) setHomeVisibleCount(16);
   }, [homeLayout, products.length]);
 
+  const allNewestVisible = homeVisibleCount >= newest.length;
   const visibleNewest = homeLayout
     ? newest.slice(0, homeVisibleCount)
     : newest;
   const pauseAutoScroll = useContinuousHomeRail(homeRailRef, { enabled: homeLayout, itemCount: visibleNewest.length, speed: 25, startDelayMs: 8000 });
+  useEffect(() => {
+    if (homeLayout && homeRailRef.current) homeRailRef.current.dataset.clientMounted = 'true';
+  }, [homeLayout]);
+  useEffect(() => {
+    if (!homeLayout || homeVisibleCount >= newest.length) return;
+    const rail = homeRailRef.current;
+    if (!rail) return;
+    const reveal = () => {
+      if (rail.scrollWidth - rail.scrollLeft - rail.clientWidth <= rail.clientWidth * 2) {
+        setHomeVisibleCount(count => Math.min(newest.length, count + 16));
+      }
+    };
+    rail.addEventListener('scroll', reveal, { passive: true });
+    return () => rail.removeEventListener('scroll', reveal);
+  }, [homeLayout, homeVisibleCount, newest.length]);
 
   function moveArrivals(direction: number) {
     pauseAutoScroll.current();
+    if (direction > 0 && homeVisibleCount < newest.length) {
+      setHomeVisibleCount(count => Math.min(newest.length, count + 16));
+    }
     homeRailRef.current?.scrollBy({ left: direction * (homeRailRef.current.clientWidth + 10), behavior: 'smooth' });
   }
-  const addProduct = async (product: Product) => {
+  const addProduct = async (product: Product, selectedSize = '') => {
     if (checkingId) return;
     setCheckingId(product.id);
     setActionError('');
@@ -95,8 +117,9 @@ export default function NewArrivalsRail({
       const fresh = await getVerifiedDealProduct(product.id) as Product;
       const image = imageOf(fresh) || imageOf(product);
       const currentPrice = priceOf(fresh);
+      if (selectedSize && !getMegaDealAvailableSizes(fresh).includes(selectedSize)) throw new Error('Selected size no longer available. Please choose another.');
       if (productHasVariants(fresh) &&
-          openVariantModal({ ...fresh, price: currentPrice, image, imageUrl: image }, 'cart')) return;
+          openVariantModal({ ...fresh, price: currentPrice, image, imageUrl: image, preferredSize: selectedSize || undefined }, 'cart')) return;
       if (currentPrice <= 0) throw new Error('Product price is unavailable.');
       addItem({
         id: fresh.id,
@@ -137,18 +160,11 @@ export default function NewArrivalsRail({
         <div
           ref={homeRailRef}
           aria-busy={!ready}
+          data-total-products={newest.length}
+          data-rendered-products={visibleNewest.length}
           className="home-arrivals__rail" role="region" aria-label="Swipe New Arrivals" tabIndex={0}
-          onScroll={(event) => {
-            if (homeVisibleCount >= newest.length) return;
-            const rail = event.currentTarget;
-            const nearEnd =
-              rail.scrollLeft + rail.clientWidth * 2 >= (rail.querySelector<HTMLElement>('[data-loop-copy]')?.offsetLeft ?? rail.scrollWidth / 2);
-            if (nearEnd) {
-              setHomeVisibleCount((count) => Math.min(newest.length, count + 16));
-            }
-          }}
         >
-          {(visibleNewest.length > 1 ? [0, 1] : [0]).flatMap((copy) => visibleNewest.map((p, index) => (
+          {(allNewestVisible && visibleNewest.length > 1 ? [0, 1] : [0]).flatMap((copy) => visibleNewest.map((p, index) => (
             <div key={`${copy}:${p.id}`} data-loop-original={copy === 0 && index === 0 ? '' : undefined}
               data-loop-copy={copy === 1 && index === 0 ? '' : undefined} className="min-w-0">
               <HomeProductCard product={p} badgeText="New Arrival" />
@@ -201,7 +217,11 @@ export default function NewArrivalsRail({
               <div className="p-2.5">
                 <FastProductLink product={p} className="block"><p className="line-clamp-2 min-h-[28px] text-[10px] font-black leading-[14px]">{titleOf(p)}</p></FastProductLink>
                 <p className="mt-1 text-[11px] font-black text-[#E1352B]">Rs. {priceOf(p).toLocaleString()}</p>
-                <button type="button" onClick={() => void addProduct(p)} disabled={checkingId !== null} className="mt-2 flex w-full items-center justify-center gap-1 rounded-lg bg-[#14140F] px-2 py-2 text-[9px] font-black text-white">{checkingId === p.id ? 'Checking options…' : addedId === p.id ? 'Added ✓' : <><ShoppingCart size={12}/>Add to cart</>}</button>
+                <CardSizePicker sizes={p.availableSizes} selected={pickedSizes[p.id] || ''}
+                  onSelect={size => setPickedSizes(current => ({ ...current, [p.id]: size }))}
+                  title={titleOf(p)} category={String(p.category || '')} disabled={checkingId === p.id}
+                  className="mt-2" />
+                <button type="button" onClick={() => void addProduct(p, pickedSizes[p.id] || '')} disabled={checkingId !== null} className="mt-2 flex w-full items-center justify-center gap-1 rounded-lg bg-[#14140F] px-2 py-2 text-[9px] font-black text-white">{checkingId === p.id ? 'Checking options…' : addedId === p.id ? 'Added ✓' : <><ShoppingCart size={12}/>Add to cart</>}</button>
               </div>
             </article>
           );

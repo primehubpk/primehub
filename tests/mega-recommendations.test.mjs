@@ -71,3 +71,24 @@ test('direct links load the shared catalog once; existing Home catalog is reused
     assert.equal(states[1].length, hasCatalog ? 1 : 2);
   }
 });
+
+test('only the reviewed landscape Mega photo gets its own wide uncropped frame', async () => {
+  const source = ts.transpileModule(fs.readFileSync('lib/megaImagePresentation.ts', 'utf8'), {
+    compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
+  }).outputText;
+  const { megaImageNeedsWideBackdrop } = await import('data:text/javascript;charset=utf-8,' + encodeURIComponent(source));
+  const photo = 'https://images.primehubmall.com/products/1795103525267-file_00000000cd20820bbdfb543ae9eaf6c9.webp';
+  assert.equal(megaImageNeedsWideBackdrop('1qABfsZcsw66eDYTmeMJ', photo), true);
+  assert.equal(megaImageNeedsWideBackdrop('other-product', photo), false);
+  assert.equal(megaImageNeedsWideBackdrop('1qABfsZcsw66eDYTmeMJ', 'https://images.primehubmall.com/products/replaced-by-admin.webp'), false);
+  const card = fs.readFileSync('components/home/GlassOfferCard.tsx', 'utf8');
+  const css = fs.readFileSync('components/home/glass-offers.css', 'utf8');
+  assert.match(card, /wideRecommendationImage = recommendation && !trimImage/);
+  assert.match(card, /data-mega-wide=\{wideRecommendationImage/);
+  assert.match(card, /glass-offer-card--wide/);
+  assert.doesNotMatch(card, /glass-offer-card__wide-backdrop/);
+  assert.match(css, /\.glass-offer-card--recommendation \.glass-offer-card__image--wide\s*\{\s*aspect-ratio:4\/3/);
+  assert.match(css, /\.glass-offer-card--recommendation\.glass-offer-card--wide/);
+  assert.match(css, /min-width:290px; align-self:flex-start/);
+  assert.match(css, /\.glass-offer-card__image--wide \.glass-offer-card__wide-main/);
+});

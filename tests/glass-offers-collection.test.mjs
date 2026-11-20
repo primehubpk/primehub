@@ -188,8 +188,15 @@ test('home Mega, BOGO and New Arrivals rails keep native endless scrolling witho
   assert.match(arrivals, /useContinuousHomeRail\(homeRailRef/);
   assert.match(arrivals, /newestFirst\(products, homeLayout, settings\.glassDealShowcase\)/);
   assert.doesNotMatch(arrivals, /homeLayout\s*\?\s*100/);
-  assert.match(arrivals, /setHomeVisibleCount\(\(count\)\s*=>\s*Math\.min\(newest\.length,\s*count\s*\+\s*16\)\)/);
-  assert.match(arrivals, /querySelector<HTMLElement>\('\[data-loop-copy\]'\)/);
+  assert.match(arrivals, /setHomeVisibleCount\(\(?count\)?\s*=>\s*Math\.min\(newest\.length,\s*count\s*\+\s*16\)\)/);
+  assert.match(arrivals, /allNewestVisible && visibleNewest\.length > 1/);
+  assert.match(arrivals, /rail\.scrollWidth - rail\.scrollLeft - rail\.clientWidth/);
+  const categoryRail = await fs.readFile(path.join(root, 'components/home/HomeCategoryDeals.tsx'), 'utf8');
+  assert.match(categoryRail, /allCategoryProductsVisible && loopProducts\.length > 1/);
+  assert.match(categoryRail, /rail\.scrollWidth - rail\.scrollLeft - rail\.clientWidth/);
+  const continuous = await fs.readFile(path.join(root, 'lib/useContinuousHomeRail.ts'), 'utf8');
+  assert.match(continuous, /copy \? copy\.offsetLeft/);
+  assert.match(continuous, /if \(!copy\) scrollPosition = Math\.min\(scrollPosition, maxScroll\)/);
 });
 
 test('Skills and Wholesale come directly after arrivals, with real-thumb 3D collection banners', async () => {
@@ -416,7 +423,7 @@ test('homepage connects the full Prime Family before an unbounded vertical Sale 
   assert.match(sale, /standalone \|\| verticalHome \? visibleProducts\.map/);
   assert.match(css, /\.home-sale-home--vertical \.home-sale-products--vertical/);
   assert.match(css, /grid-auto-flow:row/);
-  assert.match(css, /grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
+  assert.match(css, /grid-template-columns:minmax\(0,1fr\)/);
   assert.match(commerce, /onPrevious=\{showArrows \?/);
 });
 
@@ -685,4 +692,19 @@ test('original photo restoration preview keeps live data and newer Admin photos 
   } finally {
     if(previous===undefined)delete process.env.VERCEL_ENV;else process.env.VERCEL_ENV=previous;
   }
+});
+
+test('home Sale Mela shows exactly one full-photo card per row with price-ordered products, not visit shuffle', async () => {
+  const [css, source] = await Promise.all([
+    fs.readFile(path.join(root, 'components/home/home.css'), 'utf8'),
+    fs.readFile(path.join(root, 'components/home/HomeCollections.tsx'), 'utf8'),
+  ]);
+  const section = css.split('.home-sale-home--vertical .home-sale-products--vertical {')[1]?.split('}')[0] || '';
+  assert.match(section, /grid-template-columns:minmax\(0,1fr\)/);
+  assert.match(section, /max-width:720px/);
+  assert.match(css, /\.home-sale-home--vertical \.home-sale-home-frame \.home-product-image img \{object-fit:contain !important\}/);
+  assert.doesNotMatch(css, /\.home-sale-home--vertical \.home-sale-products--vertical \{grid-template-columns:repeat\((?:2|3|4)/);
+  assert.match(source, /useVisitProductOrder\(products, `sale-\$\{href\}`, movingRailRef, !standalone && !verticalHome\)/);
+  assert.match(source, /const baseMatches = wholesale[\s\S]*?sortBySalePrice\(/);
+  assert.match(source, /const matches = verticalHome[\s\S]*?\? baseMatches/);
 });

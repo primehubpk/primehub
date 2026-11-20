@@ -397,6 +397,8 @@ export default function ShopLandingCatalog({
               </div>
             </div>
 
+            {shop.actionError && <p role="alert" className="my-2 rounded-lg bg-red-50 px-3 py-2 text-xs font-semibold text-red-800">{shop.actionError}</p>}
+
             {searchView && activeCount === 0 && (
               <p className="shop-empty-tip">
                 Try a shorter word, category name, or a similar spelling.

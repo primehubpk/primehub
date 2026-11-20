@@ -57,12 +57,31 @@ async function wait(ms: number) {
   await new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function withMegaSizeLabels(products: any[]) {
-  const missing = products.filter(product => Number(product.megaDealPrice) > 0 && product.hasVariants !== false && !Array.isArray(product.variantMatrix) && !Array.isArray(product.variants));
-  const summaries = await getDualProductSizeSummaries(missing.map(product => String(product.id)), CATALOG_READ_CACHE);
-  return products.map(product => applyMegaImageRestorationPreview(Number(product.megaDealPrice) > 0
-    ? { ...product, availableSizes: summaries[String(product.id)] || getMegaDealAvailableSizes(product) }
-    : product));
+/** Bounded, cached size summaries for all variant-bearing products.
+ * Full variants never enter the public card catalog.
+ */
+async function withCardSizeLabels(products: any[]) {
+  const missingIds = products.filter(product => product.hasVariants === true &&
+    !Array.isArray(product.variantMatrix) && !Array.isArray(product.variants))
+    .map(product => String(product.id || '')).filter(Boolean);
+  const chunks: string[][] = [];
+  for (let i = 0; i < missingIds.length; i += 75) chunks.push(missingIds.slice(i, i + 75));
+  const summaries: Record<string, string[]> = {};
+  // Limit simultaneous server reads even for a large catalog.
+  for (let i = 0; i < chunks.length; i += 3) {
+    const batches = await Promise.all(chunks.slice(i, i + 3)
+      .map(ids => getDualProductSizeSummaries(ids, CATALOG_READ_CACHE)));
+    for (const batch of batches) Object.assign(summaries, batch);
+  }
+  return products.map(product => {
+    const hasVariants = product.hasVariants === true ||
+      (Array.isArray(product.variantMatrix) && product.variantMatrix.length > 0) ||
+      (Array.isArray(product.variants) && product.variants.length > 0);
+    const availableSizes = hasVariants
+      ? summaries[String(product.id)] ?? getMegaDealAvailableSizes(product)
+      : [];
+    return applyMegaImageRestorationPreview(hasVariants ? { ...product, availableSizes } : product);
+  });
 }
 
 async function loadPublicCatalog() {
@@ -75,7 +94,7 @@ async function loadPublicCatalog() {
 
     if (result.source !== 'empty' && result.products.length > 0) {
       return {
-        products: await withMegaSizeLabels(result.products.map(product => applyBogoAvailability(applyBogoOfferPrice(applyCollectionPrice(product, settings.glassDealShowcase)), (settings as any).bogoDealShowcase))),
+        products: await withCardSizeLabels(result.products.map(product => applyBogoAvailability(applyBogoOfferPrice(applyCollectionPrice(product, settings.glassDealShowcase)), (settings as any).bogoDealShowcase))),
         categories: result.categories,
         source: result.source,
       };
@@ -87,7 +106,7 @@ async function loadPublicCatalog() {
 
 export const getPublicCatalogSnapshot = unstable_cache(
   loadPublicCatalog,
-  ['primehub-public-catalog-dual-v13-mega-originals-sizes', megaImagePreviewCacheKey],
+  ['primehub-public-catalog-dual-v15-verified-kids-size-cleanup', megaImagePreviewCacheKey],
   { revalidate: STOREFRONT_REVALIDATE_SECONDS, tags: ['public-catalog', 'storefront-settings'] },
 );
 
@@ -147,7 +166,7 @@ export async function getFreshPublicCatalogSnapshot() {
   if (result.source === 'empty' || result.products.length === 0) {
     throw new Error(`Fresh public catalog unavailable (source: ${result.source}).`);
   }
-  return { ...result, products: await withMegaSizeLabels(result.products.map(product => applyBogoAvailability(applyBogoOfferPrice(applyCollectionPrice(product, settings.glassDealShowcase)), (settings as any).bogoDealShowcase))) };
+  return { ...result, products: await withCardSizeLabels(result.products.map(product => applyBogoAvailability(applyBogoOfferPrice(applyCollectionPrice(product, settings.glassDealShowcase)), (settings as any).bogoDealShowcase))) };
 }
 
 async function loadPublicProduct(productId: string) {

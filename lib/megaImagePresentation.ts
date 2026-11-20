@@ -14,4 +14,16 @@ export function megaImageNeedsTrim(productId: unknown, image: string): boolean {
   try { return new URL(image).pathname === `/products/${file}`; } catch { return false; }
 }
 
+/** The reviewed 800x600 full gift-box photo looks letterboxed in a 4:5 recommendation tile.
+ * Only its original R2 file gets the wide-photo treatment; later Admin replacements are exempt.
+ */
+export function megaImageNeedsWideBackdrop(productId: unknown, image: string): boolean {
+  if (String(productId) !== '1qABfsZcsw66eDYTmeMJ') return false;
+  try {
+    return new URL(image).pathname === '/products/1795103525267-file_00000000cd20820bbdfb543ae9eaf6c9.webp';
+  } catch {
+    return false;
+  }
+}
+
 export const megaImageTrimStyle = { objectFit: 'cover' as const, transform: 'scale(1.195)', padding: 0 };
