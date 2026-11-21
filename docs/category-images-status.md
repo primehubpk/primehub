@@ -1,4 +1,23 @@
-# Category image display — 20 November 2026
+# Category image display — 21 November 2026
+
+## 21 November 2026 — fresh verification complete
+
+- Reused the latest existing fix/all-category-full-images-nov20 checkout at d6cfec3bed80c294a53e4a9fe52e2df3fabece42. No additional storefront runtime changes were necessary: existing full-photo/contain implementation passed the fresh image checks.
+- Recovered only stale webjob-4b20090a6d8c metadata: worker9988 was previously stopped, but its old running flag blocked restart after Windows reused a PID. No process was killed. Exact-file recovery reservation was released.
+- Current preview: webjob-463dbfb3aed2, worker14184, port3010 READY. Local http://localhost:3010/ and same-WiFi http://10.118.124.197:3010/category/glass-bangles . Browser-reported laptop LAN address remains10.118.124.197. Physical Android was not independently operated.
+- HOME webjob-5d617d2f9464: 1 PASS/0 FAIL/0 SKIP. All20 categories,575/575 unique category product photos loaded, including90/90 Glass Bangles. Missing/placeholder/crop/zoom violations0, page errors0. Mobile viewport/document393/393 and desktop1366/1366.
+- Final category/size/cart/recommendation/recovery job webjob-fec2efb537e7:25 PASS/0 FAIL/0 SKIP. All20 category routes HTTP200;260 initially rendered selected-category photos loaded and contained, no overflow/crop/zoom violations; four real product heroes loaded contained. This is not a claim that all90 glass products were simultaneously mounted on the standalone route: all90 were independently loaded by the complete Home audit above.
+- Additional webjob-e86e6a1c7299:2 PASS/0 FAIL/0 SKIP. Fresh Home/Glass/category-product navigation had no hydration errors. Customer-style scrolling completed Sale Mela batches; Mega26/26, BOGO52/52 and Sale Mela plus wholesale682/682 photos loaded with contain/no transform and no missing images. These collection totals overlap the earlier category audit and must not be added to575 as unique inventory.
+- Existing route audit now retains full page-error messages with URL and emits its already-captured Glass screenshot thumbnail. Reviewed the returned mobile thumbnail directly; full393px/mobile1366px desktop screenshots and JSON reports remain in .next/category-image-audit/. No screenshot was published or uploaded.
+- Initial cold availability job webjob-e482202eddf9 SKIPPED while Next compiled and is not counted as a pass. Initial route job webjob-c21db76af517 had valid image results but failed on one truncated hydration warning; six-navigation diagnostic webjob-3131fa061019 and the later complete20-route job did not reproduce it. No unrelated runtime workaround was added. First extra-collection harness webjob-7ac2697c5b8d waited without scrolling and timed out; it was corrected to scroll real progressive-load sentinels, preserving the working storefront loader.
+- Changed this continuation: tests/category-route-image.test.mjs, new tests/category-image-hydration.test.mjs, this existing STATUS. New diagnostics are Windows/laptop-only and skip without the preceding local route evidence. Storefront runtime source, product photos/data, prices, stock, variants, orders and payments unchanged. Earlier TypeScript success remains recorded below; no new production build/deploy claimed for diagnostic-only changes.
+- Review is ready on the same feature branch. Save these diagnostic/STATUS changes with the guarded exact-file commit, verify Git clean, then release only this checkout's task reservation. No main merge or production deployment was requested/performed.
+
+Remaining source-photo limitation:
+- Display clipping is resolved. Five historical Mega full originals remain unrecovered; rendering cannot recreate pixels absent inside those source files. Exact and simplified Library filename searches21Nov returned no matches; this does not prove no differently named copy exists.
+- Missing source references: olyH0uP7w0c1OHqUCZvf / IMG-20260506-WA0202; snuIjJfa6dLY7VS8jc7j /1768359603697.png; fdjFxM4miXaFL2vuTNaB /1768359603645.png;16CbiM9CdxtvhszzGYGu / IMG_20260502_142453; Drk9zpU2DWWFfXWcKYrY / IMG_20260102_101138.jpg. Preserve original product color/design/count; do not invent missing details or claim these originals were repaired.
+
+## 20 November 2026 — implementation history
 
 Branch: fix/all-category-full-images-nov20
 Base: main 7a27acadecc8bb8fd7c19146d66b513981e3a589
@@ -57,4 +76,4 @@ Home category photos checked:
 
 Limit: these checks verify complete rendering of available source files. They cannot reconstruct pixels already missing inside an uploaded photograph. Existing historical missing-original Mega notes remain applicable; no invented product details or replacement photos were generated, and no production catalog image was swapped.
 
-Saved source commit: e806a5d4e9036a2ec2e2263ffb493d2e2974eecc. Four image regression files and this current STATUS are retained on the same branch. Final preview worker8208 is READY on3010; the dedicated review window remains open. Task reservation is released after final clean Git readback. Next action is owner review of the local preview. Production deployment/main merge require a later task-specific owner instruction.
+Historical20Nov source checkpoint: e806a5d4e9036a2ec2e2263ffb493d2e2974eecc. Four image regression files and this current STATUS are retained on the same branch. Final preview worker8208 is READY on3010; the dedicated review window remains open. Task reservation is released after final clean Git readback. Next action is owner review of the local preview. Production deployment/main merge require a later task-specific owner instruction.
