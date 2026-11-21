@@ -85,7 +85,7 @@ function CategoryRailCard({ category, matches }: { category: Category; matches: 
     rail.dispatchEvent(new CustomEvent<number>('primehub:advance', { detail: direction }));
     rail.scrollBy({ left: direction * (rail.clientWidth + 10), behavior: 'smooth' });
   };
-  return <div className="home-category-3d-frame rounded-[20px] border border-[#DCCCA8]/60 bg-[#FFFCF7] pb-3 shadow-sm">
+  return <div className={`home-category-3d-frame ${/^ph\s*metal\s*deals$/i.test(category.title.trim()) ? "home-category-ph-metal" : ""} rounded-[20px] border border-[#DCCCA8]/60 bg-[#FFFCF7] pb-3 shadow-sm`}>
     <Commerce3DBanner kind="category" title={category.title} href={href}
       iconImage={iconImage} images={matches.map(product => normalizeImageUrl(imageOf(product)))}
       onMove={move}/>

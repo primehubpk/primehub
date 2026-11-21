@@ -54,7 +54,7 @@ export default function CatalogProductCard({ product, addedId, addProduct, compa
     return (
       <article className="group overflow-hidden rounded-[18px] border border-[#E9E2D8] bg-white shadow-[0_7px_22px_rgba(56,43,27,0.075)] transition hover:-translate-y-0.5 hover:shadow-[0_11px_28px_rgba(56,43,27,0.12)] sm:rounded-[20px]">
         <FastProductLink product={product} className="block">
-          <div data-glass-full-photo={fullPhoto || undefined} className={fullPhoto ? 'relative aspect-square overflow-hidden bg-[#FFFCF7]' : 'relative aspect-[1.5/1] overflow-hidden bg-[#F7F2EA] sm:aspect-[1.58/1]'}>
+          <div data-glass-full-photo={fullPhoto || undefined} className="relative aspect-[4/5] overflow-hidden bg-[#FFFCF7]">
             {image ? (
               <RetryableStorefrontImage
                 src={image}
@@ -66,7 +66,7 @@ export default function CatalogProductCard({ product, addedId, addProduct, compa
                 fetchPriority={priority ? 'high' : 'auto'}
                 unoptimized={isDirectStorefrontImage(image)}
                 sizes="(max-width: 900px) 50vw, 430px"
-                className={fullPhoto ? 'object-contain object-center' : 'object-cover transition duration-500 group-hover:scale-[1.03]'}
+                className="object-contain object-center p-1"
               />
             ) : (
               <div className="flex h-full items-center justify-center text-[10px] font-bold text-black/25">No image</div>
@@ -121,7 +121,7 @@ export default function CatalogProductCard({ product, addedId, addProduct, compa
   return (
     <article className={`group flex h-full flex-col overflow-hidden ${dense ? 'rounded-[15px] sm:rounded-[20px]' : 'rounded-[22px]'} border border-[#e6ded2] bg-white shadow-[0_6px_18px_rgba(35,29,20,0.06)] transition hover:-translate-y-0.5 hover:shadow-[0_12px_30px_rgba(35,29,20,0.12)] ${compact ? 'w-[168px] shrink-0 snap-start sm:w-[186px]' : 'w-full'}`}>
       <FastProductLink product={product} className="block">
-        <div className={`relative overflow-hidden bg-[#f3eee7] ${dense ? 'aspect-[1.38/1] sm:aspect-[1.22/1]' : 'aspect-square'}`}>
+        <div className="relative aspect-[4/5] overflow-hidden bg-[#f3eee7]">
           {image ? (
             <RetryableStorefrontImage
               src={image}
@@ -133,7 +133,7 @@ export default function CatalogProductCard({ product, addedId, addProduct, compa
               fetchPriority={priority ? 'high' : 'auto'}
               unoptimized={isDirectStorefrontImage(image)}
               sizes={dense ? '(max-width: 639px) 50vw, (max-width: 1279px) 33vw, 25vw' : '(max-width: 767px) 50vw, 25vw'}
-              className="object-cover transition duration-500 group-hover:scale-[1.03]"
+              className="object-contain object-center p-1"
             />
           ) : (
             <div className="flex h-full items-center justify-center text-[10px] font-bold text-black/25">No image</div>

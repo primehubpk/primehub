@@ -1,4 +1,5 @@
 'use client';
+import Image from '@/components/StorefrontSourceImage';
 
 import { imageOf, priceOf, titleOf } from '@/components/checkout/useCheckout';
 import CartItemControls from './CartItemControls';
@@ -29,8 +30,8 @@ export default function CartItem({
     const trim = megaImageNeedsTrim(item.productId, image);
     return <article data-cart-item={id} className="rounded-2xl border border-[#E4E8E1] bg-white p-3">
       <div className="flex items-start gap-3">
-        <div className="h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-[#F7F7F2]">
-          {image ? <img src={image} alt={title} className="h-full w-full object-contain" style={trim ? megaImageTrimStyle : undefined}/> : <div className="grid h-full place-items-center text-xs text-black/30">No image</div>}
+        <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-[#F7F7F2]">
+          {image ? <Image fill unoptimized src={image} alt={title} className="h-full w-full object-contain" style={trim ? megaImageTrimStyle : undefined}/> : <div className="grid h-full place-items-center text-xs text-black/30">No image</div>}
         </div>
         <div className="min-w-0 flex-1">
           <h2 className="line-clamp-2 text-[13px] font-bold leading-[18px]">{title}</h2>
@@ -64,9 +65,9 @@ export default function CartItem({
   return (
     <article className="rounded-2xl border border-black/[0.06] bg-white p-3 shadow-[0_4px_18px_rgba(0,0,0,0.045)] sm:p-4">
       <div className="flex gap-3 sm:gap-4">
-        <div className="h-24 w-24 shrink-0 overflow-hidden rounded-2xl bg-[#F7F7F5] sm:h-28 sm:w-28">
+        <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-2xl bg-[#F7F7F5] sm:h-28 sm:w-28">
           {image ? (
-            <img src={image} alt={title} className="h-full w-full object-cover" />
+            <Image fill unoptimized src={image} alt={title} className="h-full w-full object-contain" />
           ) : (
             <div className="flex h-full items-center justify-center text-xs font-bold text-black/25">No image</div>
           )}

@@ -1,4 +1,5 @@
 'use client';
+import Image from '@/components/StorefrontSourceImage';
 
 import { useEffect, useMemo, useState } from 'react';
 import { Bot, Check, ChevronRight, Minus, Pencil, Plus, ShoppingCart, Sparkles, X, Zap } from 'lucide-react';
@@ -309,13 +310,13 @@ export default function VariantSelectorBottomSheet({
         <div className="flex items-center gap-3 border-b border-black/7 pb-4">
           <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-2xl bg-[#F4F4F1]">
             {visibleSelectedImage ? (
-              <img
+              <Image fill unoptimized
                 src={visibleSelectedImage}
                 alt=""
                 loading="eager"
-                decoding="sync"
+                decoding="async"
                 fetchPriority="high"
-                className="h-full w-full object-cover"
+                className="h-full w-full object-contain"
               />
             ) : null}
           </div>
@@ -344,7 +345,7 @@ export default function VariantSelectorBottomSheet({
                   aria-label="Ask Salar about this product option"
                 >
                   <span className="flex h-5 w-5 items-center justify-center overflow-hidden rounded-full bg-[#FFB020] text-[#14140F]">
-                    {salarIconUrl ? <img src={salarIconUrl} alt="" className="h-full w-full object-cover" /> : <Bot size={11} />}
+                    {salarIconUrl ? <img src={salarIconUrl} alt="" className="h-full w-full object-contain" /> : <Bot size={11} />}
                   </span>
                   Need help?
                 </button>
@@ -409,13 +410,13 @@ export default function VariantSelectorBottomSheet({
                   >
                     <span className="relative h-10 w-10 shrink-0 overflow-hidden rounded-xl bg-[#F4F4F1]">
                       {visibleItemImage ? (
-                        <img
+                        <Image fill unoptimized
                           src={visibleItemImage}
                           alt=""
                           loading="eager"
-                          decoding="sync"
+                          decoding="async"
                           fetchPriority="high"
-                          className="h-full w-full object-cover"
+                          className="h-full w-full object-contain"
                         />
                       ) : <span className="block h-full w-full bg-black/10" />}
                     </span>

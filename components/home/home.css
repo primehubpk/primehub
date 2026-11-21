@@ -1229,8 +1229,18 @@
      half of a 1200px rail. Inline mobile grid sizing remains untouched. */
   .home-sale-home-frame .home-product-image,
   .home-category-3d-frame .home-product-image {
-    aspect-ratio:1;
+    aspect-ratio:4/5;
   }
+}
+
+/* Owner-approved compact full-photo display for ALL homepage category rails.
+   A square media frame avoids excess top/bottom letterboxing for square photos.
+   Keep contain to protect the original image from cropping or distortion. */
+.home-category-3d-frame .home-product-image {
+  aspect-ratio: 1 / 1;
+}
+.home-category-3d-frame .home-product-image > img {
+  padding: 0;
 }
 
 /* Owner-approved final homepage Sale Mela: a vertically growing product grid,
@@ -1244,7 +1254,7 @@
   grid-auto-columns:auto;
   width:100%;
   min-width:0;
-  max-width:720px;
+  max-width:520px;
   margin-inline:auto;
   overflow:visible;
   scroll-snap-type:none;
@@ -1252,8 +1262,9 @@
   gap:14px;
 }
 .home-sale-home--vertical .home-sale-products--vertical > div {min-width:0}
-.home-sale-home--vertical .home-sale-home-frame .home-product-image {aspect-ratio:4/5}
-.home-sale-home--vertical .home-sale-home-frame .home-product-image img {object-fit:contain !important}
+.home-sale-home--vertical .home-sale-home-frame .home-product-image {aspect-ratio:1/1}
+.home-sale-home--vertical .home-sale-home-frame .home-product-image img,
+.home-sale-home--vertical .home-sale-home-frame .home-product-image svg[data-photo-source] {object-fit:contain !important;padding:0 !important}
 @media(min-width:760px) {
   .home-sale-home--vertical .home-sale-products--vertical {gap:18px}
 }

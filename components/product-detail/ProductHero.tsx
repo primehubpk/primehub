@@ -1,5 +1,6 @@
 'use client';
-import Image from 'next/image';
+import Image from '@/components/StorefrontSourceImage';
+import { getGlassContentBox } from '@/lib/glassImagePresentation';
 import { useEffect, useState, type CSSProperties } from 'react';
 import { Sparkles, ChevronLeft, ChevronRight, Play, X, ZoomIn } from 'lucide-react';
 import { isDirectStorefrontImage } from '@/lib/imageUrl';
@@ -71,12 +72,11 @@ export default function ProductHero({ product, images, activeImage, savingsAmoun
                 if (!isMegaProduct) return;
                 const { naturalWidth: width, naturalHeight: height } = event.currentTarget;
                 if (width > 0 && height > 0) {
-                  setMeasuredImage({ src: displayImage, aspect: width / height });
+                  const box = getGlassContentBox(displayImage);
+                  setMeasuredImage({ src: displayImage, aspect: box ? box.width / box.height : width / height });
                 }
               }}
-              className={isMegaProduct
-                ? 'object-contain p-2'
-                : (liveDeal || bigDealActive ? 'object-contain' : 'object-cover')}
+              className={isMegaProduct ? 'object-contain p-2' : 'object-contain object-center p-1'}
             />
           </button>
         ) : <div className="flex h-full items-center justify-center text-sm font-bold text-black/25">No product image</div>}
@@ -91,7 +91,7 @@ export default function ProductHero({ product, images, activeImage, savingsAmoun
         <div className="flex gap-2 overflow-x-auto p-3">
           {images.map((image, index) => (
             <button type="button" key={`${image}-${index}`} onClick={() => onImageChange(() => index)} className={`relative h-16 w-16 shrink-0 overflow-hidden rounded-xl border-2 ${index === activeImage ? 'border-[#E1352B]' : 'border-transparent'}`} aria-label={`View image ${index + 1}`}>
-              <Image src={image} alt="" fill unoptimized={shouldUseDirectStorefrontImage(image, bigDealActive)} sizes="64px" quality={65} loading="lazy" style={megaImageNeedsTrim(product.id, image) ? megaImageTrimStyle : undefined} className={isMegaProduct ? "object-contain" : "object-cover"} />
+              <Image src={image} alt="" fill unoptimized={shouldUseDirectStorefrontImage(image, bigDealActive)} sizes="64px" quality={65} loading="lazy" style={megaImageNeedsTrim(product.id, image) ? megaImageTrimStyle : undefined} className="object-contain object-center" />
             </button>
           ))}
         </div>

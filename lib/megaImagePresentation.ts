@@ -26,4 +26,5 @@ export function megaImageNeedsWideBackdrop(productId: unknown, image: string): b
   }
 }
 
-export const megaImageTrimStyle = { objectFit: 'cover' as const, transform: 'scale(1.195)', padding: 0 };
+// Keep the legacy helper shape for existing callers, while preserving every source edge.
+export const megaImageTrimStyle = { objectFit: 'contain' as const, transform: 'none', padding: 0 };
