@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { ChevronRight } from 'lucide-react';
 import { categoryHref, productMatchesCategory } from '@/lib/categoryUtils';
 import { Category } from './ShopTypes';
+import { normalizeImageUrl } from '@/lib/imageUrl';
 
 type Props = {
   categories: Category[];
@@ -52,7 +53,7 @@ export default function CategoryFilter({
       <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto overflow-y-visible overscroll-x-contain scroll-smooth pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {visible.map((cat) => {
           const label = cat.name || cat.title || cat.id || 'Category';
-          const icon = cat.iconUrl || cat.imageUrl || cat.image;
+          const icon = normalizeImageUrl(cat.iconUrl || cat.imageUrl || cat.image);
 
           return (
             <Link

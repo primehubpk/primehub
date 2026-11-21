@@ -15,7 +15,7 @@ import CatalogProductGrid from './shop/CatalogProductGrid';
 import FastProductLink from '@/components/FastProductLink';
 import BackHomeLink from '@/components/BackHomeLink';
 import { categoryHref, productMatchesCategory, slugifyCategory } from '@/lib/categoryUtils';
-import { isDirectStorefrontImage } from '@/lib/imageUrl';
+import { isDirectStorefrontImage, normalizeImageUrl } from '@/lib/imageUrl';
 import { isWholesaleProduct } from '@/lib/wholesale';
 import { discountOf, imageOf, titleOf, type Product, type Category } from './shop/ShopTypes';
 
@@ -321,7 +321,7 @@ export default function ShopCatalog({
     const selectedCategory = currentSection?.category;
     const selectedProducts = currentSection?.products || categoryProducts;
     const selectedLabel = selectedCategory ? categoryLabel(selectedCategory) : shop.categoryLabel;
-    const selectedIcon = selectedCategory?.iconUrl || selectedCategory?.imageUrl || selectedCategory?.image;
+    const selectedIcon = normalizeImageUrl(selectedCategory?.iconUrl || selectedCategory?.imageUrl || selectedCategory?.image);
 
     return (
       <div className="home-storefront min-h-screen bg-[#FFFCF7] pb-28">
@@ -385,7 +385,7 @@ export default function ShopCatalog({
 
           {followingSections.map((section) => {
             const label = categoryLabel(section.category);
-            const icon = section.category.iconUrl || section.category.imageUrl || section.category.image;
+            const icon = normalizeImageUrl(section.category.iconUrl || section.category.imageUrl || section.category.image);
 
             return (
               <section
