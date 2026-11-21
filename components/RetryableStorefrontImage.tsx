@@ -1,6 +1,7 @@
 'use client';
 
-import Image, { type ImageProps } from 'next/image';
+import type { ImageProps } from 'next/image';
+import Image from '@/components/StorefrontSourceImage';
 import { useEffect, useRef, useState } from 'react';
 
 type Props = Omit<ImageProps, 'src' | 'alt'> & {

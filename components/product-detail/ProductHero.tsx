@@ -1,5 +1,6 @@
 'use client';
-import Image from 'next/image';
+import Image from '@/components/StorefrontSourceImage';
+import { getGlassContentBox } from '@/lib/glassImagePresentation';
 import { useEffect, useState, type CSSProperties } from 'react';
 import { Sparkles, ChevronLeft, ChevronRight, Play, X, ZoomIn } from 'lucide-react';
 import { isDirectStorefrontImage } from '@/lib/imageUrl';
@@ -71,7 +72,8 @@ export default function ProductHero({ product, images, activeImage, savingsAmoun
                 if (!isMegaProduct) return;
                 const { naturalWidth: width, naturalHeight: height } = event.currentTarget;
                 if (width > 0 && height > 0) {
-                  setMeasuredImage({ src: displayImage, aspect: width / height });
+                  const box = getGlassContentBox(displayImage);
+                  setMeasuredImage({ src: displayImage, aspect: box ? box.width / box.height : width / height });
                 }
               }}
               className={isMegaProduct ? 'object-contain p-2' : 'object-contain object-center p-1'}

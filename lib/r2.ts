@@ -40,12 +40,21 @@ export function r2Client() {
   });
 }
 
+export const MAX_PRODUCT_IMAGE_BYTES = 100_000;
+
 export async function compressForR2(buffer: Buffer) {
-  return sharp(buffer)
-    .rotate()
-    .resize({ width: 800, height: 800, fit: 'inside', withoutEnlargement: true })
-    .webp({ quality: 80 })
-    .toBuffer();
+  // Preserve every source edge and its natural aspect ratio; no blur padding.
+  for (const side of [800, 720, 640, 560, 480]) {
+    for (const quality of [80, 72, 64, 56, 48]) {
+      const output = await sharp(buffer)
+        .rotate()
+        .resize({ width: side, height: side, fit: 'inside', withoutEnlargement: true })
+        .webp({ quality, smartSubsample: true })
+        .toBuffer();
+      if (output.length <= MAX_PRODUCT_IMAGE_BYTES) return output;
+    }
+  }
+  throw new Error('Product image cannot be encoded within 100 KB.');
 }
 
 export async function compressSalaarImageForR2(buffer: Buffer) {

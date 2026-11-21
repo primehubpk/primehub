@@ -1,7 +1,7 @@
 'use client';
 
 import { useId, useRef, useState } from 'react';
-import Image from 'next/image';
+import Image from '@/components/StorefrontSourceImage';
 import Link from 'next/link';
 import { Minus, Plus, ShoppingCart, Tag } from 'lucide-react';
 import { isDirectStorefrontImage, normalizeImageUrl } from '@/lib/imageUrl';

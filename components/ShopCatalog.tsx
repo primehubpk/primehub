@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import Image from 'next/image';
+import Image from '@/components/StorefrontSourceImage';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { ArrowRight, Boxes, Flame, Grid2X2, SlidersHorizontal, Star, Tag, Zap } from 'lucide-react';

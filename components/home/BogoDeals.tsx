@@ -1,7 +1,7 @@
 'use client';
 
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
-import Image from 'next/image';
+import Image from '@/components/StorefrontSourceImage';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { ArrowRight, Gift, ShoppingBag } from 'lucide-react';
