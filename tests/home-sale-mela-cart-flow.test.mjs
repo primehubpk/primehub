@@ -177,7 +177,7 @@ test('existing full Prime Skills showcase sits below the embedded Sale Mela', ()
 });
 
 
-test('Prime Family reuses one guest-visible dashboard on route and home while reward claims stay login-gated', () => {
+test('Prime Family homepage banner opens the guest-visible dashboard while reward claims stay login-gated', () => {
   const nav = read('components/BottomNav.tsx');
   const dashboardPage = read('app/reseller/dashboard/page.tsx');
   const dashboard = read('components/reseller/PrimeFamilyDashboard.tsx');
@@ -194,15 +194,16 @@ test('Prime Family reuses one guest-visible dashboard on route and home while re
   assert.match(dashboard, /if \(!user \|\| spinning/);
   assert.match(dashboard, /view === 'wallet'/);
   assert.doesNotMatch(dashboard, /view === 'home' && <section[^>]*>[\s\S]*?>Wallet<\/span>/);
-  assert.match(dashboard, /Cash Wallet/);
+  assert.match(dashboard, /Points Wallet/);
+  assert.match(dashboard, /View shopping wallet/);
   assert.match(
     home,
     /<SkillsShowcase[\s\S]*?embedded[\s\S]*?<HomePrimeFamilyLazy[\s\S]*?initialSettings=/,
   );
   const lazy = read('components/home/HomePrimeFamilyLazy.tsx');
-  assert.match(lazy, /IntersectionObserver/);
-  assert.match(lazy, /rootMargin: '1200px 0px'/);
-  assert.match(lazy, /<PrimeFamilyDashboard[\s\S]*?embedded[\s\S]*?initialSettings=/);
+  assert.match(lazy, /href="\/reseller\/dashboard"/);
+  assert.match(lazy, /Explore Prime Family/);
+  assert.doesNotMatch(lazy, /<PrimeFamilyDashboard/);
   assert.doesNotMatch(home, /HomeResellerClubFull/);
   assert.doesNotMatch(join, /ResellerTasksContent/);
   assert.match(join, /signInReseller\(email, password, rememberMe\)/);
@@ -232,7 +233,20 @@ test('homepage avoids redundant skills/settings reads before lower sections are 
 
   assert.match(home, /<HomePrimeSkills initialItems=\{initialSkills\} \/>/);
   assert.match(commerce, /if \(initialItems\.length\) \{[\s\S]*?setItems\(initialItems\);[\s\S]*?return;/);
-  assert.match(lazy, /setReady\(true\)/);
+  assert.doesNotMatch(lazy, /PrimeFamilyDashboard|fetch\(/);
   assert.match(dashboard, /hasSeededSettings/);
   assert.match(dashboard, /Promise\.resolve<Response \| null>\(null\)/);
+});
+
+test('mobile Sale Mela shows a full-width banner, complete left filters, and two-column continuation', () => {
+  const source = read('components/home/HomeCollections.tsx');
+  const css = read('components/home/home.css');
+  assert.match(source, /inlineFilters=\{verticalHome && bucketIndex === 0 && inlineFiltersOpen/);
+  assert.match(source, /visibleProducts\.slice\(0, leadSize\)/);
+  assert.match(source, /visibleProducts\.slice\(leadSize\)/);
+  assert.match(source, /new ResizeObserver\(measure\)/);
+  assert.match(css, /home-sale-home--vertical .home-sale-home-frame > \.home-commerce-banner\s*\{\s*width:100%;min-height:124px/);
+  assert.match(css, /home-sale-inline-filters\.is-open\s*\{\s*display:block;position:static;max-height:none;overflow:visible/);
+  assert.match(css, /home-sale-products--vertical\s*\{\s*grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/);
+  assert.match(css, /home-sale-filter-lead-panel\s*\{display:none\}/);
 });

@@ -2,7 +2,7 @@
 
 import RetryableStorefrontImage from '@/components/RetryableStorefrontImage';
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ChevronRight, Eye, Package, ShoppingCart, SlidersHorizontal } from "lucide-react";
 import FastProductLink from "@/components/FastProductLink";
 import CardSizePicker from '@/components/shop/CardSizePicker';
@@ -382,6 +382,7 @@ function ProgressiveHomeSaleProducts({
   href,
   label,
   cropImageEdges = false,
+  inlineFilters,
 }: {
   products: Product[];
   standalone: boolean;
@@ -390,6 +391,7 @@ function ProgressiveHomeSaleProducts({
   href: string;
   label: string;
   cropImageEdges?: boolean;
+  inlineFilters?: ReactNode;
 }) {
   const initialLimit = standalone || verticalHome ? HOME_GRID_INITIAL_PRODUCTS : HOME_RAIL_INITIAL_PRODUCTS;
   const batchSize = standalone || verticalHome ? HOME_GRID_PRODUCT_BATCH : HOME_RAIL_PRODUCT_BATCH;
@@ -454,7 +456,49 @@ function ProgressiveHomeSaleProducts({
   // Only the separate standalone page retains its existing progressive grid.
   const visibleProducts = standalone ? products.slice(0, limit) : verticalHome ? visitProducts.slice(0, limit) : visitProducts;
   const loopProducts = visibleProducts;
+  const filterRef = useRef<HTMLDivElement>(null);
+  const leadProductsRef = useRef<HTMLDivElement>(null);
+  const [leadCount, setLeadCount] = useState(4);
+  const hasInlineFilters = Boolean(inlineFilters);
+  const leadSize = hasInlineFilters ? Math.min(leadCount, visibleProducts.length) : 0;
+
+  // Match the single-column lead to the full filter panel; the remaining
+  // products return to the regular two-column grid.
+  useEffect(() => {
+    if (!hasInlineFilters || !verticalHome) return;
+    const panel = filterRef.current;
+    const lead = leadProductsRef.current;
+    if (!panel || !lead) return;
+    const measure = () => {
+      if (!window.matchMedia('(max-width: 1023px)').matches) return;
+      const height = panel.getBoundingClientRect().height;
+      const leadHeight = lead.getBoundingClientRect().height;
+      const last = lead.lastElementChild;
+      if (!height || !last) return;
+      const lastHeight = last.getBoundingClientRect().height;
+      if (leadHeight < height && leadSize < visibleProducts.length) {
+        setLeadCount(leadSize + 1);
+      } else if (leadSize > 1 && leadHeight - lastHeight - 10 >= height) {
+        setLeadCount(leadSize - 1);
+      }
+    };
+    const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null;
+    observer?.observe(panel);
+    observer?.observe(lead);
+    window.addEventListener('resize', measure);
+    measure();
+    return () => { observer?.disconnect(); window.removeEventListener('resize', measure); };
+  }, [hasInlineFilters, verticalHome, leadSize, visibleProducts.length]);
   useContinuousHomeRail(movingRailRef, { enabled: !standalone && !verticalHome, itemCount: loopProducts.length, speed: 24, startDelayMs: 8000 });
+
+  const renderProduct = ({ product, index, copy }: { product: Product; index: number; copy: number }) => (
+    <div key={`${copy}:${index}:${product.id}`}
+      data-loop-original={!standalone && copy === 0 && index === 0 ? '' : undefined}
+      data-loop-copy={!standalone && copy === 1 && index === 0 ? '' : undefined}
+      style={{ minWidth: 0 }}>
+      <HomeProductCard product={product} pack={wholesale} cropImageEdges={cropImageEdges} />
+    </div>
+  );
 
   return (
     <div
@@ -476,22 +520,17 @@ function ProgressiveHomeSaleProducts({
       aria-busy={!ready}
 
     >
-      {visibleProducts.length ? (
-        (standalone || verticalHome ? visibleProducts.map((product, index) => ({ product, index, copy: 0 }))
-          : (loopProducts.length > 1 ? [0, 1] : [0]).flatMap((copy) => loopProducts.map((product, index) => ({ product, index, copy })))).map(({ product, index, copy }) => (
-          <div
-            key={`${copy}:${index}:${product.id}`}
-            data-loop-original={!standalone && copy === 0 && index === 0 ? '' : undefined}
-            data-loop-copy={!standalone && copy === 1 && index === 0 ? '' : undefined}
-            style={{ minWidth: 0 }}
-          >
-            <HomeProductCard
-              product={product}
-              pack={wholesale}
-              cropImageEdges={cropImageEdges}
-            />
+      {hasInlineFilters && (
+        <div className="home-sale-filter-lead">
+          <div ref={filterRef} className="home-sale-filter-lead-panel">{inlineFilters}</div>
+          <div ref={leadProductsRef} className="home-sale-filter-lead-products">
+            {visibleProducts.slice(0, leadSize).map((product, index) => renderProduct({ product, index, copy: 0 }))}
           </div>
-        ))
+        </div>
+      )}
+      {visibleProducts.length ? (
+        (standalone || verticalHome ? visibleProducts.slice(leadSize).map((product, index) => ({ product, index: index + leadSize, copy: 0 }))
+          : (loopProducts.length > 1 ? [0, 1] : [0]).flatMap((copy) => loopProducts.map((product, index) => ({ product, index, copy })))).map(renderProduct)
       ) : (
         <p className="home-empty">
           New offers are on their way.{" "}
@@ -620,9 +659,8 @@ export default function HomeCollections({
 
           {verticalHome && <div className="home-sale-shop-toolbar"><div><p className="text-[10px] font-black uppercase tracking-wider text-[#0F6A5F]">PrimeHubMall</p><h2 className="text-xl font-black">Sale Mela <span className="text-xs text-black/50">— {productCount} products</span></h2></div><button type="button" className="shop-mobile-filter" aria-expanded={inlineFiltersOpen} aria-controls="home-sale-shop-by" onClick={() => setInlineFiltersOpen(value => !value)}><SlidersHorizontal size={15}/> {inlineFiltersOpen ? "Hide filters" : "Shop By"}</button></div>}
           <div className={verticalHome ? "shop-catalog-layout home-sale-shop-layout" : undefined}>
-          {verticalHome && <aside id="home-sale-shop-by" className={`shop-desktop-filters home-sale-inline-filters ${inlineFiltersOpen ? "is-open" : ""}`} aria-label="Sale Mela filters"><ShopFilterPanel {...panelProps}/></aside>}
           <div className={verticalHome ? "shop-results" : undefined}>
-          {visibleBuckets.map((bucket) => {
+          {visibleBuckets.map((bucket, bucketIndex) => {
             const wholesale = isWholesalePriceBucket(bucket);
             // The separate Wholesale Packages collection follows all three retail bands.
             const amount = Number(bucket.amount || 0);
@@ -643,7 +681,7 @@ export default function HomeCollections({
                       : matchesPriceBucket(price, buckets, amount);
                   }),
                 );
-            if (verticalHome && (category !== "all" || maxPrice !== "all" || wholesaleOnly) && baseMatches.length === 0) return null;
+            if (verticalHome && bucketIndex !== 0 && (category !== "all" || maxPrice !== "all" || wholesaleOnly) && baseMatches.length === 0) return null;
             const matches = verticalHome
               // Include all products in each range: Rs. 1–98 were previously
               // dropped by the horizontal-only exact-price ordering helper.
@@ -758,6 +796,7 @@ export default function HomeCollections({
                   href={href}
                   label={`${bucket.title} products`}
                   cropImageEdges={standalone && wholesale}
+                  inlineFilters={verticalHome && bucketIndex === 0 && inlineFiltersOpen ? <aside id="home-sale-shop-by" className="home-sale-inline-filters is-open" aria-label="Sale Mela filters"><ShopFilterPanel {...panelProps}/></aside> : undefined}
                 />
 
                 {standalone && wholesale && kidsPacks.length > 0 ? (
