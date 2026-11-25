@@ -10,22 +10,21 @@ export default function CheckoutPage(){
   if(c.orderId)return <main className="flex min-h-screen items-center justify-center bg-[#F4F4F1] px-4"><div className="w-full max-w-md rounded-[30px] bg-white p-7 text-center shadow-xl"><div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-[#0F6A5F]/10 text-[#0F6A5F]"><CheckCircle2 size={30}/></div><p className="mt-5 text-[9px] font-black uppercase tracking-[0.25em] text-[#0F6A5F]">Order received</p><h1 className="mt-2 text-2xl font-black">Thank you! 🎉</h1><p className="mt-2 text-xs leading-5 text-black/45">Your order has been saved. Our team will contact you to confirm the delivery details.</p><div className="mt-5 rounded-2xl bg-[#F4F4F1] p-4 text-left"><p className="text-[9px] font-black uppercase tracking-wider text-black/35">Order ID</p><p className="mt-1 break-all font-[family-name:var(--font-mono)] text-xs font-black">{c.orderId}</p></div>{c.walletPaidReceipt > 0 && <div className="mt-3 rounded-2xl bg-[#DDF5F0] p-4 text-left text-xs font-black text-[#0F6A5F]"><p>Shopping credit used: Rs. {c.walletPaidReceipt.toLocaleString()}</p><p className="mt-2">Remaining to pay on delivery: Rs. {c.amountDueReceipt.toLocaleString()}</p></div>}{c.reviewProductIds.length>0&&<div className="mt-4 rounded-2xl border border-[#FFB020]/25 bg-[#FFB020]/10 p-4 text-left"><div className="flex items-center gap-2"><Star size={16} className="text-[#FFB020]" fill="currentColor"/><p className="text-xs font-black">Rate your order</p></div><p className="mt-1 text-[10px] font-bold leading-4 text-black/45">Only products from this verified order can be rated.</p><div className="mt-3 flex flex-wrap gap-2">{c.reviewProductIds.map((productId,index)=><Link key={`${productId}-${index}`} href={`/product/${encodeURIComponent(productId)}`} className="rounded-xl bg-white px-3 py-2 text-[10px] font-black shadow-sm">Rate product {c.reviewProductIds.length>1?index+1:''}</Link>)}</div></div>}<Link href="/" className="mt-5 inline-flex w-full items-center justify-center rounded-2xl bg-[#14140F] py-4 text-xs font-black text-white">Continue Shopping</Link></div></main>;
   if(!c.items.length)return <main className="flex min-h-screen items-center justify-center bg-[#F4F4F1] px-4"><div className="w-full max-w-md rounded-[30px] bg-white p-7 text-center shadow-xl"><div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#F4F4F1]"><ShoppingBag size={22} className="text-black/30"/></div><h1 className="mt-4 text-lg font-black">Your cart is empty</h1><p className="mt-1 text-xs text-black/40">Add a deal before heading to checkout.</p><Link href="/shop" className="mt-5 inline-flex rounded-full bg-[#14140F] px-5 py-3 text-[10px] font-black text-white">Browse Deals</Link></div></main>;
   return (
-    <main className="min-h-screen bg-[#F4F4F1] pb-28">
+    <main className="min-h-screen bg-[#F4F4F1] pb-[calc(220px+env(safe-area-inset-bottom))]">
       <div className="mx-auto max-w-2xl px-4 py-5 md:px-6">
         <Link href="/cart" className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-sm" aria-label="Back to cart"><ArrowLeft size={17}/></Link>
-        <form id="checkout-form" onSubmit={c.placeOrder} className="mt-4 rounded-[28px] bg-white p-5 shadow-sm md:p-7">
+        <form id="checkout-form" onSubmit={c.placeOrder} className="mt-4 rounded-[28px] bg-white p-5 shadow-sm md:p-7 [&_input]:scroll-mb-52 [&_textarea]:scroll-mb-52">
           <p className="text-[9px] font-black uppercase tracking-[0.23em] text-[#E1352B]">Secure Checkout</p>
           <h1 className="mt-1 text-2xl font-black">{c.selfCollect ? 'Your Shop Pickup Details' : 'Your Delivery & Payment Details'}</h1>
           <p className="mt-1 text-xs leading-5 text-black/45">Enter your contact and delivery details first. Your delivery choice and bill are saved in My Cart.</p>
 
-          {c.error && <div role="alert" className="mt-4 rounded-2xl bg-[#E1352B]/10 p-3 text-xs font-bold text-[#E1352B]">{c.error}</div>}
           {c.voucherError && <div role="alert" className="mt-3 rounded-2xl bg-rose-50 p-3 text-xs font-bold text-rose-600">{c.voucherError}</div>}
           {c.walletBalanceStatus === 'loading' && <p role="status" className="mt-4 rounded-xl bg-[#DDF5F0] p-3 text-xs text-[#0F6A5F]">Checking available wallet balance…</p>}
           {c.walletBalanceStatus === 'unavailable' && <p role="alert" className="mt-4 rounded-xl bg-amber-50 p-3 text-xs text-amber-700">Wallet is temporarily unavailable. Please refresh before ordering.</p>}
 
           <CustomerForm customer={c.customer} update={c.update} selfCollect={c.selfCollect}/>
 
-          <section aria-label="Complete your order" className="mt-5 rounded-2xl border border-[#D9E3DC] bg-white p-3 shadow-md">
+          <section aria-label="Complete your order" data-checkout-floating-actions className="fixed inset-x-3 bottom-[calc(80px+env(safe-area-inset-bottom))] z-[41] mx-auto max-w-[36rem] rounded-2xl border border-[#D9E3DC] bg-white p-3 shadow-[0_-3px_24px_rgba(0,0,0,0.12)]">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-[10px] font-semibold text-[#0F6A5F]">My Cart · {c.totalItems} {c.totalItems === 1 ? 'item' : 'items'}</p>
@@ -36,6 +35,7 @@ export default function CheckoutPage(){
                 <p className="text-sm font-black">{c.walletCheckoutReady ? `Rs. ${c.amountDue.toLocaleString()}` : 'Checking…'}</p>
               </div>
             </div>
+            {c.error && <p role="alert" className="mt-2 max-h-20 overflow-y-auto rounded-lg bg-rose-50 p-2 text-xs font-semibold text-rose-700">{c.error}</p>}
             <CheckoutActions placing={c.placing} walletCheckoutReady={c.walletCheckoutReady} whatsappOrder={() => {
               const form = document.getElementById('checkout-form') as HTMLFormElement | null;
               if (form?.reportValidity()) void c.whatsappOrder();
