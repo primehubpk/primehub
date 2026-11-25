@@ -1326,3 +1326,49 @@
  .home-sale-shop-layout .home-sale-inline-filters .shop-filter-group{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding:10px 0}
  .home-sale-shop-layout .home-sale-inline-filters .shop-price-options{grid-column:1/-1}
 }
+
+/* Homepage only: the tallest dashboard card must not dictate page height. */
+.home-prime-family-lazy [aria-label="Swipe through Prime Family"] {
+  align-items: start;
+  padding-block: 8px 12px;
+  max-width: 100%;
+}
+.home-prime-family-lazy [aria-label="Swipe through Prime Family"] > section {
+  max-height: 360px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior-y: contain;
+  scrollbar-width: thin;
+}
+.home-prime-family-lazy [aria-label="Swipe through Prime Family"] > .psw-panel {
+  padding: 12px;
+}
+.home-prime-family-lazy [aria-label="Swipe through Prime Family"] .psw-panel .psw {
+  width: min(100%, 190px);
+  margin: 4px auto 0;
+}
+.home-prime-family-lazy [aria-label="Swipe through Prime Family"] .psw-spin {
+  margin-top: 6px;
+  padding-block: 10px;
+}
+.home-prime-family-lazy [aria-label="Swipe through Prime Family"] .psw-panel > p {
+  font-size: 11px;
+}
+/* Only the homepage Sale Mela filter is mobile-only. The Shop page is unchanged. */
+@media (min-width:1024px) {
+  .home-sale-shop-layout.shop-catalog-layout {grid-template-columns:minmax(0,1fr)}
+  .home-sale-shop-layout .home-sale-inline-filters {display:none}
+}
+@media (max-width:1023px) {
+  .home-sale-shop-layout.shop-catalog-layout {display:grid;grid-template-columns:minmax(0,1fr);gap:8px;align-items:start}
+  .home-sale-shop-layout:has(> .home-sale-inline-filters.is-open) {grid-template-columns:clamp(104px,30vw,160px) minmax(0,1fr)}
+  .home-sale-shop-layout .home-sale-inline-filters.is-open {
+    position:sticky;top:8px;max-height:min(65dvh,490px);margin:0;padding:8px;min-width:0;overscroll-behavior-y:contain;
+  }
+  .home-sale-shop-layout .home-sale-inline-filters .shop-filter-group {grid-template-columns:minmax(0,1fr);gap:6px}
+  .home-sale-shop-layout .home-sale-inline-filters .shop-filter-heading {flex-wrap:wrap;gap:4px}
+  .home-sale-shop-layout .home-sale-inline-filters .shop-filter-group > button > span:last-child {white-space:normal;overflow-wrap:anywhere;overflow:visible}
+  .home-sale-shop-layout .home-sale-inline-filters .shop-price-options {display:grid;grid-template-columns:minmax(0,1fr);gap:4px}
+  .home-sale-shop-layout:has(> .home-sale-inline-filters.is-open) .home-sale-products--vertical {grid-template-columns:minmax(0,1fr);padding-inline:2px}
+  .home-sale-shop-layout .shop-results {overflow:hidden;min-width:0}
+}
