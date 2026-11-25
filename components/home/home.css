@@ -1319,3 +1319,10 @@
 .home-sale-shop-layout .shop-results {min-width:0;}
 @media(min-width:1024px){.home-sale-shop-layout{grid-template-columns:220px minmax(0,1fr);gap:16px}.home-sale-home--vertical .home-sale-products--vertical{grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}}
 @media(min-width:1280px){.home-sale-home--vertical .home-sale-products--vertical{grid-template-columns:repeat(4,minmax(0,1fr))}}
+
+/* Homepage-only, inline Shop By; no full-screen modal on initial visit. */
+@media(max-width:1023px){
+ .home-sale-shop-layout .home-sale-inline-filters.is-open{display:block;max-height:260px;overflow:auto;overscroll-behavior:contain;border:1px solid var(--shop-border);border-radius:16px;background:white;padding:12px;margin-bottom:12px;scrollbar-width:thin}
+ .home-sale-shop-layout .home-sale-inline-filters .shop-filter-group{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding:10px 0}
+ .home-sale-shop-layout .home-sale-inline-filters .shop-price-options{grid-column:1/-1}
+}

@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { ArrowRight, ChevronDown, Store, Truck } from 'lucide-react';
 import CartTotals from './CartTotals';
 import PrimeFamilyCartCard, { type CashbackTier } from './PrimeFamilyCartCard';
@@ -70,7 +69,7 @@ export default function CartSummary({ totalItems, quote, loading, quoteError, se
     {quoteError && <div role="alert" className="mt-3 rounded-lg bg-rose-50 p-3 text-xs text-rose-700"><p>{quoteError}</p>
       <button type="button" onClick={retryQuote} disabled={loading} className="mt-2 min-h-9 rounded-lg border border-rose-200 px-3 font-bold">Retry total</button></div>}
 
-    {ready ? <Link href="/checkout" className="mt-4 flex min-h-12 items-center justify-center gap-2 rounded-xl bg-[#0F6A5F] text-sm font-bold text-white">Checkout <ArrowRight size={16}/></Link>
+    {ready ? <a href="/checkout" className="mt-4 flex min-h-12 items-center justify-center gap-2 rounded-xl bg-[#0F6A5F] text-sm font-bold text-white">Checkout <ArrowRight size={16}/></a>
       : <button type="button" disabled className="mt-4 min-h-12 w-full rounded-xl bg-[#0F6A5F]/40 text-xs font-bold text-white">{loading ? 'Updating total…' : 'Check total first'}</button>}
     <p className="mt-2 text-center text-[10px] text-black/45">Address and payment on the next step.</p>
 

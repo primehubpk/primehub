@@ -499,7 +499,8 @@ export default function PrimeFamilyDashboard({
           {(['home', 'rewards', 'tiers', 'tasks', 'vouchers', 'wallet', 'gifts'] as View[]).map(item => <button key={item} type="button" onClick={() => setView(item)} className={`shrink-0 rounded-full px-2.5 py-2 text-[10px] font-bold capitalize shadow-sm ${view === item ? 'bg-[#14140F] text-white' : 'bg-white text-[#6B6A62]'}`}>{item}</button>)}
         </nav>
 
-        <section className={`space-y-4 px-4 pb-28 pt-3.5 sm:px-6 lg:px-8 ${view === 'home' ? 'lg:grid lg:grid-cols-2 lg:items-start lg:gap-5 lg:space-y-0' : 'lg:mx-auto lg:max-w-5xl'}`}>
+        {embedded && view === 'home' && <p className="px-4 pt-3 text-[10px] font-bold text-[#0E7C6F]">Swipe left or right to explore Prime Family →</p>}
+        <section aria-label={embedded && view === 'home' ? 'Swipe through Prime Family' : undefined} className={embedded && view === 'home' ? 'flex min-w-0 snap-x snap-proximity items-start gap-3 overflow-x-auto overscroll-x-contain px-4 pb-5 pt-3.5 [scrollbar-width:thin] [&>*]:w-[min(86vw,420px)] [&>*]:shrink-0 [&>*]:snap-start sm:[&>*]:w-[420px]' : `space-y-4 px-4 pb-28 pt-3.5 sm:px-6 lg:px-8 ${view === 'home' ? 'lg:grid lg:grid-cols-2 lg:items-start lg:gap-5 lg:space-y-0' : 'lg:mx-auto lg:max-w-5xl'}`}>
           {(view === 'home' || view === 'rewards') && <>
           <section className="rounded-[18px] bg-[#FFFDF8] p-4 shadow-[0_8px_24px_rgba(20,20,15,.05)]">
             <div className="flex items-end justify-between gap-3"><div><p className="text-[10px] font-extrabold uppercase tracking-[.14em] text-[#E85D04]">Weekly streak</p><h2 className="mt-1 text-xl font-extrabold">7-Day Check-in</h2><p className="mt-1 text-xs text-[#6B6A62]">Check in every day and unlock higher point rewards.</p></div><span className="rounded-full bg-[#FFF3E0] px-3 py-1.5 text-[10px] font-extrabold">{Math.min(7, Number(rewardWallet.streak || 0))}/7</span></div>
