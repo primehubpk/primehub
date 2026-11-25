@@ -3,7 +3,7 @@
 import RetryableStorefrontImage from '@/components/RetryableStorefrontImage';
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { ChevronRight, Eye, Package, ShoppingCart } from "lucide-react";
+import { ChevronRight, Eye, Package, ShoppingCart, SlidersHorizontal } from "lucide-react";
 import FastProductLink from "@/components/FastProductLink";
 import CardSizePicker from '@/components/shop/CardSizePicker';
 import { hasMismatchedHandSizes } from '@/lib/cardSizeLabels';
@@ -30,6 +30,10 @@ import { useContinuousHomeRail } from '@/lib/useContinuousHomeRail';
 import { useVisitProductOrder } from '@/lib/useVisitProductOrder';
 import { isDedicatedDealProduct } from '@/lib/glassOffers';
 import { orderHomeProducts } from '@/lib/homeRailOrder';
+import { ShopFilterPanel, FilterDrawer } from '@/components/shop/CatalogFilters';
+import { productMatchesCategory } from '@/lib/categoryUtils';
+import type { Category } from '@/components/shop/ShopTypes';
+import '@/components/shop/shop.css';
 import {
   isWholesalePriceBucket,
   matchesPriceBucket,
@@ -533,8 +537,10 @@ export default function HomeCollections({
   standalone = false,
   embeddedHome = false,
   verticalHome = false,
+  categories = [],
 }: {
   products: Product[];
+  categories?: Category[];
   standalone?: boolean;
   embeddedHome?: boolean;
   verticalHome?: boolean;
@@ -543,6 +549,12 @@ export default function HomeCollections({
 }) {
   const { settings } = useSettings();
   const saleSectionRef = useRef<HTMLElement>(null);
+  const [category, setCategory] = useState("all");
+  const [maxPrice, setMaxPrice] = useState("all");
+  const [wholesaleOnly, setWholesaleOnly] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [onlyDeals, setOnlyDeals] = useState(false);
+  const clearAll = () => { setCategory("all"); setMaxPrice("all"); setWholesaleOnly(false); setOnlyDeals(false); };
   const moveHomeSale = (direction: number, anchor?: string) => {
     const frame = anchor ? document.getElementById(anchor) : saleSectionRef.current;
     const rail = frame?.querySelector<HTMLElement>('.home-sale-products');
@@ -553,7 +565,8 @@ export default function HomeCollections({
   // Always reflect the latest published catalog after its first-party refresh.
   // The previous homeSaleCatalog state froze the very first snapshot forever.
   const catalog = products.filter((product) =>
-    product.published !== false && !isDedicatedDealProduct(product, settings.glassDealShowcase),
+    product.published !== false && product.active !== false && !isDedicatedDealProduct(product, settings.glassDealShowcase) &&
+    (!verticalHome || productMatchesCategory(category, product, categories)),
   );
   const saleShuffleSeed = stableSaleMelaSeed(catalog);
   const activeBuckets = sortPriceBuckets(
@@ -584,6 +597,9 @@ export default function HomeCollections({
         ] : []),
       ]
     : activeBuckets;
+  const visibleBuckets = verticalHome ? buckets.filter(bucket => wholesaleOnly ? isWholesalePriceBucket(bucket) : maxPrice !== "all" ? !isWholesalePriceBucket(bucket) && Number(bucket.amount) === Number(maxPrice) : true) : buckets;
+  const productCount = catalog.filter(product => wholesaleOnly ? isWholesaleProduct(product) : maxPrice === "all" || (!isWholesaleProduct(product) && matchesSaleMelaBucket(homePrice(product), Number(maxPrice)))).length;
+  const panelProps = { categories, category, setCategory, maxPrice, setMaxPrice, onlyDeals, setOnlyDeals, wholesaleOnly, setWholesaleOnly, clearAll, productCount };
   const kidsPacks = packs.filter(isKidsWholesaleProduct);
   const regularPacks = packs.filter((product) => !isKidsWholesaleProduct(product));
 
@@ -601,7 +617,11 @@ export default function HomeCollections({
             </HomeHeading>
           ) : null}
 
-          {buckets.map((bucket) => {
+          {verticalHome && <div className="home-sale-shop-toolbar"><div><p className="text-[10px] font-black uppercase tracking-wider text-[#0F6A5F]">PrimeHubMall</p><h2 className="text-xl font-black">Sale Mela <span className="text-xs text-black/50">— {productCount} products</span></h2></div><button type="button" className="shop-mobile-filter" onClick={() => setFiltersOpen(true)}><SlidersHorizontal size={15}/> Shop By</button></div>}
+          <div className={verticalHome ? "shop-catalog-layout home-sale-shop-layout" : undefined}>
+          {verticalHome && <aside className="shop-desktop-filters" aria-label="Sale Mela filters"><ShopFilterPanel {...panelProps}/></aside>}
+          <div className={verticalHome ? "shop-results" : undefined}>
+          {visibleBuckets.map((bucket) => {
             const wholesale = isWholesalePriceBucket(bucket);
             // The separate Wholesale Packages collection follows all three retail bands.
             const amount = Number(bucket.amount || 0);
@@ -622,6 +642,7 @@ export default function HomeCollections({
                       : matchesPriceBucket(price, buckets, amount);
                   }),
                 );
+            if (verticalHome && (category !== "all" || maxPrice !== "all" || wholesaleOnly) && baseMatches.length === 0) return null;
             const matches = verticalHome
               // Include all products in each range: Rs. 1–98 were previously
               // dropped by the horizontal-only exact-price ordering helper.
@@ -790,6 +811,9 @@ export default function HomeCollections({
               </HomeRailFrame>
             );
           })}
+          {verticalHome && productCount === 0 && <p className="rounded-xl bg-white p-5 text-sm">No products match these filters. <button type="button" className="font-bold text-[#0F6A5F]" onClick={clearAll}>Clear all</button></p>}
+          </div></div>
+          {verticalHome && <FilterDrawer {...panelProps} filtersOpen={filtersOpen} setFiltersOpen={setFiltersOpen}/>}
         </section>
       )}
     </>

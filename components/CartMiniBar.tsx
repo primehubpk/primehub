@@ -94,47 +94,47 @@ export default function CartMiniBar() {
       <button
         type="button"
         onClick={openDrawer}
-        className="fixed bottom-[calc(72px+env(safe-area-inset-bottom)+8px)] left-1/2 z-[100] flex w-[calc(100%-20px)] max-w-sm -translate-x-1/2 items-center gap-3 rounded-full border border-white/10 bg-[#151510]/[.98] px-4 py-3 text-left text-white shadow-[0_18px_70px_rgba(0,0,0,.28)] backdrop-blur-xl"
+        className="fixed bottom-[calc(72px+env(safe-area-inset-bottom)+8px)] left-1/2 z-[100] flex w-[calc(100%-20px)] max-w-sm -translate-x-1/2 items-center gap-3 rounded-full border border-black/10 bg-white px-4 py-3 text-left text-[#18231F] shadow-[0_18px_70px_rgba(0,0,0,.28)] backdrop-blur-xl"
         aria-label="Open cart"
       >
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#FFB020] text-[#151510]">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#EAF7F3] text-[#0F6A5F]">
           <ShoppingBag size={16} />
         </span>
         <span className="min-w-0 flex-1">
           <span className="block text-[10px] font-black uppercase tracking-[.14em]">
-            Cart · {totalItems} item{totalItems === 1 ? '' : 's'}
+            My Cart · {totalItems} item{totalItems === 1 ? '' : 's'}
           </span>
           <span className="mt-0.5 block font-[family-name:var(--font-mono)] text-sm font-black">
             {money(subtotal)}
           </span>
         </span>
-        <Maximize2 size={15} className="shrink-0 text-white/55" />
+        <Maximize2 size={15} className="shrink-0 text-black/55" />
       </button>
     );
   }
 
   return (
     <div className="fixed inset-x-0 bottom-[calc(72px+env(safe-area-inset-bottom)+8px)] z-[100] px-2.5 sm:px-4">
-      <div className="mx-auto max-w-5xl overflow-hidden rounded-[24px] border border-white/10 bg-[#151510]/[.99] text-white shadow-[0_18px_70px_rgba(0,0,0,.35)] backdrop-blur-xl">
-        <div className="flex items-center gap-2 border-b border-white/10 px-3 py-2.5 sm:px-4">
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white/10">
+      <div className="mx-auto max-w-5xl overflow-hidden rounded-[24px] border border-black/10 bg-white text-[#18231F] shadow-[0_18px_70px_rgba(0,0,0,.35)] backdrop-blur-xl">
+        <div className="flex items-center gap-2 border-b border-black/10 px-3 py-2.5 sm:px-4">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#EDF6F0]">
             <ShoppingBag size={15} />
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center justify-between gap-2">
-              <p className="text-[10px] font-black uppercase tracking-[.16em] text-[#FFB020]">
-                Cart · {totalItems} item{totalItems === 1 ? '' : 's'}
+              <p className="text-[10px] font-black uppercase tracking-[.16em] text-[#0F6A5F]">
+                My Cart · {totalItems} item{totalItems === 1 ? '' : 's'}
               </p>
               <p className="font-[family-name:var(--font-mono)] text-xs font-black">TOTAL: {money(subtotal)}</p>
             </div>
-            <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/10">
-              <div className="h-full rounded-full bg-[#FFB020] transition-all duration-500" style={{ width: `${progress}%` }} />
+            <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-[#EDF6F0]">
+              <div className="h-full rounded-full bg-[#0F6A5F] transition-all duration-500" style={{ width: `${progress}%` }} />
             </div>
           </div>
-          <button type="button" onClick={minimizeCart} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/8 text-white/65" aria-label="Minimize cart">
+          <button type="button" onClick={minimizeCart} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-black/5 text-black/65" aria-label="Minimize cart">
             <Minus size={14} />
           </button>
-          <button type="button" onClick={closeDrawer} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/8 text-white/65" aria-label="Close floating cart">
+          <button type="button" onClick={closeDrawer} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-black/5 text-black/65" aria-label="Close floating cart">
             <X size={14} />
           </button>
         </div>
@@ -149,50 +149,50 @@ export default function CartMiniBar() {
               const bad = !image || brokenImages[key];
               const title = titleOf(item);
               return (
-                <div key={key} className="flex min-w-0 items-center gap-2.5 rounded-2xl border border-white/8 bg-white/[.07] p-2.5">
-                  <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-white/10 ring-1 ring-white/10">
+                <div key={key} className="flex min-w-0 items-center gap-2.5 rounded-2xl border border-black/8 bg-[#F8FAF8] p-2.5">
+                  <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-[#EDF6F0] ring-1 ring-black/10">
                     {!bad ? (
-                      <img src={image} alt={title} className="h-full w-full object-cover" onError={() => setBrokenImages((current) => ({ ...current, [key]: true }))} />
+                      <img src={image} alt={title} className="h-full w-full object-contain" onError={() => setBrokenImages((current) => ({ ...current, [key]: true }))} />
                     ) : (
-                      <div className="flex h-full w-full flex-col items-center justify-center gap-0.5 text-white/30">
+                      <div className="flex h-full w-full flex-col items-center justify-center gap-0.5 text-black/30">
                         <ImageOff size={17} />
                         <span className="text-[7px] font-bold">No image</span>
                       </div>
                     )}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="line-clamp-2 text-[10px] font-black leading-3.5 text-white">{title}</p>
-                    <p className="mt-1 text-[9px] font-bold text-white/55">{money(unit)} × {qty}</p>
+                    <p className="line-clamp-2 text-[10px] font-black leading-3.5 text-[#18231F]">{title}</p>
+                    <p className="mt-1 text-[9px] font-bold text-black/55">{money(unit)} × {qty}</p>
                     <div className="mt-1.5">
-                      <CartItemControls id={key} qty={qty} title={title} removeItem={removeItem} updateQty={updateQty} dark />
+                      <CartItemControls id={key} qty={qty} title={title} removeItem={removeItem} updateQty={updateQty} />
                     </div>
                   </div>
-                  <span className="truncate text-[9px] font-black text-[#FFB020]">{money(unit * qty)}</span>
+                  <span className="truncate text-[9px] font-black text-[#0F6A5F]">{money(unit * qty)}</span>
                 </div>
               );
             })}
           </div>
         </div>
 
-        <div className="border-t border-white/10 px-3 py-2.5 sm:px-4">
+        <div className="border-t border-black/10 px-3 py-2.5 sm:px-4">
           <div className="mb-2 flex items-center justify-between gap-3">
-            <span className="text-[9px] font-bold text-white/55">{message}</span>
+            <span className="text-[9px] font-bold text-black/55">{message}</span>
             <span className="shrink-0 font-[family-name:var(--font-mono)] text-sm font-black">Subtotal {money(subtotal)}</span>
           </div>
           <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
-            <Link href="/shop" onClick={closeDrawer} className="inline-flex items-center justify-center gap-1 rounded-full border border-white/15 bg-white/8 px-3 py-2 text-[9px] font-black">
+            <Link href="/shop" onClick={closeDrawer} className="inline-flex items-center justify-center gap-1 rounded-full border border-black/15 bg-black/5 px-3 py-2 text-[9px] font-black">
               <Plus size={11} />Add more products
             </Link>
-            <Link href="/" onClick={closeDrawer} className="inline-flex items-center justify-center gap-1 rounded-full border border-white/15 bg-white/8 px-3 py-2 text-[9px] font-black">
+            <Link href="/" onClick={closeDrawer} className="inline-flex items-center justify-center gap-1 rounded-full border border-black/15 bg-black/5 px-3 py-2 text-[9px] font-black">
               <Home size={11} />Home
             </Link>
-            <Link href="/cart" onClick={closeDrawer} className="inline-flex items-center justify-center rounded-full border border-white/15 bg-white/8 px-3 py-2 text-[9px] font-black">
+            <Link href="/cart" onClick={closeDrawer} className="inline-flex items-center justify-center rounded-full border border-black/15 bg-black/5 px-3 py-2 text-[9px] font-black">
               View cart
             </Link>
-            <button type="button" onClick={() => setWhatsAppOpen(true)} className="inline-flex items-center justify-center rounded-full bg-[#0F6A5F] px-3 py-2 text-[9px] font-black">
+            <button type="button" onClick={() => setWhatsAppOpen(true)} className="inline-flex items-center justify-center rounded-full bg-[#0F6A5F] px-3 py-2 text-[9px] font-black text-white">
               WhatsApp Order
             </button>
-            <Link href="/checkout" onClick={closeDrawer} className="col-span-2 inline-flex items-center justify-center rounded-full bg-white px-4 py-2.5 text-[9px] font-black text-[#151510] sm:col-span-1">
+            <Link href="/checkout" onClick={closeDrawer} className="col-span-2 inline-flex items-center justify-center rounded-full bg-[#0F6A5F] px-4 py-2.5 text-[9px] font-black text-white sm:col-span-1">
               Checkout
             </Link>
           </div>

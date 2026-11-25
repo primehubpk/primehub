@@ -32,10 +32,11 @@ export default function FloatingCartShortcut() {
       href="/cart"
       prefetch={false}
       aria-label={`View shopping cart, ${count} item${count === 1 ? '' : 's'}`}
-      title="View cart"
-      className="fixed bottom-[104px] left-3 z-[49] flex h-14 w-14 touch-manipulation items-center justify-center rounded-full border-2 border-white bg-[#14140F] text-white shadow-[0_8px_26px_rgba(20,20,15,0.28)] transition-transform active:scale-95 sm:bottom-6 sm:left-5"
+      title="My Cart"
+      className="fixed bottom-[104px] left-3 z-[49] flex h-14 min-w-14 flex-col gap-0.5 touch-manipulation items-center justify-center rounded-full border border-black/10 bg-white px-2 text-[#0F6A5F] shadow-[0_8px_26px_rgba(20,20,15,0.28)] transition-transform active:scale-95 sm:bottom-6 sm:left-5"
     >
-      <ShoppingCart size={21} aria-hidden="true" />
+      <ShoppingCart size={19} aria-hidden="true" />
+      <span className="whitespace-nowrap text-[9px] font-black leading-none">My Cart</span>
       <span aria-hidden="true" className="absolute -right-1.5 -top-1.5 flex min-h-6 min-w-6 items-center justify-center rounded-full bg-[#E1352B] px-1 text-[10px] font-black leading-none text-white ring-2 ring-white">
         {count > 99 ? '99+' : count}
       </span>

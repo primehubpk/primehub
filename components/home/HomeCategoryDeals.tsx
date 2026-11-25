@@ -9,21 +9,23 @@ import type { Category } from '@/lib/types';
 import { useContinuousHomeRail } from '@/lib/useContinuousHomeRail';
 import { useVisitProductOrder } from '@/lib/useVisitProductOrder';
 import { Commerce3DBanner } from './HomeCommerceRails';
+import { bridalHomepagePreviews } from '@/lib/bridalHomepagePreviews';
 
-function MovingCategoryProductRail({ products, railRef, namespace }: {
+function MovingCategoryProductRail({ products, railRef, namespace, fixedOrder = false }: {
   namespace: string;
+  fixedOrder?: boolean;
   products: Product[];
   railRef: RefObject<HTMLDivElement | null>;
 }) {
   // OWNER LOCK: one full-size horizontal row through the entire category.
-  const { items: allProducts, ready } = useVisitProductOrder(products, namespace, railRef);
+  const { items: allProducts, ready } = useVisitProductOrder(products, namespace, railRef, !fixedOrder);
   // 20+ category sections must not hydrate every card twice on page refresh.
   // Start with one compact tranche and stream the rest as that rail is swiped.
   const [visibleCount, setVisibleCount] = useState(12);
   useEffect(() => setVisibleCount(12), [namespace, products.length]);
   const loopProducts = allProducts.slice(0, visibleCount);
   const allCategoryProductsVisible = visibleCount >= allProducts.length;
-  useContinuousHomeRail(railRef, { itemCount: loopProducts.length, speed: 23, startDelayMs: 8000 });
+  useContinuousHomeRail(railRef, { enabled: !fixedOrder, itemCount: loopProducts.length, speed: 23, startDelayMs: 8000 });
   useEffect(() => {
     const rail = railRef.current;
     if (rail) rail.dataset.clientMounted = 'true';
@@ -63,7 +65,7 @@ function MovingCategoryProductRail({ products, railRef, namespace }: {
       scrollPaddingInlineStart: 0,
     }}
   >
-    {(allCategoryProductsVisible && loopProducts.length > 1 ? [0, 1] : [0]).flatMap(copy =>
+    {(!fixedOrder && allCategoryProductsVisible && loopProducts.length > 1 ? [0, 1] : [0]).flatMap(copy =>
       loopProducts.map((product, index) => (
         <div key={copy + ':' + index + ':' + product.id} className="min-w-0"
           data-loop-original={copy === 0 && index === 0 ? '' : undefined}
@@ -78,6 +80,7 @@ function CategoryRailCard({ category, matches }: { category: Category; matches: 
   const railRef = useRef<HTMLDivElement>(null);
   const href = categoryHref(category) as Parameters<typeof Commerce3DBanner>[0]['href'];
   const iconImage = normalizeImageUrl(category.iconUrl || category.imageUrl || '');
+  const fixedOrder = /^bridal\s+collection$/i.test(category.title.trim());
   const move = (direction: number) => {
     const rail = railRef.current;
     if (!rail) return;
@@ -89,7 +92,7 @@ function CategoryRailCard({ category, matches }: { category: Category; matches: 
     <Commerce3DBanner kind="category" title={category.title} href={href}
       iconImage={iconImage} images={matches.map(product => normalizeImageUrl(imageOf(product)))}
       onMove={move}/>
-    <MovingCategoryProductRail products={matches} railRef={railRef} namespace={`category-${category.id}`}/>
+    <MovingCategoryProductRail products={matches} railRef={railRef} namespace={`category-${category.id}`} fixedOrder={fixedOrder}/>
   </div>;
 }
 
@@ -104,7 +107,7 @@ export default function HomeCategoryDeals({ products, categories }: { products: 
       const matches = products.filter(product =>
         product.published !== false && productMatchesCategory(category.title, product, categories));
       return matches.length
-        ? <CategoryRailCard key={category.id} category={category} matches={matches}/>
+        ? <CategoryRailCard key={category.id} category={category} matches={bridalHomepagePreviews(matches, category.title)}/>
         : null;
     })}
   </section>;
