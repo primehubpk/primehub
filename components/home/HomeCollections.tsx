@@ -553,6 +553,7 @@ export default function HomeCollections({
   const [maxPrice, setMaxPrice] = useState("all");
   const [wholesaleOnly, setWholesaleOnly] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [inlineFiltersOpen, setInlineFiltersOpen] = useState(true);
   const [onlyDeals, setOnlyDeals] = useState(false);
   const clearAll = () => { setCategory("all"); setMaxPrice("all"); setWholesaleOnly(false); setOnlyDeals(false); };
   const moveHomeSale = (direction: number, anchor?: string) => {
@@ -617,9 +618,9 @@ export default function HomeCollections({
             </HomeHeading>
           ) : null}
 
-          {verticalHome && <div className="home-sale-shop-toolbar"><div><p className="text-[10px] font-black uppercase tracking-wider text-[#0F6A5F]">PrimeHubMall</p><h2 className="text-xl font-black">Sale Mela <span className="text-xs text-black/50">— {productCount} products</span></h2></div><button type="button" className="shop-mobile-filter" onClick={() => setFiltersOpen(true)}><SlidersHorizontal size={15}/> Shop By</button></div>}
+          {verticalHome && <div className="home-sale-shop-toolbar"><div><p className="text-[10px] font-black uppercase tracking-wider text-[#0F6A5F]">PrimeHubMall</p><h2 className="text-xl font-black">Sale Mela <span className="text-xs text-black/50">— {productCount} products</span></h2></div><button type="button" className="shop-mobile-filter" aria-expanded={inlineFiltersOpen} aria-controls="home-sale-shop-by" onClick={() => setInlineFiltersOpen(value => !value)}><SlidersHorizontal size={15}/> {inlineFiltersOpen ? "Hide filters" : "Shop By"}</button></div>}
           <div className={verticalHome ? "shop-catalog-layout home-sale-shop-layout" : undefined}>
-          {verticalHome && <aside className="shop-desktop-filters" aria-label="Sale Mela filters"><ShopFilterPanel {...panelProps}/></aside>}
+          {verticalHome && <aside id="home-sale-shop-by" className={`shop-desktop-filters home-sale-inline-filters ${inlineFiltersOpen ? "is-open" : ""}`} aria-label="Sale Mela filters"><ShopFilterPanel {...panelProps}/></aside>}
           <div className={verticalHome ? "shop-results" : undefined}>
           {visibleBuckets.map((bucket) => {
             const wholesale = isWholesalePriceBucket(bucket);

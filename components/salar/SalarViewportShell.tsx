@@ -34,6 +34,89 @@ export default function SalarViewportShell({ initialIconUrl = '' }: { initialIco
   const [visualBox, setVisualBox] = useState<VisualBox>({ height: 800, top: 0 });
   const [enhancersReady, setEnhancersReady] = useState(false);
 
+  // Drag only the collapsed launcher, not the chat or its controls. Persist a
+  // viewport-relative position and clamp it on resize/orientation changes.
+  useEffect(() => {
+    const shell = document.getElementById('salar-viewport-shell');
+    if (!shell) return;
+    let position: { x: number; y: number } | null = null;
+    try {
+      const saved = JSON.parse(localStorage.getItem('ph-salar-launcher-position') || 'null');
+      if (saved && Number.isFinite(saved.x) && Number.isFinite(saved.y)) position = saved;
+    } catch {}
+    let drag: { id: number; button: HTMLButtonElement; x: number; y: number; left: number; top: number; moved: boolean } | null = null;
+    let suppressUntil = 0;
+    const clamp = (v: number, min: number, max: number) => Math.min(Math.max(min, v), Math.max(min, max));
+    const launcher = () => shell.querySelector<HTMLButtonElement>('button[data-salar-draggable]') ||
+      Array.from(shell.querySelectorAll<HTMLButtonElement>('button')).find(button =>
+        button.textContent?.trim() === 'Salar' && !shell.querySelector('button[aria-label="Close Salar"]'));
+    const apply = () => {
+      const button = launcher();
+      if (!button) return;
+      button.dataset.salarDraggable = 'true';
+      const wrapper = button.parentElement?.parentElement;
+      if (!wrapper) return;
+      if (!position) {
+        wrapper.classList.toggle('salar-checkout-default', location.pathname === '/checkout');
+        return;
+      }
+      const width = wrapper.offsetWidth || 64, height = wrapper.offsetHeight || 90;
+      const x = clamp(position.x * window.innerWidth, 8, window.innerWidth - width - 8);
+      const y = clamp(position.y * window.innerHeight, 8, window.innerHeight - height - 80);
+      wrapper.style.setProperty('--salar-drag-x', x + 'px');
+      wrapper.style.setProperty('--salar-drag-y', y + 'px');
+      wrapper.classList.add('salar-user-position');
+    };
+    const down = (e: PointerEvent) => {
+      const button = launcher();
+      if (!button || !(e.target instanceof Node) || !button.contains(e.target) || e.button !== 0) return;
+      const wrapper = button.parentElement?.parentElement;
+      if (!wrapper) return;
+      const rect = wrapper.getBoundingClientRect();
+      drag = { id: e.pointerId, button, x: e.clientX, y: e.clientY, left: rect.left, top: rect.top, moved: false };
+      button.setPointerCapture(e.pointerId);
+    };
+    const move = (e: PointerEvent) => {
+      if (!drag || e.pointerId !== drag.id) return;
+      const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+      if (!drag.moved && Math.hypot(dx, dy) < 7) return;
+      drag.moved = true;
+      position = { x: (drag.left + dx) / window.innerWidth, y: (drag.top + dy) / window.innerHeight };
+      apply();
+    };
+    const end = (e: PointerEvent) => {
+      if (!drag || e.pointerId !== drag.id) return;
+      if (drag.moved) {
+        suppressUntil = Date.now() + 500;
+        try { localStorage.setItem('ph-salar-launcher-position', JSON.stringify(position)); } catch {}
+      }
+      drag = null;
+    };
+    const click = (e: MouseEvent) => {
+      if (e.detail !== 0 && Date.now() < suppressUntil && (e.target as Element)?.closest?.('button[data-salar-draggable]')) {
+        e.preventDefault(); e.stopImmediatePropagation();
+      }
+    };
+    const observer = new MutationObserver(apply);
+    observer.observe(shell, { childList: true, subtree: true });
+    shell.addEventListener('pointerdown', down);
+    shell.addEventListener('pointermove', move);
+    shell.addEventListener('pointerup', end);
+    shell.addEventListener('pointercancel', end);
+    shell.addEventListener('click', click, true);
+    window.addEventListener('resize', apply);
+    apply();
+    return () => {
+      observer.disconnect();
+      shell.removeEventListener('pointerdown', down);
+      shell.removeEventListener('pointermove', move);
+      shell.removeEventListener('pointerup', end);
+      shell.removeEventListener('pointercancel', end);
+      shell.removeEventListener('click', click, true);
+      window.removeEventListener('resize', apply);
+    };
+  }, []);
+
   useEffect(() => {
     const update = () => setVisualBox(currentVisualBox());
     update();
@@ -138,6 +221,12 @@ export default function SalarViewportShell({ initialIconUrl = '' }: { initialIco
           border-radius: 0 !important;
         }
 
+        #salar-viewport-shell button[data-salar-draggable] { touch-action: none; cursor: grab; user-select: none; -webkit-user-drag: none; }
+        #salar-viewport-shell button[data-salar-draggable]:active { cursor: grabbing; }
+        #salar-viewport-shell > .salar-user-position:not(:has(button[aria-label="Close Salar"])) {
+          left: var(--salar-drag-x) !important; top: var(--salar-drag-y) !important; right: auto !important; bottom: auto !important;
+        }
+        #salar-viewport-shell > .salar-checkout-default:not(.salar-user-position):not(:has(button[aria-label="Close Salar"])) { bottom: calc(225px + env(safe-area-inset-bottom)) !important; }
         /* Collapsed Salar stays a simple profile-style floating avatar. */
         #salar-viewport-shell > div:not(:has(button[aria-label="Close Salar"])) > div {
           gap: 0 !important;

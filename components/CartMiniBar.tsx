@@ -192,9 +192,9 @@ export default function CartMiniBar() {
             <button type="button" onClick={() => setWhatsAppOpen(true)} className="inline-flex items-center justify-center rounded-full bg-[#0F6A5F] px-3 py-2 text-[9px] font-black text-white">
               WhatsApp Order
             </button>
-            <Link href="/checkout" onClick={closeDrawer} className="col-span-2 inline-flex items-center justify-center rounded-full bg-[#0F6A5F] px-4 py-2.5 text-[9px] font-black text-white sm:col-span-1">
+            <a href="/checkout" onClick={closeDrawer} className="col-span-2 inline-flex items-center justify-center rounded-full bg-[#0F6A5F] px-4 py-2.5 text-[9px] font-black text-white sm:col-span-1">
               Checkout
-            </Link>
+            </a>
           </div>
         </div>
       </div>

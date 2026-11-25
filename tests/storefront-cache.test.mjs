@@ -93,10 +93,10 @@ test('PWA always retrieves fresh online HTML and deletes previous deployment pag
       addEventListener: (name, callback) => events.set(name, callback),
       skipWaiting: async () => {},
       clients: { claim: async () => {} },
-      registration: { navigationPreload: { enable: async () => {} } },
+      registration: { navigationPreload: { disable: async () => {} } },
     },
     caches: {
-      keys: async () => ['primehub-pwa-v7-pages', 'primehub-pwa-v7-static', 'primehub-pwa-v8-shell'],
+      keys: async () => ['primehub-pwa-v7-pages', 'primehub-pwa-v7-static', 'primehub-pwa-v8-shell', 'primehub-pwa-v9-shell'],
       delete: async (name) => { deletedCaches.push(name); return true; },
       match: async (request) => {
         cacheMatchCalled = true;
@@ -114,7 +114,7 @@ test('PWA always retrieves fresh online HTML and deletes previous deployment pag
   const activation = { waitUntil(promise) { this.completion = promise; } };
   events.get('activate')(activation);
   await activation.completion;
-  assert.deepEqual(deletedCaches.sort(), ['primehub-pwa-v7-pages', 'primehub-pwa-v7-static']);
+  assert.deepEqual(deletedCaches.sort(), ['primehub-pwa-v7-pages', 'primehub-pwa-v7-static', 'primehub-pwa-v8-shell']);
 
   const navigation = {
     request: {
@@ -124,7 +124,7 @@ test('PWA always retrieves fresh online HTML and deletes previous deployment pag
       destination: 'document',
       headers: { get: () => null },
     },
-    preloadResponse: Promise.resolve(undefined),
+    preloadResponse: Promise.resolve(new Response('STALE PRELOAD')),
     respondWith(promise) { this.result = promise; },
   };
   events.get('fetch')(navigation);

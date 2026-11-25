@@ -64,7 +64,7 @@ export default function CartPage() {
           <div aria-live="polite"><p className="text-[10px] font-semibold text-black/50">Total to pay</p>
             <p className="text-lg font-black">{selection.loading ? 'Updating…' : selection.quote && !selection.quoteError ? `Rs. ${Number(selection.quote.total || 0).toLocaleString('en-PK')}` : 'Unavailable'}</p></div>
           {selection.quote && !selection.loading && !selection.quoteError
-            ? <Link href="/checkout" className="flex min-h-11 min-w-[148px] items-center justify-center rounded-xl bg-[#0F6A5F] px-5 text-sm font-bold text-white">Checkout →</Link>
+            ? <a href="/checkout" className="flex min-h-11 min-w-[148px] items-center justify-center rounded-xl bg-[#0F6A5F] px-5 text-sm font-bold text-white">Checkout →</a>
             : <button disabled className="min-h-11 min-w-[148px] rounded-xl bg-[#0F6A5F]/40 px-4 text-xs font-bold text-white">{selection.loading ? 'Updating total…' : 'Check total first'}</button>}
         </div>
       </div>

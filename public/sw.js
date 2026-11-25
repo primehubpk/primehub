@@ -1,7 +1,7 @@
 // PrimeHubMall PWA service worker.
 // Cache only static/app-shell assets. All navigations are network-first.
 // Never persist HTML, catalogs, prices, cart, checkout or account data.
-const VERSION = 'primehub-pwa-v8';
+const VERSION = 'primehub-pwa-v9';
 const SHELL_CACHE = `${VERSION}-shell`;
 const STATIC_CACHE = `${VERSION}-static`;
 const IMAGE_CACHE = `${VERSION}-images`;
@@ -63,8 +63,7 @@ async function imageCacheFirst(request) {
 
 async function networkNavigation(event) {
   try {
-    const preloaded = await event.preloadResponse;
-    if (preloaded) return preloaded;
+    // Always retrieve fresh navigation HTML instead of a stale preload.
     // Bypass HTTP cached HTML; products and prices must reflect the live release.
   return await fetch(event.request, { cache: 'no-store' });
   } catch {
@@ -91,7 +90,7 @@ self.addEventListener('activate', (event) => {
         .map((name) => caches.delete(name)),
     );
     if (self.registration.navigationPreload) {
-      try { await self.registration.navigationPreload.enable(); } catch {}
+      try { await self.registration.navigationPreload.disable(); } catch {}
     }
     await self.clients.claim();
   })());
