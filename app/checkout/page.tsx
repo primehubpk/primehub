@@ -23,10 +23,12 @@ export default function CheckoutPage(){
           {c.walletBalanceStatus === 'loading' && <p role="status" className="mt-4 rounded-xl bg-[#DDF5F0] p-3 text-xs text-[#0F6A5F]">Checking available wallet balance…</p>}
           {c.walletBalanceStatus === 'unavailable' && <p role="alert" className="mt-4 rounded-xl bg-amber-50 p-3 text-xs text-amber-700">Wallet is temporarily unavailable. Please refresh before ordering.</p>}
 
-          <section aria-label="Quick order actions" className="sticky top-2 z-20 mt-4 rounded-2xl border border-[#D9E3DC] bg-white p-3 shadow-md">
+          <CustomerForm customer={c.customer} update={c.update} selfCollect={c.selfCollect}/>
+
+          <section aria-label="Complete your order" className="mt-5 rounded-2xl border border-[#D9E3DC] bg-white p-3 shadow-md">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <p className="text-[10px] font-semibold text-[#0F6A5F]">My Cart · {c.totalItems} items</p>
+                <p className="text-[10px] font-semibold text-[#0F6A5F]">My Cart · {c.totalItems} {c.totalItems === 1 ? 'item' : 'items'}</p>
                 <p className="line-clamp-2 text-xs font-bold">{titleOf(c.items[0])}{c.items.length > 1 ? ` + ${c.items.length - 1} more` : ''}</p>
               </div>
               <div className="shrink-0 text-right" aria-live="polite">
@@ -39,7 +41,6 @@ export default function CheckoutPage(){
               if (form?.reportValidity()) void c.whatsappOrder();
             }}/>
           </section>
-          <CustomerForm customer={c.customer} update={c.update} selfCollect={c.selfCollect}/>
           <details className="mt-5 rounded-2xl border border-black/10 bg-white p-3">
             <summary className="cursor-pointer text-xs font-bold">Review items &amp; prices · {c.totalItems} items</summary>
             <div className="mt-2 space-y-2">{c.items.map((item: { id?: string; qty?: number; quantity?: number; title?: string; name?: string; price?: number }, index: number) => <div key={String(item.id || index)} className="flex justify-between gap-3 border-t border-black/5 pt-2 text-xs"><span className="min-w-0">{titleOf(item)} × {Number(item.quantity || item.qty || 1)}</span><strong className="shrink-0">Rs. {(priceOf(item) * Number(item.quantity || item.qty || 1)).toLocaleString()}</strong></div>)}</div>
