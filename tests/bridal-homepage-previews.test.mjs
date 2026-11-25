@@ -52,3 +52,22 @@ test('category component uses a stable two-colour row only for Bridal Collection
   assert.match(page,/enabled: !fixedOrder/);
   assert.match(page,/!fixedOrder && allCategoryProductsVisible/);
 });
+
+test('separate mehroon preview uses original photo, owner-confirmed 30 stock and distinct ID', async () => {
+  const compiledSplit = ts.transpileModule(fs.readFileSync(path.join(root,'lib/bridalSplitPreview.ts'),'utf8'), {
+    compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
+  }).outputText;
+  const { previewBridalCatalog, BRIDAL_SOURCE_ID, BRIDAL_DRAFT_ID } = await import('data:text/javascript;charset=utf-8,'+encodeURIComponent(compiledSplit));
+  const original = {id: BRIDAL_SOURCE_ID, title: 'Red Bridal', price:900, stock:30, images:[newRedUrl,newMehroonUrl]};
+  assert.deepEqual(previewBridalCatalog([original],false),[original]);
+  const [red, mehroon] = previewBridalCatalog([original],true);
+  assert.equal(red.id,BRIDAL_SOURCE_ID);
+  assert.deepEqual(red.images,[newRedUrl]);
+  assert.equal(mehroon.id,BRIDAL_DRAFT_ID);
+  assert.deepEqual(mehroon.images,[newMehroonUrl]);
+  assert.equal(mehroon.price,900);
+  assert.equal(mehroon.stock,30);
+  assert.equal(mehroon.quantity,30);
+  assert.equal(original.images.length,2);
+  assert.equal(previewBridalCatalog([red,mehroon],true).length,2);
+});

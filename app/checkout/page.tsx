@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { ArrowLeft, CheckCircle2, ShoppingBag, Star } from 'lucide-react';
-import { useCheckout } from '@/components/checkout/useCheckout';
+import { titleOf, priceOf, useCheckout } from '@/components/checkout/useCheckout';
 import CustomerForm from '@/components/checkout/CustomerForm';
 import CheckoutActions from '@/components/checkout/CheckoutActions';
 
@@ -13,16 +13,37 @@ export default function CheckoutPage(){
     <main className="min-h-screen bg-[#F4F4F1] pb-28">
       <div className="mx-auto max-w-2xl px-4 py-5 md:px-6">
         <Link href="/cart" className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-sm" aria-label="Back to cart"><ArrowLeft size={17}/></Link>
-        <form onSubmit={c.placeOrder} className="mt-4 rounded-[28px] bg-white p-5 shadow-sm md:p-7">
+        <form id="checkout-form" onSubmit={c.placeOrder} className="mt-4 rounded-[28px] bg-white p-5 shadow-sm md:p-7">
           <p className="text-[9px] font-black uppercase tracking-[0.23em] text-[#E1352B]">Secure Checkout</p>
           <h1 className="mt-1 text-2xl font-black">{c.selfCollect ? 'Your Shop Pickup Details' : 'Your Delivery & Payment Details'}</h1>
-          <p className="mt-1 text-xs leading-5 text-black/45">Your delivery choice, promo code and bill were already set in Cart. Complete your contact details to place the order.</p>
+          <p className="mt-1 text-xs leading-5 text-black/45">Enter your contact and delivery details first. Your delivery choice and bill are saved in My Cart.</p>
 
           {c.error && <div role="alert" className="mt-4 rounded-2xl bg-[#E1352B]/10 p-3 text-xs font-bold text-[#E1352B]">{c.error}</div>}
           {c.voucherError && <div role="alert" className="mt-3 rounded-2xl bg-rose-50 p-3 text-xs font-bold text-rose-600">{c.voucherError}</div>}
           {c.walletBalanceStatus === 'loading' && <p role="status" className="mt-4 rounded-xl bg-[#DDF5F0] p-3 text-xs text-[#0F6A5F]">Checking available wallet balance…</p>}
           {c.walletBalanceStatus === 'unavailable' && <p role="alert" className="mt-4 rounded-xl bg-amber-50 p-3 text-xs text-amber-700">Wallet is temporarily unavailable. Please refresh before ordering.</p>}
 
+          <section aria-label="Quick order actions" className="sticky top-2 z-20 mt-4 rounded-2xl border border-[#D9E3DC] bg-white p-3 shadow-md">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-[10px] font-semibold text-[#0F6A5F]">My Cart · {c.totalItems} items</p>
+                <p className="line-clamp-2 text-xs font-bold">{titleOf(c.items[0])}{c.items.length > 1 ? ` + ${c.items.length - 1} more` : ''}</p>
+              </div>
+              <div className="shrink-0 text-right" aria-live="polite">
+                <p className="text-[10px] text-black/55">Amount to pay</p>
+                <p className="text-sm font-black">{c.walletCheckoutReady ? `Rs. ${c.amountDue.toLocaleString()}` : 'Checking…'}</p>
+              </div>
+            </div>
+            <CheckoutActions placing={c.placing} walletCheckoutReady={c.walletCheckoutReady} whatsappOrder={() => {
+              const form = document.getElementById('checkout-form') as HTMLFormElement | null;
+              if (form?.reportValidity()) void c.whatsappOrder();
+            }}/>
+          </section>
+          <CustomerForm customer={c.customer} update={c.update} selfCollect={c.selfCollect}/>
+          <details className="mt-5 rounded-2xl border border-black/10 bg-white p-3">
+            <summary className="cursor-pointer text-xs font-bold">Review items &amp; prices · {c.totalItems} items</summary>
+            <div className="mt-2 space-y-2">{c.items.map((item: { id?: string; qty?: number; quantity?: number; title?: string; name?: string; price?: number }, index: number) => <div key={String(item.id || index)} className="flex justify-between gap-3 border-t border-black/5 pt-2 text-xs"><span className="min-w-0">{titleOf(item)} × {Number(item.quantity || item.qty || 1)}</span><strong className="shrink-0">Rs. {(priceOf(item) * Number(item.quantity || item.qty || 1)).toLocaleString()}</strong></div>)}</div>
+          </details>
           <div className="mt-5 rounded-[22px] border border-[#0F6A5F]/20 bg-[#EAF7F3] p-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h2 className="text-sm font-black text-[#0F6A5F]">Payment Overview</h2>
@@ -59,8 +80,7 @@ export default function CheckoutPage(){
             )}
           </div>
           <p className="mt-4 rounded-xl bg-[#F4F4F1] p-3 text-[11px] leading-5 text-black/60">Wallet cash, voucher discounts and cashback apply only to regular products. Mega Deals / 70% off and Buy 1 Get 1 Free are excluded, including in mixed carts.</p>
-          <CustomerForm customer={c.customer} update={c.update} selfCollect={c.selfCollect}/>
-          <CheckoutActions placing={c.placing} walletCheckoutReady={c.walletCheckoutReady} whatsappOrder={c.whatsappOrder}/>
+
         </form>
       </div>
     </main>

@@ -1,4 +1,7 @@
 import 'server-only';
+import { BRIDAL_SOURCE_ID, BRIDAL_DRAFT_ID, previewBridalCatalog, splitBridalPreview } from '@/lib/bridalSplitPreview';
+const bridalSplitEnabled = process.env.VERCEL_ENV === 'preview';
+const bridalSplitCacheKey = bridalSplitEnabled ? 'bridal-split-review-v1' : 'bridal-canonical';
 import { applyMegaImageRestorationPreview, megaImagePreviewCacheKey } from '@/lib/megaImageRestorationPreview';
 import { unstable_cache } from 'next/cache';
 import { STOREFRONT_REVALIDATE_SECONDS, publicProductCacheTag } from '@/lib/storefrontCachePolicy';
@@ -73,7 +76,7 @@ async function withCardSizeLabels(products: any[]) {
       .map(ids => getDualProductSizeSummaries(ids, CATALOG_READ_CACHE)));
     for (const batch of batches) Object.assign(summaries, batch);
   }
-  return products.map(product => {
+  return previewBridalCatalog(products.map(product => {
     const hasVariants = product.hasVariants === true ||
       (Array.isArray(product.variantMatrix) && product.variantMatrix.length > 0) ||
       (Array.isArray(product.variants) && product.variants.length > 0);
@@ -81,7 +84,7 @@ async function withCardSizeLabels(products: any[]) {
       ? summaries[String(product.id)] ?? getMegaDealAvailableSizes(product)
       : [];
     return applyMegaImageRestorationPreview(hasVariants ? { ...product, availableSizes } : product);
-  });
+  }), bridalSplitEnabled);
 }
 
 async function loadPublicCatalog() {
@@ -106,7 +109,7 @@ async function loadPublicCatalog() {
 
 export const getPublicCatalogSnapshot = unstable_cache(
   loadPublicCatalog,
-  ['primehub-public-catalog-dual-v15-verified-kids-size-cleanup', megaImagePreviewCacheKey],
+  ['primehub-public-catalog-dual-v15-verified-kids-size-cleanup', megaImagePreviewCacheKey, bridalSplitCacheKey],
   { revalidate: STOREFRONT_REVALIDATE_SECONDS, tags: ['public-catalog', 'storefront-settings'] },
 );
 
@@ -169,10 +172,21 @@ export async function getFreshPublicCatalogSnapshot() {
   return { ...result, products: await withCardSizeLabels(result.products.map(product => applyBogoAvailability(applyBogoOfferPrice(applyCollectionPrice(product, settings.glassDealShowcase)), (settings as any).bogoDealShowcase))) };
 }
 
+// Only the public review snapshot can resolve the new draft ID; order validation
+// keeps using the authoritative dual-read product, which has no such live SKU.
+async function readBridalReviewProduct(id: string, options: typeof PRODUCT_READ_CACHE) {
+  const result = await getDualProduct(id, options);
+  if (!bridalSplitEnabled || (id !== BRIDAL_SOURCE_ID && id !== BRIDAL_DRAFT_ID)) return result;
+  if (id === BRIDAL_DRAFT_ID && result.product) return result;
+  const source = id === BRIDAL_SOURCE_ID ? result : await getDualProduct(BRIDAL_SOURCE_ID, options);
+  if (!source.product) return result;
+  const product = splitBridalPreview(source.product).find(item => item.id === id);
+  return product ? { ...source, product } : result;
+}
 async function loadPublicProduct(productId: string) {
   const id = String(productId || '').trim();
   if (!id) return { product: null, source: 'empty' as const };
-  const [result, settings] = await Promise.all([getDualProduct(id, PRODUCT_READ_CACHE), getStorefrontSettingsSnapshot()]);
+  const [result, settings] = await Promise.all([readBridalReviewProduct(id, PRODUCT_READ_CACHE), getStorefrontSettingsSnapshot()]);
   // An upstream outage must not replace a last-good cached product with null.
   if (result.source === 'empty') throw new Error('Public product unavailable.');
   return { ...result, product: result.product ? applyMegaImageRestorationPreview(applyBogoAvailability(applyBogoOfferPrice(applyCollectionPrice(result.product, settings.glassDealShowcase)), (settings as any).bogoDealShowcase)) : null };
@@ -183,7 +197,7 @@ export async function getPublicProductSnapshot(productId: string) {
   if (!id) return { product: null, source: 'empty' as const };
   return unstable_cache(
     () => loadPublicProduct(id),
-    ['primehub-public-product-dual-v7-mega-originals-preview', megaImagePreviewCacheKey, id],
+    ['primehub-public-product-dual-v7-mega-originals-preview', megaImagePreviewCacheKey, bridalSplitCacheKey, id],
     {
       revalidate: STOREFRONT_REVALIDATE_SECONDS,
       // Keep the roll-up tag for the explicitly requested full catalog refresh.
@@ -196,7 +210,7 @@ export async function getFreshPublicProductSnapshot(productId: string) {
   const id = String(productId || '').trim();
   if (!id) return { product: null, source: 'empty' as const };
   const [result, settings] = await Promise.all([
-    getDualProduct(id, { cache: 'no-store', timeoutMs: PUBLIC_PRIMARY_TIMEOUT_MS }), getStorefrontSettingsSnapshot(),
+    readBridalReviewProduct(id, PRODUCT_READ_CACHE), getStorefrontSettingsSnapshot(),
   ]);
   return { ...result, product: result.product ? applyMegaImageRestorationPreview(applyBogoAvailability(applyBogoOfferPrice(applyCollectionPrice(result.product, settings.glassDealShowcase)), (settings as any).bogoDealShowcase)) : null };
 }

@@ -1310,3 +1310,12 @@
   outline:3px solid #d9a643;
   outline-offset:3px;
 }
+
+/* Home Sale Mela: reuse Shop By controls and keep the existing price bands. */
+.home-sale-home--vertical {--shop-green:#005448;--shop-border:#e4ddd2;}
+.home-sale-shop-toolbar {display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;}
+.home-sale-home--vertical .home-sale-products--vertical {grid-template-columns:repeat(2,minmax(0,1fr));max-width:none;align-items:start;}
+.home-sale-home--vertical .home-sale-progress {grid-column:1/-1;}
+.home-sale-shop-layout .shop-results {min-width:0;}
+@media(min-width:1024px){.home-sale-shop-layout{grid-template-columns:220px minmax(0,1fr);gap:16px}.home-sale-home--vertical .home-sale-products--vertical{grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}}
+@media(min-width:1280px){.home-sale-home--vertical .home-sale-products--vertical{grid-template-columns:repeat(4,minmax(0,1fr))}}

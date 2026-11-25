@@ -343,6 +343,7 @@ export default function HomePageClient({
           </div>
           <HomeCollections
             products={regularProducts}
+            categories={categories}
             verticalHome
             onSelect={selectPrice}
             onWholesaleSelect={selectWholesale}

@@ -11,6 +11,8 @@ export function bridalHomepagePreviews(products: Product[], categoryTitle: strin
 
   const red = products.find(product => product.id === BRIDAL_RED_PRODUCT_ID);
   const mehroon = products.find(product => product.id === BRIDAL_MEHROON_PRODUCT_ID);
+  const separate = products.find(product => product.id === 'ph-new-20261124-bridal-kalire-mehroon');
+  if (red && mehroon && separate) return [red, separate, mehroon, ...products.filter(product => ![red.id, separate.id, mehroon.id].includes(product.id))];
   const alternatePhoto = mehroon && Array.isArray(mehroon.images)
     ? mehroon.images[1] : undefined;
   if (!red || !mehroon || typeof alternatePhoto !== 'string' || !alternatePhoto.trim()) {
